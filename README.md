@@ -1,0 +1,2 @@
+# StudyAI
+Studying with AI
