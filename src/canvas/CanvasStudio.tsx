@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import { API } from "../api";
+import { ScientificLayer, type ScienceMode } from "./ScientificLayer";
+import { arrowGeometry, synchronizeObject, withArrowEndpoints } from "./geometry";
 import { applyCanvasProposal, canvasEditSchema, proposeCanvasEdit, type CanvasProposal } from "./tutor";
 import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
@@ -19,7 +21,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const editorListeners = useRef<Array<() => void>>([]);
   const boardRef = useRef<Board | null>(null);
   const documentRef = useRef<CanvasDocument>(emptyCanvasDocument());
-  const objectHistory = useRef<{ undo: ScientificObject[][]; redo: ScientificObject[][] }>({ undo: [], redo: [] });
+  const objectHistory = useRef<{ undo: CanvasDocument[]; redo: CanvasDocument[] }>({ undo: [], redo: [] });
+  const nativeGesture = useRef<CanvasDocument | null>(null);
   const latestChange = useRef<"drawing" | "objects">("drawing");
   const loadSequence = useRef(0);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -39,6 +42,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false });
   const [boardMenu, setBoardMenu] = useState(false);
   const [proposal, setProposal] = useState<CanvasProposal>();
+  const [scienceMode, setScienceMode] = useState<ScienceMode>(null);
+  const [nativeTool, setNativeTool] = useState("select");
+  const [spaceHeld, setSpaceHeld] = useState(false);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects, freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
@@ -61,7 +67,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   const refreshHistory = useCallback(() => {
     const editor = editorRef.current;
-    setUndoState({ canUndo: Boolean(editor?.store.canUndo || objectHistory.current.undo.length), canRedo: Boolean(editor?.store.canRedo || objectHistory.current.redo.length) });
+    setUndoState({ canUndo: Boolean(objectHistory.current.undo.length), canRedo: Boolean(objectHistory.current.redo.length) });
   }, []);
   const cleanupEditor = useCallback(() => {
     editorListeners.current.forEach((unsubscribe) => unsubscribe());
@@ -108,6 +114,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     boardRef.current = board;
     setSelectedId(undefined);
     setEditingId(undefined);
+    setScienceMode(null);
     objectHistory.current = { undo: [], redo: [] };
     latestChange.current = "drawing";
     setUndoState({ canUndo: false, canRedo: false });
@@ -201,7 +208,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     editorRef.current = editor;
     const unlistenHistory = editor.store.listenHistory(refreshHistory);
     const unlistenCamera = editor.on("camera", () => setEditorFrame((frame) => frame + 1));
-    editorListeners.current.push(unlistenHistory, unlistenCamera);
+    const unlistenTool = editor.on("tool", () => { setNativeTool(editor.tool); setScienceMode(null); });
+    const unlistenSelection = editor.on("selection", () => { if (editor.selection.size) setSelectedId(undefined); });
+    editorListeners.current.push(unlistenHistory, unlistenCamera, unlistenTool, unlistenSelection);
     setEditorFrame((frame) => frame + 1);
     refreshHistory();
   }, [refreshHistory]);
@@ -215,7 +224,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   const replaceObjects = useCallback((objects: ScientificObject[], trackHistory = true) => {
     if (trackHistory) {
-      objectHistory.current.undo.push(documentRef.current.objects);
+      objectHistory.current.undo.push(structuredClone(currentDocument()));
       objectHistory.current.redo = [];
     }
     latestChange.current = "objects";
@@ -225,37 +234,35 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   const updateObject = useCallback((id: string, update: Partial<ScientificObject>, trackHistory = true) => {
     const next = documentRef.current.objects.map((object) => object.id === id ? { ...object, ...update } as ScientificObject : object);
-    replaceObjects(next, trackHistory);
+    replaceObjects(next.map((object) => synchronizeObject(documentRef.current.objects.find((old) => old.id === object.id) ?? object, object)), trackHistory);
   }, [replaceObjects]);
 
-  const undoObjectChange = useCallback(() => {
-    const previous = objectHistory.current.undo.pop();
-    if (!previous) return false;
-    objectHistory.current.redo.push(documentRef.current.objects);
-    latestChange.current = "objects";
-    scheduleSave(boardRef.current, { ...currentDocument(), objects: previous });
-    refreshHistory();
-    return true;
-  }, [currentDocument, refreshHistory, scheduleSave]);
-  const redoObjectChange = useCallback(() => {
-    const next = objectHistory.current.redo.pop();
-    if (!next) return false;
-    objectHistory.current.undo.push(documentRef.current.objects);
-    latestChange.current = "objects";
-    scheduleSave(boardRef.current, { ...currentDocument(), objects: next });
-    refreshHistory();
-    return true;
-  }, [currentDocument, refreshHistory, scheduleSave]);
+  const restoreDocument = useCallback((next: CanvasDocument) => {
+    editorRef.current?.store.loadSnapshot(next.snapshot, "remote");
+    scheduleSave(boardRef.current, next);
+    setSelectedId(undefined); setEditingId(undefined); refreshHistory();
+  }, [refreshHistory, scheduleSave]);
   const undo = useCallback(() => {
-    if (latestChange.current === "objects" && undoObjectChange()) return;
-    if (editorRef.current?.store.canUndo) { editorRef.current.store.undo(); return; }
-    undoObjectChange();
-  }, [undoObjectChange]);
+    const previous = objectHistory.current.undo.pop();
+    if (!previous) return;
+    objectHistory.current.redo.push(structuredClone(currentDocument()));
+    restoreDocument(previous);
+  }, [currentDocument, restoreDocument]);
   const redo = useCallback(() => {
-    if (latestChange.current === "objects" && redoObjectChange()) return;
-    if (editorRef.current?.store.canRedo) { editorRef.current.store.redo(); return; }
-    redoObjectChange();
-  }, [redoObjectChange]);
+    const next = objectHistory.current.redo.pop();
+    if (!next) return;
+    objectHistory.current.undo.push(structuredClone(currentDocument()));
+    restoreDocument(next);
+  }, [currentDocument, restoreDocument]);
+  const finishNativeGesture = () => {
+    const before = nativeGesture.current; nativeGesture.current = null;
+    if (!before) return;
+    queueMicrotask(() => {
+      if (JSON.stringify(before.snapshot) !== JSON.stringify(currentDocument().snapshot)) {
+        objectHistory.current.undo.push(before); objectHistory.current.redo = []; refreshHistory();
+      }
+    });
+  };
 
   const addObject = useCallback((kind: ScientificObject["kind"], patch?: Partial<ScientificObject>) => {
     const editor = editorRef.current;
@@ -269,9 +276,13 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   const useTool = useCallback(async (tool: CanvasTool) => {
     if (tool.action === "quickdraw") {
+      setScienceMode(null);
       quickdrawRef.current?.editor?.setTool(tool.tool);
       setToolOpen(false);
       return;
+    }
+    if (tool.id === "vector" || tool.id === "force") {
+      editorRef.current?.setTool("select"); setScienceMode(tool.id); setToolOpen(false); setEditingId(undefined); return;
     }
     if (tool.id === "linked-note") {
       try {
@@ -307,7 +318,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       if (!response.ok) throw new Error("create failed");
       const board = { id, name: nextName, revision: 1 };
       setBoards((items) => [board, ...items]);
-      await loadBoard(board);
+      await loadBoard(board); setBoardMenu(false);
     } catch { onStatus("Could not create a board"); }
   }, [boards.length, courseId, lessonId, loadBoard, onStatus, saveNow]);
 
@@ -382,8 +393,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     updateObject(resize.id, { width: Math.max(150, resize.origin.width + (event.clientX - resize.start.x) / resize.scale), height: Math.max(78, resize.origin.height + (event.clientY - resize.start.y) / resize.scale) }, false);
   };
   const finishDrag = () => {
-    if (dragRef.current) { objectHistory.current.undo.push(dragRef.current.previous); objectHistory.current.redo = []; latestChange.current = "objects"; refreshHistory(); }
-    if (resizeRef.current) { objectHistory.current.undo.push(resizeRef.current.previous); objectHistory.current.redo = []; latestChange.current = "objects"; refreshHistory(); }
+    if (dragRef.current) { objectHistory.current.undo.push({ ...currentDocument(), objects: dragRef.current.previous }); objectHistory.current.redo = []; latestChange.current = "objects"; refreshHistory(); }
+    if (resizeRef.current) { objectHistory.current.undo.push({ ...currentDocument(), objects: resizeRef.current.previous }); objectHistory.current.redo = []; latestChange.current = "objects"; refreshHistory(); }
     dragRef.current = null; resizeRef.current = null;
   };
 
@@ -397,6 +408,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label="Choose canvas board"><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
         {boardMenu && <div className="canvas-board-menu">{boards.map((board) => <button key={board.id} className={board.id === activeBoard?.id ? "current" : ""} onClick={() => void changeBoard(board.id)}>{board.name}</button>)}<button onClick={() => void createBoard()}><Plus size={13} /> New board</button>{boards.length > 1 && <button className="delete-board" onClick={() => void deleteBoard()}><Trash2 size={13} /> Delete current board</button>}</div>}
       </div>
+      {scienceMode && <span className="science-mode-status" role="status">Drag to draw {scienceMode} · Esc cancels</span>}
+      {selectedId && <button className="button-soft" aria-label="Inspect selected object" onClick={() => setEditingId(selectedId)}>Inspect</button>}
       <div className="canvas-actions">
         <button className="icon-button" title="Undo" aria-label="Undo canvas change" disabled={!undoState.canUndo} onClick={undo}><Undo2 size={15} /></button>
         <button className="icon-button" title="Redo" aria-label="Redo canvas change" disabled={!undoState.canRedo} onClick={redo}><Redo2 size={15} /></button>
@@ -409,14 +422,23 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     <div className="canvas-viewport">
       {toolOpen && <aside className="canvas-tool-palette"><div className="palette-heading"><span>CANVAS TOOLS</span><button className="icon-button" title="Collapse canvas tools" aria-label="Collapse canvas tools" onClick={() => setToolOpen(false)}><X size={14} /></button></div><label className="palette-search"><Search size={14} /><input aria-label="Search canvas tools" placeholder="Find a tool" value={toolSearch} onChange={(event) => setToolSearch(event.target.value)} /></label>{(["Draw", "Science", "Learning"] as const).map((group) => {
         const tools = filteredTools.filter((tool) => tool.group === group);
-        return tools.length ? <section className="palette-group" key={group}><h4>{group}</h4>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
+        return tools.length ? <section className="palette-group" key={group}><h4>{group}</h4>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
-      <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement}>
+      <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
+        if ((event.target as HTMLElement).tagName === "CANVAS" && event.button === 0) { nativeGesture.current = structuredClone(currentDocument()); setSelectedId(undefined); }
+      }} onPointerUpCapture={finishNativeGesture} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
+        if ((event.target as HTMLElement).closest("input,textarea,select")) return;
+        if (event.code === "Space") setSpaceHeld(true);
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); event.stopPropagation(); event.shiftKey ? redo() : undo(); }
+        if (event.key === "Escape") { setScienceMode(null); setSelectedId(undefined); setEditingId(undefined); }
+        if ((event.key === "Delete" || event.key === "Backspace") && selectedId) { event.preventDefault(); event.stopPropagation(); replaceObjects(documentRef.current.objects.filter((object) => object.id !== selectedId)); setSelectedId(undefined); }
+      }} onKeyUpCapture={(event) => { if (event.code === "Space") setSpaceHeld(false); }} onBlur={() => setSpaceHeld(false)}>
         {loading ? <div className="canvas-loading">Loading saved canvas…</div> : <>
-          <Quickdraw key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} autoFit onMount={onMount} onChange={handleQuickdrawChange} />
+          <Quickdraw key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} />
+          {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} />}
           <div className="canvas-object-layer">
-            {document.objects.map((object) => <CanvasCard key={object.id} object={object} editor={editorRef.current} selected={selectedId === object.id} onSelect={() => setSelectedId(object.id)} onEdit={() => setEditingId(object.id)} onDelete={() => { replaceObjects(documentRef.current.objects.filter((item) => item.id !== object.id)); if (selectedId === object.id) setSelectedId(undefined); }} onPointerDown={(event) => startDrag(event, object)} onPointerMove={moveDrag} onPointerUp={finishDrag} onResizeStart={(event) => startResize(event, object)} onResizeMove={moveResize} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />)}
+            {document.objects.filter((object) => object.kind !== "vector" && object.kind !== "force").map((object) => <CanvasCard key={object.id} object={object} editor={editorRef.current} selected={selectedId === object.id} onSelect={() => setSelectedId(object.id)} onEdit={() => setEditingId(object.id)} onDelete={() => { replaceObjects(documentRef.current.objects.filter((item) => item.id !== object.id)); if (selectedId === object.id) setSelectedId(undefined); }} onPointerDown={(event) => startDrag(event, object)} onPointerMove={moveDrag} onPointerUp={finishDrag} onResizeStart={(event) => startResize(event, object)} onResizeMove={moveResize} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />)}
           </div>
         </>}
       </div>
@@ -466,7 +488,10 @@ function ObjectEditor({ object, objects, onChange, onClose, onOpenNote }: { obje
     {object.kind === "atom" && <>{textInput("Label", object.label, (label) => patch("label", label))}<label>Element<select value={object.element} onChange={(event) => patch("element", event.target.value as Element)}>{elementOptions}</select></label>{numberInput("Nonbonding electrons", object.nonbondingElectrons, (value) => patch("nonbondingElectrons", value))}{numberInput("Bond order sum", object.bondOrderSum, (value) => patch("bondOrderSum", value), 0.5)}<div className="editor-calculation">Formal charge <b>{formatCharge(formalCharge(object.element, object.nonbondingElectrons, object.bondOrderSum))}</b></div></>}
     {object.kind === "bond" && <>{textInput("Label", object.label, (label) => patch("label", label))}{textInput("From atom ID", object.from, (from) => patch("from", from))}{textInput("To atom ID", object.to, (to) => patch("to", to))}<label>Bond order<select value={object.order} onChange={(event) => patch("order", Number(event.target.value) as BondOrder)}>{bondOrders.map((order) => <option key={order} value={order}>{order}</option>)}</select></label></>}
     {object.kind === "equation" && <>{textInput("Equation", object.expression, (expression) => patch("expression", expression))}{textInput("Units", object.units ?? "", (units) => patch("units", units))}<h4>Variables</h4>{Object.entries(object.variables).map(([name, value]) => numberInput(name, value, (next) => patch("variables", { ...object.variables, [name]: next })))}<button className="button-soft" onClick={() => patch("variables", { ...object.variables, [`x${Object.keys(object.variables).length + 1}`]: 0 })}>Add variable</button></>}
-    {(object.kind === "vector" || object.kind === "force") && <>{textInput("Label", object.label, (label) => patch("label", label))}<div className="vector-input-grid">{object.components.map((value, index) => numberInput(["x", "y", "z"][index], value, (next) => patch("components", object.components.map((component, i) => i === index ? next : component) as [number, number, number]), 0.1))}</div>{textInput("Units", object.units, (units) => patch("units", units))}<div className="editor-calculation">Magnitude <b>{vectorMagnitude(...object.components).toFixed(3)} {object.units}</b></div></>}
+    {(object.kind === "vector" || object.kind === "force") && <>{textInput("Label", object.label, (label) => patch("label", label))}<div className="vector-input-grid">{object.components.map((value, index) => numberInput(["x", "y", "z"][index], value, (next) => patch("components", object.components.map((component, i) => i === index ? next : component) as [number, number, number]), 0.1))}</div>{textInput("Units", object.units, (units) => patch("units", units))}<label>Units per canvas unit<input aria-label="Units per canvas unit" type="number" min="0.000001" step="any" placeholder="Uncalibrated" value={object.geometry?.unitsPerCanvasUnit ?? ""} onChange={(event) => {
+      const geometry = arrowGeometry(object); const scale = event.target.value === "" ? undefined : Number(event.target.value); if (scale !== undefined && (!Number.isFinite(scale) || scale <= 0)) return;
+      onChange(withArrowEndpoints({ ...object, geometry: { ...geometry, unitsPerCanvasUnit: scale } }, geometry.tail, geometry.tip));
+    }} /></label><p>{object.geometry?.unitsPerCanvasUnit === undefined ? "Uncalibrated: x/y components use canvas units; upward is positive y." : "Scale supplied by you. The arrow shows x/y; z remains part of the magnitude."}</p><div className="editor-calculation">Magnitude <b>{vectorMagnitude(...object.components).toFixed(3)} {object.units}</b></div></>}
     {object.kind === "measurement" && <>{textInput("Label", object.label, (label) => patch("label", label))}{numberInput("Value", object.value, (value) => patch("value", value), 0.01)}{textInput("Units", object.units, (units) => patch("units", units))}</>}
     {object.kind === "graph" && <><label>Graph model<input value={object.expression} readOnly /></label><div className="vector-input-grid">{numberInput("x minimum", object.xRange[0], (value) => onChange({ xRange: [value, object.xRange[1]], points: sampleSquare([value, object.xRange[1]]) } as Partial<ScientificObject>))}{numberInput("x maximum", object.xRange[1], (value) => onChange({ xRange: [object.xRange[0], value], points: sampleSquare([object.xRange[0], value]) } as Partial<ScientificObject>))}</div>{textInput("x-axis label", object.xLabel, (xLabel) => patch("xLabel", xLabel))}{textInput("y-axis label", object.yLabel, (yLabel) => patch("yLabel", yLabel))}<p>y = x² · {object.points.length} sampled points</p></>}
     {object.kind === "anatomy" && <>{textInput("Structure ID", object.structureId, (structureId) => patch("structureId", structureId))}{textInput("Body system", object.system, (system) => patch("system", system))}{textInput("Labels (comma-separated)", object.labels.join(", "), (labels) => patch("labels", labels.split(",").map((label) => label.trim()).filter(Boolean)))}</>}

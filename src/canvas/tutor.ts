@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { emptyCanvasDocument, parseCanvasDocument, type ScientificObject } from "./model";
+import { synchronizeObject } from "./geometry";
 
 export const canvasEditSchema = z.object({
   boardId: z.string(), objectId: z.string().describe("Top-level scientific object ID. For molecule edits use its molecule ID, never a child atom or bond ID."),
@@ -27,7 +28,7 @@ export function proposeCanvasEdit(context: CanvasContext, edit: CanvasEdit): Can
     if (edit.atomEdits?.length) patch.atoms = before.atoms.map((atom) => ({ ...atom, ...edit.atomEdits?.find((update) => update.id === atom.id) }));
     if (edit.bondEdits?.length) patch.resonanceForms = before.resonanceForms.map((form) => form.id !== active.id ? form : { ...form, bonds: form.bonds.map((bond) => ({ ...bond, ...edit.bondEdits?.find((update) => update.id === bond.id) })) });
   }
-  const after = { ...before, ...patch };
+  const after = synchronizeObject(before, { ...before, ...patch });
   parseCanvasDocument({ ...emptyCanvasDocument(), objects: [after] });
   return { ...edit, patchJson: JSON.stringify(patch, null, 2), before: structuredClone(before), after };
 }

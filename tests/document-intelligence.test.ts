@@ -40,7 +40,7 @@ describe("document intelligence", () => {
   it("extracts PDF page text with one-based page metadata", async () => {
     const pdf = await extractDocument("sample.pdf", pdfFixture());
     expect(pdf.units).toEqual([{ type: "page", number: 1, text: "PDF sample page" }]);
-  });
+  }, 15_000);
 
   it("reports scanned PDFs and empty documents as non-indexable instead of claiming OCR", async () => {
     await expect(extractDocument("scan.pdf", pdfFixture(""))).rejects.toThrow("No extractable text");

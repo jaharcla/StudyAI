@@ -15,7 +15,6 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await page.getByRole("button", { name: "Choose canvas board" }).click();
   await page.getByRole("button", { name: "New board" }).click();
-  await page.getByRole("button", { name: "Choose canvas board" }).click();
   await expect(page.locator(".canvas-object")).toHaveCount(0);
   await page.getByRole("button", { name: "Lecture", exact: true }).click();
   const filename = `bonding-${Date.now()}.pdf`;

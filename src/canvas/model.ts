@@ -1,5 +1,6 @@
 import type { Snapshot } from "@quickdrawjs/react";
 import type { Element } from "../science";
+import { synchronizeObject, type ArrowGeometry } from "./geometry";
 
 export type Point = { x: number; y: number };
 export type BondOrder = 1 | 1.5 | 2 | 3;
@@ -13,8 +14,8 @@ export type ScientificObject =
   | (CanvasObjectBase & { kind: "bond"; from: string; to: string; order: BondOrder; label: string })
   | (CanvasObjectBase & { kind: "molecule"; name: string; atoms: MoleculeAtom[]; resonanceForms: ResonanceForm[]; activeResonanceId: string })
   | (CanvasObjectBase & { kind: "equation"; expression: string; variables: Record<string, number>; units?: string })
-  | (CanvasObjectBase & { kind: "vector"; components: [number, number, number]; units: string; label: string })
-  | (CanvasObjectBase & { kind: "force"; components: [number, number, number]; units: string; label: string; pointOfApplication?: Point })
+  | (CanvasObjectBase & { kind: "vector"; components: [number, number, number]; units: string; label: string; geometry?: ArrowGeometry })
+  | (CanvasObjectBase & { kind: "force"; components: [number, number, number]; units: string; label: string; pointOfApplication?: Point; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "measurement"; value: number; units: string; label: string })
   | (CanvasObjectBase & { kind: "graph"; expression: string; xRange: [number, number]; points: Array<[number, number]>; xLabel: string; yLabel: string })
   | (CanvasObjectBase & { kind: "anatomy"; structureId: string; system: string; labels: string[] })
@@ -43,7 +44,7 @@ export function parseCanvasDocument(value: unknown): CanvasDocument {
     if (!snapshot.document || !snapshot.document.store || typeof snapshot.document.store !== "object") throw new Error("Invalid drawing data.");
     record.objects.forEach(validateObject);
     if (new Set(record.objects.map((object) => object.id)).size !== record.objects.length) throw new Error("Duplicate scientific object IDs.");
-    return { version: 1, snapshot, objects: record.objects as ScientificObject[] };
+    return { version: 1, snapshot, objects: (record.objects as ScientificObject[]).map((object) => synchronizeObject(object, object)) };
   }
   if (record.document && typeof record.document === "object" && "store" in record.document) {
     return { version: 1, snapshot: record as unknown as Snapshot, objects: [] };
@@ -77,6 +78,10 @@ function validateObject(value: unknown) {
     if (!object.resonanceForms.some((form) => (form as Record<string, unknown>).id === object.activeResonanceId)) throw new Error("Invalid active resonance form.");
   }
   if ((object.kind === "vector" || object.kind === "force") && (!Array.isArray(object.components) || object.components.length !== 3 || !object.components.every((n) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid vector data.");
+  if ((object.kind === "vector" || object.kind === "force") && object.geometry !== undefined) {
+    const geometry = object.geometry as ArrowGeometry;
+    if (!geometry || ![geometry.tail?.x, geometry.tail?.y, geometry.tip?.x, geometry.tip?.y].every((n) => typeof n === "number" && Number.isFinite(n)) || (geometry.unitsPerCanvasUnit !== undefined && (!Number.isFinite(geometry.unitsPerCanvasUnit) || geometry.unitsPerCanvasUnit <= 0))) throw new Error("Invalid arrow geometry.");
+  }
   if (object.kind === "atom" && (!elements.includes(String(object.element)) || !Number.isInteger(object.nonbondingElectrons) || Number(object.nonbondingElectrons) < 0 || typeof object.bondOrderSum !== "number" || !Number.isFinite(object.bondOrderSum) || object.bondOrderSum < 0)) throw new Error("Invalid atom data.");
   if (object.kind === "bond" && ![1, 1.5, 2, 3].includes(object.order as number)) throw new Error("Invalid bond order.");
   for (const field of ["conceptId", "answer"]) if (object[field] !== undefined && typeof object[field] !== "string") throw new Error("Invalid optional scientific text field.");
