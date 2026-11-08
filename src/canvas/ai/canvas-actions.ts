@@ -1,5 +1,6 @@
 import { newId, pageBounds, type Editor, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
 import { z } from "zod";
+import { assertCanvasRevision, requireCanvasRevision } from "../proposal-revision";
 
 const coordinate = z.number().finite().min(-1_000_000).max(1_000_000);
 const dimension = z.number().finite().min(1).max(100_000);
@@ -31,7 +32,7 @@ export const canvasReadSchema = z.object({ boardId: idSchema }).strict();
 
 export type CanvasAction = z.infer<typeof shapeActionSchema>;
 export type CanvasActionBatch = z.infer<typeof canvasActionSchema>;
-export type CanvasProposal = { id: string; boardId: string; expectedFingerprint: string; actions: CanvasAction[]; description: string; requiresConfirmation: boolean };
+export type CanvasProposal = { id: string; boardId: string; baseRevision: number; expectedFingerprint: string; actions: CanvasAction[]; description: string; requiresConfirmation: boolean };
 
 const colors = ["black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow", "orange", "green", "light-green", "light-red", "red"];
 const sizes = ["s", "m", "l", "xl"];
@@ -108,7 +109,8 @@ export function validateCanvasAction(source: Store | Snapshot, value: unknown): 
   return action;
 }
 
-export function proposeCanvasAction(source: Store | Snapshot, boardId: string, value: unknown): CanvasProposal {
+export function proposeCanvasAction(source: Store | Snapshot, boardId: string, value: unknown, baseRevision?: number): CanvasProposal {
+  requireCanvasRevision(baseRevision);
   const batch = canvasActionSchema.parse(value);
   if (!boardId || batch.boardId !== boardId) throw new Error("The active board changed. Read its current context again.");
   const actions = batch.actions.map((action) => validateCanvasAction(source, action));
@@ -125,7 +127,7 @@ export function proposeCanvasAction(source: Store | Snapshot, boardId: string, v
     if (action.kind === "deleteShape") deleted.add(action.id);
   }
   const destructive = actions.filter((action) => action.kind === "deleteShape").length;
-  return { id: newId("canvas-proposal"), boardId, expectedFingerprint: canvasFingerprint(source), actions, description: actions.map(describe).join("; "), requiresConfirmation: destructive > 0 || actions.length > 5 };
+  return { id: newId("canvas-proposal"), boardId, baseRevision, expectedFingerprint: canvasFingerprint(source), actions, description: actions.map(describe).join("; "), requiresConfirmation: destructive > 0 || actions.length > 5 };
 }
 
 function describe(action: CanvasAction): string {
@@ -162,8 +164,9 @@ function shapeCenter(shape: ShapeRecord): { x: number; y: number } {
   return { x: shape.x + width / 2, y: shape.y + height / 2 };
 }
 
-export function approveCanvasProposal(source: Store, activeBoardId: string, proposal: CanvasProposal, editor?: Editor): { changedId: string } {
+export function approveCanvasProposal(source: Store, activeBoardId: string, proposal: CanvasProposal, editor?: Editor, currentRevision?: number): { changedId: string } {
   if (!activeBoardId || proposal.boardId !== activeBoardId) throw new Error("Proposal belongs to a different board.");
+  assertCanvasRevision(proposal.baseRevision, currentRevision);
   if (proposal.expectedFingerprint !== canvasFingerprint(source)) throw new Error("Canvas changed after this proposal; request a fresh proposal.");
   const actions = proposal.actions.map((action) => validateCanvasAction(source, action));
   if (actions.length > 5 && !proposal.requiresConfirmation) throw new Error("Large changes require explicit confirmation.");

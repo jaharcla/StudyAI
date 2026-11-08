@@ -1,7 +1,7 @@
 import { localBounds, pageBounds, type Bounds, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
 
-export type CanvasScope = { boardId: string; courseId: string; lessonId: string };
+export type CanvasScope = { boardId: string; courseId: string; lessonId: string; revision?: number };
 export type CanvasContextOptions = {
   source: Store | Snapshot;
   selectedIds: readonly string[];
@@ -144,7 +144,7 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
     .slice(0, maxItems).map(scientificSummary);
   const spatialRelationships = focus.flatMap((shape) => focus.filter((other) => other.id !== shape.id && gap(shape.bounds, other.bounds) <= nearbyDistance)
     .slice(0, 4).map((other) => ({ fromId: shape.id, relation: relationship(shape.bounds, other.bounds), toId: other.id }))).slice(0, maxItems * 4);
-  const context: CanvasAIContext = { scope: { boardId: options.scope.boardId.slice(0, 160), courseId: options.scope.courseId.slice(0, 160), lessonId: options.scope.lessonId.slice(0, 160) }, viewport, selected, visible, nearbyObjects, spatialRelationships, truncated: selectedCandidates.length > selected.length };
+  const context: CanvasAIContext = { scope: { boardId: options.scope.boardId.slice(0, 160), courseId: options.scope.courseId.slice(0, 160), lessonId: options.scope.lessonId.slice(0, 160), revision: options.scope.revision }, viewport, selected, visible, nearbyObjects, spatialRelationships, truncated: selectedCandidates.length > selected.length };
   const maxChars = Math.floor(charLimit);
   while (JSON.stringify(context).length > maxChars && (context.nearbyObjects.length || context.spatialRelationships.length || context.visible.length)) {
     context.truncated = true;

@@ -4,7 +4,7 @@ import { applyCanvasProposal, proposeCanvasEdit } from "../src/canvas/tutor";
 
 describe("tutor canvas proposals", () => {
   const object = createObject("molecule", 100, 100);
-  const context = { boardId: "board-1", courseId: "chem-120", lessonId: "lesson-03", objects: [object] };
+  const context = { boardId: "board-1", courseId: "chem-120", lessonId: "lesson-03", revision: 4, objects: [object] };
   const edit = { boardId: "board-1", objectId: object.id, patchJson: '{"name":"Reviewed CO2"}', reason: "Clarify the label" };
   it("proposes without mutating and applies the approved patch", () => {
     const proposal = proposeCanvasEdit(context, edit);
@@ -20,6 +20,8 @@ describe("tutor canvas proposals", () => {
     const proposal = proposeCanvasEdit(context, edit);
     expect(() => applyCanvasProposal({ ...context, boardId: "other" }, proposal)).toThrow("stale");
     expect(() => applyCanvasProposal({ ...context, objects: [{ ...object, x: 300 }] }, proposal)).toThrow("stale");
+    expect(() => applyCanvasProposal({ ...context, revision: 5 }, proposal)).toThrow("stale");
+    expect(() => applyCanvasProposal({ ...context, courseId: "other-course" }, proposal)).toThrow("stale");
   });
   it("rejects edits that break structured object rendering or molecule references", () => {
     const anatomy = createObject("anatomy", 100, 100);

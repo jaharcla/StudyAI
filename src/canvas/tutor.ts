@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { emptyCanvasDocument, parseCanvasDocument, type ScientificObject } from "./model";
 import { synchronizeObject } from "./geometry";
+import { assertCanvasRevision, requireCanvasRevision } from "./proposal-revision";
 
 export const canvasEditSchema = z.object({
   boardId: z.string(), objectId: z.string().describe("Top-level scientific object ID. For molecule edits use its molecule ID, never a child atom or bond ID."),
@@ -10,10 +11,12 @@ export const canvasEditSchema = z.object({
   reason: z.string(),
 });
 export type CanvasEdit = z.infer<typeof canvasEditSchema>;
-export type CanvasContext = { boardId: string; courseId: string; lessonId: string; objects: ScientificObject[] };
-export type CanvasProposal = CanvasEdit & { before: ScientificObject; after: ScientificObject };
+export type CanvasContext = { boardId: string; courseId: string; lessonId: string; revision?: number; objects: ScientificObject[] };
+export type CanvasProposal = CanvasEdit & { courseId: string; lessonId: string; baseRevision: number; expectedObjects: string; before: ScientificObject; after: ScientificObject };
 
 export function proposeCanvasEdit(context: CanvasContext, edit: CanvasEdit): CanvasProposal {
+  const baseRevision = context.revision;
+  requireCanvasRevision(baseRevision);
   if (context.boardId !== edit.boardId) throw new Error("The active board changed. Read its current context again.");
   const before = context.objects.find((object) => object.id === edit.objectId);
   if (!before) throw new Error("Scientific object not found on the active board.");
@@ -30,11 +33,12 @@ export function proposeCanvasEdit(context: CanvasContext, edit: CanvasEdit): Can
   }
   const after = synchronizeObject(before, { ...before, ...patch });
   parseCanvasDocument({ ...emptyCanvasDocument(), objects: [after] });
-  return { ...edit, patchJson: JSON.stringify(patch, null, 2), before: structuredClone(before), after };
+  return { ...edit, courseId: context.courseId, lessonId: context.lessonId, baseRevision, expectedObjects: JSON.stringify(context.objects), patchJson: JSON.stringify(patch, null, 2), before: structuredClone(before), after };
 }
 
 export function applyCanvasProposal(context: CanvasContext, proposal: CanvasProposal): ScientificObject[] {
   const current = context.objects.find((object) => object.id === proposal.objectId);
-  if (context.boardId !== proposal.boardId || JSON.stringify(current) !== JSON.stringify(proposal.before)) throw new Error("This proposal is stale. Ask the tutor to propose it again.");
+  assertCanvasRevision(proposal.baseRevision, context.revision);
+  if (context.boardId !== proposal.boardId || context.courseId !== proposal.courseId || context.lessonId !== proposal.lessonId || JSON.stringify(context.objects) !== proposal.expectedObjects || JSON.stringify(current) !== JSON.stringify(proposal.before)) throw new Error("This proposal is stale. Ask the tutor to propose it again.");
   return context.objects.map((object) => object.id === proposal.objectId ? proposal.after : object);
 }

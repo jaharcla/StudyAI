@@ -18,7 +18,7 @@ it("keeps numerical inspector and tutor changes synchronized with arrow endpoint
   if (vector.kind !== "vector") throw Error();
   const next = synchronizeObject(vector, { ...vector, components: [10, -5, 2] });
   expect(arrowGeometry(next as typeof vector).tip).toEqual({ x: 270, y: 160 });
-  const proposal = proposeCanvasEdit({ boardId: "board", courseId: "course", lessonId: "lesson", objects: [next] }, { boardId: "board", objectId: next.id, patchJson: '{"components":[2,3,0]}', reason: "Change the vector" });
+  const proposal = proposeCanvasEdit({ boardId: "board", courseId: "course", lessonId: "lesson", revision: 0, objects: [next] }, { boardId: "board", objectId: next.id, patchJson: '{"components":[2,3,0]}', reason: "Change the vector" });
   expect(proposal.after).toMatchObject({ components: [2, 3, 0], geometry: { tip: { x: 78, y: -32 } } });
 });
 

@@ -31,14 +31,14 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     handler: async (action) => {
       try {
         if (!options.store) throw new Error("The active canvas is not ready.");
-        const proposal = proposeCanvasAction(options.store, options.scope.boardId, action);
+        const proposal = proposeCanvasAction(options.store, options.scope.boardId, action, options.scope.revision);
         options.onProposal(proposal);
         return { status: "pending_user_review", proposalId: proposal.id, description: proposal.description, requiresConfirmation: proposal.requiresConfirmation };
       } catch (error) {
         return { status: "rejected", error: error instanceof Error ? error.message : "Invalid canvas action." };
       }
     },
-  }, [options.store, options.scope.boardId, options.onProposal]);
+  }, [options.store, options.scope.boardId, options.scope.revision, options.onProposal]);
   useFrontendTool({
     name: "get_canvas_state",
     description: "Read the active QuickDraw board's native shapes, IDs, page coordinates, types and properties. Pass the current boardId from the active canvas context.",
