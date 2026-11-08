@@ -75,4 +75,32 @@ describe("adaptive learning subsystem", () => {
     expect(learning.rate({ cardId: cardId.id, idempotencyKey: "review-1", rating: "Again" })).toMatchObject({ duplicate: true });
     expect(database.prepare("SELECT count(*) total FROM review_logs").get()).toMatchObject({ total: 1 });
   });
+
+  it("accepts all four FSRS ratings, applies mastery to incorrect evidence, and resumes the scheduled queue", () => {
+    let learning = setup();
+    const ratings = ["Again", "Hard", "Good", "Easy"] as const;
+    for (const rating of ratings) learning.addReviewedQuestion({ courseId: "c", lessonId: "l", concept: `Rating ${rating}`, prompt: `Question for ${rating}`, choices: [{ id: "a", text: "Correct" }, { id: "b", text: "Incorrect" }], correctChoice: "a", explanation: "The cited source supports the correct choice.", sourceDocumentId: "d", sourcePage: 4, sourceExcerpt: "Water is H2O, composed of hydrogen and oxygen." });
+    const encountered = new Set<string>();
+    for (const [index, rating] of ratings.entries()) {
+      const question = learning.ask("c", "l");
+      expect(question).not.toBeNull();
+      encountered.add(question!.conceptId);
+      const grade = learning.submit({ presentationId: question!.presentationId, idempotencyKey: `rating-attempt-${rating}`, choiceId: index === 0 ? "b" : "a" });
+      if (!("mastery" in grade)) throw new Error("Attempt unexpectedly deduplicated.");
+      if (index === 0) { expect(grade.correct).toBe(false); expect(grade.mastery).toBeGreaterThan(0.1); }
+      const card = database.prepare("SELECT id,fsrs_state FROM learning_cards WHERE concept_id=?").get(question!.conceptId) as { id: string; fsrs_state: string };
+      const result = learning.rate({ cardId: card.id, idempotencyKey: `rating-log-${rating}`, rating });
+      expect(result.rating).toBe(rating);
+      expect(result.dueAt).toBe((JSON.parse((database.prepare("SELECT fsrs_state FROM learning_cards WHERE id=?").get(card.id) as { fsrs_state: string }).fsrs_state) as { due: string }).due);
+      expect(Date.parse(result.dueAt!)).toBeGreaterThan(time.getTime());
+    }
+    expect(encountered.size).toBe(4);
+    expect(database.prepare("SELECT rating FROM review_logs ORDER BY rowid").all()).toEqual(ratings.map((rating) => ({ rating })));
+    expect(database.prepare("SELECT count(*) total FROM grading_evidence WHERE accepted=1").get()).toMatchObject({ total: 4 });
+    expect(learning.ask("c", "l")).toBeNull();
+    database.close();
+    database = new Database(path);
+    learning = new LearningService(database, () => new Date(time));
+    expect(learning.resume("c", "l")).toMatchObject({ phase: "ready", dueCard: expect.any(Object) });
+  });
 });

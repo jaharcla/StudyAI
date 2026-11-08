@@ -14,9 +14,11 @@ test("adaptive study asks, grades, schedules, and resumes from persistent state"
   await page.getByRole("button", { name: "Study this lesson" }).click();
   await page.getByRole("button", { name: "Ask a reviewed question" }).click();
   await expect(page.getByRole("heading", { name: "Where is DNA located?" })).toBeVisible();
-  await page.getByRole("button", { name: "Nucleus", exact: true }).click();
+  await expect(page.getByText("Source: cell-biology.txt. A cell contains DNA in its nucleus.")).toBeVisible();
+  await page.getByRole("button", { name: "Ribosome", exact: true }).click();
   await page.getByRole("button", { name: "Check answer" }).click();
-  await expect(page.getByText("Correct", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not quite", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Concept mastery: \d+%/)).toBeVisible();
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await expect(page.getByText("Review scheduled for", { exact: false })).toBeVisible();
   await page.reload();
