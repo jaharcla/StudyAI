@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Store } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
+import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
 import { API } from "../api";
 import { ScientificLayer, type ScienceMode } from "./ScientificLayer";
 import { arrowGeometry, synchronizeObject, withArrowEndpoints } from "./geometry";
@@ -18,7 +20,9 @@ import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
 type Board = { id: string; name: string; revision: number };
+type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
 type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void };
+const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 
 export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
@@ -31,6 +35,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const latestChange = useRef<"drawing" | "objects">("drawing");
   const loadSequence = useRef(0);
   const saveTimer = useRef<number | undefined>(undefined);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const revisions = useRef(new Map<string, number>());
+  const skipQuickdrawSave = useRef<unknown>(undefined);
   const boardElement = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [boards, setBoards] = useState<Board[]>([]);
@@ -51,6 +58,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [shapeProposal, setShapeProposal] = useState<ShapeProposal>();
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
+  const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
+  const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [proposalBusy, setProposalBusy] = useState(false);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects, freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
@@ -58,7 +68,10 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     parameters: canvasEditSchema,
     handler: async (edit) => {
       try {
-        const next = proposeCanvasEdit({ boardId: boardRef.current?.id ?? "", courseId, lessonId, objects: documentRef.current.objects }, edit);
+        const currentBoard = boardRef.current;
+        if (!currentBoard) throw new Error("The active board is not ready.");
+        const context = { boardId: currentBoard.id, courseId, lessonId, objects: documentRef.current.objects, revision: currentBoard.revision } as Parameters<typeof proposeCanvasEdit>[0] & { revision: number };
+        const next = proposeCanvasEdit(context, edit);
         setProposal(next);
         return { status: "pending_user_review", reason: next.reason };
       } catch (error) { return { status: "rejected", error: error instanceof Error ? error.message : "Invalid edit" }; }
@@ -76,7 +89,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     selectedIds: selectedShapeIds,
     viewport: editorRef.current?.viewportPageBounds() ?? { x: 0, y: 0, w: 1, h: 1 },
     objects: document.objects,
-    scope: { boardId: activeBoard?.id ?? "", courseId, lessonId },
+    scope: { boardId: activeBoard?.id ?? "", courseId, lessonId, revision: activeBoard?.revision ?? 0 } as never,
     onProposal: setShapeProposal,
   });
 
@@ -90,18 +103,39 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     editorRef.current = null;
   }, []);
 
-  const postDocument = useCallback(async (board: Board, next: CanvasDocument) => {
-    try {
-      const response = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: board.id, courseId, lessonId, name: board.name, document: next }) });
-      if (!response.ok) throw new Error("save failed");
-      if (boardRef.current?.id === board.id) onStatus("All changes saved");
-    } catch {
-      if (boardRef.current?.id === board.id) onStatus("Canvas save unavailable");
-    }
+  const postDocument = useCallback((board: Board, next: CanvasDocument) => {
+    const job = saveQueue.current.then(async () => {
+      const expectedRevision = revisions.current.get(board.id) ?? board.revision;
+      try {
+        const response = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: board.id, courseId, lessonId, name: board.name, expectedRevision, document: next }) });
+        if (response.status === 409) {
+          if (boardRef.current?.id === board.id) onStatus("Canvas changed elsewhere. Reload the board before saving.");
+          return false;
+        }
+        if (!response.ok) throw new Error("save failed");
+        const result = await response.json() as { revision?: number };
+        if (!Number.isInteger(result.revision) || result.revision! <= expectedRevision) throw new Error("Canvas save did not return a newer revision.");
+        revisions.current.set(board.id, result.revision!);
+        const update = (current: Board) => current.id === board.id ? { ...current, revision: result.revision! } : current;
+        setBoards((current) => current.map(update));
+        setActiveBoard((current) => current?.id === board.id ? { ...current, revision: result.revision! } : current);
+        if (boardRef.current?.id === board.id) {
+          boardRef.current = { ...boardRef.current, revision: result.revision! };
+          onStatus("All changes saved");
+        }
+        return true;
+      } catch {
+        if (boardRef.current?.id === board.id) onStatus("Canvas save unavailable");
+        return false;
+      }
+    });
+    saveQueue.current = job.then(() => undefined, () => undefined);
+    return job;
   }, [courseId, lessonId, onStatus]);
 
   const scheduleSave = useCallback((board: Board | null, next: CanvasDocument) => {
     next = resolveScene(next);
+    setCanvasAnalysis(undefined);
     documentRef.current = next;
     setDocument(next);
     if (!board) return;
@@ -128,8 +162,116 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const saveNow = useCallback(async () => {
     window.clearTimeout(saveTimer.current);
     const board = boardRef.current;
-    if (board && !loading) await postDocument(board, currentDocument());
+    if (!board || loading) return false;
+    return postDocument(board, currentDocument());
   }, [currentDocument, loading, postDocument]);
+
+  const readAuthoritativeBoard = useCallback(async (board: Board) => {
+    const response = await fetch(`${API}/canvases/${encodeURIComponent(board.id)}?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`);
+    if (!response.ok) throw new Error("The saved board revision is unavailable.");
+    const row = await response.json() as PersistedBoard;
+    if (row.id !== board.id || row.course_id !== courseId || row.lesson_id !== lessonId || !Number.isInteger(row.revision)) throw new Error("The saved board scope does not match the active course and lesson.");
+    const persistedValue = typeof row.document === "string" ? JSON.parse(row.document) : row.document;
+    const persistedDocument = resolveScene(parseCanvasDocument(persistedValue));
+    const localDocument = currentDocument();
+    if (stableJson(persistedDocument) !== stableJson(localDocument)) throw new Error("The board changed elsewhere. Reload it before continuing.");
+    if (boardRef.current?.id !== board.id) throw new Error("The active board changed. Try again on the current board.");
+    revisions.current.set(board.id, row.revision);
+    const currentBoard = { ...board, revision: row.revision };
+    boardRef.current = currentBoard;
+    setActiveBoard(currentBoard);
+    setBoards((current) => current.map((item) => item.id === board.id ? currentBoard : item));
+    return { revision: row.revision, document: persistedDocument };
+  }, [courseId, currentDocument, lessonId]);
+
+  const analyzeBoard = useCallback(async () => {
+    const board = boardRef.current;
+    const editor = editorRef.current;
+    if (!board || !editor || loading || analysisBusy || proposalBusy) return;
+    const sequence = loadSequence.current;
+    const requestDocument = structuredClone(currentDocument());
+    const selectedIds = [...new Set([...selectedShapeIds, ...(selectedId ? [selectedId] : [])])];
+    setCanvasAnalysis(undefined);
+    setAnalysisBusy(true);
+    try {
+      if (!await saveNow()) throw new Error("Save the active board before analysis.");
+      const persisted = await readAuthoritativeBoard(board);
+      if (stableJson(persisted.document) !== stableJson(requestDocument)) throw new Error("The board changed while saving. Analyze again.");
+      const image = await editor.exportImage({ background: true, scale: 2 });
+      if (!image) throw new Error("The active board could not be rendered for analysis.");
+      if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(requestDocument)) throw new Error("The board changed during analysis setup. Try again.");
+      const response = await fetch(`${API}/canvases/${encodeURIComponent(board.id)}/analysis?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, image: { base64: await blobToBase64(image), mimeType: image.type || "image/png" } }),
+      });
+      const body = await response.json() as { analysis?: CanvasAnalysisResult; error?: string };
+      if (!response.ok || !body.analysis) throw new Error(body.error ?? "Canvas analysis failed.");
+      if (body.analysis.boardId !== board.id || body.analysis.courseId !== courseId || body.analysis.lessonId !== lessonId || body.analysis.revision !== persisted.revision) throw new Error("Canvas analysis returned a mismatched or stale board revision.");
+      if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(requestDocument)) throw new Error("The board changed while analysis was running. Analyze the current board again.");
+      setCanvasAnalysis(body.analysis);
+      onStatus("Canvas analysis is ready for the Tutor");
+    } catch (error) {
+      setCanvasAnalysis(undefined);
+      onStatus(error instanceof Error ? error.message : "Canvas analysis failed");
+    } finally { setAnalysisBusy(false); }
+  }, [analysisBusy, courseId, currentDocument, lessonId, loading, onStatus, proposalBusy, readAuthoritativeBoard, saveNow, selectedId, selectedShapeIds]);
+
+  const applyTutorProposal = useCallback(async () => {
+    const board = boardRef.current;
+    const pending = proposal;
+    if (!board || !pending || proposalBusy) return;
+    setProposalBusy(true);
+    try {
+      const sequence = loadSequence.current;
+      const base = structuredClone(currentDocument());
+      const authoritative = await readAuthoritativeBoard(board);
+      if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
+      const context = { boardId: board.id, courseId, lessonId, objects: base.objects, revision: authoritative.revision } as Parameters<typeof applyCanvasProposal>[0] & { revision: number };
+      const objects = applyCanvasProposal(context, pending);
+      const next = resolveScene({ ...base, objects });
+      if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
+      if (!await postDocument({ ...board, revision: authoritative.revision }, next)) return;
+      if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(base)) throw new Error("The active board changed before the approved edit could be shown.");
+      objectHistory.current.undo.push(base); objectHistory.current.redo = [];
+      documentRef.current = next;
+      setDocument(next);
+      setCanvasAnalysis(undefined);
+      setProposal(undefined);
+      refreshHistory();
+    } catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply canvas proposal"); }
+    finally { setProposalBusy(false); }
+  }, [courseId, currentDocument, lessonId, onStatus, postDocument, proposal, proposalBusy, readAuthoritativeBoard, refreshHistory]);
+
+  const applyQuickdrawProposal = useCallback(async () => {
+    const board = boardRef.current;
+    const pending = shapeProposal;
+    if (!board || !pending || proposalBusy) return;
+    setProposalBusy(true);
+    try {
+      const sequence = loadSequence.current;
+      const base = structuredClone(currentDocument());
+      const authoritative = await readAuthoritativeBoard(board);
+      if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
+      const preview = new Store();
+      preview.loadSnapshot(base.snapshot);
+      approveCanvasProposalAtRevision(preview, board.id, pending, undefined, authoritative.revision);
+      const next = { ...base, snapshot: preview.getSnapshot() };
+      const changesBoard = pending.actions.some((action) => action.kind !== "selectShapes");
+      if (changesBoard) {
+        if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
+        if (!await postDocument({ ...board, revision: authoritative.revision }, next)) return;
+      }
+      const editor = editorRef.current;
+      if (!editor || boardRef.current?.id !== board.id || sequence !== loadSequence.current || stableJson(currentDocument()) !== stableJson(base)) throw new Error("The active board changed before the proposal could be applied.");
+      if (changesBoard) skipQuickdrawSave.current = next.snapshot;
+      approveCanvasProposalAtRevision(editor.store, board.id, pending, editor, authoritative.revision);
+      if (changesBoard) { documentRef.current = next; setDocument(next); }
+      setCanvasAnalysis(undefined);
+      setShapeProposal(undefined);
+    } catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply canvas proposal"); }
+    finally { setProposalBusy(false); }
+  }, [currentDocument, onStatus, postDocument, proposalBusy, readAuthoritativeBoard, shapeProposal]);
 
   const loadBoard = useCallback(async (board: Board) => {
     const sequence = ++loadSequence.current;
@@ -138,6 +280,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     setLoading(true);
     setActiveBoard(board);
     boardRef.current = board;
+    setCanvasAnalysis(undefined);
     setShapeProposal(undefined);
     setSelectedId(undefined);
     setEditingId(undefined);
@@ -148,9 +291,15 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     try {
       const response = await fetch(`${API}/canvases/${encodeURIComponent(board.id)}?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`);
       if (!response.ok) throw new Error("load failed");
-      const row = await response.json();
+      const row = await response.json() as PersistedBoard;
+      if (row.id !== board.id || row.course_id !== courseId || row.lesson_id !== lessonId || !Number.isInteger(row.revision)) throw new Error("Canvas scope mismatch");
       const next = resolveScene(parseCanvasDocument(JSON.parse(row.document)));
       if (sequence !== loadSequence.current) return;
+      const currentBoard = { ...board, revision: row.revision };
+      revisions.current.set(board.id, row.revision);
+      boardRef.current = currentBoard;
+      setActiveBoard(currentBoard);
+      setBoards((current) => current.map((item) => item.id === board.id ? currentBoard : item));
       documentRef.current = next;
       setDocument(next);
     } catch {
@@ -165,9 +314,11 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   useEffect(() => {
     let live = true;
     ++loadSequence.current;
+    revisions.current.clear();
     setLoading(true);
     setProposal(undefined);
     setShapeProposal(undefined);
+    setCanvasAnalysis(undefined);
     setSelectedShapeIds([]);
     setActiveBoard(null);
     boardRef.current = null;
@@ -185,6 +336,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         if (!live) return;
         if (rows.length) {
           const available = rows.map((row) => ({ id: row.id, name: row.name, revision: row.revision }));
+          available.forEach((board) => revisions.current.set(board.id, board.revision));
           setBoards(available);
           await loadBoard(available[0]);
           return;
@@ -197,11 +349,14 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         } catch { /* A new board can start empty when no legacy drawing exists. */ }
         if (!live) return;
         const created = { id: newId("canvas"), name: "Board 1", revision: 0 };
-        const save = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...created, courseId, lessonId, document: initial }) });
+        const save = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...created, courseId, lessonId, expectedRevision: 0, document: initial }) });
         if (!save.ok) throw new Error("create failed");
-        const body = await save.json();
+        const body = await save.json() as { id?: string; revision?: number };
+        if (!body.id || !Number.isInteger(body.revision) || body.revision! < 1) throw new Error("Canvas creation did not return its revision.");
         created.id = body.id;
+        created.revision = body.revision!;
         if (!live) return;
+        revisions.current.set(created.id, created.revision);
         setBoards([created]);
         boardRef.current = created;
         setActiveBoard(created);
@@ -211,6 +366,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       } catch {
         if (!live) return;
         setBoards([]);
+        revisions.current.clear();
         setDocument(emptyCanvasDocument());
         setLoading(false);
         onStatus("Canvas storage unavailable");
@@ -250,6 +406,11 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   const handleQuickdrawChange = useCallback((_diff: unknown, source: string, editor: Editor) => {
     if (source !== "user") return;
+    if (skipQuickdrawSave.current) {
+      const expected = skipQuickdrawSave.current;
+      skipQuickdrawSave.current = undefined;
+      if (stableJson(editor.store.getSnapshot()) === stableJson(expected)) return;
+    }
     if (!nativeGesture.current) { objectHistory.current.undo.push(structuredClone(documentRef.current)); objectHistory.current.redo = []; }
     latestChange.current = "drawing";
     scheduleSave(boardRef.current, { ...documentRef.current, snapshot: editor.store.getSnapshot() });
@@ -340,10 +501,13 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     const nextDocument = emptyCanvasDocument();
     const id = newId("canvas");
     try {
-      await saveNow();
-      const response = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, courseId, lessonId, name: nextName, document: nextDocument }) });
+      if (!await saveNow()) throw new Error("Save the current board before creating another board.");
+      const response = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, courseId, lessonId, name: nextName, expectedRevision: 0, document: nextDocument }) });
       if (!response.ok) throw new Error("create failed");
-      const board = { id, name: nextName, revision: 1 };
+      const result = await response.json() as { revision?: number };
+      if (!Number.isInteger(result.revision) || result.revision! < 1) throw new Error("Canvas creation did not return its revision.");
+      const board = { id, name: nextName, revision: result.revision! };
+      revisions.current.set(id, board.revision);
       setBoards((items) => [board, ...items]);
       await loadBoard(board); setBoardMenu(false);
     } catch { onStatus("Could not create a board"); }
@@ -352,18 +516,20 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const changeBoard = useCallback(async (id: string) => {
     const board = boards.find((item) => item.id === id);
     if (!board || board.id === activeBoard?.id) return;
-    await saveNow();
+    if (!await saveNow()) { onStatus("The current board could not be saved. It remains open."); return; }
     await loadBoard(board);
     setBoardMenu(false);
-  }, [activeBoard?.id, boards, loadBoard, saveNow]);
+  }, [activeBoard?.id, boards, loadBoard, onStatus, saveNow]);
 
   const deleteBoard = useCallback(async () => {
     if (!activeBoard || boards.length < 2 || !window.confirm(`Delete “${activeBoard.name}”?`)) return;
+    if (!await saveNow()) { onStatus("The current board could not be saved. It remains open."); return; }
     await fetch(`${API}/canvases/${encodeURIComponent(activeBoard.id)}?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`, { method: "DELETE" });
+    revisions.current.delete(activeBoard.id);
     const remaining = boards.filter((board) => board.id !== activeBoard.id);
     setBoards(remaining);
     await loadBoard(remaining[0]);
-  }, [activeBoard, boards, loadBoard, courseId, lessonId]);
+  }, [activeBoard, boards, loadBoard, courseId, lessonId, onStatus, saveNow]);
 
   const exportJson = useCallback(() => {
     if (!activeBoard) return;
@@ -390,19 +556,12 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   }, [onStatus, scheduleSave]);
 
   return <div className="canvas-studio">
-    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" onClick={() => {
-      try { replaceObjects(applyCanvasProposal({ boardId: boardRef.current?.id ?? "", courseId, lessonId, objects: documentRef.current.objects }, proposal)); setProposal(undefined); }
-      catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply proposal"); setProposal(undefined); }
-    }}>Apply tutor edit</button><button className="button-soft" onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
-    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>AI canvas proposal</strong><p>{shapeProposal.description}</p><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre><button className="button-primary" onClick={() => {
-      try {
-        if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
-        const editor = editorRef.current;
-        if (!editor || !activeBoard) throw new Error("The active canvas is not ready.");
-        approveCanvasProposal(editor.store, activeBoard.id, shapeProposal, editor);
-        setShapeProposal(undefined);
-      } catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply canvas proposal"); setShapeProposal(undefined); }
-    }}>Apply canvas proposal</button><button className="button-soft" onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
+    {canvasAnalysis && <CanvasAnalysisTutorContext analysis={canvasAnalysis} />}
+    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved edit…" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
+    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>AI canvas proposal</strong><p>{shapeProposal.description}</p><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => {
+      if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
+      void applyQuickdrawProposal();
+    }}>{proposalBusy ? "Saving approved proposal…" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
     <div className="canvas-tools-bar">
       <div className="canvas-board-selector">
         <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label="Choose canvas board"><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
@@ -411,6 +570,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} · Esc cancels</span>}
       {selectedId && <div className="science-selection-actions"><button className="button-soft" aria-label="Inspect selected object" onClick={() => setEditingId(selectedId)}>Inspect</button><button className="button-soft" aria-label="Send scientific object to back" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([object, ...document.objects.filter((item) => item.id !== selectedId)]); }}>Back</button><button className="button-soft" aria-label="Bring scientific object to front" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([...document.objects.filter((item) => item.id !== selectedId), object]); }}>Front</button><button className="button-soft" aria-label="Delete selected scientific object" onClick={() => { replaceObjects(document.objects.filter((item) => item.id !== selectedId)); setSelectedId(undefined); }}>Delete</button></div>}
       <div className="canvas-actions">
+        <button className="button-soft" disabled={!activeBoard || loading || analysisBusy || proposalBusy} title="Analyze the saved active board and share its validated evidence with the Tutor" onClick={() => void analyzeBoard()}><Atom size={14} />{analysisBusy ? "Analyzing…" : "Analyze board"}</button>
         <button className="icon-button" title="Undo" aria-label="Undo canvas change" disabled={!undoState.canUndo} onClick={undo}><Undo2 size={15} /></button>
         <button className="icon-button" title="Redo" aria-label="Redo canvas change" disabled={!undoState.canRedo} onClick={redo}><Redo2 size={15} /></button>
         <button className="icon-button" title="Import canvas JSON" aria-label="Import canvas JSON" onClick={() => importRef.current?.click()}><Upload size={15} /></button>
@@ -438,10 +598,29 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
           <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} onSelectionChange={(ids) => setSelectedShapeIds(ids)} />
           {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
         </>}
+        {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>
     </div>
     {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} />}
   </div>;
+}
+
+function CanvasAnalysisTutorContext({ analysis }: { analysis: CanvasAnalysisResult }) {
+  useAgentContext({ description: "StudyAI canvas analysis result", value: analysis as never });
+  return null;
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return String(JSON.stringify(value));
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(",")}}`;
 }
 
 function ObjectEditor({ object, objects, onChange, onClose, onOpenNote }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void }) {
