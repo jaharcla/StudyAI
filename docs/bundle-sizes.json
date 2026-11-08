@@ -1,0 +1,187 @@
+{
+  "units": "bytes; per-file gzip",
+  "documentCommit": "7eb5449507946c988cae806a2c2c15d3cd5ad9f9",
+  "canvasCommit": "0ecf5033049ab2eeaaf827ff8a9c0c14cd9b7ed0",
+  "document": {
+    "entry": {
+      "file": "assets/index-BZN-x_4M.js",
+      "bytes": 3411235,
+      "gzipBytes": 978031
+    },
+    "total": {
+      "files": 424,
+      "bytes": 19887236,
+      "gzipBytes": 5182798
+    },
+    "pdfWorker": {
+      "file": "assets/pdf.worker.min-qwK7q_zL.mjs",
+      "bytes": 1046214,
+      "gzipBytes": 289897
+    },
+    "largest": [
+      {
+        "file": "assets/index-BZN-x_4M.js",
+        "bytes": 3411235,
+        "gzipBytes": 978031
+      },
+      {
+        "file": "assets/dist-B6v-vrVP.js",
+        "bytes": 1411150,
+        "gzipBytes": 264725
+      },
+      {
+        "file": "assets/pdf.worker.min-qwK7q_zL.mjs",
+        "bytes": 1046214,
+        "gzipBytes": 289897
+      },
+      {
+        "file": "assets/emacs-lisp-C9XAeP06.js",
+        "bytes": 779854,
+        "gzipBytes": 196031
+      },
+      {
+        "file": "assets/cynefin-OW5HDTMX-BUxYq47J.js",
+        "bytes": 688439,
+        "gzipBytes": 154444
+      },
+      {
+        "file": "assets/mermaid.core-VOfJM3_w.js",
+        "bytes": 663840,
+        "gzipBytes": 162656
+      },
+      {
+        "file": "assets/cpp-CofmeUqb.js",
+        "bytes": 626081,
+        "gzipBytes": 44821
+      },
+      {
+        "file": "assets/wasm-CG6Dc4jp.js",
+        "bytes": 622336,
+        "gzipBytes": 230293
+      }
+    ]
+  },
+  "canvas": {
+    "entry": {
+      "file": "assets/index-B9zZqX6-.js",
+      "bytes": 3010843,
+      "gzipBytes": 858757
+    },
+    "total": {
+      "files": 425,
+      "bytes": 20895572,
+      "gzipBytes": 5582029
+    },
+    "chemistry": {
+      "file": "assets/chemistry-DevpnQTD.js",
+      "bytes": 1097002,
+      "gzipBytes": 340787
+    },
+    "largest": [
+      {
+        "file": "assets/index-B9zZqX6-.js",
+        "bytes": 3010843,
+        "gzipBytes": 858757
+      },
+      {
+        "file": "assets/dist-qdcqflRp.js",
+        "bytes": 1411152,
+        "gzipBytes": 264726
+      },
+      {
+        "file": "assets/resources-D5ymtJwZ.json",
+        "bytes": 1351963,
+        "gzipBytes": 466509
+      },
+      {
+        "file": "assets/chemistry-DevpnQTD.js",
+        "bytes": 1097002,
+        "gzipBytes": 340787
+      },
+      {
+        "file": "assets/emacs-lisp-C9XAeP06.js",
+        "bytes": 779854,
+        "gzipBytes": 196031
+      },
+      {
+        "file": "assets/cynefin-OW5HDTMX-CzscKMWP.js",
+        "bytes": 688439,
+        "gzipBytes": 154445
+      },
+      {
+        "file": "assets/mermaid.core-I3wiJltV.js",
+        "bytes": 663840,
+        "gzipBytes": 162658
+      },
+      {
+        "file": "assets/cpp-CofmeUqb.js",
+        "bytes": 626081,
+        "gzipBytes": 44821
+      }
+    ]
+  },
+  "integration": {
+    "entry": {
+      "file": "assets/index-Ca9erKX9.js",
+      "bytes": 3022042,
+      "gzipBytes": 862131
+    },
+    "total": {
+      "files": 428,
+      "bytes": 22403421,
+      "gzipBytes": 6008598
+    },
+    "pdfWorker": {
+      "file": "assets/pdf.worker.min-qwK7q_zL.mjs",
+      "bytes": 1046214,
+      "gzipBytes": 289897
+    },
+    "chemistry": {
+      "file": "assets/chemistry-BAOtVvr1.js",
+      "bytes": 1097002,
+      "gzipBytes": 340786
+    },
+    "largest": [
+      {
+        "file": "assets/index-Ca9erKX9.js",
+        "bytes": 3022042,
+        "gzipBytes": 862131
+      },
+      {
+        "file": "assets/dist-BxN5aRud.js",
+        "bytes": 1411166,
+        "gzipBytes": 264726
+      },
+      {
+        "file": "assets/resources-D5ymtJwZ.json",
+        "bytes": 1351963,
+        "gzipBytes": 466509
+      },
+      {
+        "file": "assets/chemistry-BAOtVvr1.js",
+        "bytes": 1097002,
+        "gzipBytes": 340786
+      },
+      {
+        "file": "assets/pdf.worker.min-qwK7q_zL.mjs",
+        "bytes": 1046214,
+        "gzipBytes": 289897
+      },
+      {
+        "file": "assets/emacs-lisp-C9XAeP06.js",
+        "bytes": 779854,
+        "gzipBytes": 196031
+      },
+      {
+        "file": "assets/cynefin-OW5HDTMX--J72ODMK.js",
+        "bytes": 688439,
+        "gzipBytes": 154442
+      },
+      {
+        "file": "assets/mermaid.core-zx7GvV52.js",
+        "bytes": 663840,
+        "gzipBytes": 162656
+      }
+    ]
+  }
+}

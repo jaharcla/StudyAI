@@ -1,9 +1,9 @@
-export const DOCUMENT_API = "http://127.0.0.1:8201/api/document-intelligence";
+export const DOCUMENT_API = "/api/document-intelligence";
 
 export type UnitType = "page" | "slide" | "text";
 export type SourceReference = { documentId: string; unitType: UnitType; unitNumber: number; chunkIndex: number };
 export type SearchHit = { documentId: string; title: string; filename: string; unitType: UnitType; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number };
-export type LibraryDocument = { id: string; courseId: string; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
+export type LibraryDocument = { id: string; courseId: string; lessonId?: string | null; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
 export type DocumentData = LibraryDocument & { units: Array<{ type: UnitType; number: number; title?: string; text: string }> };
 
 export function parseSourceReference(sourceRef: string): SourceReference | undefined {
@@ -26,13 +26,13 @@ export async function requestJson<T>(url: string, init?: RequestInit): Promise<T
   return value;
 }
 
-export function uploadOne(file: File, courseId: string, onProgress: (value: number) => void): Promise<{ status: "imported" | "duplicate" | "error"; message: string; documentId?: string }> {
+export function uploadOne(file: File, courseId: string, onProgress: (value: number) => void, lessonId?: string): Promise<{ status: "imported" | "duplicate" | "error"; message: string; documentId?: string }> {
   return new Promise(async (resolve) => {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = "";
       for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-      const body = JSON.stringify({ courseId, files: [{ name: file.name, contentBase64: btoa(binary) }] });
+      const body = JSON.stringify({ courseId, lessonId, files: [{ name: file.name, contentBase64: btoa(binary) }] });
       const xhr = new XMLHttpRequest();
       xhr.open("POST", DOCUMENT_API + "/import");
       xhr.setRequestHeader("content-type", "application/json");

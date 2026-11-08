@@ -8,3 +8,5 @@ test-results/
 
 # LangGraph API
 .langgraph_api
+*.tsbuildinfo
+.worktrees/

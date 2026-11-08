@@ -1,5 +1,7 @@
 # Document intelligence handoff
 
+Historical subsystem handoff. Current shared API, tutor, canvas, lesson associations, and verification are recorded in [INTEGRATION_VERIFICATION.md](INTEGRATION_VERIFICATION.md); that report supersedes the integration TODOs below.
+
 ## Included
 
 - User-triggerable bulk import service for PDF, DOCX, PPTX, and UTF-8 TXT, with a 20-file/50 MB batch limit and 20 MB per-file limit.

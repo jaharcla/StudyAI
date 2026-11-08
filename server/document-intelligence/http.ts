@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type Database from "better-sqlite3";
+import { getStudyAIConfig, LOOPBACK_HOST } from "../config.js";
 import { deleteDocument, getDocument, getDocumentFile, getDocumentLocation, importDocumentsIndividually, listDocuments, MAX_BATCH_BYTES, MAX_BATCH_FILES, retrieveCourseDocuments, searchDocuments } from "./service.js";
 import type { ImportFile } from "./types.js";
 
@@ -7,10 +8,11 @@ const MAX_REQUEST_BYTES = 70 * 1024 * 1024;
 type Handler = (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
 
 export function createDocumentIntelligenceHandler(db: Database.Database, storageRoot?: string): Handler {
+  const origin = getStudyAIConfig().webOrigin;
   return async (request, response) => {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    const url = new URL(request.url ?? "/", `http://${LOOPBACK_HOST}`);
     if (url.pathname.startsWith("/api/document-intelligence/") && request.method === "OPTIONS") {
-      response.writeHead(204, { "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+      response.writeHead(204, { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
       response.end();
       return true;
     }
@@ -18,6 +20,7 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
       try {
         const input = await readJson(request);
         if (typeof input.courseId !== "string" || !Array.isArray(input.files)) return send(response, 400, { error: "courseId and files are required." });
+        if (input.lessonId !== undefined && (typeof input.lessonId !== "string" || !db.prepare("SELECT id FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId))) return send(response, 400, { error: "Lesson not found in this course." });
         if (input.files.length > MAX_BATCH_FILES) return send(response, 413, { error: `A batch can contain at most ${MAX_BATCH_FILES} files.` });
         const files: ImportFile[] = input.files.map((file: { name?: unknown; contentBase64?: unknown }) => {
           if (typeof file?.name !== "string" || typeof file.contentBase64 !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.contentBase64)) throw new Error("Each file needs a name and valid base64 content.");
@@ -25,6 +28,9 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
         });
         if (files.reduce((sum, file) => sum + file.bytes.byteLength, 0) > MAX_BATCH_BYTES) return send(response, 413, { error: "Batch exceeds the 50 MB total limit." });
         const results = await importDocumentsIndividually(db, input.courseId, files, storageRoot);
+        if (typeof input.lessonId === "string") for (const result of results) {
+          if (result.status === "imported") db.prepare("UPDATE di_documents SET lesson_id=? WHERE id=? AND course_id=?").run(input.lessonId, result.document.id, input.courseId);
+        }
         return send(response, 200, { results, documents: results.filter((result) => result.status === "imported").map((result) => result.document) });
       } catch (error) { return sendError(response, error); }
     }
@@ -56,7 +62,7 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
         try {
           const file = await getDocumentFile(db, course, documentId);
           if (!file) return send(response, 404, { error: "Document not found in this course." });
-          response.writeHead(200, { "content-type": file.mimeType, "content-length": String(file.bytes.byteLength), "content-disposition": "inline; filename*=UTF-8''" + encodeURIComponent(file.filename), "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+          response.writeHead(200, { "content-type": file.mimeType, "content-length": String(file.bytes.byteLength), "content-disposition": "inline; filename*=UTF-8''" + encodeURIComponent(file.filename), "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
           response.end(file.bytes);
           return true;
         } catch (error) { return sendError(response, error); }
@@ -100,7 +106,7 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
 }
 
 function send(response: ServerResponse, status: number, value: unknown): boolean {
-  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": getStudyAIConfig().webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
   response.end(JSON.stringify(value));
   return true;
 }

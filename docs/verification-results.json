@@ -1,0 +1,67 @@
+{
+  "verifiedLocalDate": "2026-11-07",
+  "timezone": "America/Toronto",
+  "sourceCommits": [
+    "7eb5449507946c988cae806a2c2c15d3cd5ad9f9",
+    "0ecf5033049ab2eeaaf827ff8a9c0c14cd9b7ed0"
+  ],
+  "node": "v24.13.0",
+  "model": "qwen3:latest",
+  "productionBrowser": true,
+  "typescript": "passed",
+  "build": "passed",
+  "cleanInstall": "passed",
+  "unit": {
+    "passed": 41,
+    "failed": 0,
+    "files": 9
+  },
+  "endToEnd": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 42037.291999999994,
+    "tests": [
+      {
+        "title": "canvas creates, calculates, saves, reloads, and separates boards by course",
+        "status": "passed",
+        "durationMs": 2408
+      },
+      {
+        "title": "imports a PDF, retrieves its fact in the tutor, and opens its page citation",
+        "status": "passed",
+        "durationMs": 15560
+      },
+      {
+        "title": "PDF import → index → tutor citation → Lewis edit → save → reload",
+        "status": "passed",
+        "durationMs": 16638
+      },
+      {
+        "title": "canvas API rejects cross-course reads, writes, deletes and invalid lessons",
+        "status": "passed",
+        "durationMs": 94
+      },
+      {
+        "title": "legacy TXT API imports remain indexed and deletion stays synchronized",
+        "status": "passed",
+        "durationMs": 69
+      },
+      {
+        "title": "workspace renders, saves its canvas, and switches study views",
+        "status": "passed",
+        "durationMs": 1583
+      }
+    ]
+  },
+  "sourceInputCount": 56,
+  "sourceInputsSha256": "17ba3433c0438c8f9cecf86fc7ac39868759794fa4a1773c3f7c41e41d67a0d4",
+  "dependencyAdvisories": {
+    "low": 6,
+    "moderate": 10,
+    "high": 25,
+    "critical": 4,
+    "total": 45
+  },
+  "mainMerged": false
+}

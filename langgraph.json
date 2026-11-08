@@ -1,5 +1,9 @@
 {
-  "dependencies": ["."],
-  "graphs": { "studyai": "./server/agent.ts:graph" },
-  "env": ".env.example"
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "studyai": "./server/agent.ts:graph"
+  },
+  "env": ".env"
 }

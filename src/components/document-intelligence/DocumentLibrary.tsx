@@ -6,9 +6,9 @@ import { DOCUMENT_API, type LibraryDocument, type SearchHit, parseSourceReferenc
 
 type Course = { id: string; title: string };
 type Upload = { id: string; file: File; status: "queued" | "uploading" | "imported" | "duplicate" | "error"; progress: number; message?: string; documentId?: string };
-type Props = { courseId: string; courses?: Course[]; onCourseChange?: (courseId: string) => void; initialSourceRef?: string; initialSourceKey?: number; initialQuery?: string };
+type Props = { courseId: string; lessonId?: string; courses?: Course[]; onCourseChange?: (courseId: string) => void; initialDocumentId?: string; initialSourceRef?: string; initialSourceKey?: number; initialQuery?: string };
 
-export function DocumentLibrary({ courseId, courses = [], onCourseChange, initialSourceRef, initialSourceKey, initialQuery }: Props) {
+export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChange, initialDocumentId, initialSourceRef, initialSourceKey, initialQuery }: Props) {
   const [documents, setDocuments] = useState<LibraryDocument[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [query, setQuery] = useState("");
@@ -42,10 +42,11 @@ export function DocumentLibrary({ courseId, courses = [], onCourseChange, initia
   }, [refresh, query]);
 
   useEffect(() => {
+    if (initialDocumentId) { setViewer({ documentId: initialDocumentId }); return; }
     if (!initialSourceRef) return;
     const source = parseSourceReference(initialSourceRef);
     if (source) setViewer({ documentId: source.documentId, sourceRef: initialSourceRef });
-  }, [initialSourceRef, initialSourceKey]);
+  }, [initialSourceRef, initialSourceKey, initialDocumentId]);
 
   useEffect(() => { if (initialQuery !== undefined) setQuery(initialQuery); }, [initialQuery]);
 
@@ -67,7 +68,7 @@ export function DocumentLibrary({ courseId, courses = [], onCourseChange, initia
     for (const job of jobs) {
       if (job.status === "error") continue;
       setUploads((current) => current.map((item) => item.id === job.id ? { ...item, status: "uploading", progress: 0 } : item));
-      const result = await uploadOne(job.file, courseId, (progress) => setUploads((current) => current.map((item) => item.id === job.id ? { ...item, progress } : item)));
+      const result = await uploadOne(job.file, courseId, (progress) => setUploads((current) => current.map((item) => item.id === job.id ? { ...item, progress } : item)), lessonId);
       setUploads((current) => current.map((item) => item.id === job.id ? { ...item, status: result.status, progress: result.status === "error" ? item.progress : 100, message: result.message, documentId: result.documentId } : item));
       if (result.status === "imported") await refresh(query);
     }

@@ -41,7 +41,12 @@ export function pptxFixture(): Uint8Array {
 }
 
 export function pdfFixture(text = "PDF sample page"): Uint8Array {
-  const stream = text ? "BT /F1 12 Tf 72 720 Td (" + text + ") Tj ET" : "q Q";
+  const lines: string[] = [];
+  for (const word of text.split(/\s+/)) {
+    if (!lines.length || lines[lines.length - 1].length + word.length > 78) lines.push(word);
+    else lines[lines.length - 1] += " " + word;
+  }
+  const stream = text ? "BT /F1 12 Tf 16 TL 72 720 Td " + lines.map((line) => "(" + line.replace(/[()\\]/g, "\\$&") + ") Tj T*").join(" ") + " ET" : "q Q";
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",

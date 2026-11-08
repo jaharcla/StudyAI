@@ -29,6 +29,7 @@ export function initializeDocumentIntelligenceSchema(db: Database.Database): voi
   `);
   const columns = db.pragma("table_info(di_documents)") as Array<{ name: string }>;
   if (!columns.some((column) => column.name === "content_hash")) db.exec("ALTER TABLE di_documents ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''");
+  if (!columns.some((column) => column.name === "lesson_id")) db.exec("ALTER TABLE di_documents ADD COLUMN lesson_id TEXT");
   db.exec("CREATE UNIQUE INDEX IF NOT EXISTS di_documents_course_hash_idx ON di_documents(course_id, content_hash) WHERE content_hash <> ''");
   db.pragma("foreign_keys = ON");
 }

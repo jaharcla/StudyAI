@@ -1,25 +1,28 @@
 import { expect, test } from "@playwright/test";
 import { pdfFixture } from "../fixtures/document-intelligence.js";
+import { createCourseWithLesson, selectCourseOnPage } from "./helpers";
 
-const dataApi = "http://127.0.0.1:8201/api";
+const dataApi = "/api";
 
 test("imports a PDF, retrieves its fact in the tutor, and opens its page citation", async ({ page, request }) => {
   test.setTimeout(240_000);
   await expect.poll(async () => (await request.get(dataApi + "/courses")).status(), { timeout: 30_000 }).toBe(200);
-  await expect.poll(async () => (await request.get("http://127.0.0.1:8200/api/copilotkit/info")).status(), { timeout: 30_000 }).toBe(200);
-  await expect.poll(async () => (await request.get("http://127.0.0.1:8123/ok")).status(), { timeout: 30_000 }).toBe(200);
+  await expect.poll(async () => (await request.get("/api/copilotkit/info")).status(), { timeout: 30_000 }).toBe(200);
+  await expect.poll(async () => { try { return (await request.get(`http://127.0.0.1:${process.env.AGENT_PORT ?? 8133}/ok`)).status(); } catch { return 0; } }, { timeout: 30_000 }).toBe(200);
+  const { course } = await createCourseWithLesson(request);
   await page.goto("/");
+  await selectCourseOnPage(page, course.title);
   await page.getByRole("button", { name: "Lecture", exact: true }).click();
 
   const input = page.locator(".di-file-input");
   await input.setInputFiles({ name: "citation-proof.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdfFixture("The assigned alloy code is ZORBIUM-417.")) });
   await expect(page.getByText("Indexed", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect.poll(async () => {
-    const response = await request.get(dataApi + "/document-intelligence/search?course=chem-120&q=ZORBIUM-417");
+    const response = await request.get(dataApi + `/document-intelligence/search?course=${course.id}&q=ZORBIUM-417`);
     const body = await response.json();
     return Boolean(body.results?.[0]);
   }, { timeout: 30_000 }).toBe(true);
-  const searchResponse = await request.get(dataApi + "/document-intelligence/search?course=chem-120&q=ZORBIUM-417");
+  const searchResponse = await request.get(dataApi + `/document-intelligence/search?course=${course.id}&q=ZORBIUM-417`);
   const hit = (await searchResponse.json()).results[0] as { documentId: string; filename: string; unitType: string; unitNumber: number; sourceRef: string };
 
   try {
@@ -37,6 +40,6 @@ test("imports a PDF, retrieves its fact in the tutor, and opens its page citatio
     await expect(page.getByRole("dialog", { name: "citation-proof.pdf" })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Page 1 of 1")).toBeVisible();
   } finally {
-    await request.delete(dataApi + "/document-intelligence/documents/" + encodeURIComponent(hit.documentId) + "?course=chem-120").catch(() => undefined);
+    await request.delete(dataApi + "/document-intelligence/documents/" + encodeURIComponent(hit.documentId) + `?course=${course.id}`).catch(() => undefined);
   }
 });

@@ -11,7 +11,7 @@ export const MAX_BATCH_FILES = 20;
 export const MAX_BATCH_BYTES = 50 * 1024 * 1024;
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
-export type IndexedDocument = { id: string; courseId: string; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
+export type IndexedDocument = { id: string; courseId: string; lessonId: string | null; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
 export type DocumentSearchResult = { documentId: string; title: string; filename: string; unitType: string; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number };
 export type ImportFileResult =
   | { status: "imported"; fileName: string; document: { id: string; title: string; unitCount: number; chunkCount: number } }
@@ -126,7 +126,7 @@ export async function importDocumentsIndividually(db: Database.Database, courseI
 export function listDocuments(db: Database.Database, courseId: string, query = ""): { documents: IndexedDocument[]; results: ReturnType<typeof searchDocuments> } {
   initializeDocumentIntelligenceSchema(db);
   if (!courseId) return { documents: [], results: [] };
-  const sql = "SELECT d.id,d.course_id AS courseId,d.title,d.filename,d.mime_type AS mimeType,d.imported_at AS importedAt," +
+  const sql = "SELECT d.id,d.course_id AS courseId,d.lesson_id AS lessonId,d.title,d.filename,d.mime_type AS mimeType,d.imported_at AS importedAt," +
     "(SELECT count(*) FROM di_units u WHERE u.document_id=d.id) AS unitCount," +
     "(SELECT count(*) FROM di_chunks c WHERE c.document_id=d.id) AS chunkCount " +
     "FROM di_documents d WHERE d.course_id=? AND (?='' OR d.title LIKE ? ESCAPE '\\' OR d.filename LIKE ? ESCAPE '\\') ORDER BY d.imported_at DESC";
@@ -137,7 +137,7 @@ export function listDocuments(db: Database.Database, courseId: string, query = "
 
 export function getDocument(db: Database.Database, courseId: string, documentId: string): (IndexedDocument & { units: Array<{ type: string; number: number; title?: string; text: string }> }) | undefined {
   initializeDocumentIntelligenceSchema(db);
-  const sql = "SELECT d.id,d.course_id AS courseId,d.title,d.filename,d.mime_type AS mimeType,d.imported_at AS importedAt," +
+  const sql = "SELECT d.id,d.course_id AS courseId,d.lesson_id AS lessonId,d.title,d.filename,d.mime_type AS mimeType,d.imported_at AS importedAt," +
     "(SELECT count(*) FROM di_units u WHERE u.document_id=d.id) AS unitCount," +
     "(SELECT count(*) FROM di_chunks c WHERE c.document_id=d.id) AS chunkCount FROM di_documents d WHERE d.id=? AND d.course_id=?";
   const document = db.prepare(sql).get(documentId, courseId) as IndexedDocument | undefined;
@@ -150,7 +150,18 @@ export async function deleteDocument(db: Database.Database, courseId: string, do
   initializeDocumentIntelligenceSchema(db);
   const document = db.prepare("SELECT storage_path FROM di_documents WHERE id=? AND course_id=?").get(documentId, courseId) as { storage_path: string } | undefined;
   if (!document) return false;
-  db.prepare("DELETE FROM di_documents WHERE id=? AND course_id=?").run(documentId, courseId);
+  db.transaction(() => {
+    db.prepare("DELETE FROM di_documents WHERE id=? AND course_id=?").run(documentId, courseId);
+    const hasTable = (name: string) => Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name));
+    if (hasTable("documents") && db.prepare("SELECT id FROM documents WHERE id=? AND course_id=?").get(documentId, courseId)) {
+      if (hasTable("document_chunks")) {
+        const chunks = db.prepare("SELECT id,content FROM document_chunks WHERE document_id=? AND course_id=?").all(documentId, courseId) as Array<{ id: number; content: string }>;
+        if (hasTable("chunk_search")) for (const chunk of chunks) db.prepare("INSERT INTO chunk_search(chunk_search,rowid,content) VALUES('delete',?,?)").run(chunk.id, chunk.content);
+        db.prepare("DELETE FROM document_chunks WHERE document_id=? AND course_id=?").run(documentId, courseId);
+      }
+      db.prepare("DELETE FROM documents WHERE id=? AND course_id=?").run(documentId, courseId);
+    }
+  })();
   await unlink(document.storage_path).catch(() => undefined);
   return true;
 }
@@ -170,7 +181,7 @@ export function retrieveCourseDocuments(db: Database.Database, courseId: string,
     : { status: "no_evidence", message: "No matching excerpts were found in this course.", courseId, results: [] };
 }
 
-function mimeType(filename: string): string {
+export function mimeType(filename: string): string {
   switch (extname(filename).toLowerCase()) {
     case ".pdf": return "application/pdf";
     case ".docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
