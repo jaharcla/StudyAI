@@ -1,0 +1,330 @@
+{
+  "document": {
+    "store": {
+      "bio-title": {
+        "id": "bio-title",
+        "typeName": "shape",
+        "type": "text",
+        "x": 70,
+        "y": 40,
+        "rot": 0,
+        "z": 1,
+        "props": {
+          "text": "Animal cell",
+          "color": "green",
+          "size": "l",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "cell-membrane": {
+        "id": "cell-membrane",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 150,
+        "y": 120,
+        "rot": 0,
+        "z": 2,
+        "props": {
+          "geo": "ellipse",
+          "w": 550,
+          "h": 340,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "cell"
+        }
+      },
+      "nucleus": {
+        "id": "nucleus",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 340,
+        "y": 230,
+        "rot": 0,
+        "z": 3,
+        "props": {
+          "geo": "ellipse",
+          "w": 150,
+          "h": 130,
+          "color": "violet",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "N"
+        }
+      },
+      "mitochondrion": {
+        "id": "mitochondrion",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 535,
+        "y": 295,
+        "rot": 0,
+        "z": 4,
+        "props": {
+          "geo": "ellipse",
+          "w": 115,
+          "h": 60,
+          "color": "orange",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "M"
+        }
+      },
+      "membrane-callout": {
+        "id": "membrane-callout",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 140,
+        "y": 145,
+        "rot": 0,
+        "z": 5,
+        "props": {
+          "dx": 70,
+          "dy": 0,
+          "bend": 0,
+          "color": "green",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "typed-membrane-label": {
+        "id": "typed-membrane-label",
+        "typeName": "shape",
+        "type": "text",
+        "x": 45,
+        "y": 130,
+        "rot": 0,
+        "z": 6,
+        "props": {
+          "text": "cell membrane",
+          "color": "green",
+          "size": "m",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "hand-DNA-D-1": {
+        "id": "hand-DNA-D-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 370,
+        "y": 275,
+        "rot": 0,
+        "z": 7,
+        "props": {
+          "pts": [
+            0,
+            18,
+            0.65,
+            0,
+            0,
+            0.65,
+            7,
+            1,
+            0.65,
+            13,
+            5,
+            0.65,
+            14,
+            9,
+            0.65,
+            13,
+            14,
+            0.65,
+            7,
+            18,
+            0.65,
+            0,
+            18,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-DNA-N-1": {
+        "id": "hand-DNA-N-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 390,
+        "y": 275,
+        "rot": 0,
+        "z": 8,
+        "props": {
+          "pts": [
+            0,
+            18,
+            0.65,
+            0,
+            0,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-DNA-N-2": {
+        "id": "hand-DNA-N-2",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 390,
+        "y": 275,
+        "rot": 0,
+        "z": 9,
+        "props": {
+          "pts": [
+            0,
+            0,
+            0.65,
+            13,
+            18,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-DNA-N-3": {
+        "id": "hand-DNA-N-3",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 390,
+        "y": 275,
+        "rot": 0,
+        "z": 10,
+        "props": {
+          "pts": [
+            13,
+            18,
+            0.65,
+            13,
+            0,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-DNA-A-1": {
+        "id": "hand-DNA-A-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 412,
+        "y": 275,
+        "rot": 0,
+        "z": 11,
+        "props": {
+          "pts": [
+            0,
+            18,
+            0.65,
+            6,
+            0,
+            0.65,
+            13,
+            18,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-DNA-A-2": {
+        "id": "hand-DNA-A-2",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 412,
+        "y": 275,
+        "rot": 0,
+        "z": 12,
+        "props": {
+          "pts": [
+            3,
+            11,
+            0.65,
+            10,
+            11,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-nucleus-label": {
+        "id": "hand-nucleus-label",
+        "typeName": "shape",
+        "type": "text",
+        "x": 352,
+        "y": 390,
+        "rot": 0,
+        "z": 13,
+        "props": {
+          "text": "nucleus",
+          "color": "violet",
+          "size": "m",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "mito-callout": {
+        "id": "mito-callout",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 685,
+        "y": 325,
+        "rot": 0,
+        "z": 14,
+        "props": {
+          "dx": -35,
+          "dy": 0,
+          "bend": 0,
+          "color": "orange",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "typed-mito-label": {
+        "id": "typed-mito-label",
+        "typeName": "shape",
+        "type": "text",
+        "x": 705,
+        "y": 310,
+        "rot": 0,
+        "z": 15,
+        "props": {
+          "text": "energy",
+          "color": "orange",
+          "size": "m",
+          "font": "serif",
+          "autosize": true,
+          "scale": 1
+        }
+      }
+    }
+  }
+}

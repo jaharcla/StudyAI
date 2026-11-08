@@ -1,0 +1,321 @@
+{
+  "document": {
+    "store": {
+      "chem-title": {
+        "id": "chem-title",
+        "typeName": "shape",
+        "type": "text",
+        "x": 70,
+        "y": 45,
+        "rot": 0,
+        "z": 1,
+        "props": {
+          "text": "Carboxylate resonance",
+          "color": "blue",
+          "size": "l",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "o-left-1": {
+        "id": "o-left-1",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 90,
+        "y": 165,
+        "rot": 0,
+        "z": 2,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "carbon-1": {
+        "id": "carbon-1",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 205,
+        "y": 165,
+        "rot": 0,
+        "z": 3,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "C"
+        }
+      },
+      "o-right-1": {
+        "id": "o-right-1",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 320,
+        "y": 165,
+        "rot": 0,
+        "z": 4,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "double-bond-left-1": {
+        "id": "double-bond-left-1",
+        "typeName": "shape",
+        "type": "line",
+        "x": 152,
+        "y": 185,
+        "rot": 0,
+        "z": 5,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "double-bond-left-2": {
+        "id": "double-bond-left-2",
+        "typeName": "shape",
+        "type": "line",
+        "x": 152,
+        "y": 198,
+        "rot": 0,
+        "z": 6,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "single-bond-right": {
+        "id": "single-bond-right",
+        "typeName": "shape",
+        "type": "line",
+        "x": 267,
+        "y": 191,
+        "rot": 0,
+        "z": 7,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "formal-charge-left-1": {
+        "id": "formal-charge-left-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 341,
+        "y": 133,
+        "rot": 0,
+        "z": 8,
+        "props": {
+          "pts": [
+            0,
+            7,
+            0.65,
+            14,
+            7,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "o-left-2": {
+        "id": "o-left-2",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 520,
+        "y": 165,
+        "rot": 0,
+        "z": 9,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "carbon-2": {
+        "id": "carbon-2",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 635,
+        "y": 165,
+        "rot": 0,
+        "z": 10,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "C"
+        }
+      },
+      "o-right-2": {
+        "id": "o-right-2",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 750,
+        "y": 165,
+        "rot": 0,
+        "z": 11,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "single-bond-left": {
+        "id": "single-bond-left",
+        "typeName": "shape",
+        "type": "line",
+        "x": 582,
+        "y": 191,
+        "rot": 0,
+        "z": 12,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "double-bond-right-1": {
+        "id": "double-bond-right-1",
+        "typeName": "shape",
+        "type": "line",
+        "x": 697,
+        "y": 185,
+        "rot": 0,
+        "z": 13,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "double-bond-right-2": {
+        "id": "double-bond-right-2",
+        "typeName": "shape",
+        "type": "line",
+        "x": 697,
+        "y": 198,
+        "rot": 0,
+        "z": 14,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "formal-charge-right-1": {
+        "id": "formal-charge-right-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 541,
+        "y": 133,
+        "rot": 0,
+        "z": 15,
+        "props": {
+          "pts": [
+            0,
+            7,
+            0.65,
+            14,
+            7,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "resonance-caption": {
+        "id": "resonance-caption",
+        "typeName": "shape",
+        "type": "text",
+        "x": 400,
+        "y": 300,
+        "rot": 0,
+        "z": 16,
+        "props": {
+          "text": "resonance",
+          "color": "violet",
+          "size": "m",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "resonance-arrow": {
+        "id": "resonance-arrow",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 390,
+        "y": 195,
+        "rot": 0,
+        "z": 17,
+        "props": {
+          "dx": 100,
+          "dy": 0,
+          "bend": 0,
+          "color": "violet",
+          "size": "m",
+          "dash": "solid"
+        }
+      }
+    }
+  }
+}

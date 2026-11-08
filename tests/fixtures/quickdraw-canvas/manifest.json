@@ -1,0 +1,188 @@
+{
+  "generator": "@quickdrawjs/react Store + drawShape",
+  "format": "Store.getSnapshot()",
+  "fixtures": [
+    {
+      "id": "chemistry-lewis-resonance",
+      "title": "Lewis structures with formal charges and resonance",
+      "question": "Interpret the two Lewis structures and the resonance arrow. Which atoms carry formal charge, and what relationship does the arrow indicate?",
+      "strokes": [
+        "formal-charge-left-1",
+        "formal-charge-right-1"
+      ],
+      "expectedOcrText": "- -",
+      "expectedObjectIds": [
+        "o-left-1",
+        "carbon-1",
+        "o-right-1",
+        "o-left-2",
+        "carbon-2",
+        "o-right-2"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "o-left-1",
+          "toId": "carbon-1",
+          "relation": "double bond"
+        },
+        {
+          "fromId": "carbon-1",
+          "toId": "o-right-1",
+          "relation": "single bond"
+        },
+        {
+          "fromId": "o-left-2",
+          "toId": "carbon-2",
+          "relation": "single bond"
+        },
+        {
+          "fromId": "carbon-2",
+          "toId": "o-right-2",
+          "relation": "double bond"
+        }
+      ],
+      "expectedConcepts": [
+        "resonance",
+        "formal charge",
+        "oxygen"
+      ]
+    },
+    {
+      "id": "physics-free-body",
+      "title": "Free-body diagram with mixed labels",
+      "question": "Identify the body and force vectors. Give the direction of each labeled force, and say whether the vertical components balance.",
+      "strokes": [
+        "hand-force-FN-1",
+        "hand-force-FN-2",
+        "hand-force-FN-3"
+      ],
+      "expectedOcrText": "F N",
+      "expectedObjectIds": [
+        "block",
+        "force-normal",
+        "force-weight",
+        "force-applied",
+        "force-friction"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "force-normal",
+          "toId": "block",
+          "relation": "acts on"
+        },
+        {
+          "fromId": "force-weight",
+          "toId": "block",
+          "relation": "acts on"
+        },
+        {
+          "fromId": "force-applied",
+          "toId": "block",
+          "relation": "acts on"
+        },
+        {
+          "fromId": "force-friction",
+          "toId": "block",
+          "relation": "acts on"
+        }
+      ],
+      "expectedConcepts": [
+        "normal force",
+        "weight",
+        "applied force",
+        "friction",
+        "vertical"
+      ]
+    },
+    {
+      "id": "biology-cell-annotations",
+      "title": "Cell diagram with handwritten DNA annotation",
+      "question": "Name the labeled cell structures. What does the handwritten annotation inside the nucleus read?",
+      "strokes": [
+        "hand-DNA-D-1",
+        "hand-DNA-N-1",
+        "hand-DNA-N-2",
+        "hand-DNA-N-3",
+        "hand-DNA-A-1",
+        "hand-DNA-A-2"
+      ],
+      "expectedOcrText": "DNA",
+      "expectedObjectIds": [
+        "cell-membrane",
+        "nucleus",
+        "mitochondrion"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "cell-membrane",
+          "toId": "nucleus",
+          "relation": "contains"
+        },
+        {
+          "fromId": "cell-membrane",
+          "toId": "mitochondrion",
+          "relation": "contains"
+        },
+        {
+          "fromId": "nucleus",
+          "toId": "hand-DNA-D-1",
+          "relation": "contains"
+        }
+      ],
+      "expectedConcepts": [
+        "cell membrane",
+        "nucleus",
+        "mitochondrion",
+        "DNA"
+      ]
+    },
+    {
+      "id": "mixed-typed-handwritten",
+      "title": "Typed geometry with handwritten scientific labels",
+      "question": "What is the charge sign and force direction if the electric field points right? Distinguish observed labels from inferred physics.",
+      "strokes": [
+        "hand-positive-charge-1",
+        "hand-positive-charge-2"
+      ],
+      "expectedOcrText": "+",
+      "expectedObjectIds": [
+        "particle",
+        "electric-field"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "electric-field",
+          "toId": "particle",
+          "relation": "field at particle"
+        }
+      ],
+      "expectedConcepts": [
+        "positive",
+        "right",
+        "force",
+        "qE"
+      ]
+    },
+    {
+      "id": "ambiguous-incomplete-link",
+      "title": "Incomplete force relationship",
+      "question": "Does F act on object A or object B? State what can be concluded and what remains ambiguous.",
+      "strokes": [
+        "ambiguous-F-1",
+        "ambiguous-F-2",
+        "ambiguous-F-3"
+      ],
+      "expectedOcrText": "F",
+      "expectedObjectIds": [
+        "object-A",
+        "object-B",
+        "unheaded-connector"
+      ],
+      "expectedRelationships": [],
+      "expectedConcepts": [
+        "ambiguous"
+      ],
+      "mustAbstain": true
+    }
+  ]
+}

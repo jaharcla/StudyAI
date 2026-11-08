@@ -12,6 +12,7 @@ import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
 import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { createLearningHandler } from "./learning/http.js";
+import { createCanvasAnalysisHandler } from "./canvas-analysis/http.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
@@ -21,11 +22,13 @@ if (legacyDocuments.failures.length) console.warn("Legacy document indexing fail
 const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": config.webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
 const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYAI_DOCUMENTS);
 const learningHandler = createLearningHandler(new LearningService(db), config.webOrigin);
+const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
 
 const server = createServer(async (req, res) => {
   try {
   if (await learningHandler(req, res)) return;
   if (await documentHandler(req, res)) return;
+  if (await canvasAnalysisHandler(req, res)) return;
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url ?? "/", `http://${LOOPBACK_HOST}:${port}`);
   if (req.method === "GET" && url.pathname === "/api/models") {

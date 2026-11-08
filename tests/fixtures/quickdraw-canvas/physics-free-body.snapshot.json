@@ -1,0 +1,267 @@
+{
+  "document": {
+    "store": {
+      "fbd-title": {
+        "id": "fbd-title",
+        "typeName": "shape",
+        "type": "text",
+        "x": 80,
+        "y": 40,
+        "rot": 0,
+        "z": 1,
+        "props": {
+          "text": "Free-body diagram",
+          "color": "blue",
+          "size": "l",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "block": {
+        "id": "block",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 390,
+        "y": 235,
+        "rot": 0,
+        "z": 2,
+        "props": {
+          "geo": "rectangle",
+          "w": 105,
+          "h": 75,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "m"
+        }
+      },
+      "force-normal": {
+        "id": "force-normal",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 442,
+        "y": 235,
+        "rot": 0,
+        "z": 3,
+        "props": {
+          "dx": 0,
+          "dy": -130,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "force-weight": {
+        "id": "force-weight",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 442,
+        "y": 310,
+        "rot": 0,
+        "z": 4,
+        "props": {
+          "dx": 0,
+          "dy": 130,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "force-applied": {
+        "id": "force-applied",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 495,
+        "y": 273,
+        "rot": 0,
+        "z": 5,
+        "props": {
+          "dx": 160,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "force-friction": {
+        "id": "force-friction",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 390,
+        "y": 273,
+        "rot": 0,
+        "z": 6,
+        "props": {
+          "dx": -125,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "hand-force-FN-1": {
+        "id": "hand-force-FN-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 455,
+        "y": 110,
+        "rot": 0,
+        "z": 7,
+        "props": {
+          "pts": [
+            0,
+            18,
+            0.65,
+            0,
+            0,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-force-FN-2": {
+        "id": "hand-force-FN-2",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 455,
+        "y": 110,
+        "rot": 0,
+        "z": 8,
+        "props": {
+          "pts": [
+            0,
+            0,
+            0.65,
+            13,
+            0,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-force-FN-3": {
+        "id": "hand-force-FN-3",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 455,
+        "y": 110,
+        "rot": 0,
+        "z": 9,
+        "props": {
+          "pts": [
+            0,
+            8,
+            0.65,
+            10,
+            8,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-force-subscript": {
+        "id": "hand-force-subscript",
+        "typeName": "shape",
+        "type": "text",
+        "x": 470,
+        "y": 122,
+        "rot": 0,
+        "z": 10,
+        "props": {
+          "text": "N",
+          "color": "violet",
+          "size": "s",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "typed-force-weight": {
+        "id": "typed-force-weight",
+        "typeName": "shape",
+        "type": "text",
+        "x": 455,
+        "y": 445,
+        "rot": 0,
+        "z": 11,
+        "props": {
+          "text": "mg",
+          "color": "black",
+          "size": "m",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "typed-force-applied": {
+        "id": "typed-force-applied",
+        "typeName": "shape",
+        "type": "text",
+        "x": 620,
+        "y": 245,
+        "rot": 0,
+        "z": 12,
+        "props": {
+          "text": "Fₐ",
+          "color": "black",
+          "size": "m",
+          "font": "serif",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "typed-force-friction": {
+        "id": "typed-force-friction",
+        "typeName": "shape",
+        "type": "text",
+        "x": 325,
+        "y": 245,
+        "rot": 0,
+        "z": 13,
+        "props": {
+          "text": "f",
+          "color": "black",
+          "size": "m",
+          "font": "serif",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "force-equilibrium": {
+        "id": "force-equilibrium",
+        "typeName": "shape",
+        "type": "text",
+        "x": 350,
+        "y": 485,
+        "rot": 0,
+        "z": 14,
+        "props": {
+          "text": "ΣFₓ = 0",
+          "color": "blue",
+          "size": "m",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,321 @@
+{
+  "document": {
+    "store": {
+      "qd_001": {
+        "id": "qd_001",
+        "typeName": "shape",
+        "type": "text",
+        "x": 70,
+        "y": 45,
+        "rot": 0,
+        "z": 1,
+        "props": {
+          "text": "Carboxylate resonance",
+          "color": "blue",
+          "size": "l",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "qd_002": {
+        "id": "qd_002",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 90,
+        "y": 165,
+        "rot": 0,
+        "z": 2,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "qd_003": {
+        "id": "qd_003",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 205,
+        "y": 165,
+        "rot": 0,
+        "z": 3,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "C"
+        }
+      },
+      "qd_004": {
+        "id": "qd_004",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 320,
+        "y": 165,
+        "rot": 0,
+        "z": 4,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "qd_005": {
+        "id": "qd_005",
+        "typeName": "shape",
+        "type": "line",
+        "x": 152,
+        "y": 185,
+        "rot": 0,
+        "z": 5,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "qd_006": {
+        "id": "qd_006",
+        "typeName": "shape",
+        "type": "line",
+        "x": 152,
+        "y": 198,
+        "rot": 0,
+        "z": 6,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "qd_007": {
+        "id": "qd_007",
+        "typeName": "shape",
+        "type": "line",
+        "x": 267,
+        "y": 191,
+        "rot": 0,
+        "z": 7,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "qd_008": {
+        "id": "qd_008",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 341,
+        "y": 133,
+        "rot": 0,
+        "z": 8,
+        "props": {
+          "pts": [
+            0,
+            7,
+            0.65,
+            14,
+            7,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "qd_009": {
+        "id": "qd_009",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 520,
+        "y": 165,
+        "rot": 0,
+        "z": 9,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "qd_010": {
+        "id": "qd_010",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 635,
+        "y": 165,
+        "rot": 0,
+        "z": 10,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "C"
+        }
+      },
+      "qd_011": {
+        "id": "qd_011",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 750,
+        "y": 165,
+        "rot": 0,
+        "z": 11,
+        "props": {
+          "geo": "ellipse",
+          "w": 62,
+          "h": 62,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "O"
+        }
+      },
+      "qd_012": {
+        "id": "qd_012",
+        "typeName": "shape",
+        "type": "line",
+        "x": 582,
+        "y": 191,
+        "rot": 0,
+        "z": 12,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "qd_013": {
+        "id": "qd_013",
+        "typeName": "shape",
+        "type": "line",
+        "x": 697,
+        "y": 185,
+        "rot": 0,
+        "z": 13,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "qd_014": {
+        "id": "qd_014",
+        "typeName": "shape",
+        "type": "line",
+        "x": 697,
+        "y": 198,
+        "rot": 0,
+        "z": 14,
+        "props": {
+          "dx": 53,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "qd_015": {
+        "id": "qd_015",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 541,
+        "y": 133,
+        "rot": 0,
+        "z": 15,
+        "props": {
+          "pts": [
+            0,
+            7,
+            0.65,
+            14,
+            7,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "qd_016": {
+        "id": "qd_016",
+        "typeName": "shape",
+        "type": "text",
+        "x": 400,
+        "y": 300,
+        "rot": 0,
+        "z": 16,
+        "props": {
+          "text": "resonance",
+          "color": "violet",
+          "size": "m",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "qd_017": {
+        "id": "qd_017",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 390,
+        "y": 195,
+        "rot": 0,
+        "z": 17,
+        "props": {
+          "dx": 100,
+          "dy": 0,
+          "bend": 0,
+          "color": "violet",
+          "size": "m",
+          "dash": "solid"
+        }
+      }
+    }
+  }
+}

@@ -62,6 +62,15 @@ it("reports tool-calling incompatibility without returning JSON as ordinary chat
   expect(result.messages.at(-1)?.content).not.toContain("{\"kind\"");
 });
 
+it("rejects an invalid canvas analysis before it reaches the inference provider", async () => {
+  const result = await graph.invoke({
+    copilotkit: { context: [...context, { description: "StudyAI canvas analysis result", value: { boardId: "board-1", courseId: "chem-120", lessonId: "lesson-03", inferredInterpretations: { items: [{ statement: "verified fact" }] } } }] },
+    messages: [new HumanMessage("Explain this board")],
+  });
+  expect(mocks.invoke).not.toHaveBeenCalled();
+  expect(result.messages.at(-1)?.content).toContain("rejected as invalid, stale, or out of scope");
+});
+
 it("does not bind canvas tools from another course or retrieve another course's excerpts", async () => {
   mocks.invoke.mockResolvedValue(new AIMessage("No course excerpts found."));
   await graph.invoke({ copilotkit: { context: [{ ...context[0], value: { courseId: "biol-130", lessonId: "lesson-03" } }, context[1]], actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("TUTOR-771")] });

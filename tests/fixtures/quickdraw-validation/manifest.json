@@ -1,0 +1,213 @@
+{
+  "generator": "@quickdrawjs/react Store + drawShape",
+  "format": "Store.getSnapshot()",
+  "ids": "opaque qd_NNN identifiers; labels are stored only in shape props",
+  "fixtures": [
+    {
+      "id": "chemistry-lewis-resonance",
+      "title": "Lewis structures with formal charges and resonance",
+      "question": "Interpret the two Lewis structures and the resonance arrow. Which atoms carry formal charge, and what relationship does the arrow indicate?",
+      "strokes": [
+        "qd_008",
+        "qd_015"
+      ],
+      "expectedOcrText": "- -",
+      "expectedObjectIds": [
+        "qd_002",
+        "qd_003",
+        "qd_004",
+        "qd_009",
+        "qd_010",
+        "qd_011"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "qd_002",
+          "toId": "qd_003",
+          "relation": "double bond"
+        },
+        {
+          "fromId": "qd_003",
+          "toId": "qd_004",
+          "relation": "single bond"
+        },
+        {
+          "fromId": "qd_009",
+          "toId": "qd_010",
+          "relation": "single bond"
+        },
+        {
+          "fromId": "qd_010",
+          "toId": "qd_011",
+          "relation": "double bond"
+        }
+      ],
+      "expectedConcepts": [
+        "resonance",
+        "formal charge",
+        "oxygen"
+      ]
+    },
+    {
+      "id": "physics-free-body",
+      "title": "Free-body diagram with mixed labels",
+      "question": "Identify the body and force vectors. Give the direction of each labeled force, and say whether the vertical components balance.",
+      "strokes": [
+        "qd_007",
+        "qd_008",
+        "qd_009"
+      ],
+      "expectedOcrText": "F N",
+      "expectedObjectIds": [
+        "qd_002",
+        "qd_003",
+        "qd_004",
+        "qd_005",
+        "qd_006"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "qd_003",
+          "toId": "qd_002",
+          "relation": "acts on"
+        },
+        {
+          "fromId": "qd_004",
+          "toId": "qd_002",
+          "relation": "acts on"
+        },
+        {
+          "fromId": "qd_005",
+          "toId": "qd_002",
+          "relation": "acts on"
+        },
+        {
+          "fromId": "qd_006",
+          "toId": "qd_002",
+          "relation": "acts on"
+        }
+      ],
+      "expectedConcepts": [
+        "normal force",
+        "weight",
+        "applied force",
+        "friction",
+        "vertical"
+      ]
+    },
+    {
+      "id": "biology-cell-annotations",
+      "title": "Cell diagram with handwritten DNA annotation",
+      "question": "Name the labeled cell structures. What does the handwritten annotation inside the nucleus read?",
+      "strokes": [
+        "qd_007",
+        "qd_008",
+        "qd_009",
+        "qd_010",
+        "qd_011",
+        "qd_012"
+      ],
+      "expectedOcrText": "DNA",
+      "expectedObjectIds": [
+        "qd_002",
+        "qd_003",
+        "qd_004"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "qd_002",
+          "toId": "qd_003",
+          "relation": "contains"
+        },
+        {
+          "fromId": "qd_002",
+          "toId": "qd_004",
+          "relation": "contains"
+        },
+        {
+          "fromId": "qd_003",
+          "toId": "qd_007",
+          "relation": "contains"
+        }
+      ],
+      "expectedConcepts": [
+        "cell membrane",
+        "nucleus",
+        "mitochondrion",
+        "DNA"
+      ]
+    },
+    {
+      "id": "mixed-typed-handwritten",
+      "title": "Typed geometry with handwritten scientific labels",
+      "question": "What is the charge sign and force direction if the electric field points right? Distinguish observed labels from inferred physics.",
+      "strokes": [
+        "qd_004",
+        "qd_005"
+      ],
+      "expectedOcrText": "+",
+      "expectedObjectIds": [
+        "qd_002",
+        "qd_003"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "qd_003",
+          "toId": "qd_002",
+          "relation": "field at particle"
+        }
+      ],
+      "expectedConcepts": [
+        "positive",
+        "right",
+        "force",
+        "qE"
+      ]
+    },
+    {
+      "id": "ambiguous-incomplete-link",
+      "title": "Incomplete force relationship",
+      "question": "Does F act on object A or object B? State what can be concluded and what remains ambiguous.",
+      "strokes": [
+        "qd_005",
+        "qd_006",
+        "qd_007"
+      ],
+      "expectedOcrText": "F",
+      "expectedObjectIds": [
+        "qd_002",
+        "qd_003",
+        "qd_004"
+      ],
+      "expectedRelationships": [
+        {
+          "fromId": "qd_002",
+          "toId": "qd_003",
+          "relation": "connected"
+        }
+      ],
+      "expectedConcepts": [
+        "ambiguous"
+      ],
+      "mustAbstain": true
+    },
+    {
+      "id": "human-created-curve",
+      "title": "Persisted human-created freehand curve",
+      "question": "What can be concluded from this unlabeled stroke?",
+      "strokes": [
+        "shape:mw726efx00cxif"
+      ],
+      "expectedOcrText": "",
+      "expectedObjectIds": [
+        "shape:mw726efx00cxif"
+      ],
+      "expectedRelationships": [],
+      "expectedConcepts": [],
+      "mustAbstain": true,
+      "humanCreated": true,
+      "scientificAccuracyScorable": false
+    }
+  ],
+  "humanDrawingSource": "Read-only snapshot from a persisted local Quickdraw Store entry; one 73-point unlabeled freehand curve, no synthetic generator."
+}

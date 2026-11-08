@@ -1,0 +1,167 @@
+{
+  "document": {
+    "store": {
+      "ambig-title": {
+        "id": "ambig-title",
+        "typeName": "shape",
+        "type": "text",
+        "x": 70,
+        "y": 45,
+        "rot": 0,
+        "z": 1,
+        "props": {
+          "text": "Which object receives the force?",
+          "color": "blue",
+          "size": "l",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "object-A": {
+        "id": "object-A",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 295,
+        "y": 215,
+        "rot": 0,
+        "z": 2,
+        "props": {
+          "geo": "rectangle",
+          "w": 90,
+          "h": 85,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "A"
+        }
+      },
+      "object-B": {
+        "id": "object-B",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 475,
+        "y": 215,
+        "rot": 0,
+        "z": 3,
+        "props": {
+          "geo": "rectangle",
+          "w": 90,
+          "h": 85,
+          "color": "black",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "B"
+        }
+      },
+      "unheaded-connector": {
+        "id": "unheaded-connector",
+        "typeName": "shape",
+        "type": "line",
+        "x": 385,
+        "y": 258,
+        "rot": 0,
+        "z": 4,
+        "props": {
+          "dx": 90,
+          "dy": 0,
+          "bend": 0,
+          "color": "black",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "ambiguous-F-1": {
+        "id": "ambiguous-F-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 424,
+        "y": 220,
+        "rot": 0,
+        "z": 5,
+        "props": {
+          "pts": [
+            0,
+            18,
+            0.65,
+            0,
+            0,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "ambiguous-F-2": {
+        "id": "ambiguous-F-2",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 424,
+        "y": 220,
+        "rot": 0,
+        "z": 6,
+        "props": {
+          "pts": [
+            0,
+            0,
+            0.65,
+            13,
+            0,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "ambiguous-F-3": {
+        "id": "ambiguous-F-3",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 424,
+        "y": 220,
+        "rot": 0,
+        "z": 7,
+        "props": {
+          "pts": [
+            0,
+            8,
+            0.65,
+            10,
+            8,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "ambiguous-question": {
+        "id": "ambiguous-question",
+        "typeName": "shape",
+        "type": "text",
+        "x": 440,
+        "y": 215,
+        "rot": 0,
+        "z": 8,
+        "props": {
+          "text": "?",
+          "color": "red",
+          "size": "m",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      }
+    }
+  }
+}

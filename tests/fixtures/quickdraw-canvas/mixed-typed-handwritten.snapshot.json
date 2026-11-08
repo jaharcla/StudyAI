@@ -1,0 +1,141 @@
+{
+  "document": {
+    "store": {
+      "mixed-title": {
+        "id": "mixed-title",
+        "typeName": "shape",
+        "type": "text",
+        "x": 55,
+        "y": 40,
+        "rot": 0,
+        "z": 1,
+        "props": {
+          "text": "Charged particle in E-field",
+          "color": "blue",
+          "size": "l",
+          "font": "sans",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "particle": {
+        "id": "particle",
+        "typeName": "shape",
+        "type": "geo",
+        "x": 400,
+        "y": 230,
+        "rot": 0,
+        "z": 2,
+        "props": {
+          "geo": "ellipse",
+          "w": 90,
+          "h": 90,
+          "color": "violet",
+          "size": "m",
+          "dash": "solid",
+          "fill": "none",
+          "label": "q"
+        }
+      },
+      "electric-field": {
+        "id": "electric-field",
+        "typeName": "shape",
+        "type": "arrow",
+        "x": 180,
+        "y": 275,
+        "rot": 0,
+        "z": 3,
+        "props": {
+          "dx": 480,
+          "dy": 0,
+          "bend": 0,
+          "color": "green",
+          "size": "m",
+          "dash": "solid"
+        }
+      },
+      "hand-positive-charge-1": {
+        "id": "hand-positive-charge-1",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 435,
+        "y": 195,
+        "rot": 0,
+        "z": 4,
+        "props": {
+          "pts": [
+            0,
+            8,
+            0.65,
+            14,
+            8,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "hand-positive-charge-2": {
+        "id": "hand-positive-charge-2",
+        "typeName": "shape",
+        "type": "draw",
+        "x": 435,
+        "y": 195,
+        "rot": 0,
+        "z": 5,
+        "props": {
+          "pts": [
+            7,
+            1,
+            0.65,
+            7,
+            15,
+            0.65
+          ],
+          "color": "black",
+          "size": "m",
+          "dash": "draw",
+          "done": true,
+          "isPen": true
+        }
+      },
+      "typed-field-label": {
+        "id": "typed-field-label",
+        "typeName": "shape",
+        "type": "text",
+        "x": 610,
+        "y": 235,
+        "rot": 0,
+        "z": 6,
+        "props": {
+          "text": "E",
+          "color": "green",
+          "size": "l",
+          "font": "serif",
+          "autosize": true,
+          "scale": 1
+        }
+      },
+      "hand-force-label": {
+        "id": "hand-force-label",
+        "typeName": "shape",
+        "type": "text",
+        "x": 360,
+        "y": 390,
+        "rot": 0,
+        "z": 7,
+        "props": {
+          "text": "F = qE",
+          "color": "violet",
+          "size": "m",
+          "font": "draw",
+          "autosize": true,
+          "scale": 1
+        }
+      }
+    }
+  }
+}
