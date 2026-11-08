@@ -65,3 +65,53 @@ test("vectors and forces draw at the pointer, manipulate endpoints, inspect, pan
   await expect.poll(async () => Object.keys((await read()).snapshot.document.store).length).toBe(0);
   await expect(page.locator('[data-kind="vector"]')).toHaveCount(1);
 });
+
+test("force calibration preserves its drawing and point of application", async ({ page, request }) => {
+  const { course, lesson } = await createCourseWithLesson(request);
+  await page.goto("/"); await selectCourseOnPage(page, course.title);
+  await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
+  await tool(page, "Force");
+  const box = (await page.locator(".canvas-board").boundingBox())!;
+  await drag(page, { x: box.x + 300, y: box.y + 230 }, { x: box.x + 300, y: box.y + 130 });
+  const force = page.locator('[data-kind="force"]');
+  const before = await force.locator(".science-arrow-line").boundingBox();
+  await page.getByRole("button", { name: "Inspect selected object" }).click();
+  await page.getByRole("spinbutton", { name: "Units per canvas unit", exact: true }).fill("0.1");
+  await page.getByLabel("Units", { exact: true }).fill("N");
+  await page.locator(".canvas-object-editor").getByRole("button", { name: "Done" }).click();
+  await expect(force).toContainText("10.00 N");
+  expect(await force.locator(".science-arrow-line").boundingBox()).toEqual(before);
+  await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved");
+  await page.reload(); await expect(force).toContainText("10.00 N");
+  const boards = await (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`)).json();
+  const row = await (await request.get(`/api/canvases/${boards[0].id}?course=${course.id}&lesson=${lesson.id}`)).json();
+  const object = JSON.parse(row.document).objects[0];
+  expect(object).toMatchObject({ components: [0, 10, 0], units: "N", geometry: { unitsPerCanvasUnit: 0.1 } });
+  expect(object.pointOfApplication).toEqual(object.geometry.tail);
+});
+
+test("tutor reads vector components and proposes synchronized visual edits", async ({ page, request }) => {
+  test.setTimeout(240_000);
+  const { course, lesson } = await createCourseWithLesson(request);
+  await page.goto("/"); await selectCourseOnPage(page, course.title);
+  await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
+  await tool(page, "Vector");
+  const box = (await page.locator(".canvas-board").boundingBox())!;
+  await drag(page, { x: box.x + 300, y: box.y + 230 }, { x: box.x + 420, y: box.y + 170 });
+  const chat = page.getByTestId("copilot-chat-textarea");
+  await chat.fill("Read the vector on my active canvas. State its x and y component values using digits."); await chat.press("Enter");
+  await expect(page.locator(".copilot-slot")).toContainText("120", { timeout: 120_000 });
+  await expect(page.locator(".copilot-slot")).toContainText("60");
+  await chat.fill("Use propose_canvas_edit to propose changing my vector components to [80,30,0]. Preserve its tail, units and scale. Call the tool for review."); await chat.press("Enter");
+  await expect(page.getByRole("region", { name: "Tutor canvas proposal" })).toBeVisible({ timeout: 120_000 });
+  await page.getByRole("button", { name: "Apply tutor edit", exact: true }).click();
+  await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved");
+  const boards = await (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`)).json();
+  const row = await (await request.get(`/api/canvases/${boards[0].id}?course=${course.id}&lesson=${lesson.id}`)).json();
+  const object = JSON.parse(row.document).objects[0];
+  expect(object.components).toEqual([80, 30, 0]);
+  expect(object.geometry.tip.x - object.geometry.tail.x).toBe(80);
+  expect(object.geometry.tail.y - object.geometry.tip.y).toBe(30);
+  const line = page.locator('[data-kind="vector"] .science-arrow-line');
+  expect(Number(await line.getAttribute("x2")) - Number(await line.getAttribute("x1"))).toBe(80);
+});

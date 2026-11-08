@@ -4,7 +4,7 @@ import { synchronizeObject, type ArrowGeometry } from "./geometry";
 
 export type Point = { x: number; y: number };
 export type BondOrder = 1 | 1.5 | 2 | 3;
-export type MoleculeAtom = { id: string; element: Element; nonbondingElectrons: number };
+export type MoleculeAtom = { id: string; element: Element; nonbondingElectrons: number; position?: Point };
 export type MoleculeBond = { id: string; from: string; to: string; order: BondOrder };
 export type ResonanceForm = { id: string; name: string; bonds: MoleculeBond[] };
 export type CanvasObjectBase = { id: string; x: number; y: number; width: number; height: number };
@@ -68,6 +68,7 @@ function validateObject(value: unknown) {
   if (object.kind === "molecule") {
     if (!Array.isArray(object.atoms) || !Array.isArray(object.resonanceForms) || typeof object.name !== "string") throw new Error("Invalid molecule data.");
     for (const atom of object.atoms as Array<Record<string, unknown>>) if (typeof atom.id !== "string" || !elements.includes(String(atom.element)) || !Number.isInteger(atom.nonbondingElectrons) || Number(atom.nonbondingElectrons) < 0) throw new Error("Invalid molecule atom data.");
+    for (const atom of object.atoms) if (atom.position !== undefined && (!atom.position || ![atom.position.x, atom.position.y].every((n: unknown) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid atom position.");
     const atomIds = new Set(object.atoms.map((atom) => atom.id));
     if (atomIds.size !== object.atoms.length) throw new Error("Duplicate molecule atoms.");
     for (const form of object.resonanceForms as Array<Record<string, unknown>>) {

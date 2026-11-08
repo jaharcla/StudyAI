@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { pdfFixture } from "../fixtures/document-intelligence";
-import { createCourse, createCourseWithLesson, createLesson, selectCourseOnPage } from "./helpers";
+import { createCourse, createCourseWithLesson, createLesson, drawCarbonDioxide, selectCourseOnPage } from "./helpers";
 
 test("PDF import → index → tutor citation → Lewis edit → save → reload", async ({ page, request }) => {
   test.setTimeout(360_000);
@@ -15,7 +15,7 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await page.getByRole("button", { name: "Choose canvas board" }).click();
   await page.getByRole("button", { name: "New board" }).click();
-  await expect(page.locator(".canvas-object")).toHaveCount(0);
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toHaveCount(0);
   await page.getByRole("button", { name: "Lecture", exact: true }).click();
   const filename = `bonding-${Date.now()}.pdf`;
   await page.locator(".di-file-input").setInputFiles({ name: filename, mimeType: "application/pdf", buffer: Buffer.from(pdfFixture("The carbon dioxide Lewis structure has two double bonds and four nonbonding electrons on each oxygen. The lecture marker is LEWIS-7042.")) });
@@ -40,11 +40,11 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await expect(viewer.locator(".react-pdf__Page__canvas")).toBeVisible({ timeout: 30_000 });
   await viewer.getByRole("button", { name: "Close preview" }).click();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
-  await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
+  await drawCarbonDioxide(page);
   await page.getByRole("combobox", { name: "Bond order", exact: true }).first().selectOption("1");
   await page.getByRole("spinbutton", { name: "Nonbonding electrons", exact: true }).first().fill("6");
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
-  await page.getByRole("button", { name: "Collapse canvas tools", exact: true }).click();
+  if (await page.getByRole("button", { name: "Collapse canvas tools", exact: true }).isVisible()) await page.getByRole("button", { name: "Collapse canvas tools", exact: true }).click();
   await page.getByRole("button", { name: /^Draw —/ }).click();
   const canvasBox = (await page.locator(".canvas-board").boundingBox())!;
   await page.mouse.move(canvasBox.x + 35, canvasBox.y + 100);
@@ -65,12 +65,12 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   const proposal = page.getByRole("region", { name: "Tutor canvas proposal" });
   await expect(proposal).toBeVisible({ timeout: 180_000 });
   await expect(proposal).toContainText("Tutor reviewed CO2");
-  await expect(page.locator(".canvas-object")).toContainText("Carbon dioxide");
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toContainText("Carbon dioxide");
   await page.getByRole("button", { name: "Apply tutor edit" }).click();
-  await expect(page.locator(".canvas-object")).toContainText("Tutor reviewed CO2");
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toContainText("Tutor reviewed CO2");
   await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved");
   await page.reload();
-  await expect(page.locator(".canvas-object")).toContainText("Tutor reviewed CO2");
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toContainText("Tutor reviewed CO2");
   const boards = await (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`)).json();
   const saved = await (await request.get(`/api/canvases/${boards[0].id}?course=${course.id}&lesson=${lesson.id}`)).json();
   const molecule = JSON.parse(saved.document).objects[0];
@@ -78,18 +78,18 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   expect(molecule.resonanceForms[0].bonds[0].order).toBe(2);
   expect(shapes(JSON.parse(saved.document))).toEqual(drawing);
   await page.getByRole("combobox", { name: "Active lesson" }).selectOption(alternateLesson.id);
-  await expect(page.locator(".canvas-object")).toHaveCount(0);
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toHaveCount(0);
   await page.getByRole("combobox", { name: "Active lesson" }).selectOption(lesson.id);
-  await expect(page.locator(".canvas-object")).toContainText("Tutor reviewed CO2");
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toContainText("Tutor reviewed CO2");
   await page.getByRole("button", { name: "Link a document", exact: true }).click();
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
-  await page.locator(".canvas-object").filter({ hasText: filename }).getByRole("button", { name: "Open source", exact: true }).click();
+  await page.locator("[data-scientific-id], .canvas-object").filter({ hasText: filename }).getByRole("button", { name: "Open source", exact: true }).click();
   await expect(page.getByRole("dialog", { name: filename })).toBeVisible();
   await page.getByRole("dialog", { name: filename }).getByRole("button", { name: "Close preview" }).click();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
   await page.getByRole("button", { name: "Link a note", exact: true }).click();
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
-  await page.locator(".canvas-object").filter({ hasText: "Canvas note" }).getByRole("button", { name: "Open note", exact: true }).click();
+  await page.locator("[data-scientific-id], .canvas-object").filter({ hasText: "Canvas note" }).getByRole("button", { name: "Open note", exact: true }).click();
   await page.locator(".notes-modal textarea").fill("Lewis structure review notes");
   await expect.poll(async () => (await (await request.get(`/api/notes?course=${course.id}&lesson=${lesson.id}`)).json())[0]?.body).toBe("Lewis structure review notes");
   expect(await (await request.get(`/api/notes?course=${course.id}&lesson=${alternateLesson.id}`)).json()).toEqual([]);

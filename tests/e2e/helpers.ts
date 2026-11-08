@@ -23,3 +23,31 @@ export async function selectCourseOnPage(page: Page, title: string): Promise<voi
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   await page.locator(".course-list").getByRole("button", { name: new RegExp(escaped) }).click();
 }
+
+export async function drawCarbonDioxide(page: Page, leaveInspectorOpen = true): Promise<void> {
+  const opener = page.getByRole("button", { name: "Open canvas tools", exact: true });
+  if (await opener.isVisible()) await opener.click();
+  await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
+  const box = (await page.locator(".canvas-board").boundingBox())!;
+  const y = box.y + 200, left = box.x + 280;
+  for (const [index, element] of ["O", "C", "O"].entries()) {
+    await page.getByRole("combobox", { name: "Placement element", exact: true }).selectOption(element);
+    await page.mouse.click(left + index * 80, y);
+  }
+  await page.getByRole("button", { name: "Connect atoms", exact: true }).click();
+  await page.getByRole("combobox", { name: "Drawing bond order", exact: true }).selectOption("2");
+  await page.locator('[data-element="O"] .atom-hit').first().click();
+  await page.locator('[data-element="C"] .atom-hit').click();
+  await page.locator('[data-element="C"] .atom-hit').click();
+  await page.locator('[data-element="O"] .atom-hit').last().click();
+  await page.getByRole("button", { name: "Place atoms", exact: true }).click();
+  for (const oxygen of [page.locator('[data-element="O"] .atom-hit').first(), page.locator('[data-element="O"] .atom-hit').last()]) {
+    await oxygen.click();
+    await page.getByRole("button", { name: "Add lone pair", exact: true }).click();
+    await page.getByRole("button", { name: "Add lone pair", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Finish molecule", exact: true }).click();
+  await page.getByRole("button", { name: "Inspect molecule", exact: true }).click();
+  await page.getByLabel("Molecule name", { exact: true }).fill("Carbon dioxide");
+  if (!leaveInspectorOpen) await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
+}

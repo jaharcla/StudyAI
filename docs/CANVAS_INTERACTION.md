@@ -16,4 +16,11 @@ Baseline: `9b7d0568f35f73d736d97d49993209201734dcfa`. Worktree/branch: `canvas-d
 
 Verified: TypeScript and build passed; 44 unit tests passed; 7 production Chromium tests passed (49.4 seconds), including the original PDF/tutor/Lewis-card integration flow and the new vector/force pointer test. The palette accessible-name issue and an obsolete test board-menu toggle were corrected. A cold PDF.js import exceeded its original 5-second unit timeout under load; that extraction test now allows 15 seconds. Physical calibration has unit coverage; the browser test covers uncalibrated drawing and numeric editing.
 
-Later milestones add Lewis construction and the remaining spatial tools.
+## Milestone B — Lewis construction
+
+- Lewis mode starts empty. Clicks place atoms at world coordinates; placement and selected-element controls are separate. Connect mode supports click/click or dragging between atoms, with a live bond preview. Single, double, triple and aromatic bond orders use the existing model; double-click cycles single/double/triple.
+- Atom dragging preserves attached bond IDs and topology. The molecule label or Move molecule mode translates the whole structure. Lone-pair controls update existing electron counts and formal-charge calculations. The detailed inspector retains resonance editing and OpenChemLib conversion.
+- Atom positions are optional relative world coordinates. Legacy molecules receive a readable linear layout without changing atom/bond/form IDs. JSON version and SQLite schema are unchanged.
+- Pointer changes commit once on release. Selection, cancellation, camera projection, history, numeric edits and tutor proposals share the same scientific objects.
+
+Verification: TypeScript/build and 46 unit tests pass. Browser coverage builds CO2 by pointer, checks OpenChemLib, changes elements/bond orders/lone pairs, checks charges, moves an atom with persistent bonds, and saves/reloads. Additional tests cover force calibration and real tutor vector edits.

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createCourse, createCourseWithLesson, createLesson, selectCourseOnPage } from "./helpers";
+import { createCourse, createCourseWithLesson, createLesson, drawCarbonDioxide, selectCourseOnPage } from "./helpers";
 
 test("canvas creates, calculates, saves, reloads, and separates boards by course", async ({ page }) => {
   test.setTimeout(120_000);
@@ -12,14 +12,14 @@ test("canvas creates, calculates, saves, reloads, and separates boards by course
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await page.getByRole("button", { name: "Choose canvas board" }).click();
   await page.getByRole("button", { name: "New board" }).click();
-  await expect(page.locator(".canvas-object")).toHaveCount(0);
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Lewis structure" }).click();
+  await drawCarbonDioxide(page);
   await expect(page.getByRole("heading", { name: "Carbon dioxide" })).toBeVisible();
   await page.getByRole("button", { name: "Convert with OpenChemLib" }).click();
   await expect(page.getByText("OpenChemLib SMILES: O=C=O")).toBeVisible();
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done" }).click();
-  await expect(page.locator(".canvas-object").getByText("3 atoms · 2 bonds · 1 form")).toBeVisible();
+  await expect(page.locator("[data-scientific-id], .canvas-object").getByText("3 atoms · 2 bonds · 1 form")).toBeVisible();
   await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved", { timeout: 10_000 });
 
   const boardsResponse = await page.request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`);
@@ -30,13 +30,13 @@ test("canvas creates, calculates, saves, reloads, and separates boards by course
   expect(JSON.parse(saved.document).objects[0].kind).toBe("molecule");
 
   await page.reload();
-  await expect(page.locator(".canvas-object").getByText("3 atoms · 2 bonds · 1 form")).toBeVisible();
+  await expect(page.locator("[data-scientific-id], .canvas-object").getByText("3 atoms · 2 bonds · 1 form")).toBeVisible();
   await page.getByRole("button", { name: "Choose canvas board" }).click();
   await page.getByRole("button", { name: "New board" }).click();
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toContainText("Board");
-  await expect(page.locator(".canvas-object")).toHaveCount(0);
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toHaveCount(0);
 
   await selectCourseOnPage(page, otherCourse.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toContainText("Board 1");
-  await expect(page.locator(".canvas-object")).toHaveCount(0);
+  await expect(page.locator("[data-scientific-id], .canvas-object")).toHaveCount(0);
 });

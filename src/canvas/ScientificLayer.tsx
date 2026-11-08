@@ -3,12 +3,14 @@ import type { Editor } from "@quickdrawjs/react";
 import { arrowGeometry, translateObject, withArrowEndpoints } from "./geometry";
 import { createObject, type Point, type ScientificObject } from "./model";
 import { vectorMagnitude } from "../science";
+import { useMoleculeInteraction } from "./MoleculeInteraction";
 
-export type ScienceMode = "vector" | "force" | null;
-type Props = { objects: ScientificObject[]; editor: Editor; mode: ScienceMode; selectedId?: string; interactive: boolean; onSelect: (id?: string) => void; onEdit: (id: string) => void; onCommit: (objects: ScientificObject[]) => void; onFinish: () => void };
+export type ScienceMode = "vector" | "force" | "molecule" | null;
+type Props = { objects: ScientificObject[]; editor: Editor; mode: ScienceMode; selectedId?: string; interactive: boolean; onSelect: (id?: string) => void; onEdit: (id: string) => void; onCommit: (objects: ScientificObject[]) => void; onFinish: () => void; onActivateMolecule: () => void };
 type Gesture = { pointerId: number; start: Point; before: ScientificObject[]; object: ScientificObject; operation: "create" | "move" | "tail" | "tip" };
 
-export function ScientificLayer({ objects, editor, mode, selectedId, interactive, onSelect, onEdit, onCommit, onFinish }: Props) {
+export function ScientificLayer({ objects, editor, mode, selectedId, interactive, onSelect, onEdit, onCommit, onFinish, onActivateMolecule }: Props) {
+  const molecule = useMoleculeInteraction({ objects, editor, enabled: mode === "molecule", selectedId, interactive, onSelect, onEdit, onCommit, onFinish, onActivate: onActivateMolecule });
   const [preview, setPreview] = useState<ScientificObject[]>();
   const svg = useRef<SVGSVGElement>(null);
   const previewRef = useRef<ScientificObject[] | undefined>(undefined);
@@ -27,7 +29,7 @@ export function ScientificLayer({ objects, editor, mode, selectedId, interactive
     event.preventDefault(); event.stopPropagation();
     const start = point(event);
     if (!object) {
-      if (!mode) return;
+      if (mode !== "vector" && mode !== "force") return;
       const created = createObject(mode, start.x, start.y);
       if (created.kind !== "vector" && created.kind !== "force") return;
       object = withArrowEndpoints({ ...created, components: [0, 0, 0], units: "", geometry: { tail: start, tip: start } }, start, start);
@@ -65,13 +67,15 @@ export function ScientificLayer({ objects, editor, mode, selectedId, interactive
     }
     gesture.current = undefined; showPreview(undefined); onFinish();
   };
-  const visible = preview ?? objects;
+  const visible = preview ?? molecule.preview ?? objects;
   const origin = editor.pageToScreen(0, 0), zoom = editor.camera.z;
-  return <svg ref={svg} className="scientific-layer" data-testid="scientific-layer" onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
+  return <>{molecule.controls}<svg ref={svg} className="scientific-layer" data-testid="scientific-layer" onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
     <defs><marker id="science-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="context-stroke" /></marker></defs>
-    {mode && interactive && <rect className="science-placement-surface" width="100%" height="100%" fill="transparent" onPointerDown={(event) => begin(event)} />}
+    {(mode === "vector" || mode === "force") && interactive && <rect className="science-placement-surface" width="100%" height="100%" fill="transparent" onPointerDown={(event) => begin(event)} />}
     <g transform={`translate(${origin.x} ${origin.y}) scale(${zoom})`}>
+      {molecule.surface}
       {visible.map((object) => {
+        if (object.kind === "molecule") return molecule.render(object);
         if (object.kind !== "vector" && object.kind !== "force") return null;
         const geometry = arrowGeometry(object), selected = selectedId === object.id;
         return <g key={object.id} data-scientific-id={object.id} data-kind={object.kind} className={`science-arrow ${selected ? "selected" : ""}`} role="button" aria-label={`${object.kind} ${object.label}`} tabIndex={0} onDoubleClick={(event) => { event.stopPropagation(); onEdit(object.id); }}>
@@ -83,5 +87,5 @@ export function ScientificLayer({ objects, editor, mode, selectedId, interactive
         </g>;
       })}
     </g>
-  </svg>;
+  </svg></>;
 }
