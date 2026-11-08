@@ -13,6 +13,6 @@ export default defineConfig({
   reporter: [["list"], ["json", { outputFile: "test-results/results.json" }]],
   webServer: {
     command: "npm run dev", url: `${config.webOrigin}/api/courses`, reuseExistingServer: false, timeout: 120_000,
-    env: { WEB_PORT: webPort, RUNTIME_PORT: String(config.runtimePort), DATA_PORT: String(config.dataPort), AGENT_PORT: String(config.agentPort), STUDYAI_DB: resolve(testData, "studyai.sqlite"), STUDYAI_DOCUMENTS: resolve(testData, "documents"), LANGGRAPH_DEPLOYMENT_URL: config.langgraphDeploymentUrl },
+    env: { WEB_PORT: webPort, RUNTIME_PORT: String(config.runtimePort), DATA_PORT: String(config.dataPort), AGENT_PORT: String(config.agentPort), STUDYAI_DB: resolve(testData, "studyai.sqlite"), STUDYAI_DOCUMENTS: resolve(testData, "documents"), STUDYAI_E2E_PRODUCTION: process.env.STUDYAI_E2E_PRODUCTION ?? "0", LANGGRAPH_DEPLOYMENT_URL: config.langgraphDeploymentUrl },
   },
 });
