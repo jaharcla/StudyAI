@@ -1,4 +1,4 @@
-import { newId, pageBounds, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
+import { newId, pageBounds, type Editor, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
 import { z } from "zod";
 
 const coordinate = z.number().finite().min(-1_000_000).max(1_000_000);
@@ -7,21 +7,31 @@ const idSchema = z.string().min(1).max(200);
 const propsSchema = z.record(z.string(), z.unknown());
 const createSchema = z.object({
   type: z.enum(["geo", "arrow", "line", "text", "note"]),
+  id: idSchema.optional(),
   x: coordinate,
   y: coordinate,
   rot: z.number().finite().min(-6.284).max(6.284).optional(),
   props: propsSchema,
 }).strict();
-export const canvasActionSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("create"), shape: createSchema }).strict(),
-  z.object({ kind: z.literal("update"), id: idSchema, patch: z.object({ x: coordinate.optional(), y: coordinate.optional(), rot: z.number().finite().min(-6.284).max(6.284).optional(), props: propsSchema.optional() }).strict().refine((v) => Object.keys(v).length > 0 && (!v.props || Object.keys(v.props).length > 0)) }).strict(),
-  z.object({ kind: z.literal("move"), id: idSchema, x: coordinate, y: coordinate }).strict(),
-  z.object({ kind: z.literal("delete"), id: idSchema }).strict(),
-  z.object({ kind: z.literal("connect"), fromId: idSchema, toId: idSchema }).strict(),
+const patchSchema = z.object({ x: coordinate.optional(), y: coordinate.optional(), rot: z.number().finite().min(-6.284).max(6.284).optional(), props: propsSchema.optional() }).strict().refine((v) => Object.keys(v).length > 0 && (!v.props || Object.keys(v.props).length > 0));
+const colorSchema = z.enum(["black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow", "orange", "green", "light-green", "light-red", "red"]);
+const textStyle = z.object({ color: colorSchema.default("black"), size: z.enum(["s", "m", "l", "xl"]).default("m"), font: z.enum(["draw", "sans", "serif", "mono"]).default("sans"), scale: z.number().finite().min(0.2).max(10).default(1) }).strict().default({ color: "black", size: "m", font: "sans", scale: 1 });
+const shapeActionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("createShape"), shape: createSchema }).strict(),
+  z.object({ kind: z.literal("createText"), id: idSchema.optional(), x: coordinate, y: coordinate, text: z.string().min(1).max(5000), style: textStyle }).strict(),
+  z.object({ kind: z.literal("createArrow"), id: idSchema.optional(), from: z.object({ x: coordinate, y: coordinate }).strict(), to: z.object({ x: coordinate, y: coordinate }).strict(), color: colorSchema.default("black"), size: z.enum(["s", "m", "l", "xl"]).default("m"), label: z.string().max(500).optional() }).strict(),
+  z.object({ kind: z.literal("updateShape"), id: idSchema, patch: patchSchema }).strict(),
+  z.object({ kind: z.literal("moveShape"), id: idSchema, x: coordinate, y: coordinate }).strict(),
+  z.object({ kind: z.literal("deleteShape"), id: idSchema }).strict(),
+  z.object({ kind: z.literal("highlightShape"), id: idSchema, color: colorSchema.default("yellow") }).strict(),
+  z.object({ kind: z.literal("selectShapes"), ids: z.array(idSchema).max(50) }).strict(),
 ]);
+export const canvasActionSchema = z.object({ boardId: idSchema, actions: z.array(shapeActionSchema).min(1).max(30) }).strict();
+export const canvasReadSchema = z.object({ boardId: idSchema }).strict();
 
-export type CanvasAction = z.infer<typeof canvasActionSchema>;
-export type CanvasProposal = { id: string; boardId: string; expectedFingerprint: string; action: CanvasAction; description: string };
+export type CanvasAction = z.infer<typeof shapeActionSchema>;
+export type CanvasActionBatch = z.infer<typeof canvasActionSchema>;
+export type CanvasProposal = { id: string; boardId: string; expectedFingerprint: string; actions: CanvasAction[]; description: string; requiresConfirmation: boolean };
 
 const colors = ["black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow", "orange", "green", "light-green", "light-red", "red"];
 const sizes = ["s", "m", "l", "xl"];
@@ -30,7 +40,7 @@ const fills = ["none", "semi", "solid", "pattern"];
 const fonts = ["draw", "sans", "serif", "mono"];
 const geometries = ["rectangle", "ellipse", "triangle", "diamond", "hexagon", "star"];
 const allowed: Record<ShapeRecord["type"], Set<string>> = {
-  draw: new Set(), highlight: new Set(), geo: new Set(["geo", "w", "h", "color", "size", "dash", "fill", "label", "labelSize", "font"]),
+  draw: new Set(), highlight: new Set(["pts", "color", "size"]), geo: new Set(["geo", "w", "h", "color", "size", "dash", "fill", "label", "labelSize", "font"]),
   arrow: new Set(["dx", "dy", "bend", "color", "size", "dash", "connection"]), line: new Set(["dx", "dy", "color", "size", "dash"]),
   text: new Set(["text", "color", "size", "font", "autosize", "w", "scale"]), note: new Set(["text", "color", "size", "font", "scale"]), image: new Set(),
 };
@@ -72,7 +82,7 @@ function validateProps(type: ShapeRecord["type"], props: Record<string, unknown>
   }
 }
 
-function parseAction(value: unknown): CanvasAction { return canvasActionSchema.parse(value); }
+function parseAction(value: unknown): CanvasAction { return shapeActionSchema.parse(value); }
 function getShape(source: Store | Snapshot, id: string): ShapeRecord {
   const shape = storeOf(source)?.get(id) ?? snapshotOf(source).document.store[id];
   if (!shape || shape.typeName !== "shape") throw new Error(`Unknown shape ID: ${id}.`);
@@ -82,8 +92,9 @@ function getShape(source: Store | Snapshot, id: string): ShapeRecord {
 
 export function validateCanvasAction(source: Store | Snapshot, value: unknown): CanvasAction {
   const action = parseAction(value);
-  if (action.kind === "create") validateProps(action.shape.type, action.shape.props, false);
-  if (action.kind === "update") {
+  if (action.kind === "createShape") validateProps(action.shape.type, action.shape.props, false);
+  if (action.kind === "createArrow" && Math.hypot(action.to.x - action.from.x, action.to.y - action.from.y) < 0.1) throw new Error("Arrow geometry must have non-zero length.");
+  if (action.kind === "updateShape") {
     const target = getShape(source, action.id);
     if (action.patch.props) validateProps(target.type, action.patch.props, true);
     if ((target.type === "arrow" || target.type === "line") && (action.patch.props?.dx !== undefined || action.patch.props?.dy !== undefined)) {
@@ -92,38 +103,50 @@ export function validateCanvasAction(source: Store | Snapshot, value: unknown): 
     }
     if (Object.keys(action.patch).length === 0) throw new Error("An update needs at least one supported property.");
   }
-  if (action.kind === "move" || action.kind === "delete") getShape(source, action.id);
-  if (action.kind === "connect") {
-    if (action.fromId === action.toId) throw new Error("A shape cannot connect to itself.");
-    const from = getShape(source, action.fromId), to = getShape(source, action.toId);
-    const a = shapeCenter(from), b = shapeCenter(to);
-    if (Math.abs(b.x - a.x) > 1_000_000 || Math.abs(b.y - a.y) > 1_000_000) throw new Error("Connection geometry is out of bounds.");
-  }
+  if (action.kind === "moveShape" || action.kind === "deleteShape" || action.kind === "highlightShape") getShape(source, action.id);
+  if (action.kind === "selectShapes") for (const id of action.ids) getShape(source, id);
   return action;
 }
 
 export function proposeCanvasAction(source: Store | Snapshot, boardId: string, value: unknown): CanvasProposal {
-  if (!boardId) throw new Error("A board scope is required.");
-  const action = validateCanvasAction(source, value);
-  return { id: newId("canvas-proposal"), boardId, expectedFingerprint: canvasFingerprint(source), action, description: describe(action) };
+  const batch = canvasActionSchema.parse(value);
+  if (!boardId || batch.boardId !== boardId) throw new Error("The active board changed. Read its current context again.");
+  const actions = batch.actions.map((action) => validateCanvasAction(source, action));
+  const existing = new Set(storeOf(source)?.ids() ?? Object.keys(snapshotOf(source).document.store));
+  const deleted = new Set<string>();
+  for (const action of actions) {
+    const id = action.kind === "createShape" ? action.shape.id : action.kind === "createText" || action.kind === "createArrow" ? action.id : undefined;
+    if (id) {
+      if (existing.has(id)) throw new Error(`Shape ID already exists: ${id}.`);
+      existing.add(id);
+    }
+    const targetIds = action.kind === "updateShape" || action.kind === "moveShape" || action.kind === "deleteShape" || action.kind === "highlightShape" ? [action.id] : action.kind === "selectShapes" ? action.ids : [];
+    if (targetIds.some((targetId) => deleted.has(targetId))) throw new Error("An action targets a shape deleted earlier in this batch.");
+    if (action.kind === "deleteShape") deleted.add(action.id);
+  }
+  const destructive = actions.filter((action) => action.kind === "deleteShape").length;
+  return { id: newId("canvas-proposal"), boardId, expectedFingerprint: canvasFingerprint(source), actions, description: actions.map(describe).join("; "), requiresConfirmation: destructive > 0 || actions.length > 5 };
 }
 
 function describe(action: CanvasAction): string {
-  if (action.kind === "create") return `Create ${action.shape.type} shape`;
-  if (action.kind === "update") return `Update shape ${action.id}`;
-  if (action.kind === "move") return `Move shape ${action.id}`;
-  if (action.kind === "delete") return `Delete shape ${action.id}`;
-  return `Connect shapes ${action.fromId} and ${action.toId}`;
+  if (action.kind === "createShape") return `Create ${action.shape.type} shape`;
+  if (action.kind === "createText") return `Create text “${action.text.slice(0, 40)}”`;
+  if (action.kind === "createArrow") return "Create arrow";
+  if (action.kind === "updateShape") return `Update shape ${action.id}`;
+  if (action.kind === "moveShape") return `Move shape ${action.id}`;
+  if (action.kind === "deleteShape") return `Delete shape ${action.id}`;
+  if (action.kind === "highlightShape") return `Highlight shape ${action.id}`;
+  return `Select ${action.ids.length} shape(s)`;
 }
 
-function makeShape(source: Store, data: Extract<CanvasAction, { kind: "create" }>["shape"]): ShapeRecord {
+function makeShape(source: Store, data: Extract<CanvasAction, { kind: "createShape" }>["shape"]): ShapeRecord {
   const props = structuredClone(data.props);
   if (data.type === "geo") Object.assign(props, { dash: props.dash ?? "solid", fill: props.fill ?? "none" });
   if (data.type === "arrow") Object.assign(props, { bend: props.bend ?? 0, dash: props.dash ?? "solid" });
   if (data.type === "line") Object.assign(props, { dash: props.dash ?? "solid" });
   if (data.type === "text") Object.assign(props, { font: props.font ?? "draw", autosize: props.autosize ?? true, scale: props.scale ?? 1 });
   if (data.type === "note") Object.assign(props, { font: props.font ?? "draw", scale: props.scale ?? 1 });
-  return { id: newId("shape"), typeName: "shape", type: data.type, x: data.x, y: data.y, rot: data.rot ?? 0, z: source.maxZ() + 1, props };
+  return { id: data.id ?? newId("shape"), typeName: "shape", type: data.type, x: data.x, y: data.y, rot: data.rot ?? 0, z: source.maxZ() + 1, props };
 }
 
 function shapeCenter(shape: ShapeRecord): { x: number; y: number } {
@@ -139,23 +162,46 @@ function shapeCenter(shape: ShapeRecord): { x: number; y: number } {
   return { x: shape.x + width / 2, y: shape.y + height / 2 };
 }
 
-export function approveCanvasProposal(source: Store, activeBoardId: string, proposal: CanvasProposal): { changedId: string } {
+export function approveCanvasProposal(source: Store, activeBoardId: string, proposal: CanvasProposal, editor?: Editor): { changedId: string } {
   if (!activeBoardId || proposal.boardId !== activeBoardId) throw new Error("Proposal belongs to a different board.");
   if (proposal.expectedFingerprint !== canvasFingerprint(source)) throw new Error("Canvas changed after this proposal; request a fresh proposal.");
-  const action = validateCanvasAction(source, proposal.action);
+  const actions = proposal.actions.map((action) => validateCanvasAction(source, action));
+  if (actions.length > 5 && !proposal.requiresConfirmation) throw new Error("Large changes require explicit confirmation.");
+  if (actions.filter((action) => action.kind === "deleteShape").length && !proposal.requiresConfirmation) throw new Error("Destructive changes require explicit confirmation.");
   let changedId = "";
   source.transact(() => {
-    if (action.kind === "create") { const shape = makeShape(source, action.shape); changedId = shape.id; source.put(shape); }
-    else if (action.kind === "update") { changedId = action.id; source.update(action.id, action.patch); }
-    else if (action.kind === "move") { changedId = action.id; source.update(action.id, { x: action.x, y: action.y }); }
-    else if (action.kind === "delete") { changedId = action.id; source.remove([action.id]); }
-    else {
-      const a = getShape(source, action.fromId), b = getShape(source, action.toId);
-      const from = shapeCenter(a), to = shapeCenter(b);
-      const shape: ShapeRecord = { id: newId("shape"), typeName: "shape", type: "arrow", x: from.x, y: from.y, rot: 0, z: source.maxZ() + 1,
-        props: { dx: to.x - from.x, dy: to.y - from.y, bend: 0, color: "black", size: "m", dash: "solid", connection: { fromId: a.id, toId: b.id } } };
-      changedId = shape.id; source.put(shape);
+    for (const action of actions) {
+      if (action.kind === "createShape") { const shape = makeShape(source, action.shape); changedId ||= shape.id; source.put(shape); }
+      else if (action.kind === "createText") { const shape = makeShape(source, { id: action.id, type: "text", x: action.x, y: action.y, props: { text: action.text, ...action.style, autosize: true } }); changedId ||= shape.id; source.put(shape); }
+      else if (action.kind === "createArrow") {
+        const dx = action.to.x - action.from.x, dy = action.to.y - action.from.y;
+        const arrow: ShapeRecord = { id: action.id ?? newId("shape"), typeName: "shape", type: "arrow", x: action.from.x, y: action.from.y, rot: 0, z: source.maxZ() + 1, props: { dx, dy, bend: 0, color: action.color, size: action.size, dash: "solid" } };
+        changedId ||= arrow.id; source.put(arrow);
+        if (action.label) { const label = makeShape(source, { type: "text", x: (action.from.x + action.to.x) / 2, y: (action.from.y + action.to.y) / 2, props: { text: action.label, color: action.color, size: action.size, font: "sans", autosize: true, scale: 1 } }); source.put(label); }
+      }
+      else if (action.kind === "updateShape") { changedId ||= action.id; source.update(action.id, action.patch); }
+      else if (action.kind === "moveShape") { changedId ||= action.id; source.update(action.id, { x: action.x, y: action.y }); }
+      else if (action.kind === "deleteShape") { changedId ||= action.id; source.remove([action.id]); }
+      else if (action.kind === "highlightShape") {
+        const target = getShape(source, action.id), bounds = pageBounds(target);
+        const pts = [bounds.x, bounds.y + bounds.h / 2, 0.5, bounds.x + bounds.w, bounds.y + bounds.h / 2, 0.5];
+        const mark: ShapeRecord = { id: newId("shape"), typeName: "shape", type: "highlight", x: 0, y: 0, rot: 0, z: source.maxZ() + 1, props: { pts, color: action.color, size: "l" } };
+        changedId ||= mark.id; source.put(mark);
+      }
+      else if (action.kind === "selectShapes") editor?.setSelection(action.ids);
     }
   });
   return { changedId };
+}
+
+export function readCanvasState(source: Store | Snapshot, boardId: string, requestedBoardId: string) {
+  if (!boardId || boardId !== requestedBoardId) throw new Error("The active board changed. Read its current context again.");
+  const all = records(source);
+  const shapes = all.slice(0, 500).map((shape) => {
+    const props = structuredClone(shape.props);
+    if (typeof props.text === "string") props.text = props.text.slice(0, 500);
+    if (Array.isArray(props.pts)) props.pts = props.pts.slice(0, 90);
+    return { id: shape.id, type: shape.type, x: shape.x, y: shape.y, rotation: shape.rot, z: shape.z, props };
+  });
+  return { boardId, objectCount: all.length, truncated: all.length > shapes.length, shapes };
 }

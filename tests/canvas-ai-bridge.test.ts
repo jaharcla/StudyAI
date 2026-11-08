@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Store, type ShapeRecord } from "@quickdrawjs/core";
-import { approveCanvasProposal, proposeCanvasAction, validateCanvasAction } from "../src/canvas/ai/canvas-actions";
+import { approveCanvasProposal, proposeCanvasAction, readCanvasState, validateCanvasAction } from "../src/canvas/ai/canvas-actions";
 import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context";
 import type { ScientificObject } from "../src/canvas/model";
 
@@ -62,47 +62,81 @@ describe("Quickdraw AI context", () => {
 });
 
 describe("Quickdraw AI action proposals", () => {
-  it("creates, updates, moves, deletes, and connects through undoable store transactions", () => {
+  it("creates stable editable shapes and applies one undoable action batch", () => {
     const store = baseStore();
-    const create = proposeCanvasAction(store, scope.boardId, { kind: "create", shape: { type: "geo", x: 120, y: 140, props: { geo: "rectangle", w: 40, h: 30, color: "black", size: "m" } } });
-    const created = approveCanvasProposal(store, scope.boardId, create).changedId;
-    expect(store.get(created)?.typeName).toBe("shape");
-    store.undo(); expect(store.has(created)).toBe(false);
-    store.redo(); expect(store.has(created)).toBe(true);
+    const proposal = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [
+      { kind: "createShape", shape: { id: "shape:box", type: "geo", x: 120, y: 140, props: { geo: "rectangle", w: 40, h: 30, color: "black", size: "m" } } },
+      { kind: "createText", id: "shape:label", x: 140, y: 180, text: "Nitrate" },
+      { kind: "createArrow", id: "shape:arrow", from: { x: 140, y: 170 }, to: { x: 190, y: 170 }, label: "resonance" },
+    ] });
+    expect(proposal.requiresConfirmation).toBe(false);
+    approveCanvasProposal(store, scope.boardId, proposal);
+    expect(store.get("shape:box")?.typeName).toBe("shape");
+    expect((store.get("shape:label") as ShapeRecord).props.text).toBe("Nitrate");
+    expect((store.get("shape:arrow") as ShapeRecord).props.dx).toBe(50);
+    const reloaded = new Store();
+    reloaded.loadSnapshot(store.getSnapshot());
+    expect((reloaded.get("shape:label") as ShapeRecord).props.text).toBe("Nitrate");
+    store.undo(); expect(store.has("shape:box")).toBe(false);
+    store.redo(); expect(store.has("shape:box")).toBe(true);
 
-    const update = proposeCanvasAction(store, scope.boardId, { kind: "update", id: created, patch: { props: { fill: "solid" } } });
+    const update = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [{ kind: "updateShape", id: "shape:box", patch: { props: { fill: "solid" } } }] });
     approveCanvasProposal(store, scope.boardId, update);
-    expect(store.get(created)?.id).toBe(created);
-    expect((store.get(created) as ShapeRecord).props.fill).toBe("solid");
-    const move = proposeCanvasAction(store, scope.boardId, { kind: "move", id: created, x: -15, y: 25 });
+    expect((store.get("shape:box") as ShapeRecord).props.fill).toBe("solid");
+    const move = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [{ kind: "moveShape", id: "shape:box", x: -15, y: 25 }] });
     approveCanvasProposal(store, scope.boardId, move);
-    expect((store.get(created) as ShapeRecord).x).toBe(-15);
-
-    const connect = proposeCanvasAction(store, scope.boardId, { kind: "connect", fromId: "label", toId: created });
-    const arrowId = approveCanvasProposal(store, scope.boardId, connect).changedId;
-    expect((store.get(arrowId) as ShapeRecord).type).toBe("arrow");
-    const deletion = proposeCanvasAction(store, scope.boardId, { kind: "delete", id: created });
+    expect((store.get("shape:box") as ShapeRecord).x).toBe(-15);
+    const highlight = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [{ kind: "highlightShape", id: "shape:box" }] });
+    const markerId = approveCanvasProposal(store, scope.boardId, highlight).changedId;
+    expect((store.get(markerId) as ShapeRecord).type).toBe("highlight");
+    const deletion = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [{ kind: "deleteShape", id: "shape:box" }] });
+    expect(deletion.requiresConfirmation).toBe(true);
     approveCanvasProposal(store, scope.boardId, deletion);
-    expect(store.has(created)).toBe(false);
-    store.undo(); expect(store.has(created)).toBe(true);
+    expect(store.has("shape:box")).toBe(false);
+    store.undo(); expect(store.has("shape:box")).toBe(true);
   });
 
-  it("rejects unknown IDs, invalid geometry, unsupported properties, and malformed commands", () => {
+  it("reads bounded state and rejects malformed, unsupported, oversized, or conflicting requests", () => {
     const store = baseStore();
-    expect(() => validateCanvasAction(store, { kind: "move", id: "missing", x: 0, y: 0 })).toThrow(/Unknown shape ID/);
-    expect(() => validateCanvasAction(store, { kind: "create", shape: { type: "geo", x: 0, y: 0, props: { geo: "rectangle", w: 0, h: 5, color: "black", size: "m" } } })).toThrow();
-    expect(() => validateCanvasAction(store, { kind: "update", id: "label", patch: { props: { script: "alert(1)" } } })).toThrow(/Unsupported text property/);
-    expect(() => validateCanvasAction(store, { kind: "delete", id: "label", force: true })).toThrow();
+    expect(() => validateCanvasAction(store, { kind: "moveShape", id: "missing", x: 0, y: 0 })).toThrow(/Unknown shape ID/);
+    expect(() => validateCanvasAction(store, { kind: "createShape", shape: { type: "geo", x: 0, y: 0, props: { geo: "rectangle", w: 0, h: 5, color: "black", size: "m" } } })).toThrow();
+    expect(() => validateCanvasAction(store, { kind: "updateShape", id: "label", patch: { props: { script: "alert(1)" } } })).toThrow(/Unsupported text property/);
+    expect(() => validateCanvasAction(store, { kind: "deleteShape", id: "label", force: true })).toThrow();
+    expect(() => proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: Array.from({ length: 31 }, () => ({ kind: "selectShapes", ids: [] })) })).toThrow();
+    expect(() => proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [{ kind: "createText", id: "label", x: 0, y: 0, text: "collision" }] })).toThrow(/already exists/);
+    expect(() => proposeCanvasAction(store, "board-b", { boardId: "board-b", actions: [{ kind: "moveShape", id: "label", x: 2, y: 2 }] })).not.toThrow();
+    expect(() => proposeCanvasAction(store, scope.boardId, { boardId: "board-b", actions: [{ kind: "moveShape", id: "label", x: 2, y: 2 }] })).toThrow(/active board changed/);
+    expect(readCanvasState(store, scope.boardId, scope.boardId).objectCount).toBe(4);
+    expect(() => readCanvasState(store, scope.boardId, "board-b")).toThrow(/active board changed/);
   });
 
   it("rejects stale proposals and board scope changes without mutating either board", () => {
     const storeA = baseStore(), storeB = baseStore();
-    const proposal = proposeCanvasAction(storeA, "board-a", { kind: "move", id: "label", x: 50, y: 60 });
+    const proposal = proposeCanvasAction(storeA, "board-a", { boardId: "board-a", actions: [{ kind: "moveShape", id: "label", x: 50, y: 60 }] });
     expect(() => approveCanvasProposal(storeB, "board-b", proposal)).toThrow(/different board/);
     expect(() => approveCanvasProposal(storeA, "board-a", proposal)).not.toThrow();
-    const stale = proposeCanvasAction(storeA, "board-a", { kind: "move", id: "label", x: 70, y: 80 });
+    const stale = proposeCanvasAction(storeA, "board-a", { boardId: "board-a", actions: [{ kind: "moveShape", id: "label", x: 70, y: 80 }] });
     storeA.update("label", { x: 99 });
     expect(() => approveCanvasProposal(storeA, "board-a", stale)).toThrow(/changed after this proposal/);
     expect((storeB.get("label") as ShapeRecord).x).toBe(10);
+  });
+
+  it("requires confirmation for broad batches", () => {
+    const store = baseStore();
+    const actions = Array.from({ length: 6 }, (_, index) => ({ kind: "createText" as const, id: `shape:${index}`, x: index * 10, y: 0, text: "note" }));
+    const proposal = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions });
+    expect(proposal.requiresConfirmation).toBe(true);
+    proposal.requiresConfirmation = false;
+    expect(() => approveCanvasProposal(store, scope.boardId, proposal)).toThrow(/explicit confirmation/);
+  });
+
+  it("selects requested shapes through the Quickdraw editor API", () => {
+    const store = baseStore();
+    const undoCount = store.undos.length;
+    const proposal = proposeCanvasAction(store, scope.boardId, { boardId: scope.boardId, actions: [{ kind: "selectShapes", ids: ["label"] }] });
+    const editor = { setSelection: vi.fn() } as any;
+    approveCanvasProposal(store, scope.boardId, proposal, editor);
+    expect(editor.setSelection).toHaveBeenCalledWith(["label"]);
+    expect(store.undos).toHaveLength(undoCount);
   });
 });
