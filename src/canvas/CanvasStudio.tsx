@@ -12,6 +12,8 @@ import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Se
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
+import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
+import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -47,6 +49,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [placementPatch, setPlacementPatch] = useState<Partial<ScientificObject>>({});
   const [nativeTool, setNativeTool] = useState("select");
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [shapeProposal, setShapeProposal] = useState<ShapeProposal>();
+  const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects, freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
@@ -66,6 +70,15 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     return canvasTools.filter((tool) => !query || `${tool.label} ${tool.description} ${tool.group}`.toLowerCase().includes(query));
   }, [toolSearch]);
   const selectedObject = document.objects.find((item) => item.id === editingId);
+
+  useQuickdrawAIBridge({
+    store: editorRef.current?.store ?? null,
+    selectedIds: selectedShapeIds,
+    viewport: editorRef.current?.viewportPageBounds() ?? { x: 0, y: 0, w: 1, h: 1 },
+    objects: document.objects,
+    scope: { boardId: activeBoard?.id ?? "", courseId, lessonId },
+    onProposal: setShapeProposal,
+  });
 
   const refreshHistory = useCallback(() => {
     const editor = editorRef.current;
@@ -125,6 +138,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     setLoading(true);
     setActiveBoard(board);
     boardRef.current = board;
+    setShapeProposal(undefined);
     setSelectedId(undefined);
     setEditingId(undefined);
     setScienceMode(null);
@@ -153,6 +167,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     ++loadSequence.current;
     setLoading(true);
     setProposal(undefined);
+    setShapeProposal(undefined);
+    setSelectedShapeIds([]);
     setActiveBoard(null);
     boardRef.current = null;
     cleanupEditor();
@@ -223,7 +239,10 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     const unlistenHistory = editor.store.listenHistory(refreshHistory);
     const unlistenCamera = editor.on("camera", () => setEditorFrame((frame) => frame + 1));
     const unlistenTool = editor.on("tool", () => { setNativeTool(editor.tool); setScienceMode(null); });
-    const unlistenSelection = editor.on("selection", () => { if (editor.selection.size) setSelectedId(undefined); });
+    const unlistenSelection = editor.on("selection", () => {
+      setSelectedShapeIds([...editor.selection]);
+      if (editor.selection.size) setSelectedId(undefined);
+    });
     editorListeners.current.push(unlistenHistory, unlistenCamera, unlistenTool, unlistenSelection);
     setEditorFrame((frame) => frame + 1);
     refreshHistory();
@@ -375,6 +394,15 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       try { replaceObjects(applyCanvasProposal({ boardId: boardRef.current?.id ?? "", courseId, lessonId, objects: documentRef.current.objects }, proposal)); setProposal(undefined); }
       catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply proposal"); setProposal(undefined); }
     }}>Apply tutor edit</button><button className="button-soft" onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
+    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>AI canvas proposal</strong><p>{shapeProposal.description}</p><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre><button className="button-primary" onClick={() => {
+      try {
+        if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
+        const editor = editorRef.current;
+        if (!editor || !activeBoard) throw new Error("The active canvas is not ready.");
+        approveCanvasProposal(editor.store, activeBoard.id, shapeProposal, editor);
+        setShapeProposal(undefined);
+      } catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply canvas proposal"); setShapeProposal(undefined); }
+    }}>Apply canvas proposal</button><button className="button-soft" onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
     <div className="canvas-tools-bar">
       <div className="canvas-board-selector">
         <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label="Choose canvas board"><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
@@ -407,7 +435,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         if ((event.key === "Delete" || event.key === "Backspace") && selectedId) { event.preventDefault(); event.stopPropagation(); replaceObjects(documentRef.current.objects.filter((object) => object.id !== selectedId)); setSelectedId(undefined); }
       }} onKeyUpCapture={(event) => { if (event.code === "Space") setSpaceHeld(false); }} onBlur={() => setSpaceHeld(false)}>
         {loading ? <div className="canvas-loading">Loading saved canvas…</div> : <>
-          <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} />
+          <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} onSelectionChange={(ids) => setSelectedShapeIds(ids)} />
           {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
         </>}
       </div>

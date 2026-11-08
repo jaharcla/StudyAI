@@ -23,6 +23,7 @@ const molecule = makeMolecule(100, 100);
 const context = [
   { description: "StudyAI current workspace and structured canvas metadata", value: { courseId: "chem-120", lessonId: "lesson-03" } },
   { description: "StudyAI active scientific canvas objects", value: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1", objects: [molecule] } },
+  { description: "Active Quickdraw board context", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
 ];
 beforeEach(() => { mocks.invoke.mockReset(); mocks.bindTools.mockClear(); });
 
@@ -43,6 +44,22 @@ it("forwards a registered canvas tool call through LangGraph for browser review"
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
   expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("propose_canvas_edit");
+});
+
+it("binds structured QuickDraw tools only for the active course and forwards calls", async () => {
+  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_action", id: "shape-1", args: { boardId: "board-1", actions: [{ kind: "createText", id: "label-1", x: 40, y: 50, text: "Nitrate" }] } }] });
+  mocks.invoke.mockResolvedValue(response);
+  const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }, { name: "get_canvas_state" }] }, messages: [new HumanMessage("Add a nitrate label")] });
+  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("propose_canvas_action");
+  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("get_canvas_state");
+  expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
+});
+
+it("reports tool-calling incompatibility without returning JSON as ordinary chat", async () => {
+  mocks.invoke.mockRejectedValueOnce(new Error("model does not support tools"));
+  const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }] }, messages: [new HumanMessage("Draw an arrow")] });
+  expect(result.messages.at(-1)?.content).toContain("did not accept the required tool call");
+  expect(result.messages.at(-1)?.content).not.toContain("{\"kind\"");
 });
 
 it("does not bind canvas tools from another course or retrieve another course's excerpts", async () => {
