@@ -13,6 +13,7 @@ import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { createLearningHandler } from "./learning/http.js";
 import { createCanvasAnalysisHandler } from "./canvas-analysis/http.js";
+import { createCanvasPersistenceHandler } from "./canvas-persistence/http.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
@@ -23,11 +24,13 @@ const json = (res: import("node:http").ServerResponse, status: number, data: unk
 const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYAI_DOCUMENTS);
 const learningHandler = createLearningHandler(new LearningService(db), config.webOrigin);
 const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
+const canvasPersistenceHandler = createCanvasPersistenceHandler(db, config.webOrigin);
 
 const server = createServer(async (req, res) => {
   try {
   if (await learningHandler(req, res)) return;
   if (await documentHandler(req, res)) return;
+  if (await canvasPersistenceHandler(req, res)) return;
   if (await canvasAnalysisHandler(req, res)) return;
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url ?? "/", `http://${LOOPBACK_HOST}:${port}`);

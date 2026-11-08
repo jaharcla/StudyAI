@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { Readable } from "node:stream";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import Database from "better-sqlite3";
 import { createObject, emptyCanvasDocument } from "../src/canvas/model";
+import { createCanvasPersistenceHandler } from "../server/canvas-persistence/http";
 import { saveCanvasDocument } from "../server/canvas-persistence/service";
 
 function createDatabase() {
@@ -15,6 +18,24 @@ function input(expectedRevision: number, document = emptyCanvasDocument()) {
 }
 
 describe("canvas persistence compare-and-swap", () => {
+  it("returns revision and stale conflicts through the HTTP handler", async () => {
+    const database = createDatabase();
+    const handler = createCanvasPersistenceHandler(database, "http://localhost");
+    const call = async (expectedRevision: number) => {
+      const request = Object.assign(Readable.from([JSON.stringify(input(expectedRevision))]), { method: "POST", url: "/api/canvases" }) as IncomingMessage;
+      const responseState: { status?: number; body?: string } = {};
+      const response = {
+        writeHead(status: number) { responseState.status = status; return this; },
+        end(body: string) { responseState.body = body; },
+      } as unknown as ServerResponse;
+      expect(await handler(request, response)).toBe(true);
+      return { status: responseState.status, body: JSON.parse(responseState.body!) };
+    };
+    expect(await call(0)).toMatchObject({ status: 200, body: { id: "board-a", revision: 1 } });
+    expect(await call(0)).toMatchObject({ status: 409, body: { code: "stale_revision", currentRevision: 1 } });
+    database.close();
+  });
+
   it("creates at revision zero and returns a conflict for a stale revision", () => {
     const database = createDatabase();
     const created = saveCanvasDocument(database, input(0));
