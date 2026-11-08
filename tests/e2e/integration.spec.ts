@@ -82,13 +82,15 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await page.getByRole("combobox", { name: "Active lesson" }).selectOption(lesson.id);
   await expect(page.locator("[data-scientific-id], .canvas-object")).toContainText("Tutor reviewed CO2");
   await page.getByRole("button", { name: "Link a document", exact: true }).click();
-  await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".canvas-board").click({ position: { x: 500, y: 270 } });
   await page.locator("[data-scientific-id], .canvas-object").filter({ hasText: filename }).getByRole("button", { name: "Open source", exact: true }).click();
   await expect(page.getByRole("dialog", { name: filename })).toBeVisible();
   await page.getByRole("dialog", { name: filename }).getByRole("button", { name: "Close preview" }).click();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
+  if (await page.getByRole("button", { name: "Open canvas tools", exact: true }).isVisible()) await page.getByRole("button", { name: "Open canvas tools", exact: true }).click();
   await page.getByRole("button", { name: "Link a note", exact: true }).click();
-  await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
+  const noteCanvas = (await page.locator(".canvas-board").boundingBox())!;
+  await page.mouse.click(noteCanvas.x + noteCanvas.width * 0.65, noteCanvas.y + noteCanvas.height * 0.6);
   await page.locator("[data-scientific-id], .canvas-object").filter({ hasText: "Canvas note" }).getByRole("button", { name: "Open note", exact: true }).click();
   await page.locator(".notes-modal textarea").fill("Lewis structure review notes");
   await expect.poll(async () => (await (await request.get(`/api/notes?course=${course.id}&lesson=${lesson.id}`)).json())[0]?.body).toBe("Lewis structure review notes");

@@ -14,10 +14,12 @@ const assets = files(folder).map((path) => {
 const html = readFileSync(join(folder, "index.html"), "utf8");
 const entryPath = html.match(/<script[^>]+src="([^"]+)"/)?.[1].replace(/^\//, "");
 const report = {
+  units: "bytes; gzip measured per file",
   entry: assets.find((asset) => asset.file === entryPath),
   total: { files: assets.length, bytes: assets.reduce((sum, asset) => sum + asset.bytes, 0), gzipBytes: assets.reduce((sum, asset) => sum + asset.gzipBytes, 0) },
   pdfWorker: assets.find((asset) => /pdf\.worker/.test(asset.file)),
   chemistry: assets.find((asset) => /chemistry-/.test(asset.file)),
+  mathEngine: assets.find((asset) => /number-/.test(asset.file)),
   largest: [...assets].sort((a, b) => b.bytes - a.bytes).slice(0, 8),
 };
 if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify(report, null, 2) + "\n");

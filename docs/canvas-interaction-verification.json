@@ -1,0 +1,183 @@
+{
+  "verifiedAt": "2026-11-07T21:53:45.813673-05:00",
+  "timezone": "America/Toronto",
+  "branch": "work/canvas-direct-manipulation",
+  "baseline": "9b7d0568f35f73d736d97d49993209201734dcfa",
+  "milestoneA": "20d42a4e5f07eba4d9b980dfcc837d2025bb9cd0",
+  "milestoneB": "ecc14cdbc0c4a2ad8c529e4d3f98bb7a06f2af55",
+  "milestoneC": "Containing commit of this report",
+  "sourceCommits": [
+    "7eb5449507946c988cae806a2c2c15d3cd5ad9f9",
+    "0ecf5033049ab2eeaaf827ff8a9c0c14cd9b7ed0"
+  ],
+  "node": "v24.13.0",
+  "model": "qwen3:latest",
+  "mockedTutor": false,
+  "typescript": "passed via npm run build (tsc -b)",
+  "build": {
+    "status": "passed",
+    "viteDurationSeconds": 35.8,
+    "warning": "Existing chunks exceed 500 kB"
+  },
+  "dependencies": "npm ls --depth=0 passed; Math.js 15.2.0 is the only added direct dependency",
+  "unit": {
+    "passed": 52,
+    "failed": 0,
+    "files": 13,
+    "command": "npm test -- --reporter=default --reporter=json --outputFile=data/canvas-unit-results.json"
+  },
+  "productionEndToEnd": {
+    "browser": "Chromium",
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "durationMs": 79343.164,
+    "command": "WEB_PORT=5193 RUNTIME_PORT=8220 DATA_PORT=8221 AGENT_PORT=8143 STUDYAI_E2E_PRODUCTION=1 npm run test:e2e",
+    "cases": [
+      {
+        "file": "canvas.spec.ts",
+        "title": "canvas creates, calculates, saves, reloads, and separates boards by course",
+        "status": "passed",
+        "durationMs": 3214
+      },
+      {
+        "file": "direct-molecule.spec.ts",
+        "title": "places atoms, connects bonds, edits lone pairs/charges, moves atoms, converts and reloads",
+        "status": "passed",
+        "durationMs": 4354
+      },
+      {
+        "file": "direct-scene.spec.ts",
+        "title": "measurements and connections follow concepts; native shapes anchor forces; history and reload retain references",
+        "status": "passed",
+        "durationMs": 6356
+      },
+      {
+        "file": "direct-scene.spec.ts",
+        "title": "places equations and graphs, evaluates variables, traces/resizes plots, and persists mathematical edits",
+        "status": "passed",
+        "durationMs": 3038
+      },
+      {
+        "file": "direct-scene.spec.ts",
+        "title": "remaining tools place on click, retain scientific stacking, and open inspectors only explicitly",
+        "status": "passed",
+        "durationMs": 1424
+      },
+      {
+        "file": "direct-vector.spec.ts",
+        "title": "vectors and forces draw at the pointer, manipulate endpoints, inspect, pan/zoom, undo and reload",
+        "status": "passed",
+        "durationMs": 11134
+      },
+      {
+        "file": "direct-vector.spec.ts",
+        "title": "force calibration preserves its drawing and point of application",
+        "status": "passed",
+        "durationMs": 1753
+      },
+      {
+        "file": "direct-vector.spec.ts",
+        "title": "tutor reads vector components and proposes synchronized visual edits",
+        "status": "passed",
+        "durationMs": 16193
+      },
+      {
+        "file": "document-intelligence.spec.ts",
+        "title": "imports a PDF, retrieves its fact in the tutor, and opens its page citation",
+        "status": "passed",
+        "durationMs": 7266
+      },
+      {
+        "file": "integration.spec.ts",
+        "title": "PDF import â†’ index â†’ tutor citation â†’ Lewis edit â†’ save â†’ reload",
+        "status": "passed",
+        "durationMs": 17151
+      },
+      {
+        "file": "integration.spec.ts",
+        "title": "canvas API rejects cross-course reads, writes, deletes and invalid lessons",
+        "status": "passed",
+        "durationMs": 77
+      },
+      {
+        "file": "integration.spec.ts",
+        "title": "legacy TXT API imports remain indexed and deletion stays synchronized",
+        "status": "passed",
+        "durationMs": 65
+      },
+      {
+        "file": "workspace.spec.ts",
+        "title": "workspace renders, saves its canvas, and switches study views",
+        "status": "passed",
+        "durationMs": 1665
+      }
+    ]
+  },
+  "earlierProductionFailure": {
+    "stats": {
+      "startTime": "2026-11-08T02:47:08.268Z",
+      "duration": 97462.708,
+      "expected": 12,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "failure": "Native pointer-up was recorded twice; one undo retained the last stroke. Fixed by finalizing native gesture history in the next task.",
+    "record": "data/canvas-production-before-undo-fix.json"
+  },
+  "failureRecord": "CANVAS_INTERACTION.md#failure-record",
+  "bundle": {
+    "report": "canvas-interaction-bundle-sizes.json",
+    "entry": {
+      "file": "assets/index-DsfTE1rZ.js",
+      "bytes": 3045942,
+      "gzipBytes": 869611
+    },
+    "entryDelta": {
+      "bytes": 23900,
+      "gzipBytes": 7480
+    },
+    "mathEngine": {
+      "file": "assets/number-Biuqt5K8.js",
+      "bytes": 416002,
+      "gzipBytes": 121106
+    },
+    "total": {
+      "files": 429,
+      "bytes": 22847334,
+      "gzipBytes": 6138028
+    }
+  },
+  "implemented": [
+    "Pointer vector/force creation, both endpoints, movement, calibration, unified history",
+    "Interactive molecule atom/bond/lone-pair construction with stable IDs and OpenChemLib",
+    "Object/native attachments, measurements, connections, scientific stacking",
+    "Math.js equation evaluation, graph expressions, tracing and resizing",
+    "Pointer placement and secondary inspectors for all remaining palette tools"
+  ],
+  "verified": [
+    "Direct pointer creation and manipulation, camera pan/zoom, numeric synchronization",
+    "Real tutor reads vector and proposes synchronized component changes",
+    "Lewis elements, bond orders, lone pairs, charges, atom movement, OpenChemLib, persistence",
+    "Native force anchors, moving concept relationships/measurements, history, reload",
+    "Equation variables/results, plot data/tracing/resize, remaining placement and z-order",
+    "PDF import -> index -> real tutor page citation -> real tutor Lewis proposal -> save -> reload",
+    "Course/lesson/board isolation, source document/note links, legacy APIs"
+  ],
+  "compatibility": {
+    "canvasJsonVersion": 1,
+    "sqliteSchemaChanged": false,
+    "sharedApiChanged": false,
+    "originalTrackedFilesChanged": false,
+    "documentSourceNote": "Existing untracked nested .worktrees/ directory from another chat preserved"
+  },
+  "limitations": [
+    "Scientific and native drawings use separate ordered rendering planes; no arbitrary cross-plane interleaving",
+    "PNG export remains native Quickdraw drawing only; canvas JSON contains all scientific data",
+    "Anatomy labels retain identifiers and text; no new anatomical viewer",
+    "Existing npm audit: 45 advisories (6 low, 10 moderate, 25 high, 4 critical)"
+  ],
+  "remainingBlockers": [],
+  "mergedIntoMain": false
+}

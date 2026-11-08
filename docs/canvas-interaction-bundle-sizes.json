@@ -1,0 +1,70 @@
+{
+  "units": "bytes; gzip measured per file",
+  "entry": {
+    "file": "assets/index-DsfTE1rZ.js",
+    "bytes": 3045942,
+    "gzipBytes": 869611
+  },
+  "total": {
+    "files": 429,
+    "bytes": 22847334,
+    "gzipBytes": 6138028
+  },
+  "pdfWorker": {
+    "file": "assets/pdf.worker.min-qwK7q_zL.mjs",
+    "bytes": 1046214,
+    "gzipBytes": 289897
+  },
+  "chemistry": {
+    "file": "assets/chemistry-DJEcQzYg.js",
+    "bytes": 1097002,
+    "gzipBytes": 340786
+  },
+  "mathEngine": {
+    "file": "assets/number-Biuqt5K8.js",
+    "bytes": 416002,
+    "gzipBytes": 121106
+  },
+  "largest": [
+    {
+      "file": "assets/index-DsfTE1rZ.js",
+      "bytes": 3045942,
+      "gzipBytes": 869611
+    },
+    {
+      "file": "assets/dist-BmlLePtt.js",
+      "bytes": 1411166,
+      "gzipBytes": 264726
+    },
+    {
+      "file": "assets/resources-D5ymtJwZ.json",
+      "bytes": 1351963,
+      "gzipBytes": 466509
+    },
+    {
+      "file": "assets/chemistry-DJEcQzYg.js",
+      "bytes": 1097002,
+      "gzipBytes": 340786
+    },
+    {
+      "file": "assets/pdf.worker.min-qwK7q_zL.mjs",
+      "bytes": 1046214,
+      "gzipBytes": 289897
+    },
+    {
+      "file": "assets/emacs-lisp-C9XAeP06.js",
+      "bytes": 779854,
+      "gzipBytes": 196031
+    },
+    {
+      "file": "assets/cynefin-OW5HDTMX-s99-vdsO.js",
+      "bytes": 688439,
+      "gzipBytes": 154442
+    },
+    {
+      "file": "assets/mermaid.core-B3ZN03ta.js",
+      "bytes": 663840,
+      "gzipBytes": 162649
+    }
+  ]
+}

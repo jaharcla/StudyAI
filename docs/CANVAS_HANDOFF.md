@@ -2,6 +2,8 @@
 
 Historical branch handoff for `0ecf5033049ab2eeaaf827ff8a9c0c14cd9b7ed0`. Current integration contracts, verification, and remaining limitations are recorded in [INTEGRATION_VERIFICATION.md](INTEGRATION_VERIFICATION.md).
 
+The subsequent direct-manipulation implementation and its verification are in [CANVAS_INTERACTION.md](CANVAS_INTERACTION.md); it supersedes this handoff's card interaction, equation and graph limitations.
+
 ## Implemented
 
 - Quickdraw provides infinite pan/zoom, pen, shapes, arrows, text, selection, transforms, and drawing history.

@@ -33,6 +33,12 @@ test("vectors and forces draw at the pointer, manipulate endpoints, inspect, pan
   await expect.poll(async () => (await read()).objects[0]?.components).toEqual([120, 60, 0]);
   await page.getByRole("button", { name: "Redo canvas change", exact: true }).click();
   await expect.poll(async () => (await read()).objects[0]?.components).toEqual([150, 20, 0]);
+  await arrow.locator(".science-hit").click();
+  const tailHandle = (await arrow.locator('[data-endpoint="tail"]').boundingBox())!;
+  await drag(page, { x: tailHandle.x + tailHandle.width / 2, y: tailHandle.y + tailHandle.height / 2 }, { x: tailHandle.x + tailHandle.width / 2 - 20, y: tailHandle.y + tailHandle.height / 2 + 10 });
+  await expect.poll(async () => (await read()).objects[0]?.components).toEqual([170, 30, 0]);
+  await page.getByRole("button", { name: "Undo canvas change", exact: true }).click();
+  await expect.poll(async () => (await read()).objects[0]?.components).toEqual([150, 20, 0]);
   await arrow.locator(".science-hit").dblclick();
   await page.getByLabel("x", { exact: true }).fill("200"); await page.getByLabel("y", { exact: true }).fill("80");
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done" }).click();

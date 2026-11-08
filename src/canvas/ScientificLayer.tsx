@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@quickdrawjs/react";
-import { arrowGeometry, translateObject, withArrowEndpoints } from "./geometry";
+import { arrowGeometry, translateObject } from "./geometry";
 import { createObject, type Point, type ScientificObject } from "./model";
 import { vectorMagnitude } from "../science";
 import { useMoleculeInteraction } from "./MoleculeInteraction";
+import { anchorAt, lineGeometry, resolveScene, withLineEndpoints, type SceneLine } from "./scene";
+import { SceneGlyph, objectTitle } from "./SceneGlyph";
+import { SceneLineGlyph } from "./SceneLineGlyph";
 
-export type ScienceMode = "vector" | "force" | "molecule" | null;
-type Props = { objects: ScientificObject[]; editor: Editor; mode: ScienceMode; selectedId?: string; interactive: boolean; onSelect: (id?: string) => void; onEdit: (id: string) => void; onCommit: (objects: ScientificObject[]) => void; onFinish: () => void; onActivateMolecule: () => void };
-type Gesture = { pointerId: number; start: Point; before: ScientificObject[]; object: ScientificObject; operation: "create" | "move" | "tail" | "tip" };
+export type ScienceMode = ScientificObject["kind"] | null;
+type Props = { objects: ScientificObject[]; editor: Editor; mode: ScienceMode; placementPatch?: Partial<ScientificObject>; selectedId?: string; interactive: boolean; onSelect: (id?: string) => void; onEdit: (id: string) => void; onCommit: (objects: ScientificObject[]) => void; onFinish: () => void; onActivateMolecule: () => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void };
+type Gesture = { pointerId: number; start: Point; before: ScientificObject[]; object: ScientificObject; operation: "create" | "move" | "tail" | "tip" | "resize" };
+const isLine = (object: ScientificObject): object is SceneLine => ["vector", "force", "measurement", "relationship", "bond"].includes(object.kind);
 
-export function ScientificLayer({ objects, editor, mode, selectedId, interactive, onSelect, onEdit, onCommit, onFinish, onActivateMolecule }: Props) {
+export function ScientificLayer({ objects, editor, mode, placementPatch, selectedId, interactive, onSelect, onEdit, onCommit, onFinish, onActivateMolecule, onOpenNote, onOpenDocument }: Props) {
   const molecule = useMoleculeInteraction({ objects, editor, enabled: mode === "molecule", selectedId, interactive, onSelect, onEdit, onCommit, onFinish, onActivate: onActivateMolecule });
   const [preview, setPreview] = useState<ScientificObject[]>();
   const svg = useRef<SVGSVGElement>(null);
@@ -29,10 +33,13 @@ export function ScientificLayer({ objects, editor, mode, selectedId, interactive
     event.preventDefault(); event.stopPropagation();
     const start = point(event);
     if (!object) {
-      if (mode !== "vector" && mode !== "force") return;
-      const created = createObject(mode, start.x, start.y);
-      if (created.kind !== "vector" && created.kind !== "force") return;
-      object = withArrowEndpoints({ ...created, components: [0, 0, 0], units: "", geometry: { tail: start, tip: start } }, start, start);
+      if (!mode || mode === "molecule") return;
+      object = { ...createObject(mode, start.x, start.y), ...placementPatch } as ScientificObject;
+      if (isLine(object)) {
+        if (object.kind === "vector" || object.kind === "force") object = { ...object, components: [0, 0, 0], units: "" };
+        if (object.kind === "measurement") object = { ...object, value: 0, units: "" };
+        object = withLineEndpoints({ ...object, geometry: { tail: start, tip: start } }, start, start, { tailRef: anchorAt(start, objects, editor), tipRef: undefined });
+      }
       operation = "create";
     }
     editor.setSelection([]);
@@ -47,12 +54,22 @@ export function ScientificLayer({ objects, editor, mode, selectedId, interactive
     if (!current || current.pointerId !== event.pointerId) return;
     event.stopPropagation();
     const end = point(event);
+    if (current.operation === "move" && end.x === current.start.x && end.y === current.start.y) return;
     let next = current.object;
-    if ((next.kind === "vector" || next.kind === "force") && current.operation !== "move") {
-      const geometry = arrowGeometry(next);
-      next = withArrowEndpoints(next, current.operation === "tail" ? end : geometry.tail, current.operation === "tail" ? geometry.tip : end);
-    } else next = translateObject(next, end.x - current.start.x, end.y - current.start.y);
-    showPreview(current.operation === "create" ? [...current.before, next] : current.before.map((object) => object.id === next.id ? next : object));
+    if (isLine(next)) {
+      const geometry = lineGeometry(next);
+      if (current.operation === "move") {
+        const dx = end.x - current.start.x, dy = end.y - current.start.y;
+        if (next.kind === "vector" || next.kind === "force") { const moved = translateObject(next, dx, dy) as typeof next; next = { ...moved, geometry: { ...arrowGeometry(moved), tailRef: undefined, tipRef: undefined } }; }
+        else next = withLineEndpoints(next, { x: geometry.tail.x + dx, y: geometry.tail.y + dy }, { x: geometry.tip.x + dx, y: geometry.tip.y + dy }, { tailRef: undefined, tipRef: undefined });
+      } else {
+        const tail = current.operation === "tail" ? end : geometry.tail, tip = current.operation === "tail" ? geometry.tip : end;
+        next = withLineEndpoints(next, tail, tip, current.operation === "tail" ? { tailRef: anchorAt(end, current.before, editor, next.id) } : { tipRef: anchorAt(end, current.before, editor, next.id) });
+      }
+    } else if (current.operation === "resize") next = { ...next, width: Math.max(100, next.width + 2 * (end.x - current.start.x)), height: Math.max(65, next.height + 2 * (end.y - current.start.y)) };
+    else next = translateObject(next, end.x - current.start.x, end.y - current.start.y);
+    const updated = current.operation === "create" ? [...current.before, next] : current.before.map((object) => object.id === next.id ? next : object);
+    showPreview(resolveScene({ version: 1, snapshot: editor.store.getSnapshot(), objects: updated }).objects);
   };
   const finish = (event: React.PointerEvent<SVGElement>, cancel = false) => {
     if (!gesture.current || gesture.current.pointerId !== event.pointerId) return;
@@ -62,21 +79,29 @@ export function ScientificLayer({ objects, editor, mode, selectedId, interactive
     const final = previewRef.current;
     if (!cancel && final) {
       const object = final.find((item) => item.id === current.object.id)!;
-      const geometry = object.kind === "vector" || object.kind === "force" ? arrowGeometry(object) : undefined;
-      if (current.operation !== "create" || !geometry || Math.hypot(geometry.tip.x - geometry.tail.x, geometry.tip.y - geometry.tail.y) * editor.camera.z > 3) onCommit(final);
+      const geometry = isLine(object) ? lineGeometry(object) : undefined;
+      if (JSON.stringify(final) !== JSON.stringify(current.before) && (current.operation !== "create" || !geometry || Math.hypot(geometry.tip.x - geometry.tail.x, geometry.tip.y - geometry.tail.y) * editor.camera.z > 3)) onCommit(final);
     }
     gesture.current = undefined; showPreview(undefined); onFinish();
   };
-  const visible = preview ?? molecule.preview ?? objects;
+  const visible = resolveScene({ version: 1, snapshot: editor.store.getSnapshot(), objects: preview ?? molecule.preview ?? objects }).objects;
   const origin = editor.pageToScreen(0, 0), zoom = editor.camera.z;
-  return <>{molecule.controls}<svg ref={svg} className="scientific-layer" data-testid="scientific-layer" onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
+  return <>{molecule.controls}<svg ref={svg} className="scientific-layer" data-testid="scientific-layer" onPointerDownCapture={(event) => { if (mode && mode !== "molecule") begin(event); }} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
     <defs><marker id="science-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="context-stroke" /></marker></defs>
-    {(mode === "vector" || mode === "force") && interactive && <rect className="science-placement-surface" width="100%" height="100%" fill="transparent" onPointerDown={(event) => begin(event)} />}
+    {mode && mode !== "molecule" && interactive && <rect className="science-placement-surface" width="100%" height="100%" fill="transparent" />}
     <g transform={`translate(${origin.x} ${origin.y}) scale(${zoom})`}>
       {molecule.surface}
       {visible.map((object) => {
         if (object.kind === "molecule") return molecule.render(object);
-        if (object.kind !== "vector" && object.kind !== "force") return null;
+        if (object.kind !== "vector" && object.kind !== "force") {
+          const selected = selectedId === object.id;
+          if (isLine(object)) return <SceneLineGlyph key={object.id} object={object} zoom={zoom} selected={selected} interactive={interactive} onStart={(event, end) => begin(event, object, end ?? "move")} onEdit={() => onEdit(object.id)} />;
+          return <g key={object.id} data-scientific-id={object.id} data-kind={object.kind} className={`scene-object ${selected ? "selected" : ""}`} style={{ pointerEvents: interactive ? "all" : "none" }} role="button" aria-label={objectTitle(object)} onPointerDown={(event) => begin(event, object)} onDoubleClick={(event) => { event.stopPropagation(); onEdit(object.id); }}>
+            <rect className="scene-object-hit" x={object.x - object.width / 2} y={object.y - object.height / 2} width={object.width} height={object.height} />
+            <SceneGlyph object={object} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />
+            {selected && <rect className="science-handle" data-resize="true" x={object.x + object.width / 2 - 5 / zoom} y={object.y + object.height / 2 - 5 / zoom} width={10 / zoom} height={10 / zoom} onPointerDown={(event) => begin(event, object, "resize")} />}
+          </g>;
+        }
         const geometry = arrowGeometry(object), selected = selectedId === object.id;
         return <g key={object.id} data-scientific-id={object.id} data-kind={object.kind} className={`science-arrow ${selected ? "selected" : ""}`} role="button" aria-label={`${object.kind} ${object.label}`} tabIndex={0} onDoubleClick={(event) => { event.stopPropagation(); onEdit(object.id); }}>
           <line className="science-hit" style={{ pointerEvents: interactive ? "stroke" : "none" }} aria-label="Move arrow" x1={geometry.tail.x} y1={geometry.tail.y} x2={geometry.tip.x} y2={geometry.tip.y} strokeWidth={16 / zoom} onPointerDown={(event) => begin(event, object)} />

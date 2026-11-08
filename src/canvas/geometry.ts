@@ -1,12 +1,13 @@
 import type { Point, ScientificObject } from "./model";
+import type { ObjectAnchor } from "./scene";
 
-export type ArrowGeometry = { tail: Point; tip: Point; unitsPerCanvasUnit?: number };
+export type ArrowGeometry = { tail: Point; tip: Point; unitsPerCanvasUnit?: number; tailRef?: ObjectAnchor; tipRef?: ObjectAnchor };
 export type ScientificArrow = Extract<ScientificObject, { kind: "vector" | "force" }>;
 
 export function arrowGeometry(object: ScientificArrow): ArrowGeometry {
   const tail = object.geometry?.tail ?? (object.kind === "force" ? object.pointOfApplication : undefined) ?? { x: object.x, y: object.y };
   const scale = object.geometry ? object.geometry.unitsPerCanvasUnit ?? 1 : 1 / 24;
-  return { tail, tip: { x: tail.x + object.components[0] / scale, y: tail.y - object.components[1] / scale }, ...(object.geometry ? { unitsPerCanvasUnit: object.geometry.unitsPerCanvasUnit } : { unitsPerCanvasUnit: scale }) };
+  return { ...object.geometry, tail, tip: { x: tail.x + object.components[0] / scale, y: tail.y - object.components[1] / scale }, ...(object.geometry ? { unitsPerCanvasUnit: object.geometry.unitsPerCanvasUnit } : { unitsPerCanvasUnit: scale }) };
 }
 
 export function withArrowEndpoints<T extends ScientificArrow>(object: T, tail: Point, tip: Point): T {
@@ -16,12 +17,23 @@ export function withArrowEndpoints<T extends ScientificArrow>(object: T, tail: P
 }
 
 export function synchronizeObject(previous: ScientificObject, next: ScientificObject): ScientificObject {
+  if ((next.kind === "measurement" || next.kind === "relationship" || next.kind === "bond") && next.geometry) {
+    let geometry = next.geometry;
+    if ("geometry" in previous && geometry === previous.geometry) {
+      if (next.x !== previous.x || next.y !== previous.y) { const dx = next.x - previous.x, dy = next.y - previous.y; geometry = { ...geometry, tail: { x: geometry.tail.x + dx, y: geometry.tail.y + dy }, tip: { x: geometry.tip.x + dx, y: geometry.tip.y + dy }, tailRef: undefined, tipRef: undefined }; }
+      if (next.kind === "measurement" && previous.kind === "measurement" && next.value !== previous.value && next.value > 0) { const distance = Math.hypot(geometry.tip.x - geometry.tail.x, geometry.tip.y - geometry.tail.y); if (distance) geometry = { ...geometry, unitsPerCanvasUnit: next.value / distance }; }
+      if (next.kind === "relationship" && previous.kind === "relationship") geometry = { ...geometry, ...(next.fromId !== previous.fromId ? { tailRef: next.fromId ? { scope: "science", id: next.fromId } : undefined } : {}), ...(next.toId !== previous.toId ? { tipRef: next.toId ? { scope: "science", id: next.toId } : undefined } : {}) };
+    }
+    return { ...next, geometry };
+  }
   if (next.kind !== "vector" && next.kind !== "force") return next;
   const geometry = arrowGeometry(next);
+  if ((previous.kind === "vector" || previous.kind === "force") && next.geometry === previous.geometry && next.components.some((value, index) => value !== previous.components[index])) geometry.tipRef = undefined;
   if ((previous.kind === "vector" || previous.kind === "force") && next.geometry === previous.geometry && (next.x !== previous.x || next.y !== previous.y)) {
     geometry.tail = { x: geometry.tail.x + next.x - previous.x, y: geometry.tail.y + next.y - previous.y };
     const scale = geometry.unitsPerCanvasUnit ?? 1;
     geometry.tip = { x: geometry.tail.x + next.components[0] / scale, y: geometry.tail.y - next.components[1] / scale };
+    geometry.tailRef = undefined; geometry.tipRef = undefined;
   }
   return { ...next, x: geometry.tail.x, y: geometry.tail.y, geometry, ...(next.kind === "force" ? { pointOfApplication: geometry.tail } : {}) };
 }

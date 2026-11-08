@@ -11,16 +11,16 @@ export type CanvasObjectBase = { id: string; x: number; y: number; width: number
 
 export type ScientificObject =
   | (CanvasObjectBase & { kind: "atom"; element: Element; nonbondingElectrons: number; bondOrderSum: number; label: string })
-  | (CanvasObjectBase & { kind: "bond"; from: string; to: string; order: BondOrder; label: string })
+  | (CanvasObjectBase & { kind: "bond"; from: string; to: string; order: BondOrder; label: string; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "molecule"; name: string; atoms: MoleculeAtom[]; resonanceForms: ResonanceForm[]; activeResonanceId: string })
-  | (CanvasObjectBase & { kind: "equation"; expression: string; variables: Record<string, number>; units?: string })
+  | (CanvasObjectBase & { kind: "equation"; expression: string; variables: Record<string, number>; units?: string; result?: number; evaluationError?: string })
   | (CanvasObjectBase & { kind: "vector"; components: [number, number, number]; units: string; label: string; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "force"; components: [number, number, number]; units: string; label: string; pointOfApplication?: Point; geometry?: ArrowGeometry })
-  | (CanvasObjectBase & { kind: "measurement"; value: number; units: string; label: string })
-  | (CanvasObjectBase & { kind: "graph"; expression: string; xRange: [number, number]; points: Array<[number, number]>; xLabel: string; yLabel: string })
+  | (CanvasObjectBase & { kind: "measurement"; value: number; units: string; label: string; geometry?: ArrowGeometry })
+  | (CanvasObjectBase & { kind: "graph"; expression: string; xRange: [number, number]; points: Array<[number, number]>; xLabel: string; yLabel: string; evaluationError?: string })
   | (CanvasObjectBase & { kind: "anatomy"; structureId: string; system: string; labels: string[] })
   | (CanvasObjectBase & { kind: "concept"; title: string; definition: string; conceptId?: string })
-  | (CanvasObjectBase & { kind: "relationship"; fromId: string; toId: string; label: string })
+  | (CanvasObjectBase & { kind: "relationship"; fromId: string; toId: string; label: string; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "linked-note"; noteId: string; title: string; excerpt: string })
   | (CanvasObjectBase & { kind: "linked-document"; documentId: string; title: string; excerpt: string })
   | (CanvasObjectBase & { kind: "question"; prompt: string; answer?: string; conceptId?: string })
@@ -79,9 +79,10 @@ function validateObject(value: unknown) {
     if (!object.resonanceForms.some((form) => (form as Record<string, unknown>).id === object.activeResonanceId)) throw new Error("Invalid active resonance form.");
   }
   if ((object.kind === "vector" || object.kind === "force") && (!Array.isArray(object.components) || object.components.length !== 3 || !object.components.every((n) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid vector data.");
-  if ((object.kind === "vector" || object.kind === "force") && object.geometry !== undefined) {
+  if (["vector", "force", "measurement", "relationship", "bond"].includes(String(object.kind)) && object.geometry !== undefined) {
     const geometry = object.geometry as ArrowGeometry;
     if (!geometry || ![geometry.tail?.x, geometry.tail?.y, geometry.tip?.x, geometry.tip?.y].every((n) => typeof n === "number" && Number.isFinite(n)) || (geometry.unitsPerCanvasUnit !== undefined && (!Number.isFinite(geometry.unitsPerCanvasUnit) || geometry.unitsPerCanvasUnit <= 0))) throw new Error("Invalid arrow geometry.");
+    for (const ref of [geometry.tailRef, geometry.tipRef]) if (ref !== undefined && (!ref || !["science", "quickdraw"].includes(ref.scope) || typeof ref.id !== "string" || (ref.atomId !== undefined && typeof ref.atomId !== "string") || [ref.u, ref.v].some((value) => value !== undefined && (!Number.isFinite(value) || value < 0 || value > 1)))) throw new Error("Invalid object attachment.");
   }
   if (object.kind === "atom" && (!elements.includes(String(object.element)) || !Number.isInteger(object.nonbondingElectrons) || Number(object.nonbondingElectrons) < 0 || typeof object.bondOrderSum !== "number" || !Number.isFinite(object.bondOrderSum) || object.bondOrderSum < 0)) throw new Error("Invalid atom data.");
   if (object.kind === "bond" && ![1, 1.5, 2, 3].includes(object.order as number)) throw new Error("Invalid bond order.");
@@ -91,6 +92,8 @@ function validateObject(value: unknown) {
   if (object.kind === "anatomy" && (!Array.isArray(object.labels) || !object.labels.every((label) => typeof label === "string"))) throw new Error("Invalid anatomy labels.");
   if (object.kind === "measurement" && (typeof object.value !== "number" || !Number.isFinite(object.value))) throw new Error("Invalid measurement.");
   if (object.kind === "equation" && (!object.variables || typeof object.variables !== "object" || Array.isArray(object.variables) || !Object.values(object.variables).every((n) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid equation variables.");
+  if (object.result !== undefined && (typeof object.result !== "number" || !Number.isFinite(object.result))) throw new Error("Invalid equation result.");
+  if (object.evaluationError !== undefined && typeof object.evaluationError !== "string") throw new Error("Invalid evaluation error.");
 }
 
 export function moleculeBonds(molecule: Extract<ScientificObject, { kind: "molecule" }>) {
@@ -132,11 +135,11 @@ export function createObject(kind: ScientificObject["kind"], x: number, y: numbe
     case "atom": return { ...base, kind, element: "O", nonbondingElectrons: 4, bondOrderSum: 2, label: "Oxygen" };
     case "bond": return { ...base, kind, from: "atom-a", to: "atom-b", order: 2, label: "C=O" };
     case "molecule": return makeMolecule(x, y);
-    case "equation": return { ...base, kind, expression: "y = x²", variables: { x: 0 } };
+    case "equation": return { ...base, kind, expression: "x^2", variables: { x: 0 } };
     case "vector": return { ...base, kind, components: [3, 4, 0], units: "", label: "Vector" };
     case "force": return { ...base, kind, components: [0, -9.8, 0], units: "N", label: "Force" };
     case "measurement": return { ...base, kind, value: 1, units: "m", label: "Measurement" };
-    case "graph": return { ...base, kind, expression: "y = x²", xRange: [-3, 3], points: sampleSquare([-3, 3]), xLabel: "x", yLabel: "y" };
+    case "graph": return { ...base, kind, width: 260, height: 180, expression: "x^2", xRange: [-3, 3], points: sampleSquare([-3, 3]), xLabel: "x", yLabel: "y" };
     case "anatomy": return { ...base, kind, structureId: "", system: "", labels: [] };
     case "concept": return { ...base, kind, title: "New concept", definition: "Add a definition." };
     case "relationship": return { ...base, kind, fromId: "", toId: "", label: "relates to" };
