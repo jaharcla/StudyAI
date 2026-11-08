@@ -4,7 +4,8 @@ export function initializeDocumentIntelligenceSchema(db: Database.Database): voi
   db.exec(`
     CREATE TABLE IF NOT EXISTS di_documents (
       id TEXT PRIMARY KEY, course_id TEXT NOT NULL, title TEXT NOT NULL, filename TEXT NOT NULL,
-      mime_type TEXT NOT NULL, storage_path TEXT NOT NULL, imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      mime_type TEXT NOT NULL, storage_path TEXT NOT NULL, content_hash TEXT NOT NULL DEFAULT '',
+      imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS di_documents_course_idx ON di_documents(course_id, imported_at);
     CREATE TABLE IF NOT EXISTS di_units (
@@ -26,5 +27,8 @@ export function initializeDocumentIntelligenceSchema(db: Database.Database): voi
       INSERT INTO di_chunk_search(di_chunk_search, rowid, content) VALUES ('delete', old.id, old.content);
     END;
   `);
+  const columns = db.pragma("table_info(di_documents)") as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "content_hash")) db.exec("ALTER TABLE di_documents ADD COLUMN content_hash TEXT NOT NULL DEFAULT ''");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS di_documents_course_hash_idx ON di_documents(course_id, content_hash) WHERE content_hash <> ''");
   db.pragma("foreign_keys = ON");
 }

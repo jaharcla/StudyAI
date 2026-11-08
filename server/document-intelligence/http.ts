@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type Database from "better-sqlite3";
-import { getDocumentLocation, importDocuments, MAX_BATCH_BYTES, MAX_BATCH_FILES, searchDocuments } from "./service.js";
+import { deleteDocument, getDocument, getDocumentFile, getDocumentLocation, importDocumentsIndividually, listDocuments, MAX_BATCH_BYTES, MAX_BATCH_FILES, retrieveCourseDocuments, searchDocuments } from "./service.js";
 import type { ImportFile } from "./types.js";
 
 const MAX_REQUEST_BYTES = 70 * 1024 * 1024;
@@ -10,7 +10,7 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
   return async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     if (url.pathname.startsWith("/api/document-intelligence/") && request.method === "OPTIONS") {
-      response.writeHead(204, { "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" });
+      response.writeHead(204, { "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
       response.end();
       return true;
     }
@@ -24,7 +24,8 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
           return { name: file.name, bytes: Buffer.from(file.contentBase64, "base64") };
         });
         if (files.reduce((sum, file) => sum + file.bytes.byteLength, 0) > MAX_BATCH_BYTES) return send(response, 413, { error: "Batch exceeds the 50 MB total limit." });
-        return send(response, 201, { documents: await importDocuments(db, input.courseId, files, storageRoot) });
+        const results = await importDocumentsIndividually(db, input.courseId, files, storageRoot);
+        return send(response, 200, { results, documents: results.filter((result) => result.status === "imported").map((result) => result.document) });
       } catch (error) { return sendError(response, error); }
     }
     if (url.pathname === "/api/document-intelligence/search" && request.method === "GET") {
@@ -32,6 +33,42 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
       const query = url.searchParams.get("q") ?? "";
       if (!course || query.length > 500) return send(response, 400, { error: "A course and query of at most 500 characters are required." });
       try { return send(response, 200, { results: searchDocuments(db, course, query) }); } catch (error) { return sendError(response, error); }
+    }
+    if (url.pathname === "/api/document-intelligence/retrieve" && request.method === "GET") {
+      const course = url.searchParams.get("course") ?? "";
+      const query = url.searchParams.get("q") ?? "";
+      if (!course || query.length > 500) return send(response, 400, { error: "A course and query of at most 500 characters are required." });
+      try { return send(response, 200, retrieveCourseDocuments(db, course, query)); } catch (error) { return sendError(response, error); }
+    }
+    if (url.pathname === "/api/document-intelligence/documents" && request.method === "GET") {
+      const course = url.searchParams.get("course") ?? "";
+      const query = url.searchParams.get("q") ?? "";
+      if (!course || query.length > 500) return send(response, 400, { error: "A course and query of at most 500 characters are required." });
+      try { return send(response, 200, listDocuments(db, course, query)); } catch (error) { return sendError(response, error); }
+    }
+    const documentMatch = url.pathname.match(/^\/api\/document-intelligence\/documents\/([^/]+)(?:\/(file))?$/);
+    if (documentMatch) {
+      const course = url.searchParams.get("course") ?? "";
+      let documentId: string;
+      try { documentId = decodeURIComponent(documentMatch[1]); } catch { return send(response, 400, { error: "Invalid document ID." }); }
+      if (!course) return send(response, 400, { error: "course is required." });
+      if (request.method === "GET" && documentMatch[2] === "file") {
+        try {
+          const file = await getDocumentFile(db, course, documentId);
+          if (!file) return send(response, 404, { error: "Document not found in this course." });
+          response.writeHead(200, { "content-type": file.mimeType, "content-length": String(file.bytes.byteLength), "content-disposition": "inline; filename*=UTF-8''" + encodeURIComponent(file.filename), "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+          response.end(file.bytes);
+          return true;
+        } catch (error) { return sendError(response, error); }
+      }
+      if (request.method === "GET" && !documentMatch[2]) {
+        const document = getDocument(db, course, documentId);
+        return document ? send(response, 200, document) : send(response, 404, { error: "Document not found in this course." });
+      }
+      if (request.method === "DELETE" && !documentMatch[2]) {
+        try { return await deleteDocument(db, course, documentId) ? send(response, 200, { deleted: true }) : send(response, 404, { error: "Document not found in this course." }); }
+        catch (error) { return sendError(response, error); }
+      }
     }
     if (url.pathname === "/api/document-intelligence/source" && request.method === "GET") {
       const course = url.searchParams.get("course") ?? "";
@@ -46,7 +83,7 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
   };
 }
 
-async function readJson(request: IncomingMessage): Promise<Record<string, any>> {
+async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
   const declared = Number(request.headers["content-length"] ?? 0);
   if (declared > MAX_REQUEST_BYTES) throw Object.assign(new Error("Request exceeds the 70 MB limit."), { statusCode: 413 });
   const chunks: Buffer[] = [];
@@ -63,7 +100,7 @@ async function readJson(request: IncomingMessage): Promise<Record<string, any>> 
 }
 
 function send(response: ServerResponse, status: number, value: unknown): boolean {
-  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" });
+  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
   response.end(JSON.stringify(value));
   return true;
 }

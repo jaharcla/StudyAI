@@ -40,13 +40,14 @@ export function pptxFixture(): Uint8Array {
   });
 }
 
-export function pdfFixture(): Uint8Array {
+export function pdfFixture(text = "PDF sample page"): Uint8Array {
+  const stream = text ? "BT /F1 12 Tf 72 720 Td (" + text + ") Tj ET" : "q Q";
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
     "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    "<< /Length 52 >>\nstream\nBT /F1 12 Tf 72 720 Td (PDF sample page) Tj ET\nendstream",
+    "<< /Length " + Buffer.byteLength(stream) + " >>\nstream\n" + stream + "\nendstream",
   ];
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
