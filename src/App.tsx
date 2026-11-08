@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CopilotChat, CopilotKitProvider, useAgentContext } from "@copilotkit/react-core/v2";
-import { Quickdraw } from "@quickdrawjs/react";
 import { Activity, Atom, BookOpen, Brain, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, FlaskConical, FolderOpen, GraduationCap, Layers, Menu, Moon, MoreHorizontal, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, Upload, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
+import { CanvasStudio } from "./canvas/CanvasStudio";
 
 type Course = { id: string; title: string; code: string; color: string };
 type View = "Canvas" | "Lecture" | "Split";
@@ -25,22 +25,19 @@ function Workspace() {
   const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem("studyai.model") ?? "");
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
+  const [noteTitle, setNoteTitle] = useState("Atomic structure notes");
   const [noteId, setNoteId] = useState<string>();
   const [scienceTool, setScienceTool] = useState<"chem" | "kin" | null>(null);
   const [moduleOpen, setModuleOpen] = useState(true);
-  const [snapshot, setSnapshot] = useState<unknown>();
-  const [boardReady, setBoardReady] = useState(false);
   const [query, setQuery] = useState("");
   const [sources, setSources] = useState<any[]>([]);
   const [status, setStatus] = useState("All changes saved");
   const [tutorWidth, setTutorWidth] = useState(360);
   const uploadRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef(false);
-  const canvasSummary = useMemo(() => {
-    const records = snapshot && typeof snapshot === "object" ? Object.values(snapshot as Record<string, any>) : [];
-    const shapeTypes = records.reduce<Record<string, number>>((counts, record: any) => { const type = typeof record?.type === "string" ? record.type : "record"; counts[type] = (counts[type] ?? 0) + 1; return counts; }, {});
-    return { revision: records.length, objectCount: records.length, shapeTypes, note: "Freehand marks are not interpreted from coordinates." };
-  }, [snapshot]);
+  const [canvasSummary, setCanvasSummary] = useState({ objectCount: 0, objectTypes: {} as Record<string, number> });
+  const updateCanvasSummary = useCallback((summary: { objectCount: number; objectTypes: Record<string, number> }) => setCanvasSummary(summary), []);
+  const updateStatus = useCallback((next: string) => setStatus(next), []);
 
   useEffect(() => {
     fetch(`${API}/courses`).then((r) => r.json()).then((rows: Course[]) => { if (rows.length) { setCourses(rows); setCourse(rows[0]); } }).catch(() => undefined);
@@ -56,35 +53,18 @@ function Workspace() {
   }, []);
 
   useEffect(() => {
-    setNote(""); setNoteId(undefined);
-    fetch(`${API}/notes?course=${course.id}`).then((r) => r.json()).then((rows) => { if (rows[0]) { setNote(rows[0].body); setNoteId(rows[0].id); } }).catch(() => undefined);
+    setNote(""); setNoteId(undefined); setNoteTitle("Atomic structure notes");
+    fetch(`${API}/notes?course=${course.id}`).then((r) => r.json()).then((rows) => { if (rows[0]) { setNote(rows[0].body); setNoteId(rows[0].id); setNoteTitle(rows[0].title); } }).catch(() => undefined);
   }, [course.id]);
 
   useEffect(() => {
     if (!noteOpen) return;
     const timer = window.setTimeout(() => {
-      fetch(`${API}/notes`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: noteId, courseId: course.id, title: "Atomic structure notes", body: note }) })
+      fetch(`${API}/notes`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: noteId, courseId: course.id, title: noteTitle, body: note }) })
         .then((r) => r.json()).then((saved) => { setNoteId(saved.id); setStatus("Notes saved locally"); }).catch(() => setStatus("Notes save unavailable"));
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [note, noteOpen, noteId, course.id]);
-
-  useEffect(() => {
-    setBoardReady(false);
-    setSnapshot(undefined);
-    fetch(`${API}/drawings?course=${course.id}`).then((r) => r.json()).then((saved) => { if (saved?.snapshot) setSnapshot(JSON.parse(saved.snapshot)); }).catch(() => undefined).finally(() => setBoardReady(true));
-  }, [course.id]);
-
-  const saveBoard = useCallback((_diff: unknown, _source: unknown, editor: any) => {
-    const next = editor.store.getSnapshot();
-    setSnapshot(next);
-    setStatus("Saving…");
-    window.clearTimeout((saveBoard as any).timer);
-    (saveBoard as any).timer = window.setTimeout(() => {
-      fetch(`${API}/drawings`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId: course.id, snapshot: next }) })
-        .then(() => setStatus("All changes saved")).catch(() => setStatus("Save unavailable"));
-    }, 450);
-  }, [course.id]);
+  }, [note, noteOpen, noteId, noteTitle, course.id]);
 
   const search = async () => {
     const response = await fetch(`${API}/search?q=${encodeURIComponent(query)}&course=${course.id}`);
@@ -98,6 +78,21 @@ function Workspace() {
     const result = await response.json();
     setStatus(result.status === "indexed" ? `${file.name} added to course sources` : (result.error ?? "Import failed"));
   };
+
+  const openLinkedNote = useCallback(async (id: string) => {
+    try {
+      const rows = await fetch(`${API}/notes?course=${course.id}`).then((response) => response.json());
+      const linked = rows.find((item: any) => item.id === id);
+      if (!linked) { setStatus("Linked note was not found"); return; }
+      setNoteId(linked.id); setNoteTitle(linked.title); setNote(linked.body); setNoteOpen(true);
+    } catch { setStatus("Linked note is unavailable"); }
+  }, [course.id]);
+
+  const openLinkedDocument = useCallback(async (id: string, title: string) => {
+    setView("Lecture"); setQuery(title);
+    try { const response = await fetch(`${API}/search?q=${encodeURIComponent(title)}&course=${course.id}`); setSources(await response.json()); }
+    catch { setSources([{ title, excerpt: `Document ${id} is linked to this canvas.` }]); }
+  }, [course.id]);
 
   const changeWidth = (event: React.MouseEvent) => {
     if (!dragRef.current) return;
@@ -127,7 +122,7 @@ function Workspace() {
       <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span> MODULE 1 <span className="crumb-dot">·</span> LESSON 03</div><h1>Atomic structure &amp; bonding</h1><p>Build a mental model of atoms, electron configuration, and the forces that hold molecules together.</p></div><button className="button-soft"><Brain size={15} /> Study this lesson</button></section>
       <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions"><button className="tool-chip active" onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => uploadRef.current?.click()} title="Import source"><FolderOpen size={16} /></button></div></section>
       <div className={`work-area ${view.toLowerCase()}`}>
-        {(view === "Canvas" || view === "Split") && <div className="canvas-pane"><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div><div className="canvas-board">{boardReady ? <Quickdraw key={course.id} theme={dark ? "dark" : "light"} grid="dots" snapshot={snapshot as any} onChange={saveBoard} autoFit /> : <div className="canvas-loading">Loading saved canvas…</div>}</div><div className="canvas-footer"><span><span className="live-dot" /> Canvas ready</span><span>Revision saved locally</span></div></div>}
+        {(view === "Canvas" || view === "Split") && <div className="canvas-pane"><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div><CanvasStudio courseId={course.id} lessonId="lesson-03" theme={dark ? "dark" : "light"} onStatus={updateStatus} onOpenNote={openLinkedNote} onOpenDocument={openLinkedDocument} onSummary={updateCanvasSummary} /></div>}
         {(view === "Lecture" || view === "Split") && <div className="lecture-pane"><div className="pane-label"><span>LECTURE &amp; SOURCES</span><button onClick={() => uploadRef.current?.click()}><Plus size={14} /> Add source</button></div>{lecture}<div className="source-search"><div className="source-search-title">Search this course</div><div className="search-line"><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void search()} placeholder="Search your course materials…" /><button onClick={() => void search()}><Search size={15} /></button></div>{sources.map((item, i) => <div key={i} className="source-hit"><FileText size={14} /><span><b>{item.title}</b><small>{item.excerpt}</small></span></div>)}</div></div>}
       </div>
     </main>
@@ -135,14 +130,14 @@ function Workspace() {
     {!tutor && <button className="reopen-tutor" onClick={() => setTutor(true)}><Sparkles size={16} /> Open tutor</button>}
     <input ref={uploadRef} hidden type="file" accept=".txt" onChange={(e) => void importText(e.target.files?.[0])} />
     {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>AI provider<input value="Ollama · local" readOnly /></label><label>Model<select aria-label="Model" data-testid="model-select" value={selectedModel} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p>{models.length ? "Your selection is used for the next tutor message." : "Start Ollama and install a model to enable local chat."}</p><button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
-    {noteOpen && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div className="settings-modal notes-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · LESSON 03</span><h2>Atomic structure notes</h2></div><button className="icon-button" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this course…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
+    {noteOpen && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div className="settings-modal notes-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · LESSON 03</span><input aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this course…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
   </div>;
 }
 
 export default function App() { return <Workspace />; }
 
-function AgentContext({ course, canvas, view, model }: { course: Course; canvas: { revision: number; objectCount: number; shapeTypes: Record<string, number>; note: string }; view: View; model: string }) {
+function AgentContext({ course, canvas, view, model }: { course: Course; canvas: { objectCount: number; objectTypes: Record<string, number> }; view: View; model: string }) {
   useAgentContext({ description: "StudyAI current workspace and structured canvas metadata", value: { course: course.title, courseCode: course.code, lesson: "Atomic structure & bonding", view, canvas } });
   useAgentContext({ description: "StudyAI selected model", value: { model } });
   return null;

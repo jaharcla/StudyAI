@@ -6,7 +6,7 @@ import { extname, basename, resolve } from "node:path";
 import { db } from "./db.js";
 
 const port = 8201;
-const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" }); res.end(JSON.stringify(data)); };
+const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
 const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
@@ -22,6 +22,29 @@ const server = createServer(async (req, res) => {
   }
   if (req.method === "GET" && url.pathname === "/api/courses") return json(res, 200, db.prepare("SELECT * FROM courses").all());
   if (req.method === "GET" && url.pathname === "/api/notes") return json(res, 200, db.prepare("SELECT * FROM notes WHERE course_id=? ORDER BY updated_at DESC").all(url.searchParams.get("course") ?? "chem-120"));
+  if (req.method === "GET" && url.pathname === "/api/documents") return json(res, 200, db.prepare("SELECT id,course_id,title,imported_at FROM documents WHERE course_id=? ORDER BY imported_at DESC").all(url.searchParams.get("course") ?? "chem-120"));
+  if (req.method === "GET" && url.pathname === "/api/canvases") {
+    const courseId = url.searchParams.get("course") ?? "chem-120";
+    const lessonId = url.searchParams.get("lesson") ?? "lesson-03";
+    return json(res, 200, db.prepare("SELECT id,course_id,lesson_id,name,revision,updated_at FROM canvases WHERE course_id=? AND lesson_id=? ORDER BY updated_at DESC").all(courseId, lessonId));
+  }
+  if (req.method === "GET" && url.pathname.startsWith("/api/canvases/")) {
+    const id = decodeURIComponent(url.pathname.slice("/api/canvases/".length));
+    const row = db.prepare("SELECT * FROM canvases WHERE id=?").get(id);
+    return row ? json(res, 200, row) : json(res, 404, { error: "canvas not found" });
+  }
+  if (req.method === "POST" && url.pathname === "/api/canvases") {
+    const input = JSON.parse(await body(req, 20_000_000));
+    if (!input.courseId || !input.lessonId || !input.name || !input.document || typeof input.document !== "object") return json(res, 400, { error: "courseId, lessonId, name, and document are required" });
+    const id = input.id ?? randomUUID();
+    db.prepare("INSERT INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET name=excluded.name,document=excluded.document,revision=canvases.revision+1,updated_at=strftime('%Y-%m-%d %H:%M:%f','now')").run(id, String(input.courseId), String(input.lessonId), String(input.name).slice(0, 120), JSON.stringify(input.document));
+    return json(res, 200, { id });
+  }
+  if (req.method === "DELETE" && url.pathname.startsWith("/api/canvases/")) {
+    const id = decodeURIComponent(url.pathname.slice("/api/canvases/".length));
+    db.prepare("DELETE FROM canvases WHERE id=?").run(id);
+    return json(res, 200, { id, deleted: true });
+  }
   if (req.method === "POST" && url.pathname === "/api/notes") {
     const input = JSON.parse(await body(req));
     const id = input.id ?? randomUUID();
@@ -58,4 +81,4 @@ const server = createServer(async (req, res) => {
   return json(res, 404, { error: "not found" });
 });
 server.listen(port, "127.0.0.1", () => console.log(`StudyAI local data API on http://127.0.0.1:${port}`));
-function body(req: import("node:http").IncomingMessage) { return new Promise<string>((resolveBody, reject) => { let value = ""; req.setEncoding("utf8"); req.on("data", (chunk) => { value += chunk; if (value.length > 1_000_000) reject(new Error("payload too large")); }); req.on("end", () => resolveBody(value)); req.on("error", reject); }); }
+function body(req: import("node:http").IncomingMessage, limit = 1_000_000) { return new Promise<string>((resolveBody, reject) => { let value = ""; req.setEncoding("utf8"); req.on("data", (chunk) => { value += chunk; if (value.length > limit) reject(new Error("payload too large")); }); req.on("end", () => resolveBody(value)); req.on("error", reject); }); }
