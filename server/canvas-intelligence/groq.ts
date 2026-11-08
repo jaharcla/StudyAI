@@ -19,7 +19,7 @@ export function canvasInferenceProvider(env: NodeJS.ProcessEnv = process.env): C
 }
 
 export const groqOCRModel = (env: NodeJS.ProcessEnv = process.env) => env.CANVAS_GROQ_OCR_MODEL || "qwen/qwen3.8-27b";
-export const groqInferenceModel = (env: NodeJS.ProcessEnv = process.env) => env.CANVAS_GROQ_MODEL || env.GROQ_MODEL || "llama-3.3-70b-versatile";
+export const groqInferenceModel = (env: NodeJS.ProcessEnv = process.env) => env.CANVAS_GROQ_MODEL || env.GROQ_MODEL || "openai/gpt-oss-120b";
 const issued: number[] = [];
 
 type GroqInferenceOptions = { model: string; system: string; prompt: string; baseUrl?: string; signal?: AbortSignal; fetcher?: typeof fetch };

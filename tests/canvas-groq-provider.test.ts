@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { canvasInferenceJson, canvasInferenceProvider } from "../server/canvas-intelligence/groq.js";
+import { canvasInferenceJson, canvasInferenceProvider, groqInferenceModel } from "../server/canvas-intelligence/groq.js";
 
 const schema = z.object({ value: z.string() });
 const options = { model: "local:test", system: "Return JSON.", prompt: "Return {value:string}." };
@@ -8,6 +8,12 @@ const options = { model: "local:test", system: "Return JSON.", prompt: "Return {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Canvas inference provider preference", () => {
+  it("defaults to the current Groq tool-calling model and allows scoped overrides", () => {
+    expect(groqInferenceModel({} as NodeJS.ProcessEnv)).toBe("openai/gpt-oss-120b");
+    expect(groqInferenceModel({ GROQ_MODEL: "custom/model" } as NodeJS.ProcessEnv)).toBe("custom/model");
+    expect(groqInferenceModel({ GROQ_MODEL: "custom/model", CANVAS_GROQ_MODEL: "canvas/model" } as NodeJS.ProcessEnv)).toBe("canvas/model");
+  });
+
   it("prefers Groq when configured and allows an explicit Ollama override", () => {
     expect(canvasInferenceProvider({ GROQ_API_KEY: "test-key" } as NodeJS.ProcessEnv)).toBe("groq");
     expect(canvasInferenceProvider({ GROQ_API_KEY: "test-key", CANVAS_INFERENCE_PROVIDER: "ollama" } as NodeJS.ProcessEnv)).toBe("ollama");
