@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CopilotChat, CopilotKitProvider, useAgentContext } from "@copilotkit/react-core/v2";
 import { Quickdraw } from "@quickdrawjs/react";
-import { Activity, Atom, BookOpen, Brain, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, FlaskConical, FolderOpen, GraduationCap, Layers, Menu, Moon, MoreHorizontal, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, Upload, X } from "lucide-react";
+import { Activity, Atom, BookOpen, Brain, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, FileText, FlaskConical, GraduationCap, Layers, Menu, Moon, MoreHorizontal, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
+import { DocumentLibrary, parseSourceReference } from "./components/document-intelligence";
 
 type Course = { id: string; title: string; code: string; color: string };
 type View = "Canvas" | "Lecture" | "Split";
@@ -31,10 +32,10 @@ function Workspace() {
   const [snapshot, setSnapshot] = useState<unknown>();
   const [boardReady, setBoardReady] = useState(false);
   const [query, setQuery] = useState("");
-  const [sources, setSources] = useState<any[]>([]);
   const [status, setStatus] = useState("All changes saved");
   const [tutorWidth, setTutorWidth] = useState(360);
-  const uploadRef = useRef<HTMLInputElement>(null);
+  const [openSourceRef, setOpenSourceRef] = useState<string>();
+  const [openSourceKey, setOpenSourceKey] = useState(0);
   const dragRef = useRef(false);
   const canvasSummary = useMemo(() => {
     const records = snapshot && typeof snapshot === "object" ? Object.values(snapshot as Record<string, any>) : [];
@@ -86,17 +87,18 @@ function Workspace() {
     }, 450);
   }, [course.id]);
 
-  const search = async () => {
-    const response = await fetch(`${API}/search?q=${encodeURIComponent(query)}&course=${course.id}`);
-    setSources(await response.json());
-  };
-
-  const importText = async (file?: File) => {
-    if (!file) return;
-    const content = await file.text();
-    const response = await fetch(`${API}/documents`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: file.name, content, courseId: course.id }) });
-    const result = await response.json();
-    setStatus(result.status === "indexed" ? `${file.name} added to course sources` : (result.error ?? "Import failed"));
+  const openCitation = (event: React.MouseEvent<HTMLDivElement>) => {
+    const anchor = (event.target as HTMLElement).closest("a");
+    const href = anchor?.getAttribute("href");
+    if (!href?.startsWith("#studyai-citation=")) return;
+    event.preventDefault();
+    try {
+      const sourceRef = decodeURIComponent(href.slice("#studyai-citation=".length));
+      if (!parseSourceReference(sourceRef)) return;
+      setOpenSourceRef(sourceRef);
+      setOpenSourceKey((key) => key + 1);
+      setView("Lecture");
+    } catch { return; }
   };
 
   const changeWidth = (event: React.MouseEvent) => {
@@ -104,7 +106,6 @@ function Workspace() {
     setTutorWidth(Math.min(520, Math.max(300, window.innerWidth - event.clientX)));
   };
 
-  const lecture = <div className="lecture-empty"><div className="pdf-icon"><FileText size={24} /></div><h3>Bring your lecture into the workspace</h3><p>Import a UTF-8 text file to search it alongside your notes.</p><button className="button-primary" onClick={() => uploadRef.current?.click()}><Upload size={15} /> Import text source</button><span>PDF extraction and page citations are not available yet.</span></div>;
 
   return <div className={`app-shell ${dark ? "dark" : ""}`}>
     {sidebar && <aside className="sidebar">
@@ -125,15 +126,14 @@ function Workspace() {
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
       <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span> MODULE 1 <span className="crumb-dot">·</span> LESSON 03</div><h1>Atomic structure &amp; bonding</h1><p>Build a mental model of atoms, electron configuration, and the forces that hold molecules together.</p></div><button className="button-soft"><Brain size={15} /> Study this lesson</button></section>
-      <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions"><button className="tool-chip active" onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => uploadRef.current?.click()} title="Import source"><FolderOpen size={16} /></button></div></section>
+      <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions"><button className="tool-chip active" onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
       <div className={`work-area ${view.toLowerCase()}`}>
         {(view === "Canvas" || view === "Split") && <div className="canvas-pane"><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div><div className="canvas-board">{boardReady ? <Quickdraw key={course.id} theme={dark ? "dark" : "light"} grid="dots" snapshot={snapshot as any} onChange={saveBoard} autoFit /> : <div className="canvas-loading">Loading saved canvas…</div>}</div><div className="canvas-footer"><span><span className="live-dot" /> Canvas ready</span><span>Revision saved locally</span></div></div>}
-        {(view === "Lecture" || view === "Split") && <div className="lecture-pane"><div className="pane-label"><span>LECTURE &amp; SOURCES</span><button onClick={() => uploadRef.current?.click()}><Plus size={14} /> Add source</button></div>{lecture}<div className="source-search"><div className="source-search-title">Search this course</div><div className="search-line"><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void search()} placeholder="Search your course materials…" /><button onClick={() => void search()}><Search size={15} /></button></div>{sources.map((item, i) => <div key={i} className="source-hit"><FileText size={14} /><span><b>{item.title}</b><small>{item.excerpt}</small></span></div>)}</div></div>}
+        {(view === "Lecture" || view === "Split") && <div className="lecture-pane"><DocumentLibrary courseId={course.id} courses={courses} onCourseChange={(id) => { const selected = courses.find((item) => item.id === id); if (selected) setCourse(selected); }} initialSourceRef={openSourceRef} initialSourceKey={openSourceKey} initialQuery={query} /></div>}
       </div>
     </main>
-    {tutor && <><div className="resize-handle" onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small><i /> Local AI · {course.title}</small></span></div><div><button className="icon-button" title="Tutor options"><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div><div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>Atomic structure &amp; bonding</b><small>Module 1 · {course.title}</small></span><ChevronDown size={14} /></div><p>Responses can reference your selected course. Canvas marks stay uninterpreted until you describe them.</p></div><div className="suggestions"><span>TRY ASKING</span><button onClick={() => setQuery("Explain electron configuration")}>Explain electron configuration <ChevronRight size={13} /></button><button onClick={() => setQuery("Quiz me on bonding")}>Quiz me on bonding <ChevronRight size={13} /></button></div><div className="copilot-slot"><CopilotKitProvider runtimeUrl="http://127.0.0.1:8200/api/copilotkit" agentId="studyai"><AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} /><CopilotChat className="study-chat" labels={{ welcomeMessageText: "Ask about this lesson, request a worked example, or describe a canvas mark for help." }} /></CopilotKitProvider></div><div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
+    {tutor && <><div className="resize-handle" onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small><i /> Local AI · {course.title}</small></span></div><div><button className="icon-button" title="Tutor options"><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div><div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>Atomic structure &amp; bonding</b><small>Module 1 · {course.title}</small></span><ChevronDown size={14} /></div><p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div><div className="suggestions"><span>TRY ASKING</span><button onClick={() => setQuery("Explain electron configuration")}>Explain electron configuration <ChevronRight size={13} /></button><button onClick={() => setQuery("Quiz me on bonding")}>Quiz me on bonding <ChevronRight size={13} /></button></div><div className="copilot-slot" onClick={openCitation}><CopilotKitProvider runtimeUrl="http://127.0.0.1:8200/api/copilotkit" agentId="studyai"><AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} /><CopilotChat className="study-chat" labels={{ welcomeMessageText: "Ask about this lesson, request a worked example, or describe a canvas mark for help." }} /></CopilotKitProvider></div><div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
     {!tutor && <button className="reopen-tutor" onClick={() => setTutor(true)}><Sparkles size={16} /> Open tutor</button>}
-    <input ref={uploadRef} hidden type="file" accept=".txt" onChange={(e) => void importText(e.target.files?.[0])} />
     {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>AI provider<input value="Ollama · local" readOnly /></label><label>Model<select aria-label="Model" data-testid="model-select" value={selectedModel} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p>{models.length ? "Your selection is used for the next tutor message." : "Start Ollama and install a model to enable local chat."}</p><button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
     {noteOpen && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div className="settings-modal notes-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · LESSON 03</span><h2>Atomic structure notes</h2></div><button className="icon-button" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this course…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
@@ -143,7 +143,7 @@ function Workspace() {
 export default function App() { return <Workspace />; }
 
 function AgentContext({ course, canvas, view, model }: { course: Course; canvas: { revision: number; objectCount: number; shapeTypes: Record<string, number>; note: string }; view: View; model: string }) {
-  useAgentContext({ description: "StudyAI current workspace and structured canvas metadata", value: { course: course.title, courseCode: course.code, lesson: "Atomic structure & bonding", view, canvas } });
+  useAgentContext({ description: "StudyAI current workspace and structured canvas metadata", value: { courseId: course.id, course: course.title, courseCode: course.code, lesson: "Atomic structure & bonding", view, canvas } });
   useAgentContext({ description: "StudyAI selected model", value: { model } });
   return null;
 }

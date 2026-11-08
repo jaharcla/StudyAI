@@ -10,6 +10,9 @@
   max-width: 1120px;
   margin: 0 auto;
   padding: clamp(18px, 4vw, 42px);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .di-library *, .di-viewer * { box-sizing: border-box; }

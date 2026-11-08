@@ -4,10 +4,13 @@ import { randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { extname, basename, resolve } from "node:path";
 import { db } from "./db.js";
+import { createDocumentIntelligenceHandler } from "./document-intelligence/http.js";
 
 const port = 8201;
 const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": "http://127.0.0.1:5173", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" }); res.end(JSON.stringify(data)); };
+const documentHandler = createDocumentIntelligenceHandler(db);
 const server = createServer(async (req, res) => {
+  if (await documentHandler(req, res)) return;
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
   if (req.method === "GET" && url.pathname === "/api/models") {

@@ -6,3 +6,4 @@ export { DocumentLibrary } from "./DocumentLibrary.js";
 export { DocumentViewer } from "./DocumentViewer.js";
 export { clampUnitNumber, findDocumentMatches, nextMatchIndex } from "./navigation.js";
 export type { DocumentData, LibraryDocument, SearchHit, SourceReference, UnitType } from "./api.js";
+export { parseSourceReference, sourceDocumentUrl } from "./api.js";

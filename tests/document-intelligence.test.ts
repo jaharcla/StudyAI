@@ -103,6 +103,7 @@ describe("document intelligence", () => {
   });
 
   it("exposes a course-bound LangGraph retrieval tool with explicit no-evidence output", async () => {
+    expect(() => createDocumentRetrievalTool(db, "not-a-course")).toThrow("unknown course");
     const tool = createDocumentRetrievalTool(db, "chem-120");
     const output = JSON.parse(String(await tool.invoke({ query: "evidence not present" })));
     expect(output).toMatchObject({ status: "no_evidence", courseId: "chem-120", results: [] });

@@ -2,7 +2,7 @@ export const DOCUMENT_API = "http://127.0.0.1:8201/api/document-intelligence";
 
 export type UnitType = "page" | "slide" | "text";
 export type SourceReference = { documentId: string; unitType: UnitType; unitNumber: number; chunkIndex: number };
-export type SearchHit = { documentId: string; title: string; unitType: UnitType; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number };
+export type SearchHit = { documentId: string; title: string; filename: string; unitType: UnitType; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number };
 export type LibraryDocument = { id: string; courseId: string; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
 export type DocumentData = LibraryDocument & { units: Array<{ type: UnitType; number: number; title?: string; text: string }> };
 

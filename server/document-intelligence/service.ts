@@ -12,12 +12,13 @@ export const MAX_BATCH_BYTES = 50 * 1024 * 1024;
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 export type IndexedDocument = { id: string; courseId: string; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
+export type DocumentSearchResult = { documentId: string; title: string; filename: string; unitType: string; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number };
 export type ImportFileResult =
   | { status: "imported"; fileName: string; document: { id: string; title: string; unitCount: number; chunkCount: number } }
   | { status: "duplicate"; fileName: string; document: { id: string; title: string } }
   | { status: "error"; fileName: string; error: string };
 export type RetrievalResult =
-  | { status: "evidence"; message: "Candidate excerpts found; verify each excerpt before using it as an answer."; courseId: string; results: ReturnType<typeof searchDocuments> }
+  | { status: "evidence"; message: "Candidate excerpts found; verify each excerpt before using it as an answer."; courseId: string; results: DocumentSearchResult[] }
   | { status: "no_evidence"; message: "No matching excerpts were found in this course."; courseId: string; results: [] };
 
 export function makeSourceReference(ref: SourceReference): string {
@@ -83,14 +84,14 @@ export async function importDocuments(db: Database.Database, courseId: string, f
   return prepared.map((item) => ({ id: item.id, title: item.extracted.title?.trim().slice(0, 240) || item.filename, unitCount: item.extracted.units.length, chunkCount: item.chunks.length }));
 }
 
-export function searchDocuments(db: Database.Database, courseId: string, query: string, limit = 8): Array<{ documentId: string; title: string; unitType: string; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number }> {
+export function searchDocuments(db: Database.Database, courseId: string, query: string, limit = 8): DocumentSearchResult[] {
   initializeDocumentIntelligenceSchema(db);
   const terms = query.replace(/["*:^(){}\[\]]/g, " ").trim().split(/\s+/).filter(Boolean).slice(0, 20).map((part) => `"${part.replace(/"/g, '""')}"`).join(" OR ");
   if (!terms || !courseId) return [];
-  const rows = db.prepare(`SELECT c.document_id AS documentId, d.title, c.unit_type AS unitType, c.unit_number AS unitNumber,
+  const rows = db.prepare(`SELECT c.document_id AS documentId, d.title, d.filename, c.unit_type AS unitType, c.unit_number AS unitNumber,
     c.chunk_index AS chunkIndex, snippet(di_chunk_search,0,'','','…',28) AS excerpt, bm25(di_chunk_search) AS score
     FROM di_chunk_search JOIN di_chunks c ON c.id=di_chunk_search.rowid JOIN di_documents d ON d.id=c.document_id
-    WHERE di_chunk_search MATCH ? AND c.course_id=? ORDER BY score LIMIT ?`).all(terms, courseId, Math.max(1, Math.min(50, limit))) as Array<{ documentId: string; title: string; unitType: string; unitNumber: number; chunkIndex: number; excerpt: string; score: number }>;
+    WHERE di_chunk_search MATCH ? AND c.course_id=? ORDER BY score LIMIT ?`).all(terms, courseId, Math.max(1, Math.min(50, limit))) as Array<Omit<DocumentSearchResult, "sourceRef">>;
   return rows.map((row) => ({ ...row, sourceRef: makeSourceReference({ documentId: row.documentId, unitType: row.unitType as SourceReference["unitType"], unitNumber: row.unitNumber, chunkIndex: row.chunkIndex }) }));
 }
 

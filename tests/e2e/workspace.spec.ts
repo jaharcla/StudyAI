@@ -31,8 +31,8 @@ test("workspace renders, saves its canvas, and switches study views", async ({ p
     return Boolean((await response.json())?.snapshot);
   }).toBe(true);
   await page.getByRole("button", { name: "Lecture", exact: true }).click();
-  await expect(page.getByText("LECTURE & SOURCES")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Document library" })).toBeVisible();
   await page.getByRole("button", { name: "Split", exact: true }).click();
   await expect(page.getByText("STUDY CANVAS")).toBeVisible();
-  await expect(page.getByText("LECTURE & SOURCES")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Document library" })).toBeVisible();
 });

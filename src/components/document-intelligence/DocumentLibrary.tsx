@@ -6,9 +6,9 @@ import { DOCUMENT_API, type LibraryDocument, type SearchHit, parseSourceReferenc
 
 type Course = { id: string; title: string };
 type Upload = { id: string; file: File; status: "queued" | "uploading" | "imported" | "duplicate" | "error"; progress: number; message?: string; documentId?: string };
-type Props = { courseId: string; courses?: Course[]; onCourseChange?: (courseId: string) => void; initialSourceRef?: string };
+type Props = { courseId: string; courses?: Course[]; onCourseChange?: (courseId: string) => void; initialSourceRef?: string; initialSourceKey?: number; initialQuery?: string };
 
-export function DocumentLibrary({ courseId, courses = [], onCourseChange, initialSourceRef }: Props) {
+export function DocumentLibrary({ courseId, courses = [], onCourseChange, initialSourceRef, initialSourceKey, initialQuery }: Props) {
   const [documents, setDocuments] = useState<LibraryDocument[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [query, setQuery] = useState("");
@@ -45,7 +45,9 @@ export function DocumentLibrary({ courseId, courses = [], onCourseChange, initia
     if (!initialSourceRef) return;
     const source = parseSourceReference(initialSourceRef);
     if (source) setViewer({ documentId: source.documentId, sourceRef: initialSourceRef });
-  }, [initialSourceRef]);
+  }, [initialSourceRef, initialSourceKey]);
+
+  useEffect(() => { if (initialQuery !== undefined) setQuery(initialQuery); }, [initialQuery]);
 
   const importFiles = async (files: File[]) => {
     if (!files.length || !courseId) return;
