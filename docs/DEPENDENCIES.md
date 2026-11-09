@@ -9,17 +9,17 @@ All 28 supplied ZIPs were enumerated without extracting or executing archive scr
 | `CopilotKit-main.zip` | MIT; monorepo source | Use documented v2 entrypoints from published `@copilotkit/react-core` and `@copilotkit/runtime` 1.85.0. |
 | `docling-main.zip` | MIT; Python project | Defer; Python 3.10 is installed, but no Docling component is wired. |
 | `embed-pdf-viewer-main.zip` | Repository licensing notice; CloudPDF packages | Defer; hosted service SDKs do not fit local-first requirements. |
-| `jsxgraph-main.zip` | `jsxgraph@1.14.3`; no root license file found | Defer pending license review. |
+| `jsxgraph-main.zip` | `jsxgraph@1.14.3`; dual licensed MIT/LGPL | Defer: current SVG `GraphPlot` already renders and traces 2D functions; reconsider if constrained geometry becomes a demonstrated need. |
 | `ketcher-master.zip` | Apache-2.0; source monorepo | Defer; larger editor integration remains separate work. |
 | `lancedb-main.zip` | Apache-2.0; `@lancedb/lancedb@0.42.0-beta.8` | Reject beta/native vector DB overlap; SQLite FTS5 is used first. |
 | `langchainjs-main.zip` | MIT; monorepo | Use selected published LangChain packages only. |
 | `langgraphjs-main.zip` | MIT; monorepo | Use published `@langchain/langgraph` and CLI for the tutor graph. |
-| `mathjs-develop.zip` | Apache-2.0; `mathjs@15.2.0` | Defer until symbolic/numeric editor needs it. |
-| `mathlive-master.zip` | `mathlive@0.111.4`; package license metadata | Defer until equation editor slice. |
+| `mathjs-develop.zip` | Apache-2.0; `mathjs@15.2.0` | Use: pinned numeric expression parser/evaluator for scientific equations, sampled graphs and deterministic Tutor calculations; AST allowlist and numeric-only entrypoint are in use. Reuse for MathLive `ascii-math` input and persist its validated `Node.toJSON()` form. |
+| `mathlive-master.zip` | MIT; `mathlive@0.111.4` | Verified in the isolated prototype as an on-demand local `<math-field>` editor; no MathLive npm audit finding, no CDN. Full app build, 159/159 deterministic tests, and math workspace/keyboard browser flows pass after clean lockfile installation. Mainline integration remains pending conflict review. |
 | `mediapipe-master.zip` | Apache-2.0; development monorepo | Defer; unnecessary CPU/RAM cost for current foundation. |
 | `molstar-master.zip` | MIT; v6 development packages | Defer; molecular viewer not part of first slice. |
 | `OATutor-main.zip` | MIT; multi-service app | Reference only; do not merge the application. |
-| `openchemlib-js-main.zip` | BSD-3-Clause; `openchemlib@9.25.2` | Pin for future chemistry object editing; current formal-charge utility is standalone. |
+| `openchemlib-js-main.zip` | BSD-3-Clause; `openchemlib@9.25.2` | Use: current molecule conversion/validation tool; deterministic formal charge and vector calculations remain in StudyAI's existing utility module. |
 | `plotly.js-main.zip` | MIT; bundled/source repo | Defer; load only with graphing module. |
 | `pyBKT-master.zip` | MIT; Python project | Defer until enough attempt data exists. |
 | `quickdraw-main.zip` | MIT; React package in monorepo | Use published `@quickdrawjs/react` 0.1.0 and matching core CSS. |

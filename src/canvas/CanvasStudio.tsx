@@ -8,15 +8,16 @@ import { ScientificLayer, type ScienceMode } from "./ScientificLayer";
 import { arrowGeometry, synchronizeObject, withArrowEndpoints } from "./geometry";
 import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
 import { stableJson } from "./stable-json";
-import { compileExpression, evaluateScientificObject } from "./expressions";
+import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { objectTitle } from "./SceneGlyph";
-import { applyCanvasProposal, canvasEditSchema, proposeCanvasEdit, type CanvasProposal } from "./tutor";
+import { applyCanvasProposal, canvasEditSchema, MathProposalValidationError, proposeCanvasEdit, type CanvasProposal } from "./tutor";
 import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
-import { bondOrderSum, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
+import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
 import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
 import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
+import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -62,7 +63,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [proposalBusy, setProposalBusy] = useState(false);
-  useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects, freehand: "Uninterpreted Quickdraw snapshot" } });
+  useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
     description: "Propose an edit to an existing scientific object on the active board. The user must apply it before it changes the canvas. Use current IDs from canvas context.",
@@ -72,10 +73,10 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         const currentBoard = boardRef.current;
         if (!currentBoard) throw new Error("The active board is not ready.");
         const context = { boardId: currentBoard.id, courseId, lessonId, objects: documentRef.current.objects, revision: currentBoard.revision } as Parameters<typeof proposeCanvasEdit>[0] & { revision: number };
-        const next = proposeCanvasEdit(context, edit);
+        const next = await proposeCanvasEdit(context, edit);
         setProposal(next);
         return { status: "pending_user_review", reason: next.reason };
-      } catch (error) { return { status: "rejected", error: error instanceof Error ? error.message : "Invalid edit" }; }
+      } catch (error) { return error instanceof MathProposalValidationError ? { status: error.status, error: error.message } : { status: "rejected", error: error instanceof Error ? error.message : "Invalid edit" }; }
     },
   }, [courseId, lessonId]);
 
@@ -149,7 +150,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     if (loading || !document.objects.some((object) => object.kind === "graph" || object.kind === "equation")) return;
     let live = true;
     const before = documentRef.current;
-    void Promise.all(before.objects.map(evaluateScientificObject)).then((objects) => {
+    void evaluateScientificObjects(before.objects).then((objects) => {
       if (live && documentRef.current === before && JSON.stringify(objects) !== JSON.stringify(before.objects)) scheduleSave(boardRef.current, { ...before, objects });
     });
     return () => { live = false; };
@@ -229,7 +230,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       const authoritative = await readAuthoritativeBoard(board);
       if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
       const context = { boardId: board.id, courseId, lessonId, objects: base.objects, revision: authoritative.revision } as Parameters<typeof applyCanvasProposal>[0] & { revision: number };
-      const objects = applyCanvasProposal(context, pending);
+      const objects = await applyCanvasProposal(context, pending);
       const next = resolveScene({ ...base, objects });
       if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
       if (!await postDocument({ ...board, revision: authoritative.revision }, next)) return;
@@ -433,6 +434,19 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     replaceObjects(next.map((object) => synchronizeObject(documentRef.current.objects.find((old) => old.id === object.id) ?? object, object)), trackHistory);
   }, [replaceObjects]);
 
+  const createLinkedGraph = useCallback((equationId: string) => {
+    const equation = documentRef.current.objects.find((item) => item.id === equationId);
+    if (equation?.kind !== "equation" || !equation.mathWorkspace) return;
+    const graph = createObject("graph", equation.x + 250, equation.y + 20);
+    if (graph.kind !== "graph") return;
+    graph.sourceEquationId = equation.id;
+    graph.expression = equation.expression;
+    graph.xRange = [-10, 10];
+    const updatedEquation = { ...equation, mathWorkspace: { ...equation.mathWorkspace, dependencies: [...new Set([...equation.mathWorkspace.dependencies, graph.id])] } };
+    replaceObjects(documentRef.current.objects.map((item) => item.id === equation.id ? updatedEquation : item).concat(graph));
+    setEditingId(undefined);
+  }, [replaceObjects]);
+
   const restoreDocument = useCallback((next: CanvasDocument) => {
     editorRef.current?.store.loadSnapshot(next.snapshot, "remote");
     scheduleSave(boardRef.current, next);
@@ -589,7 +603,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
         if ((event.target as HTMLElement).closest(".quickdraw-native") && !(event.target as HTMLElement).closest("button,input,textarea,select") && event.button === 0) { nativeGesture.current = structuredClone(currentDocument()); setSelectedId(undefined); }
       }} onPointerUpCapture={finishNativeGesture} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
-        if ((event.target as HTMLElement).closest("input,textarea,select")) return;
+        if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
         if (event.code === "Space") setSpaceHeld(true);
         if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) { event.preventDefault(); event.stopPropagation(); event.shiftKey || event.key.toLowerCase() === "y" ? redo() : undo(); }
         if (event.key === "Escape") { setScienceMode(null); setSelectedId(undefined); setEditingId(undefined); }
@@ -602,7 +616,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>
     </div>
-    {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} />}
+    {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} />}
   </div>;
 }
 
@@ -618,7 +632,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-function ObjectEditor({ object, objects, onChange, onClose, onOpenNote }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void }) {
+function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreateLinkedGraph }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void; onCreateLinkedGraph: () => void }) {
   const patch = (key: string, value: unknown) => onChange({ [key]: value } as Partial<ScientificObject>);
   const numberInput = (label: string, value: number, update: (value: number) => void, step = 1) => <label>{label}<input type="number" step={step} value={value} onChange={(event) => update(Number(event.target.value))} /></label>;
   const textInput = (label: string, value: string, update: (value: string) => void) => <label>{label}<input value={value} onChange={(event) => update(event.target.value)} /></label>;
@@ -626,7 +640,7 @@ function ObjectEditor({ object, objects, onChange, onClose, onOpenNote }: { obje
     {object.kind === "molecule" && <MoleculeEditor molecule={object} onChange={(next) => onChange(next)} />}
     {object.kind === "atom" && <>{textInput("Label", object.label, (label) => patch("label", label))}<label>Element<select value={object.element} onChange={(event) => patch("element", event.target.value as Element)}>{elementOptions}</select></label>{numberInput("Nonbonding electrons", object.nonbondingElectrons, (value) => patch("nonbondingElectrons", value))}{numberInput("Bond order sum", object.bondOrderSum, (value) => patch("bondOrderSum", value), 0.5)}<div className="editor-calculation">Formal charge <b>{formatCharge(formalCharge(object.element, object.nonbondingElectrons, object.bondOrderSum))}</b></div></>}
     {object.kind === "bond" && <>{textInput("Label", object.label, (label) => patch("label", label))}{textInput("From atom ID", object.from, (from) => patch("from", from))}{textInput("To atom ID", object.to, (to) => patch("to", to))}<label>Bond order<select value={object.order} onChange={(event) => patch("order", Number(event.target.value) as BondOrder)}>{bondOrders.map((order) => <option key={order} value={order}>{order}</option>)}</select></label></>}
-    {object.kind === "equation" && <>{textInput("Equation", object.expression, (expression) => patch("expression", expression))}{textInput("Units", object.units ?? "", (units) => patch("units", units))}<EquationVariables object={object} onChange={onChange} /><output className="expression-result">{object.evaluationError ?? (object.result === undefined ? "Evaluating…" : `Result: ${object.result}`)}</output></>}
+    {object.kind === "equation" && <>{!object.mathWorkspace && textInput("Equation", object.expression, (expression) => patch("expression", expression))}{textInput("Units", object.units ?? "", (units) => patch("units", units))}{object.mathWorkspace ? null : <EquationVariables object={object} onChange={onChange} />}<output className="expression-result">{object.evaluationError ?? (object.result === undefined ? "Evaluating…" : `Result: ${object.result}`)}</output><MathWorkspaceEditor object={object} onChange={onChange} onCreateLinkedGraph={onCreateLinkedGraph} /></>}
     {(object.kind === "vector" || object.kind === "force") && <>{textInput("Label", object.label, (label) => patch("label", label))}<div className="vector-input-grid">{object.components.map((value, index) => numberInput(["x", "y", "z"][index], value, (next) => patch("components", object.components.map((component, i) => i === index ? next : component) as [number, number, number]), 0.1))}</div>{textInput("Units", object.units, (units) => patch("units", units))}<label>Units per canvas unit<input aria-label="Units per canvas unit" type="number" min="0.000001" step="any" placeholder="Uncalibrated" value={object.geometry?.unitsPerCanvasUnit ?? ""} onChange={(event) => {
       const geometry = arrowGeometry(object); const scale = event.target.value === "" ? undefined : Number(event.target.value); if (scale !== undefined && (!Number.isFinite(scale) || scale <= 0)) return;
       onChange(withArrowEndpoints({ ...object, geometry: { ...geometry, unitsPerCanvasUnit: scale } }, geometry.tail, geometry.tip));
@@ -648,6 +662,74 @@ function EquationVariables({ object, onChange }: { object: Extract<ScientificObj
   const [names, setNames] = useState<string[]>(Object.keys(object.variables));
   useEffect(() => { let live = true; void compileExpression(object.expression).then((expression) => { if (live) setNames(expression.variables); }).catch(() => {}); return () => { live = false; }; }, [object.expression]);
   return <><h4>Variables</h4>{names.map((name) => <label key={name}>{name}<input aria-label={`Variable ${name}`} type="number" step="any" value={object.variables[name] ?? ""} onChange={(event) => { const value = Number(event.target.value); if (event.target.value !== "" && Number.isFinite(value)) onChange({ variables: { ...object.variables, [name]: value } }); }} /></label>)}</>;
+}
+
+type MathLiveField = HTMLElement & { value: string; getValue: (format?: string) => string };
+function MathWorkspaceEditor({ object, onChange, onCreateLinkedGraph }: { object: Extract<ScientificObject, { kind: "equation" }>; onChange: (update: Partial<ScientificObject>) => void; onCreateLinkedGraph: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const host = useRef<HTMLDivElement>(null);
+  const field = useRef<MathLiveField | undefined>(undefined);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void import("mathlive").then(() => {
+      if (!live || !host.current) return;
+      const element = globalThis.document.createElement("math-field") as MathLiveField;
+      element.setAttribute("aria-label", "Math notation");
+      element.style.display = "block";
+      element.style.width = "100%";
+      element.style.minHeight = "44px";
+      element.style.padding = "8px";
+      element.style.border = "1px solid #e4e7eb";
+      element.style.borderRadius = "5px";
+      element.value = object.mathWorkspace?.latex ?? object.expression;
+      field.current = element;
+      host.current.replaceChildren(element);
+      setReady(true);
+    }).catch((cause) => setError(cause instanceof Error ? cause.message : "MathLive could not load."));
+    return () => { live = false; field.current = undefined; };
+  }, [open]);
+  const applyNotation = async () => {
+    if (!field.current) return;
+    setBusy(true); setError("");
+    try {
+      const state = await createMathWorkspaceState(field.current.value, field.current.getValue("ascii-math"), object.mathWorkspace, object.variables);
+      onChange(state);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unsupported mathematical notation."); }
+    finally { setBusy(false); }
+  };
+  const workspace = object.mathWorkspace;
+  const updateParameter = (name: string, value: number) => {
+    if (!workspace || !Number.isFinite(value)) return;
+    const current = workspace.parameters[name];
+    if (value < current.min || value > current.max) return;
+    onChange({ variables: { ...object.variables, [name]: value }, mathWorkspace: { ...workspace, revision: workspace.revision + 1, parameters: { ...workspace.parameters, [name]: { ...current, value } } } });
+  };
+  const updateWorkspace = (patch: Partial<NonNullable<typeof workspace>>) => {
+    if (workspace) onChange({ mathWorkspace: { ...workspace, ...patch, revision: workspace.revision + 1 } });
+  };
+  return <section className="math-workspace-editor" aria-label="Mathematical workspace">
+    <h4>Mathematical workspace</h4>
+    {!open ? <button className="button-soft" onClick={() => { setReady(false); setOpen(true); }}>Open MathLive editor</button> : <>
+      <div ref={host} className="mathlive-field-host" />
+      {!ready && <span role="status">Loading MathLive…</span>}
+      <button className="button-soft" disabled={!ready || busy} onClick={() => void applyNotation()}>{busy ? "Checking notation…" : "Apply notation"}</button>
+    </>}
+    {error && <output role="alert" className="expression-result">{error}</output>}
+    {workspace && <>
+      <output className="math-workspace-expression">Parsed expression: {object.expression}</output>
+      {Object.entries(workspace.parameters).map(([name, parameter]) => <label key={name}>{name}<input aria-label={`Math parameter ${name}`} type="number" min={parameter.min} max={parameter.max} step={parameter.step} value={parameter.value} onChange={(event) => updateParameter(name, Number(event.target.value))} /><small>{parameter.min} to {parameter.max}</small></label>)}
+      <label>Current statement, left<input aria-label="Statement left" value={workspace.statement.left} maxLength={500} onChange={(event) => updateWorkspace({ statement: { ...workspace.statement, left: event.target.value } })} /></label>
+      <label>Current statement, right<input aria-label="Statement right" value={workspace.statement.right} maxLength={500} onChange={(event) => updateWorkspace({ statement: { ...workspace.statement, right: event.target.value } })} /></label>
+      <label>Assumptions<textarea aria-label="Math assumptions" value={workspace.assumptions.join("\n")} maxLength={2400} onChange={(event) => updateWorkspace({ assumptions: event.target.value.split("\n").slice(0, 100).map((item) => item.slice(0, 240)) })} /></label>
+      <label>Domain restrictions<textarea aria-label="Domain restrictions" value={workspace.domainRestrictions.join("\n")} maxLength={2400} onChange={(event) => updateWorkspace({ domainRestrictions: event.target.value.split("\n").slice(0, 100).map((item) => item.slice(0, 240)) })} /></label>
+      <button className="button-soft" onClick={onCreateLinkedGraph}>Create linked graph</button>
+      {workspace.verifiedSteps.map((step, index) => <output className="math-step-status" key={`${workspace.revision}-${index}`}>{step.status}: {step.before.left} = {step.before.right} → {step.after.left} = {step.after.right}</output>)}
+    </>}
+  </section>;
 }
 
 function MoleculeEditor({ molecule, onChange }: { molecule: Extract<ScientificObject, { kind: "molecule" }>; onChange: (next: Partial<ScientificObject>) => void }) {

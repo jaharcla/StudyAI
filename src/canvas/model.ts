@@ -4,6 +4,23 @@ import { synchronizeObject, type ArrowGeometry } from "./geometry";
 
 export type Point = { x: number; y: number };
 export type BondOrder = 1 | 1.5 | 2 | 3;
+export type SerializableMathAst = string | number | boolean | null | SerializableMathAst[] | { [key: string]: SerializableMathAst };
+export type MathParameter = { value: number; min: number; max: number; step: number };
+export type MathStatement = { left: string; right: string };
+export type MathStepOperation = { kind: "add-constant" | "subtract-constant" | "multiply-constant" | "divide-constant"; value: number } | { kind: "divide-by-variable"; variable: string } | { kind: "expand" };
+export type MathVerifiedStep = { operation: MathStepOperation; before: MathStatement; after: MathStatement; status: "valid"; assumptions: string[]; domainRestrictions: string[] };
+export type MathWorkspaceState = {
+  schemaVersion: 1;
+  latex: string;
+  expressionAst: SerializableMathAst;
+  parameters: Record<string, MathParameter>;
+  dependencies: string[];
+  assumptions: string[];
+  domainRestrictions: string[];
+  revision: number;
+  statement: MathStatement;
+  verifiedSteps: MathVerifiedStep[];
+};
 export type MoleculeAtom = { id: string; element: Element; nonbondingElectrons: number; position?: Point };
 export type MoleculeBond = { id: string; from: string; to: string; order: BondOrder };
 export type ResonanceForm = { id: string; name: string; bonds: MoleculeBond[] };
@@ -13,11 +30,11 @@ export type ScientificObject =
   | (CanvasObjectBase & { kind: "atom"; element: Element; nonbondingElectrons: number; bondOrderSum: number; label: string })
   | (CanvasObjectBase & { kind: "bond"; from: string; to: string; order: BondOrder; label: string; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "molecule"; name: string; atoms: MoleculeAtom[]; resonanceForms: ResonanceForm[]; activeResonanceId: string })
-  | (CanvasObjectBase & { kind: "equation"; expression: string; variables: Record<string, number>; units?: string; result?: number; evaluationError?: string })
+  | (CanvasObjectBase & { kind: "equation"; expression: string; variables: Record<string, number>; units?: string; result?: number; evaluationError?: string; mathWorkspace?: MathWorkspaceState })
   | (CanvasObjectBase & { kind: "vector"; components: [number, number, number]; units: string; label: string; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "force"; components: [number, number, number]; units: string; label: string; pointOfApplication?: Point; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "measurement"; value: number; units: string; label: string; geometry?: ArrowGeometry })
-  | (CanvasObjectBase & { kind: "graph"; expression: string; xRange: [number, number]; points: Array<[number, number]>; xLabel: string; yLabel: string; evaluationError?: string })
+  | (CanvasObjectBase & { kind: "graph"; expression: string; xRange: [number, number]; points: Array<[number, number]>; xLabel: string; yLabel: string; evaluationError?: string; sourceEquationId?: string })
   | (CanvasObjectBase & { kind: "anatomy"; structureId: string; system: string; labels: string[] })
   | (CanvasObjectBase & { kind: "concept"; title: string; definition: string; conceptId?: string })
   | (CanvasObjectBase & { kind: "relationship"; fromId: string; toId: string; label: string; geometry?: ArrowGeometry })
@@ -92,8 +109,68 @@ function validateObject(value: unknown) {
   if (object.kind === "anatomy" && (!Array.isArray(object.labels) || !object.labels.every((label) => typeof label === "string"))) throw new Error("Invalid anatomy labels.");
   if (object.kind === "measurement" && (typeof object.value !== "number" || !Number.isFinite(object.value))) throw new Error("Invalid measurement.");
   if (object.kind === "equation" && (!object.variables || typeof object.variables !== "object" || Array.isArray(object.variables) || !Object.values(object.variables).every((n) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid equation variables.");
+  if (object.kind === "equation" && object.mathWorkspace !== undefined) validateMathWorkspace(object.mathWorkspace);
+  if (object.kind === "graph" && object.sourceEquationId !== undefined && (typeof object.sourceEquationId !== "string" || !object.sourceEquationId)) throw new Error("Invalid graph equation link.");
   if (object.result !== undefined && (typeof object.result !== "number" || !Number.isFinite(object.result))) throw new Error("Invalid equation result.");
   if (object.evaluationError !== undefined && typeof object.evaluationError !== "string") throw new Error("Invalid evaluation error.");
+}
+
+function validateMathWorkspace(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid math workspace state.");
+  const state = value as Record<string, unknown>;
+  if (state.schemaVersion !== 1 || typeof state.latex !== "string" || state.latex.length > 500 || !Number.isSafeInteger(state.revision) || Number(state.revision) < 0) throw new Error("Invalid math workspace metadata.");
+  if (!isJsonValue(state.expressionAst, 0, { count: 0 })) throw new Error("Invalid math expression AST.");
+  if (!state.parameters || typeof state.parameters !== "object" || Array.isArray(state.parameters)) throw new Error("Invalid math parameters.");
+  for (const [name, entry] of Object.entries(state.parameters)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(name) || !entry || typeof entry !== "object") throw new Error("Invalid math parameter.");
+    const parameter = entry as Record<string, unknown>;
+    if (![parameter.value, parameter.min, parameter.max, parameter.step].every((n) => typeof n === "number" && Number.isFinite(n)) || Number(parameter.min) >= Number(parameter.max) || Number(parameter.step) <= 0 || Number(parameter.value) < Number(parameter.min) || Number(parameter.value) > Number(parameter.max)) throw new Error("Invalid math parameter range.");
+  }
+  for (const field of ["dependencies", "assumptions", "domainRestrictions"] as const) {
+    if (!Array.isArray(state[field]) || state[field].some((item) => typeof item !== "string" || item.length > 240) || state[field].length > 100) throw new Error(`Invalid math ${field}.`);
+  }
+  if (!isMathStatement(state.statement)) throw new Error("Invalid math statement.");
+  if (!Array.isArray(state.verifiedSteps) || state.verifiedSteps.length > 100 || state.verifiedSteps.some((step) => !isVerifiedMathStep(step))) throw new Error("Invalid math step history.");
+}
+
+function isMathStatement(value: unknown): value is MathStatement {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const statement = value as Record<string, unknown>;
+  return typeof statement.left === "string" && statement.left.length <= 500 && typeof statement.right === "string" && statement.right.length <= 500;
+}
+
+function isMathStepOperation(value: unknown): value is MathStepOperation {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const operation = value as Record<string, unknown>;
+  if (["add-constant", "subtract-constant", "multiply-constant", "divide-constant"].includes(String(operation.kind))) {
+    return typeof operation.value === "number" && Number.isFinite(operation.value) && !(["multiply-constant", "divide-constant"].includes(String(operation.kind)) && operation.value === 0);
+  }
+  if (operation.kind === "divide-by-variable") return typeof operation.variable === "string" && /^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(operation.variable);
+  return operation.kind === "expand";
+}
+
+function isVerifiedMathStep(value: unknown): value is MathVerifiedStep {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const step = value as Record<string, unknown>;
+  if (step.status !== "valid" || !isMathStepOperation(step.operation) || !isMathStatement(step.before) || !isMathStatement(step.after)
+    || ![step.assumptions, step.domainRestrictions].every((items) => Array.isArray(items) && items.length <= 100 && items.every((item) => typeof item === "string" && item.length <= 240))) return false;
+  const operation = step.operation as MathStepOperation;
+  if (operation.kind === "expand") return false;
+  if (operation.kind === "divide-by-variable") {
+    const variable = operation.variable.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const patterns = [new RegExp(`^\\s*${variable}\\s*(?:!=|≠)\\s*0\\s*$`), new RegExp(`^\\s*0\\s*(?:!=|≠)\\s*${variable}\\s*$`)];
+    if (![...(step.assumptions as string[]), ...(step.domainRestrictions as string[])].some((item) => patterns.some((pattern) => pattern.test(item)))) return false;
+  }
+  return true;
+}
+
+function isJsonValue(value: unknown, depth: number, state: { count: number }): value is SerializableMathAst {
+  if (++state.count > 300 || depth > 24) return false;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return typeof value !== "string" || value.length <= 500;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.length <= 200 && value.every((item) => isJsonValue(item, depth + 1, state));
+  if (typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) return Object.entries(value).length <= 100 && Object.entries(value).every(([key, item]) => key.length <= 100 && isJsonValue(item, depth + 1, state));
+  return false;
 }
 
 export function moleculeBonds(molecule: Extract<ScientificObject, { kind: "molecule" }>) {

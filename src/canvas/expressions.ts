@@ -57,3 +57,30 @@ export async function evaluateScientificObject(object: ScientificObject): Promis
     return object.kind === "equation" ? { ...object, result: undefined, evaluationError } : { ...object, points: [], evaluationError };
   }
 }
+
+async function evaluateLinkedGraph(graph: Extract<ScientificObject, { kind: "graph" }>, equation: Extract<ScientificObject, { kind: "equation" }> | undefined): Promise<ScientificObject> {
+  try {
+    if (!equation?.mathWorkspace) throw new Error("The linked mathematical equation is unavailable.");
+    const expression = await compileExpression(equation.expression);
+    if (expression.variables.some((name) => name !== "x" && equation.mathWorkspace!.parameters[name] === undefined)) throw new Error("A graph parameter is missing from its linked equation.");
+    const [min, max] = graph.xRange;
+    if (max <= min) throw new Error("x maximum must exceed x minimum.");
+    const parameters = Object.fromEntries(Object.entries(equation.mathWorkspace.parameters).map(([name, parameter]) => [name, parameter.value]));
+    const points: Array<[number, number]> = [];
+    for (let index = 0; index <= 120; index++) {
+      const x = min + (max - min) * index / 120;
+      try { points.push([x, expression.evaluate({ ...parameters, x })]); } catch { /* Domain gaps split the plotted path. */ }
+    }
+    if (!points.length) throw new Error("No finite points in this range.");
+    return { ...graph, expression: equation.expression, points, evaluationError: undefined };
+  } catch (error) {
+    return { ...graph, points: [], evaluationError: error instanceof Error ? error.message : "Invalid linked expression." };
+  }
+}
+
+export async function evaluateScientificObjects(objects: ScientificObject[]): Promise<ScientificObject[]> {
+  const equations = new Map(objects.filter((object): object is Extract<ScientificObject, { kind: "equation" }> => object.kind === "equation").map((object) => [object.id, object]));
+  return Promise.all(objects.map((object) => object.kind === "graph" && object.sourceEquationId
+    ? evaluateLinkedGraph(object, equations.get(object.sourceEquationId))
+    : evaluateScientificObject(object)));
+}

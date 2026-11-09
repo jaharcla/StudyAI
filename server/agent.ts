@@ -8,7 +8,7 @@ import { db } from "./db.js";
 import { createDocumentRetrievalTool } from "./document-intelligence/retrieval-tool.js";
 import { createScienceTools } from "./science-tools.js";
 import { retrieveCourseDocuments, type RetrievalResult } from "./document-intelligence/service.js";
-import { canvasEditSchema } from "../src/canvas/tutor.js";
+import { canvasEditSchema, MathProposalValidationError } from "../src/canvas/tutor.js";
 import { canvasActionSchema, canvasReadSchema } from "../src/canvas/ai/canvas-actions.js";
 import { CanvasAnalysisValidationError } from "./canvas-analysis/contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./canvas-analysis/receiver.js";
@@ -42,7 +42,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
   const scienceTools = createScienceTools();
   const canvasContext = objectValue(contexts.find((item) => item.description === "StudyAI active scientific canvas objects")?.value);
   const canvasTool = course && lesson && canvasContext.courseId === course.id && canvasContext.lessonId === workspace.lessonId && state.copilotkit.actions?.some((action) => action.name === "propose_canvas_edit")
-    ? { name: "propose_canvas_edit", description: "Propose scientific object edits for user review. Use the exact boardId and objectId from current canvas context and a JSON field patch. This does not apply or save the edit.", schema: canvasEditSchema } : undefined;
+    ? { name: "propose_canvas_edit", description: "Propose scientific object edits for user review using current boardId and objectId. Use JSON patches for ordinary objects; for a math workspace use mathOperation to request a supported operation on both statement sides. Every math operation is validated and remains pending until the user applies it.", schema: canvasEditSchema } : undefined;
   const quickdrawContext = objectValue(contexts.find((item) => item.description === "Active Quickdraw board context")?.value);
   const quickdrawScope = objectValue(quickdrawContext.scope);
   const sameCanvasScope = Boolean(course && lesson && quickdrawScope.courseId === course.id && quickdrawScope.lessonId === workspace.lessonId && typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId.length > 0);
@@ -178,7 +178,9 @@ async function tutor(state: typeof State.State, config?: unknown) {
           if (parsed.status === "evidence") for (const item of parsed.results) candidateByRef.set(item.sourceRef, item);
         }
       } catch (error) {
-        result = JSON.stringify({ verified: false, error: error instanceof Error ? error.message : "Tool input was invalid." });
+        result = JSON.stringify(error instanceof MathProposalValidationError
+          ? { verified: false, status: error.status, error: error.message }
+          : { verified: false, error: error instanceof Error ? error.message : "Tool input was invalid." });
       }
       toolMessages.push(new ToolMessage({ content: result, tool_call_id: call.id || randomUUID() }));
     }

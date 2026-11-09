@@ -1,5 +1,6 @@
 import { localBounds, pageBounds, type Bounds, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
+import { tutorMathWorkspace } from "../math-workspace";
 
 export type CanvasScope = { boardId: string; courseId: string; lessonId: string; revision?: number };
 export type CanvasContextOptions = {
@@ -109,7 +110,7 @@ function scientificSummary(object: ScientificObject) {
   if (object.kind === "molecule") detail = { name: object.name.slice(0, 300), atomCount: object.atoms.length, activeResonanceId: object.activeResonanceId };
   else if (object.kind === "graph") detail = { ...strings({ expression: object.expression, xLabel: object.xLabel, yLabel: object.yLabel }), xRange: object.xRange, pointCount: object.points.length };
   else if (object.kind === "anatomy") detail = { structureId: object.structureId, system: object.system.slice(0, 300), labels: object.labels.slice(0, 12).map((value) => value.slice(0, 120)) };
-  else if (object.kind === "equation") detail = { expression: object.expression.slice(0, 300), variables: Object.fromEntries(Object.entries(object.variables).slice(0, 20)), units: object.units?.slice(0, 100) };
+  else if (object.kind === "equation") detail = { expression: object.expression.slice(0, 300), variables: Object.fromEntries(Object.entries(object.variables).slice(0, 20)), units: object.units?.slice(0, 100), ...(object.mathWorkspace ? { mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : {}) };
   else if (object.kind === "vector" || object.kind === "force") detail = { components: object.components, units: object.units.slice(0, 100), label: object.label.slice(0, 300) };
   else if (object.kind === "measurement") detail = { value: object.value, units: object.units.slice(0, 100), label: object.label.slice(0, 300) };
   else if (object.kind === "atom") detail = { element: object.element, label: object.label.slice(0, 300), bondOrderSum: object.bondOrderSum };

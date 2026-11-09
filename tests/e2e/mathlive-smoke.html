@@ -1,0 +1,20 @@
+<!doctype html>
+<html><body><script type="module">
+import "mathlive";
+import { createMathWorkspaceState } from "../../src/canvas/math-workspace.ts";
+
+await customElements.whenDefined("math-field");
+const field = document.createElement("math-field");
+field.setAttribute("aria-label", "Math notation smoke test");
+document.body.append(field);
+window.readMathState = async () => {
+  const latex = field.value;
+  const ascii = field.getValue("ascii-math");
+  try {
+    const state = await createMathWorkspaceState(latex, ascii);
+    return { ascii, expression: state.expression, expressionAst: state.mathWorkspace.expressionAst };
+  } catch (error) {
+    return { ascii, error: error instanceof Error ? error.message : "invalid" };
+  }
+};
+</script></body></html>

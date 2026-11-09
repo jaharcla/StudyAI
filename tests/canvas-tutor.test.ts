@@ -6,34 +6,34 @@ describe("tutor canvas proposals", () => {
   const object = createObject("molecule", 100, 100);
   const context = { boardId: "board-1", courseId: "chem-120", lessonId: "lesson-03", revision: 4, objects: [object] };
   const edit = { boardId: "board-1", objectId: object.id, patchJson: '{"name":"Reviewed CO2"}', reason: "Clarify the label" };
-  it("proposes without mutating and applies the approved patch", () => {
-    const proposal = proposeCanvasEdit(context, edit);
+  it("proposes without mutating and applies the approved patch", async () => {
+    const proposal = await proposeCanvasEdit(context, edit);
     expect(context.objects[0]).toEqual(object);
-    expect(applyCanvasProposal(context, proposal)[0]).toMatchObject({ id: object.id, kind: "molecule", name: "Reviewed CO2" });
+    expect((await applyCanvasProposal(context, proposal))[0]).toMatchObject({ id: object.id, kind: "molecule", name: "Reviewed CO2" });
   });
-  it("rejects another board, unknown objects, identity changes and malformed science", () => {
+  it("rejects another board, unknown objects, identity changes and malformed science", async () => {
     for (const patch of [{ boardId: "other" }, { objectId: "other" }, { patchJson: '{"id":"replacement"}' }, { patchJson: '{"atoms":[{"id":"x","element":"XX","nonbondingElectrons":-1}]}' }]) {
-      expect(() => proposeCanvasEdit(context, { ...edit, ...patch })).toThrow();
+      await expect(proposeCanvasEdit(context, { ...edit, ...patch })).rejects.toThrow();
     }
   });
-  it("rejects proposals after manual edits or board changes", () => {
-    const proposal = proposeCanvasEdit(context, edit);
-    expect(() => applyCanvasProposal({ ...context, boardId: "other" }, proposal)).toThrow("stale");
-    expect(() => applyCanvasProposal({ ...context, objects: [{ ...object, x: 300 }] }, proposal)).toThrow("stale");
-    expect(() => applyCanvasProposal({ ...context, revision: 5 }, proposal)).toThrow("stale");
-    expect(() => applyCanvasProposal({ ...context, courseId: "other-course" }, proposal)).toThrow("stale");
+  it("rejects proposals after manual edits or board changes", async () => {
+    const proposal = await proposeCanvasEdit(context, edit);
+    await expect(applyCanvasProposal({ ...context, boardId: "other" }, proposal)).rejects.toThrow("stale");
+    await expect(applyCanvasProposal({ ...context, objects: [{ ...object, x: 300 }] }, proposal)).rejects.toThrow("stale");
+    await expect(applyCanvasProposal({ ...context, revision: 5 }, proposal)).rejects.toThrow("stale");
+    await expect(applyCanvasProposal({ ...context, courseId: "other-course" }, proposal)).rejects.toThrow("stale");
   });
-  it("rejects edits that break structured object rendering or molecule references", () => {
+  it("rejects edits that break structured object rendering or molecule references", async () => {
     const anatomy = createObject("anatomy", 100, 100);
-    expect(() => proposeCanvasEdit({ ...context, objects: [anatomy] }, { ...edit, objectId: anatomy.id, patchJson: '{"labels":null}' })).toThrow();
+    await expect(proposeCanvasEdit({ ...context, objects: [anatomy] }, { ...edit, objectId: anatomy.id, patchJson: '{"labels":null}' })).rejects.toThrow();
     if (object.kind !== "molecule") throw new Error("Expected molecule fixture");
     const forms = [{ ...object.resonanceForms[0], bonds: [{ ...object.resonanceForms[0].bonds[0], to: "missing-atom" }] }];
-    expect(() => proposeCanvasEdit(context, { ...edit, patchJson: JSON.stringify({ resonanceForms: forms }) })).toThrow("endpoints");
+    await expect(proposeCanvasEdit(context, { ...edit, patchJson: JSON.stringify({ resonanceForms: forms }) })).rejects.toThrow("endpoints");
   });
-  it("merges typed Lewis corrections while preserving all atom, bond and resonance IDs", () => {
+  it("merges typed Lewis corrections while preserving all atom, bond and resonance IDs", async () => {
     if (object.kind !== "molecule") throw new Error("Expected molecule fixture");
-    const proposal = proposeCanvasEdit(context, { ...edit, atomEdits: [{ id: object.atoms[0].id, nonbondingElectrons: 6 }], bondEdits: [{ id: object.resonanceForms[0].bonds[0].id, order: 1 }] });
-    const next = applyCanvasProposal(context, proposal)[0];
+    const proposal = await proposeCanvasEdit(context, { ...edit, atomEdits: [{ id: object.atoms[0].id, nonbondingElectrons: 6 }], bondEdits: [{ id: object.resonanceForms[0].bonds[0].id, order: 1 }] });
+    const next = (await applyCanvasProposal(context, proposal))[0];
     if (next.kind !== "molecule") throw new Error("Expected molecule result");
     expect(next.atoms.map((atom) => atom.id)).toEqual(object.atoms.map((atom) => atom.id));
     expect(next.atoms[0].nonbondingElectrons).toBe(6);
