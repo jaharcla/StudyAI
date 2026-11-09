@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { AIRequestQueueFullError, AIRequestQueues } from "../server/ai-requests";
 
 describe("AI provider queues", () => {
+  it("passes PQueue's abort signal to the provider task", async () => {
+    const queues = new AIRequestQueues({ ollamaConcurrency: 1, cloudConcurrency: 1, timeoutMs: 1000, maxQueued: 1 });
+    let receivedSignal: AbortSignal | undefined;
+    await expect(queues.run("cloud", async (signal) => { receivedSignal = signal; return "ok"; })).resolves.toBe("ok");
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
+  });
+
   it("keeps provider concurrency independent", async () => {
     const queues = new AIRequestQueues({ ollamaConcurrency: 1, cloudConcurrency: 2, timeoutMs: 1000, maxQueued: 8 });
     let activeLocal = 0;
@@ -28,6 +35,18 @@ describe("AI provider queues", () => {
     release();
     await first;
     await expect(queued).resolves.toBe("queued");
+  });
+
+  it("applies the request timeout while waiting in the queue", async () => {
+    const queues = new AIRequestQueues({ ollamaConcurrency: 1, cloudConcurrency: 1, timeoutMs: 20, maxQueued: 2 });
+    let release!: () => void;
+    const active = queues.run("cloud", () => new Promise<void>((resolve) => { release = resolve; }), { timeout: 1000 });
+    let queuedTaskStarted = false;
+    const queued = queues.run("cloud", async () => { queuedTaskStarted = true; return "unexpected"; });
+    await expect(queued).rejects.toMatchObject({ name: "TimeoutError" });
+    expect(queuedTaskStarted).toBe(false);
+    release();
+    await active;
   });
 
   it("aborts queued requests and times out running requests", async () => {

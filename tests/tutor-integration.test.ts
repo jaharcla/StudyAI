@@ -17,6 +17,7 @@ vi.mock("@langchain/groq", () => ({ ChatGroq: class {
   bindTools(tools: unknown[]) { mocks.groqBindTools(tools); return this; }
 } }));
 const folder = mkdtempSync(join(tmpdir(), "studyai-tutor-"));
+const originalStudyAiDb = process.env.STUDYAI_DB;
 const originalTutorProvider = process.env.TUTOR_PROVIDER;
 const originalGroqApiKey = process.env.GROQ_API_KEY;
 const originalGroqRetries = process.env.TUTOR_GROQ_RETRIES;
@@ -24,6 +25,8 @@ const originalMaxProviderCalls = process.env.TUTOR_MAX_PROVIDER_CALLS;
 const originalMaxGroqCost = process.env.TUTOR_MAX_GROQ_COST_USD;
 const originalContextBudget = process.env.TUTOR_CONTEXT_BUDGET;
 const originalCompletionTokens = process.env.TUTOR_MAX_COMPLETION_TOKENS;
+const originalGroqInputRate = process.env.TUTOR_GROQ_INPUT_USD_PER_1M;
+const originalGroqOutputRate = process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M;
 const originalDiagnostics = process.env.AI_DIAGNOSTICS;
 process.env.STUDYAI_DB = join(folder, "test.sqlite");
 process.env.TUTOR_PROVIDER = "ollama";
@@ -44,7 +47,19 @@ const context = [
   { description: "StudyAI active scientific canvas objects", value: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1", objects: [molecule] } },
   { description: "Active Quickdraw board context", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
 ];
-beforeEach(() => { mocks.invoke.mockReset(); mocks.bindTools.mockClear(); mocks.ollamaOptions.length = 0; mocks.groqInvoke.mockReset(); mocks.groqBindTools.mockClear(); mocks.groqOptions.length = 0; });
+beforeEach(() => {
+  process.env.TUTOR_PROVIDER = "ollama";
+  process.env.GROQ_API_KEY = "";
+  process.env.TUTOR_GROQ_RETRIES = "0";
+  process.env.TUTOR_MAX_PROVIDER_CALLS = "3";
+  process.env.TUTOR_MAX_GROQ_COST_USD = "0.02";
+  process.env.TUTOR_CONTEXT_BUDGET = "16384";
+  process.env.TUTOR_MAX_COMPLETION_TOKENS = "2048";
+  process.env.TUTOR_GROQ_INPUT_USD_PER_1M = "0.15";
+  process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = "0.6";
+  delete process.env.AI_DIAGNOSTICS;
+  mocks.invoke.mockReset(); mocks.bindTools.mockClear(); mocks.ollamaOptions.length = 0; mocks.groqInvoke.mockReset(); mocks.groqBindTools.mockClear(); mocks.groqOptions.length = 0;
+});
 
 it("retrieves course evidence, canonicalizes real citations and removes invented references", async () => {
   await importDocuments(db, "chem-120", [{ name: "lecture.txt", bytes: Buffer.from("The lecture marker is TUTOR-771.") }], join(folder, "documents"));
@@ -196,6 +211,7 @@ it("rejects Groq before invocation when one bounded call exceeds the request cos
 afterAll(() => {
   db.close();
   rmSync(folder, { recursive: true, force: true });
+  if (originalStudyAiDb === undefined) delete process.env.STUDYAI_DB; else process.env.STUDYAI_DB = originalStudyAiDb;
   if (originalTutorProvider === undefined) delete process.env.TUTOR_PROVIDER; else process.env.TUTOR_PROVIDER = originalTutorProvider;
   if (originalGroqApiKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = originalGroqApiKey;
   if (originalGroqRetries === undefined) delete process.env.TUTOR_GROQ_RETRIES; else process.env.TUTOR_GROQ_RETRIES = originalGroqRetries;
@@ -203,5 +219,7 @@ afterAll(() => {
   if (originalMaxGroqCost === undefined) delete process.env.TUTOR_MAX_GROQ_COST_USD; else process.env.TUTOR_MAX_GROQ_COST_USD = originalMaxGroqCost;
   if (originalContextBudget === undefined) delete process.env.TUTOR_CONTEXT_BUDGET; else process.env.TUTOR_CONTEXT_BUDGET = originalContextBudget;
   if (originalCompletionTokens === undefined) delete process.env.TUTOR_MAX_COMPLETION_TOKENS; else process.env.TUTOR_MAX_COMPLETION_TOKENS = originalCompletionTokens;
+  if (originalGroqInputRate === undefined) delete process.env.TUTOR_GROQ_INPUT_USD_PER_1M; else process.env.TUTOR_GROQ_INPUT_USD_PER_1M = originalGroqInputRate;
+  if (originalGroqOutputRate === undefined) delete process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M; else process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = originalGroqOutputRate;
   if (originalDiagnostics === undefined) delete process.env.AI_DIAGNOSTICS; else process.env.AI_DIAGNOSTICS = originalDiagnostics;
 });

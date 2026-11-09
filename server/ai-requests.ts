@@ -3,6 +3,10 @@ import PQueue from "p-queue";
 export type AIProvider = "ollama" | "cloud";
 type QueueOptions = { signal?: AbortSignal; timeout?: number; dedupeKey?: string };
 
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("The request was aborted.", "AbortError");
+}
+
 export class AIRequestQueueFullError extends Error {
   constructor(readonly provider: AIProvider) {
     super(`The ${provider} AI request queue is full.`);
@@ -38,7 +42,17 @@ export class AIRequestQueues {
     const queue = this.queues[provider];
     if (queue.size >= this.maxQueued) return Promise.reject(new AIRequestQueueFullError(provider));
     const started = Date.now();
-    const request = queue.add(({ signal }) => task(signal), { signal: options.signal, timeout: options.timeout ?? this.timeout });
+    if (options.signal?.aborted) return Promise.reject(abortReason(options.signal));
+    const controller = new AbortController();
+    const forwardAbort = () => controller.abort(options.signal ? abortReason(options.signal) : undefined);
+    options.signal?.addEventListener("abort", forwardAbort, { once: true });
+    const timeout = options.timeout ?? this.timeout;
+    const timeoutId = setTimeout(() => controller.abort(new DOMException(`Task timed out after ${timeout}ms`, "TimeoutError")), timeout);
+    const request = queue.add(({ signal }) => task(signal), { signal: controller.signal });
+    void request.then(
+      () => { clearTimeout(timeoutId); options.signal?.removeEventListener("abort", forwardAbort); },
+      () => { clearTimeout(timeoutId); options.signal?.removeEventListener("abort", forwardAbort); },
+    );
     if (dedupeKey) {
       this.pending.set(dedupeKey, request);
       void request.finally(() => { if (this.pending.get(dedupeKey) === request) this.pending.delete(dedupeKey); }).catch(() => undefined);
