@@ -43,6 +43,13 @@ test("Canvas analysis is sent only after an explicit user action", async ({ page
   await page.goto("/");
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
+  await page.getByRole("button", { name: "Draw — D" }).click();
+  const board = (await page.locator(".canvas-board").boundingBox())!;
+  await page.mouse.move(board.x + 250, board.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(board.x + 350, board.y + 130, { steps: 5 });
+  await page.mouse.up();
+  await expect(page.locator(".saved")).toHaveText("All changes saved", { timeout: 10_000 });
   await expect(page.getByRole("button", { name: "Analyze board" })).toBeEnabled();
   expect(submitted).toHaveLength(0);
 
@@ -64,7 +71,9 @@ test("a stale canvas save keeps the uncommitted edit visible and sends its expec
   let attempted: Record<string, any> | undefined;
   await page.route("**/api/canvases", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
-    attempted = route.request().postDataJSON() as Record<string, any>;
+    const payload = route.request().postDataJSON() as Record<string, any>;
+    if (payload.expectedRevision === 0) return route.continue();
+    attempted = payload;
     await route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ error: "Canvas revision conflict" }) });
   });
   await drawCarbonDioxide(page);

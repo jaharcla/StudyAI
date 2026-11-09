@@ -349,7 +349,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         } catch { /* A new board can start empty when no legacy drawing exists. */ }
         if (!live) return;
         const created = { id: newId("canvas"), name: "Board 1", revision: 0 };
-        const save = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...created, courseId, lessonId, expectedRevision: 0, document: initial }) });
+        const save = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: created.id, name: created.name, courseId, lessonId, expectedRevision: 0, document: initial }) });
         if (!save.ok) throw new Error("create failed");
         const body = await save.json() as { id?: string; revision?: number };
         if (!body.id || !Number.isInteger(body.revision) || body.revision! < 1) throw new Error("Canvas creation did not return its revision.");
