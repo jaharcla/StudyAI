@@ -23,7 +23,7 @@ describe("Tutor context budgeting", () => {
       { type: "ai", content: "Old answer" },
       { type: "human", content: "Why is this arrow here?" },
     ];
-    const result = budgetTutorContext({ systemInstructions: "Tutor rules remain fixed.", contexts, evidence, conversation, budgetTokens: 350 });
+    const result = budgetTutorContext({ systemInstructions: "Tutor rules remain fixed.", contexts, evidence, conversation, budgetTokens: 450 });
     const serialized = JSON.stringify(result.contexts);
     expect(serialized).toContain("rev-current");
     expect(serialized).toContain("observed-1");
@@ -81,6 +81,9 @@ describe("Tutor context budgeting", () => {
   it("validates the configured context budget", () => {
     expect(getTutorContextBudget({} as NodeJS.ProcessEnv)).toBe(16_384);
     expect(getTutorContextBudget({ TUTOR_CONTEXT_BUDGET: "4096" } as NodeJS.ProcessEnv)).toBe(4096);
+    expect(getTutorContextBudget({ TUTOR_CONTEXT_BUDGET: "16384", TUTOR_MODEL_CONTEXT_LIMITS: '{"local-model":8192}' } as NodeJS.ProcessEnv, "local-model")).toBe(8192);
+    expect(getTutorContextBudget({ TUTOR_CONTEXT_BUDGET: "4096", TUTOR_MODEL_CONTEXT_LIMITS: '{"local-model":8192}' } as NodeJS.ProcessEnv, "local-model")).toBe(4096);
     expect(() => getTutorContextBudget({ TUTOR_CONTEXT_BUDGET: "10" } as NodeJS.ProcessEnv)).toThrow(/512 through 131072/);
+    expect(() => getTutorContextBudget({ TUTOR_MODEL_CONTEXT_LIMITS: "not-json" } as NodeJS.ProcessEnv, "local-model")).toThrow(/JSON object/);
   });
 });

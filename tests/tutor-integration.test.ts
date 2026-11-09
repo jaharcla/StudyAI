@@ -72,6 +72,35 @@ it("retrieves course evidence, canonicalizes real citations and removes invented
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain(molecule.atoms[0].id);
 });
 
+it("executes deterministic tutor calculations and returns the result to the model", async () => {
+  mocks.invoke.mockResolvedValueOnce(new AIMessage({ content: "", tool_calls: [{ name: "calculate_vector", id: "vector-1", args: { operation: "magnitude", vectorA: [3, 4, 0] } }] }))
+    .mockResolvedValueOnce(new AIMessage("The vector magnitude is 5 units."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Calculate the vector magnitude for (3,4,0)." )] });
+  const boundNames = mocks.bindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name);
+  expect(boundNames).toContain("calculate_vector");
+  expect(mocks.invoke).toHaveBeenCalledTimes(2);
+  expect(mocks.invoke.mock.calls[1][0].some((message: { content?: unknown }) => String(message.content).includes('"result":5'))).toBe(true);
+  expect(result.messages.at(-1)?.content).toContain("magnitude is 5");
+});
+
+it("makes context omitted under the token budget visible in the tutor answer", async () => {
+  process.env.TUTOR_CONTEXT_BUDGET = "2048";
+  process.env.TUTOR_MAX_COMPLETION_TOKENS = "256";
+  mocks.invoke.mockResolvedValue(new AIMessage("Answer based on current context."));
+  const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
+  conversation.push(new HumanMessage("Current question"));
+  const result = await graph.invoke({ activeScope: "chem-120:lesson-03", scopeStart: String(conversation[0].id), copilotkit: { context }, messages: conversation });
+  expect(result.messages.at(-1)?.content).toContain("Context note:");
+  expect(mocks.invoke.mock.calls[0][0].some((message: { content?: unknown }) => String(message.content).includes("Old question 0"))).toBe(false);
+});
+
+it("flags canvas context already marked truncated by its producer", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("Answer with available canvas evidence."));
+  const active = { ...context[2], value: { ...(context[2].value as Record<string, unknown>), truncated: true, omittedShapeCount: 3 } };
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Explain the board")] });
+  expect(result.messages.at(-1)?.content).toContain("canvas evidence marked truncated or incomplete");
+});
+
 it("forwards a registered canvas tool call through LangGraph for browser review", async () => {
   const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);

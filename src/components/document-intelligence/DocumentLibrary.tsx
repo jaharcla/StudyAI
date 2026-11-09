@@ -95,7 +95,8 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
   };
 
   return (
-    <section className="di-library">
+    <section className={`di-library${viewer ? " di-library-reading" : ""}`}>
+      {viewer ? <DocumentViewer documentId={viewer.documentId} courseId={courseId} sourceRef={viewer.sourceRef} onClose={() => setViewer(undefined)} /> : <>
       <header className="di-library-header">
         <div><span className="di-eyebrow">COURSE KNOWLEDGE</span><h2>Document library</h2><p>Import and search the materials you want to study.</p></div>
         {courses.length > 0 && onCourseChange && <label className="di-course-select"><span>Course</span><select value={courseId} onChange={(event) => onCourseChange(event.target.value)}>{courses.map((course) => <option value={course.id} key={course.id}>{course.title}</option>)}</select></label>}
@@ -144,7 +145,7 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
         </article>)}</div>
         : <div className="di-library-state"><BookOpen size={25} /><strong>{query ? "No matching documents" : "No documents yet"}</strong><span>{query ? "Try another title or phrase." : "Add a PDF, presentation, document, or text file to begin."}</span></div>}
 
-      {viewer && <DocumentViewer documentId={viewer.documentId} courseId={courseId} sourceRef={viewer.sourceRef} onClose={() => setViewer(undefined)} />}
+      </>}
     </section>
   );
 }

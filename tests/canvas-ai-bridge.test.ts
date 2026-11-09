@@ -134,6 +134,10 @@ describe("Quickdraw AI action proposals", () => {
     const textShape = result.shapes.find((item) => item.id === "text-0");
     expect((textShape?.props as Record<string, unknown> | undefined)?.text).toMatch(/^Evidence 0 /);
     expect(textShape?.truncatedProperties).toContain("props.text truncated from 511 characters to 500");
+    const targeted = readCanvasState(store, scope.boardId, scope.boardId, [], ["text-39", "missing-shape"]);
+    expect(targeted.shapes[0].id).toBe("text-39");
+    expect(targeted.requestedShapeCount).toBe(2);
+    expect(targeted.omittedRequestedShapeIds).toContain("missing-shape");
   });
 
   it("rejects stale proposals and board scope changes without mutating either board", () => {

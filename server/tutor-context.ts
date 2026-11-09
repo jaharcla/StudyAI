@@ -29,12 +29,20 @@ export class TutorContextBudgetError extends Error {
   }
 }
 
-export function getTutorContextBudget(env: NodeJS.ProcessEnv = process.env): number {
+export function getTutorContextBudget(env: NodeJS.ProcessEnv = process.env, model?: string): number {
   const raw = env.TUTOR_CONTEXT_BUDGET;
-  if (raw === undefined || raw.trim() === "") return 16_384;
-  const value = Number(raw);
+  const value = raw === undefined || raw.trim() === "" ? 16_384 : Number(raw);
   if (!Number.isInteger(value) || value < 512 || value > 131_072) throw new Error("TUTOR_CONTEXT_BUDGET must be an integer from 512 through 131072.");
-  return value;
+  let modelLimit = value;
+  if (env.TUTOR_MODEL_CONTEXT_LIMITS?.trim()) {
+    let limits: Record<string, unknown>;
+    try { limits = JSON.parse(env.TUTOR_MODEL_CONTEXT_LIMITS); }
+    catch { throw new Error("TUTOR_MODEL_CONTEXT_LIMITS must be a JSON object of model names to context token limits."); }
+    if (!limits || typeof limits !== "object" || Array.isArray(limits)) throw new Error("TUTOR_MODEL_CONTEXT_LIMITS must be a JSON object of model names to context token limits.");
+    for (const [name, limit] of Object.entries(limits)) if (!name.trim() || !Number.isInteger(limit) || Number(limit) < 512 || Number(limit) > 131_072) throw new Error("Each TUTOR_MODEL_CONTEXT_LIMITS value must be an integer from 512 through 131072.");
+    if (model && limits[model] !== undefined) modelLimit = Number(limits[model]);
+  }
+  return Math.min(value, modelLimit);
 }
 
 export function budgetTutorContext(input: {
@@ -82,7 +90,7 @@ export function budgetTutorContext(input: {
 export function estimateTutorMessageTokens(messages: unknown[]): number {
   const [system, ...conversation] = messages as Array<{ content?: unknown }>;
   const systemText = typeof system?.content === "string" ? system.content : JSON.stringify(system?.content ?? "");
-  return Math.ceil((systemText.length + JSON.stringify(conversation).length + 128) / 4);
+  return Math.ceil((systemText.length + JSON.stringify(conversation).length + 128) / 3);
 }
 
 export function diagnoseTutorMessages(messages: unknown[], budgetTokens: number): TutorContextBudgetDiagnostics {
@@ -93,7 +101,7 @@ export function diagnoseTutorMessages(messages: unknown[], budgetTokens: number)
   return {
     phase: "provider_message_preflight",
     budgetTokens,
-    estimatedTokens: Math.ceil(totalCharacters / 4),
+    estimatedTokens: Math.ceil(totalCharacters / 3),
     totalCharacters,
     systemInstructionCharacters: systemText.length,
     conversationCharacters,
@@ -118,7 +126,7 @@ function diagnoseTutorContext(input: {
   return {
     phase,
     budgetTokens: input.budgetTokens,
-    estimatedTokens: Math.ceil(totalCharacters / 4),
+    estimatedTokens: Math.ceil(totalCharacters / 3),
     totalCharacters,
     systemInstructionCharacters: input.systemInstructions.length,
     contextCharacters,
@@ -160,5 +168,5 @@ function isHuman(message: any): boolean {
 
 function measure(system: string, contexts: ContextItem[], evidence: unknown, conversation: any[]): number {
   const chars = system.length + JSON.stringify(contexts).length + JSON.stringify(evidence).length + JSON.stringify(conversation).length + 128;
-  return Math.ceil(chars / 4);
+  return Math.ceil(chars / 3);
 }

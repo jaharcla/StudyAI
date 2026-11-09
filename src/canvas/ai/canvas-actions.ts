@@ -28,7 +28,7 @@ const shapeActionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("selectShapes"), ids: z.array(idSchema).max(50) }).strict(),
 ]);
 export const canvasActionSchema = z.object({ boardId: idSchema, actions: z.array(shapeActionSchema).min(1).max(30) }).strict();
-export const canvasReadSchema = z.object({ boardId: idSchema }).strict();
+export const canvasReadSchema = z.object({ boardId: idSchema, shapeIds: z.array(idSchema).max(50).optional() }).strict();
 
 export type CanvasAction = z.infer<typeof shapeActionSchema>;
 export type CanvasActionBatch = z.infer<typeof canvasActionSchema>;
@@ -198,11 +198,12 @@ export function approveCanvasProposal(source: Store, activeBoardId: string, prop
   return { changedId };
 }
 
-export function readCanvasState(source: Store | Snapshot, boardId: string, requestedBoardId: string, selectedIds: readonly string[] = []) {
+export function readCanvasState(source: Store | Snapshot, boardId: string, requestedBoardId: string, selectedIds: readonly string[] = [], requestedShapeIds: readonly string[] = []) {
   if (!boardId || boardId !== requestedBoardId) throw new Error("The active board changed. Read its current context again.");
   const all = records(source);
   const selected = new Set(selectedIds);
-  const ordered = all.map((shape, index) => ({ shape, index })).sort((a, b) => Number(selected.has(b.shape.id)) - Number(selected.has(a.shape.id)) || a.index - b.index);
+  const requested = new Set(requestedShapeIds);
+  const ordered = all.map((shape, index) => ({ shape, index })).sort((a, b) => Number(requested.has(b.shape.id)) - Number(requested.has(a.shape.id)) || Number(selected.has(b.shape.id)) - Number(selected.has(a.shape.id)) || a.index - b.index);
   const shapes: Array<Record<string, unknown>> = [];
   let propertyTruncated = false;
   for (const { shape } of ordered) {
@@ -225,9 +226,11 @@ export function readCanvasState(source: Store | Snapshot, boardId: string, reque
   const omittedShapeCount = all.length - shapes.length;
   const omittedSelectedShapeCount = ordered.filter(({ shape }) => selected.has(shape.id)).length - shapes.filter((shape) => selected.has(String(shape.id))).length;
   const truncated = omittedShapeCount > 0 || propertyTruncated;
-  const result = { boardId, objectCount: all.length, includedShapeCount: shapes.length, omittedShapeCount, selectedShapeCount: selected.size, omittedSelectedShapeCount, truncated, shapes };
+  const includedIds = new Set(shapes.map((shape) => String(shape.id)));
+  const omittedRequestedShapeIds = [...requested].filter((id) => !includedIds.has(id));
+  const result = { boardId, objectCount: all.length, includedShapeCount: shapes.length, omittedShapeCount, selectedShapeCount: selected.size, omittedSelectedShapeCount, requestedShapeCount: requested.size, omittedRequestedShapeIds, truncated, shapes };
   if (JSON.stringify(result).length <= MAX_CANVAS_STATE_CHARS) return result;
-  return { boardId, objectCount: all.length, includedShapeCount: 0, omittedShapeCount: all.length, selectedShapeCount: selected.size, omittedSelectedShapeCount: ordered.filter(({ shape }) => selected.has(shape.id)).length, truncated: true, shapes: [] };
+  return { boardId, objectCount: all.length, includedShapeCount: 0, omittedShapeCount: all.length, selectedShapeCount: selected.size, omittedSelectedShapeCount: ordered.filter(({ shape }) => selected.has(shape.id)).length, requestedShapeCount: requested.size, omittedRequestedShapeIds: [...requested], truncated: true, shapes: [] };
 }
 
 function toolShape(shape: ShapeRecord, props: Record<string, unknown>, truncatedProperties: string[]) {

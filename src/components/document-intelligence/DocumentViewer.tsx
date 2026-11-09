@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Document as PdfDocument, Page, pdfjs } from "react-pdf";
 import { ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -20,6 +20,7 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
   const [zoom, setZoom] = useState(1);
   const [containerWidth, setContainerWidth] = useState(760);
   const [matchIndex, setMatchIndex] = useState(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -36,10 +37,11 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
   }, [sourceRef]);
 
   useEffect(() => {
-    const update = () => setContainerWidth(Math.max(280, Math.min(900, window.innerWidth - 100)));
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    const body = bodyRef.current;
+    if (!body) return;
+    const observer = new ResizeObserver(([entry]) => setContainerWidth(Math.max(240, Math.min(900, entry.contentRect.width - 40))));
+    observer.observe(body);
+    return () => observer.disconnect();
   }, []);
 
   const matches = useMemo<Match[]>(() => {
@@ -79,8 +81,7 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
   const isSlides = document?.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
   return (
-    <div className="di-viewer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="di-viewer" role="dialog" aria-modal="true" aria-label={document?.title || "Document preview"}>
+      <section className="di-viewer" role="dialog" aria-label={document?.title || "Document preview"}>
         <header className="di-viewer-header">
           <div className="di-viewer-heading"><span className="di-file-glyph">▤</span><div><strong>{document?.title || "Loading document…"}</strong><small>{document?.filename}</small></div></div>
           <button className="di-icon-button" onClick={onClose} aria-label="Close preview"><X size={18} /></button>
@@ -91,7 +92,7 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
           <button className="di-tool-button" disabled={!matches.length} onClick={() => nextMatch(1)} aria-label="Next match"><ChevronRight size={15} /></button>
           {isPdf && <><span className="di-tool-divider" /><button className="di-tool-button" onClick={() => setZoom((value) => Math.max(.55, value - .1))} aria-label="Zoom out"><Minus size={15} /></button><span className="di-zoom-label">{Math.round(zoom * 100)}%</span><button className="di-tool-button" onClick={() => setZoom((value) => Math.min(1.6, value + .1))} aria-label="Zoom in"><Plus size={15} /></button></>}
         </div>
-        <div className="di-viewer-body" data-document-viewer-body>
+        <div ref={bodyRef} className="di-viewer-body" data-document-viewer-body>
           {error && <div className="di-error">{error}</div>}
           {!document && !error && <div className="di-loading">Opening document…</div>}
           {document && isPdf && <div className="di-pdf-canvas">
@@ -111,7 +112,6 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
           {(isPdf || isSlides) && <div className="di-page-controls"><button className="di-tool-button" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => page - 1)} aria-label="Previous page"><ChevronLeft size={16} /></button><input aria-label={isPdf ? "Page number" : "Slide number"} value={currentPage} onChange={(event) => setCurrentPage(document ? isPdf ? Math.max(1, Math.min(Number(event.target.value) || 1, pageCount || 1)) : clampUnitNumber(Number(event.target.value), "slide", document) : 1)} /><button className="di-tool-button" disabled={currentPage >= (isPdf ? pageCount : units.length)} onClick={() => setCurrentPage((page) => page + 1)} aria-label="Next page"><ChevronRight size={16} /></button></div>}
         </footer>
       </section>
-    </div>
   );
 }
 
