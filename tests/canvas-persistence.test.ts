@@ -67,6 +67,7 @@ describe("canvas persistence compare-and-swap", () => {
     expect(saveCanvasDocument(database, input(1))).toMatchObject({ status: 409, body: { code: "stale_revision", currentRevision: 0 } });
     saveCanvasDocument(database, input(0));
     expect(saveCanvasDocument(database, { ...input(1), courseId: "other-course" })).toMatchObject({ status: 409, body: { code: "scope_mismatch" } });
+    expect(saveCanvasDocument(database, { ...input(0), id: "missing-lesson-board", lessonId: "missing" })).toMatchObject({ status: 400, body: { code: "lesson_not_found" } });
     database.close();
   });
 });

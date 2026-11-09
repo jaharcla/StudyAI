@@ -102,13 +102,13 @@ test("canvas API rejects cross-course reads, writes, deletes and invalid lessons
   const { course, lesson } = await createCourseWithLesson(request);
   const otherCourse = await createCourse(request, `Second course ${Date.now()}`);
   const otherLesson = await createLesson(request, otherCourse.id, "Other lesson");
-  const created = await request.post("/api/canvases", { data: { courseId: course.id, lessonId: lesson.id, name: "Scoped board", document: { version: 1, snapshot: { document: { store: {} } }, objects: [] } } });
+  const created = await request.post("/api/canvases", { data: { courseId: course.id, lessonId: lesson.id, name: "Scoped board", document: { version: 1, snapshot: { document: { store: {} } }, objects: [] }, expectedRevision: 0 } });
   const id = (await created.json()).id as string;
   expect((await request.get(`/api/canvases/${id}?course=${otherCourse.id}&lesson=${lesson.id}`)).status()).toBe(404);
   expect((await request.delete(`/api/canvases/${id}?course=${otherCourse.id}&lesson=${lesson.id}`)).status()).toBe(404);
-  const data = { id, courseId: otherCourse.id, lessonId: otherLesson.id, name: "Wrong scope", document: { version: 1, snapshot: { document: { store: {} } }, objects: [] } };
+  const data = { id, expectedRevision: 0, courseId: otherCourse.id, lessonId: otherLesson.id, name: "Wrong scope", document: { version: 1, snapshot: { document: { store: {} } }, objects: [] } };
   expect((await request.post("/api/canvases", { data })).status()).toBe(409);
-  expect((await request.post("/api/canvases", { data: { ...data, lessonId: "missing" } })).status()).toBe(400);
+  expect((await request.post("/api/canvases", { data: { ...data, id: "missing-lesson-board", lessonId: "missing" } })).status()).toBe(400);
   expect((await request.post("/api/canvases", { data: { ...data, id: "invalid-document", document: { objects: [{}] } } })).status()).toBe(400);
 });
 

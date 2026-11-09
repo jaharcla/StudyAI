@@ -38,7 +38,7 @@ export function saveCanvasDocument(database: Database.Database, value: unknown):
       return { status: 409, body: { error: "Canvas belongs to another course or lesson.", code: "scope_mismatch", currentRevision: existing.revision } };
     }
     if (!database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) {
-      return { status: 404, body: { error: "Lesson not found in this course.", code: "lesson_not_found" } };
+      return { status: 400, body: { error: "Lesson not found in this course.", code: "lesson_not_found" } };
     }
     if (!existing) {
       if (input.expectedRevision !== 0) return { status: 409, body: { error: "Canvas revision is stale.", code: "stale_revision", currentRevision: 0 } };
