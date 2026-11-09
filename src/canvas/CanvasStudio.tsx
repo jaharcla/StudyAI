@@ -23,10 +23,10 @@ type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
 type Board = { id: string; name: string; revision: number };
 type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
-type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void };
+type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 
-export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary }: Props) {
+export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, preferredBoardId, onBoardState, activityMode = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
   const editorListeners = useRef<Array<() => void>>([]);
@@ -63,6 +63,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [proposalBusy, setProposalBusy] = useState(false);
+  useEffect(() => setToolOpen(!activityMode), [activityMode]);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
@@ -111,7 +112,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       try {
         const response = await fetch(`${API}/canvases`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: board.id, courseId, lessonId, name: board.name, expectedRevision, document: next }) });
         if (response.status === 409) {
-          if (boardRef.current?.id === board.id) onStatus("Canvas changed elsewhere. Reload the board before saving.");
+          if (boardRef.current?.id === board.id) { onStatus("Canvas changed elsewhere. Reload the board before saving."); onBoardState?.({ id: board.id, revision: expectedRevision, saved: false }); }
           return false;
         }
         if (!response.ok) throw new Error("save failed");
@@ -123,17 +124,18 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         setActiveBoard((current) => current?.id === board.id ? { ...current, revision: result.revision! } : current);
         if (boardRef.current?.id === board.id) {
           boardRef.current = { ...boardRef.current, revision: result.revision! };
+          onBoardState?.({ id: board.id, revision: result.revision!, saved: stableJson(documentRef.current) === stableJson(next) });
           onStatus("All changes saved");
         }
         return true;
       } catch {
-        if (boardRef.current?.id === board.id) onStatus("Canvas save unavailable");
+        if (boardRef.current?.id === board.id) { onStatus("Canvas save unavailable"); onBoardState?.({ id: board.id, revision: expectedRevision, saved: false }); }
         return false;
       }
     });
     saveQueue.current = job.then(() => undefined, () => undefined);
     return job;
-  }, [courseId, lessonId, onStatus]);
+  }, [courseId, lessonId, onBoardState, onStatus]);
 
   const scheduleSave = useCallback((board: Board | null, next: CanvasDocument) => {
     next = resolveScene(next);
@@ -141,10 +143,11 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     documentRef.current = next;
     setDocument(next);
     if (!board) return;
+    onBoardState?.({ id: board.id, revision: revisions.current.get(board.id) ?? board.revision, saved: false });
     onStatus("Saving…");
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => void postDocument(board, next), 400);
-  }, [onStatus, postDocument]);
+  }, [onBoardState, onStatus, postDocument]);
 
   useEffect(() => {
     if (loading || !document.objects.some((object) => object.kind === "graph" || object.kind === "equation")) return;
@@ -282,6 +285,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     setLoading(true);
     setActiveBoard(board);
     boardRef.current = board;
+    onBoardState?.({ id: board.id, revision: board.revision, saved: false });
     setCanvasAnalysis(undefined);
     setShapeProposal(undefined);
     setSelectedId(undefined);
@@ -302,6 +306,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       boardRef.current = currentBoard;
       setActiveBoard(currentBoard);
       setBoards((current) => current.map((item) => item.id === board.id ? currentBoard : item));
+      onBoardState?.({ id: currentBoard.id, revision: currentBoard.revision, saved: true });
       documentRef.current = next;
       setDocument(next);
     } catch {
@@ -309,9 +314,10 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       const next = emptyCanvasDocument();
       documentRef.current = next;
       setDocument(next);
+      onBoardState?.({ id: board.id, revision: board.revision, saved: false });
       onStatus("Canvas could not be loaded");
     } finally { if (sequence === loadSequence.current) setLoading(false); }
-  }, [cleanupEditor, onStatus, courseId, lessonId]);
+  }, [cleanupEditor, onBoardState, onStatus, courseId, lessonId]);
 
   useEffect(() => {
     let live = true;
@@ -340,7 +346,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
           const available = rows.map((row) => ({ id: row.id, name: row.name, revision: row.revision }));
           available.forEach((board) => revisions.current.set(board.id, board.revision));
           setBoards(available);
-          await loadBoard(available[0]);
+          await loadBoard(available.find((board) => board.id === preferredBoardId) ?? available[0]);
           return;
         }
         let initial = emptyCanvasDocument();
@@ -362,6 +368,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         setBoards([created]);
         boardRef.current = created;
         setActiveBoard(created);
+        onBoardState?.({ id: created.id, revision: created.revision, saved: true });
         documentRef.current = initial;
         setDocument(initial);
         setLoading(false);
@@ -384,7 +391,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       if (board) void postDocument(board, next);
       cleanupEditor();
     };
-  }, [courseId, lessonId, cleanupEditor, currentDocument, loadBoard, onStatus, postDocument]);
+  }, [courseId, lessonId, preferredBoardId, cleanupEditor, currentDocument, loadBoard, onBoardState, onStatus, postDocument]);
 
   useEffect(() => {
     const counts = document.objects.reduce<Record<string, number>>((acc, object) => { acc[object.kind] = (acc[object.kind] ?? 0) + 1; return acc; }, {});

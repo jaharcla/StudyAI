@@ -20,6 +20,7 @@ const protectedDescriptions = new Set([
   "StudyAI active scientific canvas objects",
   "Active Quickdraw board context",
   "StudyAI canvas analysis result",
+  "StudyAI active learning activity",
 ]);
 
 export class TutorContextBudgetError extends Error {

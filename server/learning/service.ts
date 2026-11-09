@@ -4,12 +4,14 @@ import { createEmptyCard, fsrs, Rating, State, type Card } from "ts-fsrs";
 import { updateMastery, DEFAULT_BKT, selectWeakest } from "./bkt.js";
 import { RateCardSchema, SubmitAttemptSchema, type Rating as StudyRating } from "./contracts.js";
 import { initializeLearningSchema } from "./schema.js";
+import { LearningEventSchema, type LearningEvent } from "../../src/learning/activities/contracts.js";
 
 type QuestionDraft = { courseId: string; lessonId: string; concept: string; prompt: string; choices: Array<{ id: string; text: string }>; correctChoice: string; explanation: string; sourceDocumentId: string; sourcePage?: number | null; sourceExcerpt: string };
 type ReviewableQuestion = { id: string; version: number; concept_id: string; concept: string; prompt: string; choices: string; source_document_id: string; source_title: string; source_page: number | null; source_excerpt: string };
 
 export class LearningService {
   private readonly scheduler = fsrs({ enable_fuzz: false });
+  private lastMasteryTimestamp = 0;
   constructor(private readonly database: Database.Database, private readonly now: () => Date = () => new Date()) { initializeLearningSchema(database); }
 
   addReviewedQuestion(input: QuestionDraft) {
@@ -39,7 +41,7 @@ export class LearningService {
 
   ask(courseId: string, lessonId: string) {
     const candidates = this.database.prepare(`SELECT q.id,q.version,q.concept_id,k.name concept,q.prompt,q.choices,q.source_document_id,q.source_title,q.source_page,q.source_excerpt,
-      COALESCE((SELECT m.mastery FROM mastery_updates m WHERE m.concept_id=q.concept_id ORDER BY m.rowid DESC LIMIT 1),0.1) mastery
+      COALESCE((SELECT e.value FROM learning_mastery_evidence e WHERE e.concept_id=q.concept_id ORDER BY e.occurred_at DESC,e.sequence DESC LIMIT 1),0.1) mastery
       FROM reviewed_questions q JOIN learning_concepts k ON k.id=q.concept_id JOIN learning_cards c ON c.concept_id=k.id WHERE q.course_id=? AND q.lesson_id=? AND json_extract(c.fsrs_state,'$.due')<=? AND q.rowid=(SELECT MAX(q2.rowid) FROM reviewed_questions q2 WHERE q2.id=q.id)
       AND NOT EXISTS(SELECT 1 FROM question_presentations p JOIN reviewed_questions pq ON pq.id=p.question_id AND pq.version=p.question_version WHERE pq.concept_id=q.concept_id AND p.status='asked')`).all(courseId, lessonId, this.now().toISOString()) as Array<ReviewableQuestion & { mastery: number }>;
     const chosen = selectWeakest(candidates);
@@ -75,14 +77,38 @@ export class LearningService {
       this.database.prepare("INSERT INTO learning_attempts(id,idempotency_key,presentation_id,selected_choice,is_correct) VALUES(?,?,?,?,?)").run(attemptId, input.idempotencyKey, presentation.presentation_id, input.choiceId, Number(correct));
       this.database.prepare("UPDATE question_presentations SET status='answered' WHERE id=?").run(presentation.presentation_id);
       this.database.prepare("INSERT INTO grading_evidence(id,attempt_id,question_id,question_version,source_document_id,source_title,source_page,source_excerpt,explanation,accepted) VALUES(?,?,?,?,?,?,?,?,?,1)").run(evidenceId, attemptId, presentation.id, presentation.version, presentation.source_document_id, presentation.source_title, presentation.source_page, presentation.source_excerpt, presentation.explanation);
-      const previous = this.database.prepare("SELECT mastery FROM mastery_updates WHERE concept_id=? ORDER BY rowid DESC LIMIT 1").get(presentation.concept_id) as { mastery: number } | undefined;
-      const prior = previous?.mastery ?? DEFAULT_BKT.pInit;
+      const prior = this.latestMastery(presentation.concept_id) ?? DEFAULT_BKT.pInit;
       const mastery = updateMastery(prior, correct);
-      this.database.prepare("INSERT INTO mastery_updates(id,attempt_id,concept_id,previous_mastery,mastery,evidence_id) VALUES(?,?,?,?,?,?)").run(updateId, attemptId, presentation.concept_id, prior, mastery, evidenceId);
+      this.database.prepare("INSERT INTO mastery_updates(id,attempt_id,concept_id,previous_mastery,mastery,evidence_id,created_at) VALUES(?,?,?,?,?,?,?)").run(updateId, attemptId, presentation.concept_id, prior, mastery, evidenceId, this.nextMasteryTimestamp());
       this.ensureCard(presentation.concept_id);
       return { attemptId, evidenceId, correct, explanation: presentation.explanation, source: { documentId: presentation.source_document_id, title: presentation.source_title, page: presentation.source_page, excerpt: presentation.source_excerpt }, mastery, duplicate: false };
     });
     return result();
+  }
+
+  recordActivityEvidence(input: Omit<LearningEvent, "schemaVersion" | "id" | "conceptId" | "mastery" | "occurredAt"> & { concept: string }): LearningEvent {
+    if (!this.database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) throw new Error("Lesson not found in this course.");
+    const conceptName = input.concept.trim();
+    if (!conceptName || conceptName.length > 160) throw new Error("Learning evidence needs a valid concept.");
+    const run = this.database.transaction(() => {
+      const existingConcept = this.database.prepare("SELECT id FROM learning_concepts WHERE course_id=? AND lesson_id=? AND name=?").get(input.courseId, input.lessonId, conceptName) as { id: string } | undefined;
+      const conceptId = existingConcept?.id ?? randomUUID();
+      if (!existingConcept) this.database.prepare("INSERT INTO learning_concepts(id,course_id,lesson_id,name) VALUES(?,?,?,?)").run(conceptId, input.courseId, input.lessonId, conceptName);
+      const previous = this.latestMastery(conceptId) ?? DEFAULT_BKT.pInit;
+      const value = updateMastery(previous, input.outcome.status === "correct");
+      const occurredAt = this.nextMasteryTimestamp();
+      const { concept: _concept, ...eventInput } = input;
+      const event = LearningEventSchema.parse({ ...eventInput, schemaVersion: 1, id: randomUUID(), conceptId, mastery: { previous, value }, occurredAt });
+      this.database.prepare(`INSERT INTO learning_events(id,schema_version,course_id,lesson_id,activity_attempt_id,activity_id,activity_version,objective_id,concept_id,task_id,
+        source_refs_json,canvas_id,canvas_revision,checker_id,checker_version,outcome_status,response_json,details_json,previous_mastery,mastery_after,occurred_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        event.id, event.schemaVersion, event.courseId, event.lessonId, event.activityAttemptId, event.activityId, event.activityVersion, event.objectiveId, event.conceptId, event.taskId,
+        JSON.stringify(event.sourceRefs), event.canvas.id, event.canvas.revision, event.outcome.checkerId, event.outcome.checkerVersion, event.outcome.status,
+        JSON.stringify(event.outcome.response), event.outcome.details ? JSON.stringify(event.outcome.details) : null, event.mastery.previous, event.mastery.value, event.occurredAt,
+      );
+      return event;
+    });
+    return run.immediate();
   }
 
   rate(raw: unknown) {
@@ -114,6 +140,17 @@ export class LearningService {
     if (this.database.prepare("SELECT 1 FROM learning_cards WHERE concept_id=?").get(conceptId)) return;
     const card = createEmptyCard(this.now());
     this.database.prepare("INSERT INTO learning_cards(id,concept_id,fsrs_state) VALUES(?,?,?)").run(randomUUID(), conceptId, JSON.stringify(serializeCard(card)));
+  }
+  private latestMastery(conceptId: string): number | undefined {
+    const row = this.database.prepare("SELECT value FROM learning_mastery_evidence WHERE concept_id=? ORDER BY occurred_at DESC,sequence DESC LIMIT 1").get(conceptId) as { value: number } | undefined;
+    return row?.value;
+  }
+  private nextMasteryTimestamp(): string {
+    const latest = this.database.prepare("SELECT MAX(occurred_at) AS occurred_at FROM learning_mastery_evidence").get() as { occurred_at: string | null };
+    const prior = latest.occurred_at ? Date.parse(latest.occurred_at) : 0;
+    const value = Math.max(this.now().getTime(), Number.isFinite(prior) ? prior + 1 : 0, this.lastMasteryTimestamp + 1);
+    this.lastMasteryTimestamp = value;
+    return new Date(value).toISOString();
   }
   private publicQuestion(question: ReviewableQuestion, presentationId: string) {
     return { presentationId, questionId: question.id, version: question.version, conceptId: question.concept_id, concept: question.concept, prompt: question.prompt, choices: JSON.parse(question.choices), source: { documentId: question.source_document_id, title: question.source_title, page: question.source_page, excerpt: question.source_excerpt } };

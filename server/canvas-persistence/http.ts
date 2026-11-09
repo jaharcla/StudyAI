@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type Database from "better-sqlite3";
 import { CanvasPersistenceInputError, saveCanvasDocument } from "./service.js";
 
-export function createCanvasPersistenceHandler(database: Database.Database, origin: string) {
+export function createCanvasPersistenceHandler(database: Database.Database, origin: string, validateSave?: (value: unknown) => void) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
     if (request.method !== "POST" || new URL(request.url ?? "/", "http://localhost").pathname !== "/api/canvases") return false;
     const send = (status: number, value: unknown) => {
@@ -10,11 +10,14 @@ export function createCanvasPersistenceHandler(database: Database.Database, orig
       response.end(JSON.stringify(value));
     };
     try {
-      const result = saveCanvasDocument(database, JSON.parse(await readBody(request)));
+      const input = JSON.parse(await readBody(request));
+      validateSave?.(input);
+      const result = saveCanvasDocument(database, input);
       send(result.status, result.body);
     } catch (error) {
       if (error instanceof PayloadTooLargeError) send(413, { error: error.message });
       else if (error instanceof CanvasPersistenceInputError || error instanceof SyntaxError) send(400, { error: error.message });
+      else if (error && typeof error === "object" && "status" in error && typeof error.status === "number") send(error.status, { error: error instanceof Error ? error.message : "Canvas save rejected." });
       else send(500, { error: "Canvas save failed." });
     }
     return true;

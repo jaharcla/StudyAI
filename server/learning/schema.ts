@@ -32,6 +32,16 @@ export function initializeLearningSchema(database: Database.Database): void {
       previous_mastery REAL NOT NULL, mastery REAL NOT NULL, evidence_id TEXT NOT NULL REFERENCES grading_evidence(id),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS learning_events (
+      id TEXT PRIMARY KEY, schema_version INTEGER NOT NULL, course_id TEXT NOT NULL, lesson_id TEXT NOT NULL,
+      activity_attempt_id TEXT NOT NULL, activity_id TEXT NOT NULL, activity_version INTEGER NOT NULL,
+      objective_id TEXT NOT NULL, concept_id TEXT NOT NULL REFERENCES learning_concepts(id), task_id TEXT NOT NULL,
+      source_refs_json TEXT NOT NULL, canvas_id TEXT NOT NULL, canvas_revision INTEGER NOT NULL,
+      checker_id TEXT NOT NULL, checker_version INTEGER NOT NULL, outcome_status TEXT NOT NULL CHECK(outcome_status IN ('correct','incorrect')),
+      response_json TEXT NOT NULL, details_json TEXT, previous_mastery REAL NOT NULL, mastery_after REAL NOT NULL,
+      occurred_at TEXT NOT NULL,
+      FOREIGN KEY(course_id, lesson_id) REFERENCES lessons(course_id, id)
+    );
     CREATE TABLE IF NOT EXISTS learning_cards (
       id TEXT PRIMARY KEY, concept_id TEXT NOT NULL UNIQUE REFERENCES learning_concepts(id),
       fsrs_state TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -44,5 +54,10 @@ export function initializeLearningSchema(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS learning_questions_scope_idx ON reviewed_questions(course_id, lesson_id, concept_id, reviewed_at);
     CREATE INDEX IF NOT EXISTS learning_presentations_resume_idx ON question_presentations(course_id, lesson_id, status, created_at);
     CREATE INDEX IF NOT EXISTS learning_cards_due_idx ON learning_cards(updated_at);
+    CREATE INDEX IF NOT EXISTS learning_events_concept_idx ON learning_events(course_id, lesson_id, concept_id, occurred_at DESC);
+    CREATE VIEW IF NOT EXISTS learning_mastery_evidence AS
+      SELECT concept_id,mastery AS value,created_at AS occurred_at,rowid AS sequence FROM mastery_updates
+      UNION ALL
+      SELECT concept_id,mastery_after AS value,occurred_at,rowid AS sequence FROM learning_events;
   `);
 }

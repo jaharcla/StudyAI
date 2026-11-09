@@ -12,6 +12,8 @@ import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
 import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { createLearningHandler } from "./learning/http.js";
+import { LearningActivityService } from "./learning/activities/service.js";
+import { createLearningActivityHandler } from "./learning/activities/http.js";
 import { createCanvasAnalysisHandler } from "./canvas-analysis/http.js";
 import { createCanvasAnalysisProducerHandler } from "./canvas-analysis/producer.js";
 import { createCanvasPersistenceHandler } from "./canvas-persistence/http.js";
@@ -23,13 +25,17 @@ const legacyDocuments = await migrateLegacyDocuments(db);
 if (legacyDocuments.failures.length) console.warn("Legacy document indexing failures:", legacyDocuments.failures);
 const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": config.webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
 const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYAI_DOCUMENTS);
-const learningHandler = createLearningHandler(new LearningService(db), config.webOrigin);
+const learningService = new LearningService(db);
+const learningHandler = createLearningHandler(learningService, config.webOrigin);
+const activityService = new LearningActivityService(db, learningService);
+const activityHandler = createLearningActivityHandler(activityService, config.webOrigin);
 const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
 const canvasAnalysisProducerHandler = createCanvasAnalysisProducerHandler(db, config.webOrigin);
-const canvasPersistenceHandler = createCanvasPersistenceHandler(db, config.webOrigin);
+const canvasPersistenceHandler = createCanvasPersistenceHandler(db, config.webOrigin, (value) => activityService.validateCanvasSave(value));
 
 const server = createServer(async (req, res) => {
   try {
+  if (await activityHandler(req, res)) return;
   if (await learningHandler(req, res)) return;
   if (await documentHandler(req, res)) return;
   if (await canvasPersistenceHandler(req, res)) return;
