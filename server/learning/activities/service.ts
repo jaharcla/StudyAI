@@ -258,8 +258,9 @@ export class LearningActivityService {
   }
 
   validateCanvasSave(raw: unknown) {
-    const input = z.object({ id: z.string().trim().min(1).max(512), ...ScopeSchema.shape, document: z.unknown() }).passthrough().parse(raw);
-    this.validateActivityCanvasWrite(input);
+    const parsed = z.object({ id: z.string().trim().min(1).max(512).optional(), ...ScopeSchema.shape, document: z.unknown() }).passthrough().safeParse(raw);
+    if (!parsed.success) throw new ActivityServiceError("Invalid canvas save.", 400, "invalid_canvas_save");
+    if (parsed.data.id) this.validateActivityCanvasWrite({ ...parsed.data, id: parsed.data.id });
   }
 
   tutorContext(raw: unknown) {
