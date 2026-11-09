@@ -47,11 +47,20 @@ async function groqJson<T>(options: GroqInferenceOptions, schema: z.ZodType<T>, 
     method: "POST", signal,
     headers: { authorization: "Bearer " + apiKey, "content-type": "application/json" },
     body: JSON.stringify({
-      model: options.model, temperature: 0, max_completion_tokens: Number(process.env.CANVAS_GROQ_MAX_COMPLETION_TOKENS || 4096), response_format: { type: "json_object" },
+      model: options.model, temperature: 0, max_completion_tokens: Number(process.env.CANVAS_GROQ_MAX_COMPLETION_TOKENS || 4096), response_format: { type: "json_object" }, ...(options.model.startsWith("openai/gpt-oss-") ? { include_reasoning: false } : {}),
       messages: [{ role: "system", content: options.system }, { role: "user", content: options.prompt }],
     }),
   });
-  if (!response.ok) throw new Error(`Groq inference HTTP ${response.status}${response.status === 429 ? " (rate limit)" : ""}`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => undefined) as { error?: { type?: unknown; code?: unknown; param?: unknown; message?: unknown } } | undefined;
+    const providerError = payload?.error;
+    const details = [providerError?.type, providerError?.code, providerError?.param, providerError?.message]
+      .filter((value): value is string => typeof value === "string")
+      .join(": ")
+      .slice(0, 300);
+    if (process.env.AI_DIAGNOSTICS === "1" && details) console.warn(JSON.stringify({ type: "canvas_groq_error", status: response.status, model: options.model, details }));
+    throw new Error(`Groq inference HTTP ${response.status}${response.status === 429 ? " (rate limit)" : ""}${details ? `: ${details}` : ""}`);
+  }
   const payload = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
   const content = payload.choices?.[0]?.message?.content;
   if (typeof content !== "string" || !content.trim()) throw new Error("Empty Groq inference response");

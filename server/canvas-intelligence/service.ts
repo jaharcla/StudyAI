@@ -8,7 +8,7 @@ import { FUSION_SYSTEM_PROMPT, STRUCTURE_SYSTEM_PROMPT } from "./prompts.js";
 import { associateOCRLabels, imageRegionsFromInput, localizeOCRByRegion, type OCRAssociation } from "./regions.js";
 import { ollamaText } from "./ollama.js";
 import { canvasInferenceJson, canvasInferenceProvider, canvasOCRProvider, groqInferenceModel, groqOCR, groqOCRModel } from "./groq.js";
-import { OCRResultSchema, StructureResultSchema, getCanvasIntelligenceModels, schemasForCanvasIds, type CanvasIntelligenceModels, type CanvasInput, type FusionResult, type OCRImageRegion, type OCRResult, type StructureResult } from "./types.js";
+import { OCRResultSchema, StructureResultSchema, getCanvasIntelligenceModels, normalizeCanvasFusionOutput, normalizeCanvasStructureOutput, schemasForCanvasIds, type CanvasIntelligenceModels, type CanvasInput, type FusionResult, type OCRImageRegion, type OCRResult, type StructureResult } from "./types.js";
 
 export type CanvasMode = "fast" | "recognize" | "deep";
 export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels };
@@ -26,7 +26,8 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   const latencyMs: Record<string, number> = { normalization: performance.now() - normalizationStarted }, cached: string[] = [];
   const deterministic = geometryObservations(input);
   if (mode === "fast") return { mode, revision: input.revision, structure: StructureResultSchema.parse({ objects: [], relationships: [], observations: deterministic, ambiguities: [] }), latencyMs: { ...latencyMs, total: performance.now() - started }, cached };
-  const schemas = schemasForCanvasIds([...input.nativeRecords.map((record) => record.id), ...input.scientificObjects.map((object) => object.id)]);
+  const canvasIds = [...new Set([...input.nativeRecords.map((record) => record.id), ...input.scientificObjects.map((object) => object.id)])];
+  const schemas = schemasForCanvasIds(canvasIds);
   const quickdrawRecords = input.nativeRecords.map((record) => {
     const raw = record.raw && typeof record.raw === "object" ? record.raw as Record<string, unknown> : { id: record.id, type: record.type };
     return { ...raw, normalized: { bounds: record.bounds, geometry: record.geometry } };
@@ -80,7 +81,7 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   const runStructure = async () => {
     if (cachedStructure) return cachedStructure;
     const before = Date.now();
-    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.reasoning, system: STRUCTURE_SYSTEM_PROMPT, prompt: structurePrompt! }, schemas.structure);
+    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.reasoning, system: STRUCTURE_SYSTEM_PROMPT, prompt: structurePrompt! }, schemas.structure, (value) => normalizeCanvasStructureOutput(value, canvasIds));
     const combined = StructureResultSchema.parse(mergeQuickdrawBondRelationships(input, result));
     latencyMs.structure = Date.now() - before; structureCache.set(structKey, combined); return combined;
   };
@@ -101,7 +102,7 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
     const before = Date.now();
     const prompt = serializePrompt("fusion", { ...fixedFusionContext, canvasEvidence: selectedContext });
     if (prompt.length > maxInputChars) throw new Error(`Fusion evidence exceeds CANVAS_MAX_INPUT_CHARS (${maxInputChars}); select a smaller canvas region or raise the configured limit.`);
-    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.fusion, system: FUSION_SYSTEM_PROMPT, prompt }, schemas.fusion);
+    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.fusion, system: FUSION_SYSTEM_PROMPT, prompt }, schemas.fusion, (value) => normalizeCanvasFusionOutput(value, canvasIds));
     fusion = schemas.fusion.parse(mergeQuickdrawBondRelationships(input, result));
     latencyMs.fusion = Date.now() - before; fusionCache.set(fusionKey, fusion);
   }

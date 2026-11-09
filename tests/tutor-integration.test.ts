@@ -96,6 +96,22 @@ it("reports tool-calling incompatibility without returning JSON as ordinary chat
   expect(result.messages.at(-1)?.content).not.toContain("{\"kind\"");
 });
 
+it("allows a text answer when the user explicitly says not to edit the canvas", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("The canvas directly encodes carbon dioxide with two double bonds. Its other interpretations remain unverified."));
+  const result = await graph.invoke({
+    copilotkit: { context, actions: [{ name: "propose_canvas_action" }, { name: "get_canvas_state" }] },
+    messages: [new HumanMessage("State the molecule and bond pattern, separate observation from uncertainty, and do not edit the board.")],
+  });
+  expect(result.messages.at(-1)?.content).toContain("carbon dioxide");
+  expect(result.messages.at(-1)?.content).not.toContain("did not receive a structured canvas tool call");
+});
+
+it("reports an empty provider answer instead of returning a blank message", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage(""));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Explain this canvas.")] });
+  expect(result.messages.at(-1)?.content).toContain("model returned an empty answer");
+});
+
 it("rejects an invalid canvas analysis before it reaches the inference provider", async () => {
   const result = await graph.invoke({
     copilotkit: { context: [...context, { description: "StudyAI canvas analysis result", value: { boardId: "board-1", courseId: "chem-120", lessonId: "lesson-03", inferredInterpretations: { items: [{ statement: "verified fact" }] } } }] },
@@ -148,7 +164,7 @@ it("prefers Groq with a bounded completion and accounts for provider usage metad
   expect(result.messages.at(-1)?.content).toContain("Groq answer");
   expect(mocks.groqInvoke).toHaveBeenCalledTimes(1);
   expect(mocks.invoke).not.toHaveBeenCalled();
-  expect(mocks.groqOptions[0]).toMatchObject({ model: "openai/gpt-oss-120b", maxRetries: 0, maxTokens: 2048 });
+  expect(mocks.groqOptions[0]).toMatchObject({ model: "openai/gpt-oss-120b", maxRetries: 0, maxTokens: 2048, reasoningEffort: "low" });
   const record = diagnostic.mock.calls.map(([line]) => JSON.parse(String(line))).find((item) => item.type === "tutor_request");
   expect(record).toMatchObject({ provider: "groq", invocationCount: 1, usage: { inputTokens: 20, outputTokens: 5, totalTokens: 25 }, estimatedCostUsd: 0.0004 });
   diagnostic.mockRestore();

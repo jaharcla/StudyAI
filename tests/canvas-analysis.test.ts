@@ -6,6 +6,7 @@ import { CanvasEvidenceBundleSchema, SelectedCanvasContextSchema } from "../serv
 import { normalizeCanvasInput } from "../server/canvas-intelligence/input.js";
 import { CanvasAnalysisResultSchema, CanvasAnalysisValidationError, createCanvasAnalysisResult, currentCanvasRevision, validateCanvasAnalysisForBoard } from "../server/canvas-analysis/contract.js";
 import { createCanvasAnalysisHandler } from "../server/canvas-analysis/http.js";
+import { validateCanvasAnalysisAtReceiver } from "../server/canvas-analysis/receiver.js";
 
 const snapshot = {
   document: { store: {
@@ -77,6 +78,7 @@ receiverDb.exec("CREATE TABLE lessons(id TEXT,course_id TEXT); CREATE TABLE canv
 const canvasAnalysisHandler = createCanvasAnalysisHandler(receiverDb, "http://localhost");
 beforeEach(() => {
   receiverDb.prepare("INSERT OR REPLACE INTO lessons(id,course_id) VALUES(?,?)").run(board.lessonId, board.courseId);
+  receiverDb.prepare("DELETE FROM canvases WHERE id=?").run(board.boardId);
   receiverDb.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,revision,document) VALUES(?,?,?,?,?)").run(board.boardId, board.courseId, board.lessonId, board.revision, board.document);
 });
 afterAll(() => receiverDb.close());
@@ -147,6 +149,12 @@ describe("CanvasAnalysisResult contract", () => {
     receiverDb.prepare("UPDATE canvases SET revision=? WHERE id=?").run(board.revision + 1, board.boardId);
     const stale = await validateAtApi(buildResult());
     expect(stale).toMatchObject({ handled: true, status: 409, body: { code: "stale_revision" } });
+  });
+
+  it("validates JSON-encoded CopilotKit context against the authoritative board", () => {
+    const result = validateCanvasAnalysisAtReceiver(receiverDb, JSON.stringify(buildResult()), { boardId: board.boardId, courseId: board.courseId, lessonId: board.lessonId });
+    expect(result.revisionHash).toBe(currentCanvasRevision(board).revisionHash);
+    expect(() => validateCanvasAnalysisAtReceiver(receiverDb, "not JSON", { boardId: board.boardId, courseId: board.courseId, lessonId: board.lessonId })).toThrow(expect.objectContaining({ code: "invalid_result" }));
   });
 
   it("rejects API results whose board, course, or lesson scope differs", async () => {

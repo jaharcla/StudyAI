@@ -33,6 +33,7 @@ export const canvasReadSchema = z.object({ boardId: idSchema }).strict();
 export type CanvasAction = z.infer<typeof shapeActionSchema>;
 export type CanvasActionBatch = z.infer<typeof canvasActionSchema>;
 export type CanvasProposal = { id: string; boardId: string; baseRevision: number; expectedFingerprint: string; actions: CanvasAction[]; description: string; requiresConfirmation: boolean };
+export const MAX_CANVAS_STATE_CHARS = 12_000;
 
 const colors = ["black", "grey", "light-violet", "violet", "blue", "light-blue", "yellow", "orange", "green", "light-green", "light-red", "red"];
 const sizes = ["s", "m", "l", "xl"];
@@ -197,14 +198,96 @@ export function approveCanvasProposal(source: Store, activeBoardId: string, prop
   return { changedId };
 }
 
-export function readCanvasState(source: Store | Snapshot, boardId: string, requestedBoardId: string) {
+export function readCanvasState(source: Store | Snapshot, boardId: string, requestedBoardId: string, selectedIds: readonly string[] = []) {
   if (!boardId || boardId !== requestedBoardId) throw new Error("The active board changed. Read its current context again.");
   const all = records(source);
-  const shapes = all.slice(0, 500).map((shape) => {
-    const props = structuredClone(shape.props);
-    if (typeof props.text === "string") props.text = props.text.slice(0, 500);
-    if (Array.isArray(props.pts)) props.pts = props.pts.slice(0, 90);
-    return { id: shape.id, type: shape.type, x: shape.x, y: shape.y, rotation: shape.rot, z: shape.z, props };
-  });
-  return { boardId, objectCount: all.length, truncated: all.length > shapes.length, shapes };
+  const selected = new Set(selectedIds);
+  const ordered = all.map((shape, index) => ({ shape, index })).sort((a, b) => Number(selected.has(b.shape.id)) - Number(selected.has(a.shape.id)) || a.index - b.index);
+  const shapes: Array<Record<string, unknown>> = [];
+  let propertyTruncated = false;
+  for (const { shape } of ordered) {
+    const truncatedProperties: string[] = [];
+    const props = compactToolValue(shape.props, "props", truncatedProperties, 0) as Record<string, unknown>;
+    const candidate = toolShape(shape, props, truncatedProperties);
+    if (fitsCanvasState(boardId, all.length, [...shapes, candidate], selected)) {
+      shapes.push(candidate);
+      propertyTruncated ||= truncatedProperties.length > 0;
+      continue;
+    }
+    const essential = essentialProps(shape.type, props);
+    const omittedProperties = Object.keys(shape.props).filter((key) => !(key in essential));
+    const fallback = toolShape(shape, essential, [...truncatedProperties, ...omittedProperties.map((key) => `props.${key} omitted to fit result`)]);
+    if (fitsCanvasState(boardId, all.length, [...shapes, fallback], selected)) {
+      shapes.push(fallback);
+      propertyTruncated = true;
+    }
+  }
+  const omittedShapeCount = all.length - shapes.length;
+  const omittedSelectedShapeCount = ordered.filter(({ shape }) => selected.has(shape.id)).length - shapes.filter((shape) => selected.has(String(shape.id))).length;
+  const truncated = omittedShapeCount > 0 || propertyTruncated;
+  const result = { boardId, objectCount: all.length, includedShapeCount: shapes.length, omittedShapeCount, selectedShapeCount: selected.size, omittedSelectedShapeCount, truncated, shapes };
+  if (JSON.stringify(result).length <= MAX_CANVAS_STATE_CHARS) return result;
+  return { boardId, objectCount: all.length, includedShapeCount: 0, omittedShapeCount: all.length, selectedShapeCount: selected.size, omittedSelectedShapeCount: ordered.filter(({ shape }) => selected.has(shape.id)).length, truncated: true, shapes: [] };
+}
+
+function toolShape(shape: ShapeRecord, props: Record<string, unknown>, truncatedProperties: string[]) {
+  return {
+    id: shape.id,
+    type: shape.type,
+    x: shape.x,
+    y: shape.y,
+    rotation: shape.rot,
+    z: shape.z,
+    props,
+    ...(truncatedProperties.length ? { truncatedProperties: truncatedProperties.slice(0, 12), additionalTruncatedPropertyCount: Math.max(0, truncatedProperties.length - 12) } : {}),
+  };
+}
+
+function compactToolValue(value: unknown, path: string, truncatedProperties: string[], depth: number): unknown {
+  if (typeof value === "string") {
+    if (value.length <= 500) return value;
+    truncatedProperties.push(`${path} truncated from ${value.length} characters to 500`);
+    return value.slice(0, 500);
+  }
+  if (Array.isArray(value)) {
+    if (path === "props.pts" && value.length > 90 && value.every((item) => typeof item === "number")) {
+      const stride = value.length % 3 === 0 ? 3 : 1;
+      const pointCount = Math.floor(value.length / stride);
+      const keptPoints = Math.max(1, Math.floor(90 / stride));
+      const sample = Array.from({ length: keptPoints }, (_, index) => Math.round(index * (pointCount - 1) / Math.max(1, keptPoints - 1)));
+      truncatedProperties.push(`${path} sampled ${pointCount} points to ${sample.length} across the stroke`);
+      return sample.flatMap((point) => value.slice(point * stride, point * stride + stride));
+    }
+    const kept = value.slice(0, 90);
+    if (value.length > kept.length) truncatedProperties.push(`${path} truncated from ${value.length} items to ${kept.length}`);
+    if (depth >= 5 && kept.some((item) => item && typeof item === "object")) {
+      truncatedProperties.push(`${path} nested values omitted after depth 5`);
+      return kept.map((item) => item && typeof item === "object" ? "[nested value omitted]" : item);
+    }
+    return kept.map((item, index) => compactToolValue(item, `${path}[${index}]`, truncatedProperties, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    const kept = entries.slice(0, 30);
+    if (entries.length > kept.length) truncatedProperties.push(`${path} omitted ${entries.length - kept.length} properties`);
+    return Object.fromEntries(kept.map(([key, item]) => [key, compactToolValue(item, `${path}.${key}`, truncatedProperties, depth + 1)]));
+  }
+  return value;
+}
+
+function essentialProps(type: ShapeRecord["type"], props: Record<string, unknown>): Record<string, unknown> {
+  const fields: Record<string, string[]> = {
+    draw: ["pts", "size"], highlight: ["pts", "color", "size"], geo: ["geo", "w", "h", "label", "color", "size"],
+    arrow: ["dx", "dy", "bend", "connection", "color", "size"], line: ["dx", "dy", "color", "size"],
+    text: ["text", "color", "size", "font", "autosize", "scale"], note: ["text", "color", "size", "font", "scale"], image: [],
+  };
+  return Object.fromEntries((fields[type] ?? []).filter((key) => key in props).map((key) => [key, props[key]]));
+}
+
+function fitsCanvasState(boardId: string, objectCount: number, shapes: Array<Record<string, unknown>>, selected: Set<string>): boolean {
+  const includedShapeCount = shapes.length;
+  const selectedShapeCount = selected.size;
+  const includedSelected = shapes.filter((shape) => selected.has(String(shape.id))).length;
+  const result = { boardId, objectCount, includedShapeCount, omittedShapeCount: objectCount - includedShapeCount, selectedShapeCount, omittedSelectedShapeCount: selectedShapeCount - includedSelected, truncated: includedShapeCount < objectCount || shapes.some((shape) => "truncatedProperties" in shape), shapes };
+  return JSON.stringify(result).length <= MAX_CANVAS_STATE_CHARS;
 }

@@ -9,9 +9,10 @@ import { createDocumentRetrievalTool } from "./document-intelligence/retrieval-t
 import { retrieveCourseDocuments, type RetrievalResult } from "./document-intelligence/service.js";
 import { canvasEditSchema } from "../src/canvas/tutor.js";
 import { canvasActionSchema, canvasReadSchema } from "../src/canvas/ai/canvas-actions.js";
+import { CanvasAnalysisValidationError } from "./canvas-analysis/contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./canvas-analysis/receiver.js";
 import { aiRequestQueues, AIRequestQueueFullError, type AIProvider } from "./ai-requests.js";
-import { getTutorContextBudget, budgetTutorContext, estimateTutorMessageTokens, TutorContextBudgetError } from "./tutor-context.js";
+import { getTutorContextBudget, budgetTutorContext, diagnoseTutorMessages, estimateTutorMessageTokens, TutorContextBudgetError } from "./tutor-context.js";
 import { getTutorProviderSettings, type TutorProvider } from "./tutor-provider.js";
 
 const State = Annotation.Root({
@@ -50,8 +51,9 @@ async function tutor(state: typeof State.State, config?: unknown) {
     try {
       if (!course || !lesson || !boardId || (quickdrawContext.scope && (quickdrawScope.courseId !== course.id || quickdrawScope.lessonId !== workspace.lessonId))) throw new Error("Canvas analysis scope is unavailable.");
       validatedCanvasAnalysis = validateCanvasAnalysisAtReceiver(db, canvasAnalysisContext.value, { boardId, courseId: course.id, lessonId: String(workspace.lessonId) });
-    } catch {
-      return { activeScope, scopeStart, messages: [new AIMessage("Canvas analysis was rejected as invalid, stale, or out of scope. Refresh the analysis for the active board, course, and lesson before I use it.")] };
+    } catch (error) {
+      const reason = error instanceof CanvasAnalysisValidationError ? error.code : "scope_mismatch";
+      return { activeScope, scopeStart, messages: [new AIMessage(`Canvas analysis was rejected as invalid, stale, or out of scope (${reason}). Refresh the analysis for the active board, course, and lesson before I use it.`)] };
     }
   }
   const quickdrawActions = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "propose_canvas_action")
@@ -84,7 +86,10 @@ async function tutor(state: typeof State.State, config?: unknown) {
   try {
     budgeted = budgetTutorContext({ systemInstructions: instructions, contexts: promptContexts, evidence, conversation, budgetTokens: contextBudget });
   } catch (error) {
-    if (error instanceof TutorContextBudgetError) return { activeScope, scopeStart, messages: [new AIMessage("The current canvas evidence and question exceed the Tutor context budget. Narrow the active canvas selection or reduce the supplied evidence, then try again.")] };
+    if (error instanceof TutorContextBudgetError) {
+      logTutorContextOverflow(error);
+      return { activeScope, scopeStart, messages: [new AIMessage("The current canvas evidence and question exceed the Tutor context budget. Narrow the active canvas selection or reduce the supplied evidence, then try again.")] };
+    }
     throw error;
   }
   const system = new SystemMessage(
@@ -103,7 +108,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
       const queueProvider: AIProvider = provider === "groq" ? "cloud" : "ollama";
       const runnable = (unbound ? baseModel : model) as { invoke(input: typeof history, options?: { signal?: AbortSignal }): Promise<AIMessage> };
       const estimatedTokens = estimateTutorMessageTokens(input);
-      if (estimatedTokens > contextBudget) throw new TutorContextBudgetError(estimatedTokens, contextBudget);
+      if (estimatedTokens > contextBudget) throw new TutorContextBudgetError(estimatedTokens, contextBudget, diagnoseTutorMessages(input, contextBudget));
       if (requestSignal?.aborted) throw requestSignal.reason ?? new Error("Request was aborted.");
       if (run.invocationCount >= providerSettings.maxProviderCalls) throw new TutorRequestLimitError("provider_call_limit");
       if (provider === "groq") {
@@ -140,10 +145,11 @@ async function tutor(state: typeof State.State, config?: unknown) {
   let response: AIMessage;
   try { response = await invoke(history); }
   catch (error) {
+    logTutorContextOverflow(error);
     if (classifyModelFailure(error) === "tool_call_unsupported" && (quickdrawActions || quickdrawRead || canvasTool)) {
       const fallback = new SystemMessage("The selected model cannot call canvas tools. Answer ordinary explanatory questions normally. If the request requires inspecting or changing the canvas, explain that the canvas tool is unavailable. Do not claim to inspect, propose, or apply a canvas change.");
       try { response = await invoke([system, fallback, ...budgeted.conversation], true); }
-      catch (fallbackError) { return failureResult(activeScope, scopeStart, classifyModelFailure(fallbackError), run); }
+      catch (fallbackError) { logTutorContextOverflow(fallbackError); return failureResult(activeScope, scopeStart, classifyModelFailure(fallbackError), run); }
     } else return failureResult(activeScope, scopeStart, classifyModelFailure(error), run);
   }
   const candidateByRef = new Map(evidence.results.map((result) => [result.sourceRef, result]));
@@ -165,7 +171,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     if (!toolMessages.length) break;
     history.push(response, ...toolMessages);
     try { response = await invoke(history); }
-    catch (error) { return failureResult(activeScope, scopeStart, classifyModelFailure(error), run); }
+    catch (error) { logTutorContextOverflow(error); return failureResult(activeScope, scopeStart, classifyModelFailure(error), run); }
   }
   if ([canvasTool, quickdrawActions, quickdrawRead].some((tool) => tool && response.tool_calls?.some((call) => call.name === tool.name))) {
     recordTutorOutcome(run, response.tool_calls?.map((call) => call.name) ?? [], "tool_proposed", budgeted);
@@ -173,7 +179,11 @@ async function tutor(state: typeof State.State, config?: unknown) {
   }
 
   const body = messageText(response.content);
-  if ((quickdrawActions || quickdrawRead || canvasTool) && /\b(draw|create|add|edit|change|move|delete|highlight|annotate|select|correct|fix|wrong)\b|show me where/i.test(query)) return { activeScope, scopeStart, messages: [new AIMessage("I did not receive a structured canvas tool call, so the canvas was not changed. This model may not support tool calling; try a model with tool-calling support.")] };
+  if (!body.trim()) {
+    recordTutorOutcome(run, [], "empty_answer", budgeted);
+    return { activeScope, scopeStart, messages: [new AIMessage("The model returned an empty answer. Retry with a larger response limit.")] };
+  }
+  if ((quickdrawActions || quickdrawRead || canvasTool) && requestsCanvasAction(query)) return { activeScope, scopeStart, messages: [new AIMessage("I did not receive a structured canvas tool call, so the canvas was not changed. This model may not support tool calling; try a model with tool-calling support.")] };
   const verifiedLinks = canonicalizeCitationLinks(body, candidateByRef);
   const sourceList = [...candidateByRef.values()].slice(0, 5).map((item) => {
     const location = item.unitType === "page" ? "page " + item.unitNumber : item.unitType === "slide" ? "slide " + item.unitNumber : "document text";
@@ -212,7 +222,7 @@ class TutorRequestLimitError extends Error {
 }
 
 function createChatModel(provider: TutorProvider, model: string, settings: ReturnType<typeof getTutorProviderSettings>): ChatOllama | ChatGroq {
-  if (provider === "groq") return new ChatGroq({ apiKey: process.env.GROQ_API_KEY, model: settings.groqModel, temperature: 0.2, maxRetries: 0, maxTokens: settings.maxCompletionTokens });
+  if (provider === "groq") return new ChatGroq({ apiKey: process.env.GROQ_API_KEY, model: settings.groqModel, temperature: 0.2, maxRetries: 0, maxTokens: settings.maxCompletionTokens, ...(settings.groqModel.startsWith("openai/gpt-oss-") ? { reasoningEffort: "low" as const } : {}) });
   return new ChatOllama({ baseUrl: process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434", model, temperature: 0.2, think: false, numPredict: settings.maxCompletionTokens });
 }
 
@@ -286,6 +296,12 @@ function tokenCount(value: unknown): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
+function logTutorContextOverflow(error: unknown): void {
+  if (process.env.AI_DIAGNOSTICS === "1" && error instanceof TutorContextBudgetError) {
+    console.info(JSON.stringify({ type: "tutor_context_overflow", estimatedTokens: error.estimatedTokens, budgetTokens: error.budgetTokens, diagnostics: error.diagnostics }));
+  }
+}
+
 function recordTutorOutcome(run: TutorModelRun, toolCalls: string[], outcome: string, context: ReturnType<typeof budgetTutorContext>) {
   if (process.env.AI_DIAGNOSTICS === "1") console.info(JSON.stringify({ type: "tutor_request", provider: run.provider, model: run.model, providersTried: run.providersTried, fallbackReason: run.fallbackReason, retries: run.retries, invocationCount: run.invocationCount, maxProviderCalls: run.maxProviderCalls, maxGroqCostUsd: run.maxGroqCostUsd, groqReservedCostUsd: run.groqReservedCostUsd, groqAccountedCostUsd: run.groqAccountedCostUsd, toolCalls, outcome, context: { estimatedTokens: context.estimatedTokens, omittedContextCount: context.omittedContextCount, omittedTurnCount: context.omittedTurnCount }, ...(run.usage ? { usage: run.usage } : {}), ...(run.estimatedCostUsd !== undefined ? { estimatedCostUsd: run.estimatedCostUsd } : {}), latencyMs: Date.now() - run.startedAt }));
 }
@@ -315,6 +331,15 @@ function objectValue(value: unknown): Record<string, unknown> {
     try { const parsed = JSON.parse(value); return parsed && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
   }
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function requestsCanvasAction(query: string): boolean {
+  for (const match of query.matchAll(/\b(?:draw|create|add|edit|change|move|delete|highlight|annotate|select|correct|fix|show me where)\b/gi)) {
+    const before = query.slice(Math.max(0, (match.index ?? 0) - 48), match.index);
+    if (/\b(?:do not|don't|dont|never|without|not to|no need to)(?:\s+(?:please|the|a|an|my|any|canvas|board|make|perform|apply|change|changes|edit|edits))*\s*$/i.test(before)) continue;
+    return true;
+  }
+  return false;
 }
 
 function latestUserText(messages: any[]): string {

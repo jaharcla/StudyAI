@@ -88,7 +88,9 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await page.getByRole("dialog", { name: filename }).getByRole("button", { name: "Close preview" }).click();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
   if (await page.getByRole("button", { name: "Open canvas tools", exact: true }).isVisible()) await page.getByRole("button", { name: "Open canvas tools", exact: true }).click();
+  await expect(page.locator(".canvas-tool-palette")).toBeVisible();
   await page.getByRole("button", { name: "Link a note", exact: true }).click();
+  await expect(page.locator(".canvas-tool-palette")).toHaveCount(0);
   const noteCanvas = (await page.locator(".canvas-board").boundingBox())!;
   await page.mouse.click(noteCanvas.x + noteCanvas.width * 0.65, noteCanvas.y + noteCanvas.height * 0.6);
   await page.locator("[data-scientific-id], .canvas-object").filter({ hasText: "Canvas note" }).getByRole("button", { name: "Open note", exact: true }).click();

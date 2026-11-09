@@ -44,7 +44,7 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     description: "Read the active QuickDraw board's native shapes, IDs, page coordinates, types and properties. Pass the current boardId from the active canvas context.",
     parameters: canvasReadSchema,
     handler: async ({ boardId }) => {
-      try { if (!options.store) throw new Error("The active canvas is not ready."); return readCanvasState(options.store, options.scope.boardId, boardId); }
+      try { if (!options.store) throw new Error("The active canvas is not ready."); return readCanvasState(options.store, options.scope.boardId, boardId, options.selectedIds); }
       catch (error) { return { error: error instanceof Error ? error.message : "Canvas state unavailable." }; }
     },
   }, [options.store, options.scope.boardId]);

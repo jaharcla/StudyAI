@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetTutorContext, getTutorContextBudget, TutorContextBudgetError } from "../server/tutor-context";
+import { budgetTutorContext, diagnoseTutorMessages, getTutorContextBudget, TutorContextBudgetError } from "../server/tutor-context";
 
 describe("Tutor context budgeting", () => {
   it("preserves validated canvas evidence, uncertainty, source references, and the current question", () => {
@@ -43,6 +43,39 @@ describe("Tutor context budgeting", () => {
       conversation: [{ type: "human", content: "Question" }],
       budgetTokens: 512,
     })).toThrow(TutorContextBudgetError);
+  });
+
+  it("reports per-context and per-tool-result sizes when the required turn exceeds budget", () => {
+    const toolResult = JSON.stringify({ boardId: "board-1", shapes: Array.from({ length: 20 }, (_, index) => ({ id: `shape-${index}`, text: "x".repeat(400) })) });
+    const providerMessages = [
+      { type: "system", content: "Tutor rules" },
+      { type: "human", content: "Inspect the board." },
+      { type: "tool", name: "get_canvas_state", content: toolResult },
+    ];
+    let error: unknown;
+    try {
+      budgetTutorContext({
+        systemInstructions: "Tutor rules",
+        contexts: [{ description: "Active Quickdraw board context", value: { scope: { boardId: "board-1" }, shapes: [{ id: "shape-1" }] } }],
+        evidence: { status: "no_evidence" },
+        conversation: [
+          { type: "human", content: "Inspect the board." },
+          { type: "tool", name: "get_canvas_state", content: toolResult },
+        ],
+        budgetTokens: 512,
+      });
+    } catch (caught) { error = caught; }
+
+    expect(error).toBeInstanceOf(TutorContextBudgetError);
+    const diagnostics = (error as TutorContextBudgetError).diagnostics!;
+    expect(diagnostics).toMatchObject({ phase: "protected_context_preflight", budgetTokens: 512 });
+    expect(diagnostics.contextItems).toEqual([{ description: "Active Quickdraw board context", characters: expect.any(Number), included: true }]);
+    expect(diagnostics.messages.at(-1)).toMatchObject({ type: "tool", name: "get_canvas_state", contentCharacters: toolResult.length });
+
+    const providerDiagnostics = diagnoseTutorMessages(providerMessages, 512);
+    expect(providerDiagnostics).toMatchObject({ phase: "provider_message_preflight", budgetTokens: 512 });
+    expect(providerDiagnostics.messages.at(-1)).toMatchObject({ type: "tool", name: "get_canvas_state", contentCharacters: toolResult.length });
+    expect(providerDiagnostics.messages[0].contentCharacters).toBe("Inspect the board.".length);
   });
 
   it("validates the configured context budget", () => {

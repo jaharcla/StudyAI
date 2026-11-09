@@ -7,6 +7,7 @@ import { API } from "../api";
 import { ScientificLayer, type ScienceMode } from "./ScientificLayer";
 import { arrowGeometry, synchronizeObject, withArrowEndpoints } from "./geometry";
 import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
+import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObject } from "./expressions";
 import { objectTitle } from "./SceneGlyph";
 import { applyCanvasProposal, canvasEditSchema, proposeCanvasEdit, type CanvasProposal } from "./tutor";
@@ -615,12 +616,6 @@ async function blobToBase64(blob: Blob): Promise<string> {
   let binary = "";
   for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
   return btoa(binary);
-}
-
-function stableJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return String(JSON.stringify(value));
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  return `{${Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(",")}}`;
 }
 
 function ObjectEditor({ object, objects, onChange, onClose, onOpenNote }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void }) {

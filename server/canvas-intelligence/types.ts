@@ -21,6 +21,60 @@ export function schemasForCanvasIds(ids: string[]) {
   return { structure: structure as unknown as z.ZodType<StructureResult>, fusion: fusion as unknown as z.ZodType<FusionResult> };
 }
 
+export function normalizeCanvasStructureOutput(value: unknown, ids: string[]): unknown {
+  return normalizeCanvasModelReferences(value, new Set(ids));
+}
+
+export function normalizeCanvasFusionOutput(value: unknown, ids: string[]): unknown {
+  const input = normalizeCanvasModelReferences(value, new Set(ids)) as Record<string, unknown>;
+  let rejected = false;
+  const associations = (Array.isArray(input.associations) ? input.associations : []).flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) { rejected = true; return []; }
+    const item = value as Record<string, unknown>;
+    const sourceIds = Array.isArray(item.sourceIds) ? item.sourceIds.filter((id): id is string => typeof id === "string" && ids.includes(id)) : [];
+    if (sourceIds.length !== (Array.isArray(item.sourceIds) ? item.sourceIds.length : 0)) rejected = true;
+    return sourceIds.length ? [{ ...item, sourceIds: [...new Set(sourceIds)] }] : [];
+  });
+  const rawUncertainties = typeof input.uncertainties === "string" ? [input.uncertainties] : Array.isArray(input.uncertainties) ? input.uncertainties : [];
+  const warnings = (input.ambiguities as string[]).filter((item) => item.startsWith("Unsupported model"));
+  if (rejected) warnings.push("Unsupported model association sources were discarded.");
+  if (!Array.isArray(input.uncertainties) && typeof input.uncertainties !== "string") warnings.push("Model uncertainty data was malformed.");
+  return { ...input, associations, uncertainties: [...rawUncertainties, ...warnings] };
+}
+
+function normalizeCanvasModelReferences(value: unknown, allowed: Set<string>) {
+  const input = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  let rejected = false;
+  const references = (value: unknown) => {
+    const sourceIds = Array.isArray(value) ? value.filter((id): id is string => typeof id === "string" && allowed.has(id)) : [];
+    if (!Array.isArray(value) || sourceIds.length !== value.length) rejected = true;
+    return [...new Set(sourceIds)];
+  };
+  const objects = (Array.isArray(input.objects) ? input.objects : []).flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) { rejected = true; return []; }
+    const item = value as Record<string, unknown>;
+    if (typeof item.id !== "string" || !allowed.has(item.id)) { rejected = true; return []; }
+    const sourceIds = references(item.sourceIds);
+    return [{ ...item, sourceIds: sourceIds.length ? sourceIds : [item.id], basis: "model" }];
+  });
+  const relationships = (Array.isArray(input.relationships) ? input.relationships : []).flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) { rejected = true; return []; }
+    const item = value as Record<string, unknown>;
+    if (typeof item.fromId !== "string" || typeof item.toId !== "string" || !allowed.has(item.fromId) || !allowed.has(item.toId)) { rejected = true; return []; }
+    const sourceIds = references(item.sourceIds);
+    return [{ ...item, sourceIds: sourceIds.length ? sourceIds : [...new Set([item.fromId, item.toId])], basis: "model" }];
+  });
+  const observations = (Array.isArray(input.observations) ? input.observations : []).flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) { rejected = true; return []; }
+    const item = value as Record<string, unknown>, sourceIds = references(item.sourceIds);
+    if (!sourceIds.length) { rejected = true; return []; }
+    return [{ ...item, sourceIds, basis: "model" }];
+  });
+  const ambiguities = Array.isArray(input.ambiguities) ? input.ambiguities.filter((item): item is string => typeof item === "string") : [];
+  if (rejected) ambiguities.push("Unsupported model references were discarded; verify interpretations against observed canvas data.");
+  return { ...input, objects, relationships, observations, ambiguities };
+}
+
 export type OCRResult = z.infer<typeof OCRResultSchema>;
 export type StructureResult = z.infer<typeof StructureResultSchema>;
 export type FusionResult = z.infer<typeof FusionResultSchema>;

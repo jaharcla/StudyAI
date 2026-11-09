@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Store, type ShapeRecord } from "@quickdrawjs/core";
-import { approveCanvasProposal, proposeCanvasAction, readCanvasState, validateCanvasAction } from "../src/canvas/ai/canvas-actions";
+import { approveCanvasProposal, MAX_CANVAS_STATE_CHARS, proposeCanvasAction, readCanvasState, validateCanvasAction } from "../src/canvas/ai/canvas-actions";
 import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context";
 import type { ScientificObject } from "../src/canvas/model";
 
@@ -110,6 +110,30 @@ describe("Quickdraw AI action proposals", () => {
     expect(() => propose(store, scope.boardId, { boardId: "board-b", actions: [{ kind: "moveShape", id: "label", x: 2, y: 2 }] })).toThrow(/active board changed/);
     expect(readCanvasState(store, scope.boardId, scope.boardId).objectCount).toBe(4);
     expect(() => readCanvasState(store, scope.boardId, "board-b")).toThrow(/active board changed/);
+  });
+
+  it("bounds large tool results while preserving selected geometry and reporting omissions", () => {
+    const store = new Store();
+    for (let index = 0; index < 40; index++) store.put(shape(`text-${index}`, "text", index, index + 1, { text: `Evidence ${index} ${"x".repeat(500)}`, color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    const points = Array.from({ length: 3000 }, (_, index) => index);
+    store.put(shape("selected-stroke", "draw", 7, 9, { pts: points, color: "blue", size: "m" }));
+
+    const result = readCanvasState(store, scope.boardId, scope.boardId, ["selected-stroke"]);
+    const selectedStroke = result.shapes.find((item) => item.id === "selected-stroke");
+    const selectedPoints = (selectedStroke?.props as Record<string, unknown> | undefined)?.pts as number[];
+
+    expect(JSON.stringify(result).length).toBeLessThanOrEqual(MAX_CANVAS_STATE_CHARS);
+    expect(result.objectCount).toBe(41);
+    expect(result.truncated).toBe(true);
+    expect(result.omittedShapeCount).toBeGreaterThan(0);
+    expect(result.shapes[0].id).toBe("selected-stroke");
+    expect(selectedStroke).toMatchObject({ type: "draw", x: 7, y: 9 });
+    expect(selectedPoints).toHaveLength(90);
+    expect(selectedPoints.at(-1)).toBe(2999);
+    expect(selectedStroke?.truncatedProperties).toContain("props.pts sampled 1000 points to 30 across the stroke");
+    const textShape = result.shapes.find((item) => item.id === "text-0");
+    expect((textShape?.props as Record<string, unknown> | undefined)?.text).toMatch(/^Evidence 0 /);
+    expect(textShape?.truncatedProperties).toContain("props.text truncated from 511 characters to 500");
   });
 
   it("rejects stale proposals and board scope changes without mutating either board", () => {

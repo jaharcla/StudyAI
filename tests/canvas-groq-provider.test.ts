@@ -23,13 +23,17 @@ describe("Canvas inference provider preference", () => {
   it("uses Groq first when the response validates", async () => {
     vi.stubEnv("GROQ_API_KEY", "test-key");
     vi.stubEnv("CANVAS_INFERENCE_PROVIDER", "groq");
+    vi.stubEnv("CANVAS_GROQ_MODEL", "openai/gpt-oss-120b");
     const calls: string[] = [];
-    const fetcher = (async (url: string | URL | Request) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
       calls.push(String(url));
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
       return Response.json({ choices: [{ message: { content: JSON.stringify({ value: "groq" }) } }] });
     }) as typeof fetch;
     await expect(canvasInferenceJson({ ...options, fetcher }, schema)).resolves.toEqual({ value: "groq" });
     expect(calls).toEqual(["https://api.groq.com/openai/v1/chat/completions"]);
+    expect(bodies[0]).toMatchObject({ model: "openai/gpt-oss-120b", include_reasoning: false, response_format: { type: "json_object" } });
   });
 
   it("falls back to the selected Ollama model when Groq fails", async () => {

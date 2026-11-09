@@ -11,7 +11,7 @@ import { makeMolecule } from "../src/canvas/model.js";
 import { Store } from "@quickdrawjs/react";
 import { captureSelectedStrokeRegions, groupQuickdrawStrokes, localizeOCRByRegion, associateOCRLabels } from "../server/canvas-intelligence/regions.js";
 import { quickdrawPixelToWorld } from "../server/canvas-intelligence/input.js";
-import { FusionResultSchema, StructureResultSchema } from "../server/canvas-intelligence/types.js";
+import { FusionResultSchema, StructureResultSchema, normalizeCanvasFusionOutput, normalizeCanvasStructureOutput, schemasForCanvasIds } from "../server/canvas-intelligence/types.js";
 
 const records = { document: { store: {
   a: { id: "a", type: "shape", x: 0, y: 0, width: 20, height: 20 },
@@ -51,6 +51,19 @@ describe("canvas intelligence adapters", () => {
   it("normalizes sparse Qwen JSON while retaining its ambiguity", () => {
     expect(() => StructureResultSchema.parse({})).toThrow();
     expect(FusionResultSchema.parse({ answer: ["unclear", "label"], objects: [], relationships: [], associations: [], uncertainties: "No localized OCR evidence." })).toMatchObject({ answer: "unclear\nlabel", uncertainties: ["No localized OCR evidence."] });
+  });
+
+  it("discards unsupported model IDs and preserves the uncertainty", () => {
+    const schemas = schemasForCanvasIds(["molecule:co2"]);
+    const structure = schemas.structure.parse(normalizeCanvasStructureOutput({ objects: [{ id: "atom:C", kind: "atom", label: "C", sourceIds: ["atom:C"], confidence: 0.8, basis: "native" }, { id: "molecule:co2", kind: "molecule", label: "CO2", sourceIds: ["atom:C"], confidence: 0.7, basis: "native" }], relationships: [{ fromId: "atom:C", toId: "molecule:co2", relation: "bond", sourceIds: ["atom:C"], confidence: 0.7, basis: "native" }], observations: [{ description: "atom symbol", sourceIds: ["atom:C"], confidence: 0.8, basis: "native" }], ambiguities: [] }, ["molecule:co2"]));
+    expect(structure.objects).toEqual([{ id: "molecule:co2", kind: "molecule", label: "CO2", sourceIds: ["molecule:co2"], confidence: 0.7, basis: "model" }]);
+    expect(structure.relationships).toEqual([]);
+    expect(structure.observations).toEqual([]);
+    expect(structure.ambiguities).toContain("Unsupported model references were discarded; verify interpretations against observed canvas data.");
+    const fusion = schemas.fusion.parse(normalizeCanvasFusionOutput({ answer: "CO2", objects: [{ id: "atom:C", kind: "atom", label: "C", sourceIds: ["atom:C"], confidence: 0.8, basis: "native" }], relationships: [], associations: [{ description: "label", sourceIds: ["atom:C"], confidence: 0.7 }], uncertainties: [] }, ["molecule:co2"]));
+    expect(fusion.objects).toEqual([]);
+    expect(fusion.associations).toEqual([]);
+    expect(fusion.uncertainties).toContain("Unsupported model references were discarded; verify interpretations against observed canvas data.");
   });
 
   it("scopes selected records to their neighborhood and calculates only geometric facts", () => {
