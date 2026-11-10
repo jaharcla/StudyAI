@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if (( PORT <= 65532 )); then
+  runtime_port=$((PORT + 1))
+  data_port=$((PORT + 2))
+  agent_port=$((PORT + 3))
+else
+  runtime_port=$((PORT - 1))
+  data_port=$((PORT - 2))
+  agent_port=$((PORT - 3))
+fi
+
+exec env \
+  WEB_PORT="$PORT" \
+  RUNTIME_PORT="$runtime_port" \
+  DATA_PORT="$data_port" \
+  AGENT_PORT="$agent_port" \
+  npm exec -- tsx scripts/dev.ts
