@@ -1,4 +1,5 @@
 # StudyAI
+Studying with AI
 
 Local single-user study workspace. Requires Node.js 20+ and Ollama for AI tutoring.
 
