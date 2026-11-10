@@ -36,7 +36,7 @@ export function initializeLearningSchema(database: Database.Database): void {
       id TEXT PRIMARY KEY, schema_version INTEGER NOT NULL, course_id TEXT NOT NULL, lesson_id TEXT NOT NULL,
       activity_attempt_id TEXT NOT NULL, activity_id TEXT NOT NULL, activity_version INTEGER NOT NULL,
       objective_id TEXT NOT NULL, concept_id TEXT NOT NULL REFERENCES learning_concepts(id), task_id TEXT NOT NULL,
-      source_refs_json TEXT NOT NULL, canvas_id TEXT NOT NULL, canvas_revision INTEGER NOT NULL,
+      source_refs_json TEXT NOT NULL, canvas_id TEXT NOT NULL, canvas_revision INTEGER NOT NULL, canvas_document_json TEXT NOT NULL,
       checker_id TEXT NOT NULL, checker_version INTEGER NOT NULL, outcome_status TEXT NOT NULL CHECK(outcome_status IN ('correct','incorrect')),
       response_json TEXT NOT NULL, details_json TEXT, previous_mastery REAL NOT NULL, mastery_after REAL NOT NULL,
       occurred_at TEXT NOT NULL,
@@ -60,4 +60,6 @@ export function initializeLearningSchema(database: Database.Database): void {
       UNION ALL
       SELECT concept_id,mastery_after AS value,occurred_at,rowid AS sequence FROM learning_events;
   `);
+  const eventColumns = database.prepare("PRAGMA table_info(learning_events)").all() as Array<{ name: string }>;
+  if (!eventColumns.some((column) => column.name === "canvas_document_json")) database.exec("ALTER TABLE learning_events ADD COLUMN canvas_document_json TEXT NOT NULL DEFAULT 'null'");
 }

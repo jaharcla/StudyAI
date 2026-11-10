@@ -20,7 +20,7 @@ export class CanvasPersistenceInputError extends Error {
   constructor(message: string) { super(message); this.name = "CanvasPersistenceInputError"; }
 }
 
-export function saveCanvasDocument(database: Database.Database, value: unknown): SaveCanvasResult {
+export function saveCanvasDocument(database: Database.Database, value: unknown, validateSave?: (input: SaveCanvasInput) => void): SaveCanvasResult {
   let input: SaveCanvasInput;
   let document: ReturnType<typeof parseCanvasDocument>;
   try {
@@ -40,6 +40,7 @@ export function saveCanvasDocument(database: Database.Database, value: unknown):
     if (!database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) {
       return { status: 400, body: { error: "Lesson not found in this course.", code: "lesson_not_found" } };
     }
+    validateSave?.(input);
     if (!existing) {
       if (input.expectedRevision !== 0) return { status: 409, body: { error: "Canvas revision is stale.", code: "stale_revision", currentRevision: 0 } };
       database.prepare("INSERT INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,1)")

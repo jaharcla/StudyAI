@@ -67,6 +67,11 @@ test("force activity edits a model, checks it, records evidence, and resumes", a
   const attempts = await request.get(`/api/activities?course=${course.id}&lesson=${lesson.id}`);
   const values = await attempts.json();
   expect(values.attempts[0].attempt).toMatchObject({ status: "completed", responses: [{ result: { status: "correct" } }, { result: { status: "correct" } }, { result: { status: "correct" } }, { result: { status: "correct" } }] });
+  const resumed = await request.get(`/api/activities/attempts/${values.attempts[0].attempt.id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
+  const changedDocument = { ...resumed.canvas.document, objects: resumed.canvas.document.objects.map((item: { x: number }) => ({ ...item, x: item.x + 1 })) };
+  const rejectedWrite = await request.post("/api/canvases", { data: { id: resumed.canvas.id, courseId: course.id, lessonId: lesson.id, name: "Completed activity", expectedRevision: resumed.canvas.revision, document: changedDocument } });
+  expect(rejectedWrite.status()).toBe(409);
+  expect(await rejectedWrite.json()).toMatchObject({ error: expect.stringContaining("Completed activity canvases") });
 });
 
 test("graph activity constructs a linked function, checks its interpretation, and resumes", async ({ page, request }) => {

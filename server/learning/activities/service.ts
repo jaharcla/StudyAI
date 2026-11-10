@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { emptyCanvasDocument, parseCanvasDocument, type CanvasDocument } from "../../../src/canvas/model.js";
+import { isArrowGeometryConsistent } from "../../../src/canvas/geometry.js";
+import { evaluateScientificObjects } from "../../../src/canvas/expressions.js";
 import { stableJson } from "../../../src/canvas/stable-json.js";
 import { ActivityAttemptSchema, ActivityCheckerResultSchema, ActivityResponseSchema, ActivitySpecSchema, LearningEventSchema, type ActivityAttempt, type ActivityCheckerResult, type ActivityResponse, type ActivitySpec, type LearningEvent } from "../../../src/learning/activities/contracts.js";
 import { saveCanvasDocument } from "../../canvas-persistence/service.js";
@@ -145,13 +147,14 @@ export class LearningActivityService {
 
   async submit(raw: unknown) {
     const input = SubmitInputSchema.parse(raw);
+    const scoped = this.scopedAttempt(input.attemptId, input.courseId, input.lessonId);
     const duplicate = this.database.prepare("SELECT attempt_id,payload_json FROM learning_activity_attempt_events WHERE idempotency_key=?").get(input.idempotencyKey) as { attempt_id: string; payload_json: string } | undefined;
     if (duplicate) {
       if (duplicate.attempt_id !== input.attemptId) throw new ActivityServiceError("Idempotency key belongs to another attempt.", 409, "idempotency_conflict");
       return JSON.parse(duplicate.payload_json) as { duplicate: boolean; result: ActivityCheckerResult; attempt: ActivityAttempt; learningEvent?: LearningEvent };
     }
 
-    const { attemptRow, spec, canvas } = this.scopedAttempt(input.attemptId, input.courseId, input.lessonId);
+    const { attemptRow, spec, canvas } = scoped;
     const attempt = ActivityAttemptSchema.parse(JSON.parse(attemptRow.state_json));
     if (attempt.status !== "active" || !attempt.currentTaskId) throw new ActivityServiceError("This activity attempt is already complete.", 409, "attempt_complete");
     if (attempt.currentTaskId !== input.taskId) throw new ActivityServiceError("The submitted task is not the active task.", 409, "task_mismatch");
@@ -160,6 +163,7 @@ export class LearningActivityService {
     const document = parseCanvasDocument(canvas.document);
     const initial = parseCanvasDocument(JSON.parse(attemptRow.initial_document_json));
     this.validateInteractions(spec, attempt, initial, document);
+    await this.assertDerivedCanvasData(spec, attempt, document);
 
     const task = spec.tasks[attempt.currentTaskIndex];
     if (!task || task.id !== input.taskId) throw new ActivityServiceError("The active activity task is unavailable.", 409, "task_mismatch");
@@ -169,6 +173,7 @@ export class LearningActivityService {
     const config = capability.configSchema.parse(checkerSpec.config) as Record<string, unknown>;
     const artifacts = artifactContexts(spec, attempt.artifactBindings, document.objects, this.capabilities);
     const result = ActivityCheckerResultSchema.parse(await capability.check({ spec: checkerSpec, config, artifacts, response: input.response }));
+    if (result.checkerId !== capability.id || result.checkerVersion !== capability.version) throw new ActivityServiceError("The selected checker returned an unregistered identity or version.", 500, "checker_identity_mismatch");
     const submittedAt = this.nextTimestamp();
     const responseEntry: ActivityAttempt["responses"][number] = { taskId: task.id, response: input.response, result, canvasRevision: canvas.revision, submittedAt };
     const complete = result.status === "correct" && attempt.currentTaskIndex === spec.tasks.length - 1;
@@ -191,7 +196,7 @@ export class LearningActivityService {
           courseId: spec.courseId, lessonId: spec.lessonId,
           activityAttemptId: attempt.id, activityId: spec.id, activityVersion: spec.version,
           objectiveId: objective.id, concept: objective.concept, taskId: task.id,
-          sourceRefs: sourceSnapshot[objective.id], canvas: { id: canvas.id, revision: canvas.revision },
+          sourceRefs: sourceSnapshot[objective.id], canvas: { id: canvas.id, revision: canvas.revision }, canvasDocument: document,
           outcome: { checkerId: result.checkerId, checkerVersion: result.checkerVersion, status: result.status, response: input.response, ...(result.details ? { details: result.details } : {}) },
         });
         responseEntry.learningEventId = learningEvent.id;
@@ -248,11 +253,10 @@ export class LearningActivityService {
     const input = SaveActivityCanvasSchema.parse(raw);
     const { attemptRow } = this.scopedAttempt(input.attemptId, input.courseId, input.lessonId);
     const state = ActivityAttemptSchema.parse(JSON.parse(attemptRow.state_json));
-    this.validateActivityCanvasWrite({ id: state.canvasId, courseId: input.courseId, lessonId: input.lessonId, document: input.document });
     const result = saveCanvasDocument(this.database, {
       id: state.canvasId, courseId: input.courseId, lessonId: input.lessonId, name: `Activity · ${state.activityId}`.slice(0, 120),
       expectedRevision: input.expectedRevision, document: input.document,
-    });
+    }, () => this.validateActivityCanvasWrite({ id: state.canvasId, courseId: input.courseId, lessonId: input.lessonId, document: input.document }));
     if (result.status !== 200) throw new ActivityServiceError(result.body.error ?? "Canvas save failed.", result.status, result.body.code);
     return result.body;
   }
@@ -337,6 +341,7 @@ export class LearningActivityService {
     for (const [objectId, before] of beforeById) {
       const after = afterById.get(objectId)!;
       if (before.kind !== after.kind) throw new ActivityServiceError("Canvas artifact type changed during this activity.", 409, "interaction_not_allowed");
+      if (!isArrowGeometryConsistent(before, after)) throw new ActivityServiceError("Canvas object geometry must stay consistent with its model values.", 409, "interaction_not_allowed");
       const owner = artifactByObject.get(objectId);
       if (!owner) throw new ActivityServiceError("Canvas object is not owned by this activity.", 409, "interaction_not_allowed");
       const artifact = spec.artifacts.find((item) => item.id === owner.artifactId)!;
@@ -357,10 +362,28 @@ export class LearningActivityService {
       WHERE a.canvas_id=? AND a.course_id=? AND a.lesson_id=? ORDER BY a.updated_at DESC LIMIT 1`).get(input.id, input.courseId, input.lessonId) as (AttemptRow & { spec_json: string }) | undefined;
     if (!row) return;
     const attempt = ActivityAttemptSchema.parse(JSON.parse(row.state_json));
-    if (attempt.status !== "active") return;
+    if (attempt.status !== "active") throw new ActivityServiceError("Completed activity canvases are read-only so saved learning evidence remains reproducible.", 409, "attempt_complete");
     const spec = parseSpec(JSON.parse(row.spec_json));
     validateCapabilities(spec, this.capabilities);
     this.validateInteractions(spec, attempt, parseCanvasDocument(JSON.parse(row.initial_document_json)), parseCanvasDocument(input.document));
+  }
+
+  private async assertDerivedCanvasData(spec: ActivitySpec, attempt: ActivityAttempt, document: CanvasDocument) {
+    const evaluated = new Map((await evaluateScientificObjects(document.objects)).map((object) => [object.id, object as unknown as Record<string, unknown>]));
+    const actual = new Map(document.objects.map((object) => [object.id, object as unknown as Record<string, unknown>]));
+    for (const artifact of spec.artifacts) {
+      const derived = artifactCapabilityPaths(artifact, this.capabilities).derived;
+      const bindings = attempt.artifactBindings[artifact.id] ?? {};
+      for (const path of derived) {
+        const [role, ...field] = path.split(".");
+        const objectId = bindings[role];
+        const current = objectId ? actual.get(objectId) : undefined;
+        const expected = objectId ? evaluated.get(objectId) : undefined;
+        if (!current || !expected || stableJson(valueAtPath(current, field)) !== stableJson(valueAtPath(expected, field))) {
+          throw new ActivityServiceError("Derived canvas data does not match the current scientific model.", 409, "derived_state_stale");
+        }
+      }
+    }
   }
 
   private nextTimestamp() {
@@ -412,6 +435,7 @@ function changedPaths(before: Record<string, unknown>, after: Record<string, unk
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
+function valueAtPath(value: unknown, path: string[]): unknown { return path.reduce<unknown>((current, key) => isRecord(current) ? current[key] : undefined, value); }
 function pathCovered(path: string, allowed: string) { return path === allowed || path.startsWith(`${allowed}.`); }
 function isJsonValue(value: unknown, depth: number, state: { count: number }): boolean {
   if (++state.count > 10_000 || depth > 24) return false;

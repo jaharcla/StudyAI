@@ -4,9 +4,11 @@ import { randomUUID } from "node:crypto";
 import { unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { emptyCanvasDocument, parseCanvasDocument } from "../src/canvas/model.js";
+import { evaluateScientificObjects } from "../src/canvas/expressions.js";
 import { makeSourceReference } from "../server/document-intelligence/service.js";
 import { LearningService } from "../server/learning/service.js";
 import { LearningActivityService } from "../server/learning/activities/service.js";
+import { defaultActivityCapabilities, type ActivityCapabilityRegistry } from "../server/learning/activities/capabilities.js";
 import type { ActivitySpec } from "../src/learning/activities/contracts.js";
 
 const sourceExcerpt = "Constant net force changes velocity at a rate determined by mass.";
@@ -156,7 +158,8 @@ describe("reusable learning activity runtime", () => {
 
     const equationId = started.attempt.artifactBindings["motion-graph"].equation;
     const correctedGraph = parseCanvasDocument({ ...changedForce, objects: changedForce.objects.map((item) => item.id === equationId && item.kind === "equation" && item.mathWorkspace ? { ...item, variables: { ...item.variables, m: 4 }, mathWorkspace: { ...item.mathWorkspace, parameters: { ...item.mathWorkspace.parameters, m: { ...item.mathWorkspace.parameters.m, value: 4 } } } } : item) });
-    const graphSave = activities.saveCanvas({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", expectedRevision: velocity.attempt.canvasRevision, document: correctedGraph });
+    const correctedObjects = await evaluateScientificObjects(correctedGraph.objects);
+    const graphSave = activities.saveCanvas({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", expectedRevision: velocity.attempt.canvasRevision, document: parseCanvasDocument({ ...correctedGraph, objects: correctedObjects }) });
     const validGraph = await activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "match-motion-graph-slope", canvasRevision: graphSave.revision!, idempotencyKey: "model-g2", response: "4" });
     expect(validGraph.result.status).toBe("correct");
     const intercept = await activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "match-motion-graph-intercept", canvasRevision: validGraph.attempt.canvasRevision, idempotencyKey: "model-b", response: "3" });
@@ -201,7 +204,83 @@ describe("reusable learning activity runtime", () => {
     const learning = new LearningService(database, now);
     const activities = new LearningActivityService(database, learning, now);
     expect(activities.resume({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a" })).toMatchObject({ attempt: { status: "completed" }, spec: { id: "graph-interpretation", version: 1 } });
-    expect(database.prepare("SELECT source_refs_json,mastery_after FROM learning_events").get()).toMatchObject({ source_refs_json: expect.stringContaining("doc-a"), mastery_after: expect.any(Number) });
+    const persistedEvent = database.prepare("SELECT source_refs_json,canvas_document_json,mastery_after FROM learning_events").get() as { source_refs_json: string; canvas_document_json: string; mastery_after: number };
+    expect(persistedEvent).toMatchObject({ source_refs_json: expect.stringContaining("doc-a"), mastery_after: expect.any(Number) });
+    expect(JSON.parse(persistedEvent.canvas_document_json)).toEqual(started.canvas.document);
     expect(() => activities.resume({ attemptId: started.attempt.id, courseId: "course-b", lessonId: "lesson-b" })).toThrow(/not found|scope/i);
+  });
+
+  it("checks course scope before returning an idempotent submit replay", async () => {
+    const { activities } = setup();
+    await saveSpec(activities, graphSpec());
+    const started = await activities.start({ courseId: "course-a", lessonId: "lesson-a", activityId: "graph-interpretation" });
+    await activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "interpret-line", canvasRevision: started.attempt.canvasRevision, idempotencyKey: "scoped-replay", response: "2" });
+    await expect(activities.submit({ attemptId: started.attempt.id, courseId: "course-b", lessonId: "lesson-b", taskId: "interpret-line", canvasRevision: started.attempt.canvasRevision, idempotencyKey: "scoped-replay", response: "2" })).rejects.toThrow(/not found|scope/i);
+  });
+
+  it("keeps completed activity canvases immutable after recording evidence", async () => {
+    const { database, activities } = setup();
+    await saveSpec(activities, graphSpec());
+    const started = await activities.start({ courseId: "course-a", lessonId: "lesson-a", activityId: "graph-interpretation" });
+    const completed = await activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "interpret-line", canvasRevision: started.attempt.canvasRevision, idempotencyKey: "complete", response: "2" });
+    const changed = parseCanvasDocument({ ...started.canvas.document, objects: started.canvas.document.objects.map((item) => ({ ...item, x: item.x + 20 })) });
+    expect(() => activities.saveCanvas({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", expectedRevision: completed.attempt.canvasRevision, document: changed })).toThrow(/completed/i);
+    expect(database.prepare("SELECT revision FROM canvases WHERE id=?").get(started.canvas.id)).toEqual({ revision: completed.attempt.canvasRevision });
+    expect(database.prepare("SELECT count(*) total FROM learning_events").get()).toEqual({ total: 1 });
+  });
+
+  it("rejects arrow geometry that changes its visual scale independently of the model", async () => {
+    const { activities } = setup();
+    await saveSpec(activities, forceSpec());
+    const started = await activities.start({ courseId: "course-a", lessonId: "lesson-a", activityId: "force-motion" });
+    const forceId = started.attempt.artifactBindings["force-right"].object;
+    const mismatched = parseCanvasDocument({ ...started.canvas.document, objects: started.canvas.document.objects.map((item) => item.id === forceId && item.kind === "force" ? { ...item, geometry: { tail: { x: item.x, y: item.y }, tip: { x: item.x + 8, y: item.y }, unitsPerCanvasUnit: 1 } } : item) });
+    expect(() => activities.saveCanvas({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", expectedRevision: started.attempt.canvasRevision, document: mismatched })).toThrow(/geometry/i);
+  });
+
+  it("does not grade a canvas whose saved derived plot disagrees with its equation", async () => {
+    const { database, activities } = setup();
+    await saveSpec(activities, graphSpec());
+    const started = await activities.start({ courseId: "course-a", lessonId: "lesson-a", activityId: "graph-interpretation" });
+    const mismatched = parseCanvasDocument({ ...started.canvas.document, objects: started.canvas.document.objects.map((item) => item.kind === "graph" ? { ...item, points: [[0, 999]] } : item) });
+    const saved = activities.saveCanvas({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", expectedRevision: started.attempt.canvasRevision, document: mismatched });
+    await expect(activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "interpret-line", canvasRevision: saved.revision!, idempotencyKey: "mismatched-plot", response: "2" })).rejects.toMatchObject({ code: "derived_state_stale" });
+    expect(database.prepare("SELECT count(*) total FROM learning_events").get()).toEqual({ total: 0 });
+  });
+
+  it("rejects checker results whose identity does not match the selected capability", async () => {
+    const { database, learning } = setup();
+    const capabilities = new Proxy(defaultActivityCapabilities, {
+      get(target, property) {
+        if (property === "checker") return (id: string) => ({
+          ...target.checker(id),
+          check: async () => ({ status: "correct" as const, checkerId: "unregistered.checker", checkerVersion: 99, summary: "mismatched identity" }),
+        });
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as ActivityCapabilityRegistry;
+    const activities = new LearningActivityService(database, learning, now, capabilities);
+    await saveSpec(activities, graphSpec());
+    const started = await activities.start({ courseId: "course-a", lessonId: "lesson-a", activityId: "graph-interpretation" });
+    await expect(activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "interpret-line", canvasRevision: started.attempt.canvasRevision, idempotencyKey: "wrong-checker", response: "2" })).rejects.toMatchObject({ code: "checker_identity_mismatch" });
+    expect(database.prepare("SELECT count(*) total FROM learning_events").get()).toEqual({ total: 0 });
+  });
+
+  it("preserves the canvas snapshot for each learning-evidence revision", async () => {
+    const { database, activities } = setup();
+    await saveSpec(activities, forceSpec());
+    const started = await activities.start({ courseId: "course-a", lessonId: "lesson-a", activityId: "force-motion" });
+    const first = await activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "predict-acceleration", canvasRevision: started.attempt.canvasRevision, idempotencyKey: "snapshot-1", response: "3" });
+    const forceId = started.attempt.artifactBindings["force-right"].object;
+    const changed = parseCanvasDocument({ ...started.canvas.document, objects: started.canvas.document.objects.map((item) => item.id === forceId && item.kind === "force" ? { ...item, components: [12, 0, 0] } : item) });
+    const saved = activities.saveCanvas({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", expectedRevision: first.attempt.canvasRevision, document: changed });
+    await activities.submit({ attemptId: started.attempt.id, courseId: "course-a", lessonId: "lesson-a", taskId: "predict-final-velocity", canvasRevision: saved.revision!, idempotencyKey: "snapshot-2", response: "13" });
+    const events = database.prepare("SELECT canvas_revision,canvas_document_json FROM learning_events ORDER BY rowid").all() as Array<{ canvas_revision: number; canvas_document_json: string }>;
+    expect(events.map((event) => event.canvas_revision)).toEqual([first.attempt.canvasRevision, saved.revision]);
+    const firstForce = JSON.parse(events[0].canvas_document_json).objects.find((item: { id: string }) => item.id === forceId);
+    const secondForce = JSON.parse(events[1].canvas_document_json).objects.find((item: { id: string }) => item.id === forceId);
+    expect(firstForce.components).toEqual([8, 0, 0]);
+    expect(secondForce.components).toEqual([12, 0, 0]);
   });
 });

@@ -10,6 +10,16 @@ export function arrowGeometry(object: ScientificArrow): ArrowGeometry {
   return { ...object.geometry, tail, tip: { x: tail.x + object.components[0] / scale, y: tail.y - object.components[1] / scale }, ...(object.geometry ? { unitsPerCanvasUnit: object.geometry.unitsPerCanvasUnit } : { unitsPerCanvasUnit: scale }) };
 }
 
+export function isArrowGeometryConsistent(before: ScientificObject, current: ScientificObject): boolean {
+  if ((before.kind !== "vector" && before.kind !== "force") || (current.kind !== "vector" && current.kind !== "force")) return true;
+  if (before.kind !== current.kind) return false;
+  const initial = arrowGeometry(before), next = arrowGeometry(current);
+  const initialScale = initial.unitsPerCanvasUnit ?? 1, nextScale = next.unitsPerCanvasUnit ?? 1;
+  if (Math.abs(initialScale - nextScale) > 1e-9) return false;
+  if (current.geometry && Math.hypot(current.geometry.tip.x - next.tip.x, current.geometry.tip.y - next.tip.y) > 1e-7) return false;
+  return sameAnchor(before.geometry?.tailRef, current.geometry?.tailRef) && sameAnchor(before.geometry?.tipRef, current.geometry?.tipRef);
+}
+
 export function withArrowEndpoints<T extends ScientificArrow>(object: T, tail: Point, tip: Point): T {
   const scale = object.geometry?.unitsPerCanvasUnit ?? 1;
   const components: [number, number, number] = [(tip.x - tail.x) * scale, (tail.y - tip.y) * scale, object.components[2]];
@@ -45,4 +55,8 @@ export function translateObject(object: ScientificObject, dx: number, dy: number
     return { ...object, x: tail.x, y: tail.y, geometry: { ...geometry, tail, tip: { x: geometry.tip.x + dx, y: geometry.tip.y + dy } }, ...(object.kind === "force" ? { pointOfApplication: tail } : {}) };
   }
   return { ...object, x: object.x + dx, y: object.y + dy };
+}
+
+function sameAnchor(before?: ObjectAnchor, current?: ObjectAnchor) {
+  return before?.scope === current?.scope && before?.id === current?.id && before?.atomId === current?.atomId && before?.u === current?.u && before?.v === current?.v;
 }

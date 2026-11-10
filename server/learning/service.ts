@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { createEmptyCard, fsrs, Rating, State, type Card } from "ts-fsrs";
+import { parseCanvasDocument, type CanvasDocument } from "../../src/canvas/model.js";
 import { updateMastery, DEFAULT_BKT, selectWeakest } from "./bkt.js";
 import { RateCardSchema, SubmitAttemptSchema, type Rating as StudyRating } from "./contracts.js";
 import { initializeLearningSchema } from "./schema.js";
@@ -86,7 +87,7 @@ export class LearningService {
     return result();
   }
 
-  recordActivityEvidence(input: Omit<LearningEvent, "schemaVersion" | "id" | "conceptId" | "mastery" | "occurredAt"> & { concept: string }): LearningEvent {
+  recordActivityEvidence(input: Omit<LearningEvent, "schemaVersion" | "id" | "conceptId" | "mastery" | "occurredAt"> & { concept: string; canvasDocument: CanvasDocument }): LearningEvent {
     if (!this.database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) throw new Error("Lesson not found in this course.");
     const conceptName = input.concept.trim();
     if (!conceptName || conceptName.length > 160) throw new Error("Learning evidence needs a valid concept.");
@@ -97,13 +98,13 @@ export class LearningService {
       const previous = this.latestMastery(conceptId) ?? DEFAULT_BKT.pInit;
       const value = updateMastery(previous, input.outcome.status === "correct");
       const occurredAt = this.nextMasteryTimestamp();
-      const { concept: _concept, ...eventInput } = input;
+      const { concept: _concept, canvasDocument, ...eventInput } = input;
       const event = LearningEventSchema.parse({ ...eventInput, schemaVersion: 1, id: randomUUID(), conceptId, mastery: { previous, value }, occurredAt });
       this.database.prepare(`INSERT INTO learning_events(id,schema_version,course_id,lesson_id,activity_attempt_id,activity_id,activity_version,objective_id,concept_id,task_id,
-        source_refs_json,canvas_id,canvas_revision,checker_id,checker_version,outcome_status,response_json,details_json,previous_mastery,mastery_after,occurred_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+        source_refs_json,canvas_id,canvas_revision,canvas_document_json,checker_id,checker_version,outcome_status,response_json,details_json,previous_mastery,mastery_after,occurred_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
         event.id, event.schemaVersion, event.courseId, event.lessonId, event.activityAttemptId, event.activityId, event.activityVersion, event.objectiveId, event.conceptId, event.taskId,
-        JSON.stringify(event.sourceRefs), event.canvas.id, event.canvas.revision, event.outcome.checkerId, event.outcome.checkerVersion, event.outcome.status,
+        JSON.stringify(event.sourceRefs), event.canvas.id, event.canvas.revision, JSON.stringify(parseCanvasDocument(canvasDocument)), event.outcome.checkerId, event.outcome.checkerVersion, event.outcome.status,
         JSON.stringify(event.outcome.response), event.outcome.details ? JSON.stringify(event.outcome.details) : null, event.mastery.previous, event.mastery.value, event.occurredAt,
       );
       return event;
