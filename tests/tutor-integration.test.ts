@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,6 +20,7 @@ const folder = mkdtempSync(join(tmpdir(), "studyai-tutor-"));
 const originalStudyAiDb = process.env.STUDYAI_DB;
 const originalTutorProvider = process.env.TUTOR_PROVIDER;
 const originalGroqApiKey = process.env.GROQ_API_KEY;
+const originalGoogleFactCheckApiKey = process.env.GOOGLE_FACT_CHECK_API_KEY;
 const originalGroqRetries = process.env.TUTOR_GROQ_RETRIES;
 const originalMaxProviderCalls = process.env.TUTOR_MAX_PROVIDER_CALLS;
 const originalMaxGroqCost = process.env.TUTOR_MAX_GROQ_COST_USD;
@@ -47,9 +48,11 @@ const context = [
   { description: "StudyAI active scientific canvas objects", value: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1", objects: [molecule] } },
   { description: "Active Quickdraw board context", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
 ];
+function tutorMetadata(result: { messages: unknown[] }) { return (result.messages.at(-1) as AIMessage).response_metadata.studyai as any; }
 beforeEach(() => {
   process.env.TUTOR_PROVIDER = "ollama";
   process.env.GROQ_API_KEY = "";
+  delete process.env.GOOGLE_FACT_CHECK_API_KEY;
   process.env.TUTOR_GROQ_RETRIES = "0";
   process.env.TUTOR_MAX_PROVIDER_CALLS = "3";
   process.env.TUTOR_MAX_GROQ_COST_USD = "0.02";
@@ -61,15 +64,66 @@ beforeEach(() => {
   mocks.invoke.mockReset(); mocks.bindTools.mockClear(); mocks.ollamaOptions.length = 0; mocks.groqInvoke.mockReset(); mocks.groqBindTools.mockClear(); mocks.groqOptions.length = 0;
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 it("retrieves course evidence, canonicalizes real citations and removes invented references", async () => {
   await importDocuments(db, "chem-120", [{ name: "lecture.txt", bytes: Buffer.from("The lecture marker is TUTOR-771.") }], join(folder, "documents"));
   const ref = searchDocuments(db, "chem-120", "TUTOR-771")[0].sourceRef;
   mocks.invoke.mockResolvedValue(new AIMessage(`[wrong page](#studyai-citation=${encodeURIComponent(ref)}) [fake](#studyai-citation=made-up)`));
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("What is the lecture marker TUTOR-771?")] });
   expect(result.messages.at(-1)?.content).toContain("lecture.txt · document text");
-  expect(result.messages.at(-1)?.content).toContain("[unverified citation removed]");
+  expect(result.messages.at(-1)?.content).not.toContain("[unverified citation removed]");
+  expect(result.messages.at(-1)?.content).not.toContain("Retrieved candidate excerpts");
+  expect(tutorMetadata(result).retrieval.candidates).toHaveLength(1);
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain("TUTOR-771");
-  expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain(molecule.atoms[0].id);
+  expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).not.toContain(molecule.atoms[0].id);
+  expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain("Carbon dioxide");
+});
+
+it("returns an exact requested string without retrieval or citation additions", async () => {
+  await importDocuments(db, "chem-120", [{ name: "exact-output.txt", bytes: Buffer.from("STUDYAI-GROQ-CONNECTED is a test marker.") }], join(folder, "documents"));
+  mocks.invoke.mockResolvedValue(new AIMessage("STUDYAI-GROQ-CONNECTED"));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Reply with exactly: STUDYAI-GROQ-CONNECTED")] });
+
+  expect(result.messages.at(-1)?.content).toBe("STUDYAI-GROQ-CONNECTED");
+  expect(mocks.bindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name)).not.toContain("search_course_documents");
+});
+
+it("skips course retrieval for greetings even when matching documents exist", async () => {
+  await importDocuments(db, "chem-120", [{ name: "greeting.txt", bytes: Buffer.from("Hello, this is a chemistry document greeting.") }], join(folder, "documents"));
+  mocks.invoke.mockResolvedValue(new AIMessage("Hello!"));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });
+
+  expect(result.messages.at(-1)?.content).toBe("Hello!");
+  expect(mocks.bindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name)).not.toContain("search_course_documents");
+});
+
+it("includes raw canvas metadata for an explicit identifier and coordinate request", async () => {
+  const quickdraw = { ...context[2], value: { ...(context[2].value as Record<string, unknown>), selected: [{ id: "shape-17", type: "text", text: "mass", position: { x: 31, y: 41, rotation: 0, z: 1 }, bounds: { x: 31, y: 41, w: 30, h: 20 } }] } };
+  mocks.invoke.mockResolvedValue(new AIMessage("shape-17 is at x 31, y 41."));
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), quickdraw] }, messages: [new HumanMessage("Show me the shape IDs and coordinates.")] });
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+
+  expect(prompt).toContain("shape-17");
+  expect(prompt).toContain('"x":31');
+  expect(tutorMetadata(result).canvas.rawMetadataIncluded).toBe(true);
+});
+
+it("projects ordinary canvas descriptions into observations without retrieval metadata", async () => {
+  const quickdraw = { ...context[2], value: { ...(context[2].value as Record<string, unknown>), visible: [
+    { id: "shape-arrow-9", type: "arrow", position: { x: 10, y: 20, rotation: 0, z: 1 }, bounds: { x: 10, y: 20, w: 100, h: 0 }, arrow: { from: { x: 10, y: 20 }, to: { x: 110, y: 20 }, bend: 0 } },
+    { id: "shape-label-9", type: "text", text: "50 m", position: { x: 120, y: 20, rotation: 0, z: 2 }, bounds: { x: 120, y: 20, w: 30, h: 20 } },
+  ], spatialRelationships: [{ fromId: "shape-arrow-9", relation: "left of", toId: "shape-label-9" }] } };
+  mocks.invoke.mockResolvedValue(new AIMessage("There is a right-pointing arrow and a 50 m label."));
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), quickdraw] }, messages: [new HumanMessage("What is on the board?")] });
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+
+  expect(prompt).toContain("50 m");
+  expect(prompt).toContain('"direction":"right"');
+  expect(prompt).not.toContain("shape-arrow-9");
+  expect(prompt).not.toContain('"x":10');
+  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).not.toContain("search_course_documents");
+  expect(tutorMetadata(result).canvas.rawMetadataIncluded).toBe(false);
 });
 
 it("executes deterministic tutor calculations and returns the result to the model", async () => {
@@ -90,7 +144,8 @@ it("makes context omitted under the token budget visible in the tutor answer", a
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
   conversation.push(new HumanMessage("Current question"));
   const result = await graph.invoke({ activeScope: "chem-120:lesson-03", scopeStart: String(conversation[0].id), copilotkit: { context }, messages: conversation });
-  expect(result.messages.at(-1)?.content).toContain("Context note:");
+  expect(result.messages.at(-1)?.content).toBe("Answer based on current context.");
+  expect(tutorMetadata(result).context.omittedTurnCount).toBeGreaterThan(0);
   expect(mocks.invoke.mock.calls[0][0].some((message: { content?: unknown }) => String(message.content).includes("Old question 0"))).toBe(false);
 });
 
@@ -98,7 +153,8 @@ it("flags canvas context already marked truncated by its producer", async () => 
   mocks.invoke.mockResolvedValue(new AIMessage("Answer with available canvas evidence."));
   const active = { ...context[2], value: { ...(context[2].value as Record<string, unknown>), truncated: true, omittedShapeCount: 3 } };
   const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Explain the board")] });
-  expect(result.messages.at(-1)?.content).toContain("canvas evidence marked truncated or incomplete");
+  expect(result.messages.at(-1)?.content).toBe("Answer with available canvas evidence.");
+  expect(tutorMetadata(result).context.incompleteCanvasContextCount).toBe(1);
 });
 
 it("forwards a registered canvas tool call through LangGraph for browser review", async () => {
@@ -152,7 +208,7 @@ it("rejects an invalid canvas analysis before it reaches the inference provider"
 
 it("does not bind canvas tools from another course or retrieve another course's excerpts", async () => {
   mocks.invoke.mockResolvedValue(new AIMessage("No course excerpts found."));
-  await graph.invoke({ copilotkit: { context: [{ ...context[0], value: { courseId: "biol-130", lessonId: "lesson-03" } }, context[1]], actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("TUTOR-771")] });
+  await graph.invoke({ copilotkit: { context: [{ ...context[0], value: { courseId: "biol-130", lessonId: "lesson-03" } }, context[1]], actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("According to my lecture, what is TUTOR-771?")] });
   expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).not.toContain("propose_canvas_edit");
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0][0].content)).toContain('no_evidence');
 });
@@ -173,7 +229,7 @@ it("keeps previous course and lesson conversation out of the current model promp
 it("retains both retrieval tool turns when the model refines its search", async () => {
   const search = (id: string) => new AIMessage({ content: "", tool_calls: [{ name: "search_course_documents", id, args: { query: "TUTOR-771" } }] });
   mocks.invoke.mockResolvedValueOnce(search("search-1")).mockResolvedValueOnce(search("search-2")).mockResolvedValueOnce(new AIMessage("Found the excerpt."));
-  await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("TUTOR-771")] });
+  await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("According to my lecture, what is TUTOR-771?")] });
   expect(mocks.invoke).toHaveBeenCalledTimes(3);
   expect(mocks.invoke.mock.calls[2][0].filter((message: { _getType: () => string }) => message._getType() === "tool")).toHaveLength(2);
 });
@@ -194,10 +250,37 @@ it("prefers Groq with a bounded completion and accounts for provider usage metad
   expect(mocks.groqInvoke).toHaveBeenCalledTimes(1);
   expect(mocks.invoke).not.toHaveBeenCalled();
   expect(mocks.groqOptions[0]).toMatchObject({ model: "openai/gpt-oss-120b", maxRetries: 0, maxTokens: 2048, reasoningEffort: "low" });
+  expect(tutorMetadata(result).canvas.rawMetadataIncluded).toBe(false);
+  expect(tutorMetadata(result).canvas.rawContext.find((item: { description: string }) => item.description === "StudyAI active scientific canvas objects").value.objects[0].id).toBe(molecule.id);
   const record = diagnostic.mock.calls.map(([line]) => JSON.parse(String(line))).find((item) => item.type === "tutor_request");
   expect(record).toMatchObject({ provider: "groq", invocationCount: 1, usage: { inputTokens: 20, outputTokens: 5, totalTokens: 25 }, estimatedCostUsd: 0.0004 });
   diagnostic.mockRestore();
   if (originalDiagnostics === undefined) delete process.env.AI_DIAGNOSTICS; else process.env.AI_DIAGNOSTICS = originalDiagnostics;
+});
+
+it("runs search_fact_checks through Groq and returns publisher evidence to the model", async () => {
+  process.env.TUTOR_PROVIDER = "auto";
+  process.env.GROQ_API_KEY = "mock-key";
+  process.env.GOOGLE_FACT_CHECK_API_KEY = "test-google-key";
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ claims: [{
+    text: "A published factual claim.", claimant: "Example claimant", claimReview: [{
+      publisher: { name: "Example Review", site: "example.org" }, textualRating: "False", reviewDate: "2025-03-04T00:00:00Z", url: "https://example.org/review",
+    }],
+  }] }), { status: 200, headers: { "content-type": "application/json" } })));
+  mocks.groqInvoke.mockResolvedValueOnce(new AIMessage({ content: "", tool_calls: [{ name: "search_fact_checks", id: "fact-check-1", args: { query: "A published factual claim." } }] }))
+    .mockResolvedValueOnce(new AIMessage("Example Review rated the claim false. [Review](https://example.org/review)"));
+
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Please fact-check this claim: A published factual claim.")] });
+
+  const boundNames = mocks.groqBindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name);
+  expect(boundNames).toContain("search_fact_checks");
+  expect(mocks.groqInvoke).toHaveBeenCalledTimes(2);
+  const toolMessage = mocks.groqInvoke.mock.calls[1][0].find((message: { _getType: () => string }) => message._getType() === "tool");
+  expect(JSON.parse(String(toolMessage.content))).toMatchObject({
+    query: "A published factual claim.", status: "matches_found", results: [{ publisher: "Example Review", rating: "False", ratingSource: "publisher", url: "https://example.org/review" }],
+  });
+  expect(result.messages.at(-1)?.content).toContain("rated the claim false");
+  expect(JSON.stringify(result)).not.toContain("test-google-key");
 });
 
 it("falls back once to the selected Ollama model after a Groq provider failure", async () => {
@@ -213,6 +296,18 @@ it("falls back once to the selected Ollama model after a Groq provider failure",
   expect(mocks.groqInvoke).toHaveBeenCalledTimes(1);
   expect(mocks.invoke).toHaveBeenCalledTimes(1);
   expect(mocks.ollamaOptions[0]).toMatchObject({ model: "qwen3:8b", numPredict: 2048 });
+  expect(mocks.groqBindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("search_fact_checks");
+  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).not.toContain("search_fact_checks");
+});
+
+it("does not call Ollama after a Groq failure in Groq-only mode", async () => {
+  process.env.TUTOR_PROVIDER = "groq";
+  process.env.GROQ_API_KEY = "mock-key";
+  mocks.groqInvoke.mockRejectedValueOnce(new Error("Groq request failed"));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Explain this canvas.")] });
+  expect(result.messages.at(-1)?.content).toContain("provider failed");
+  expect(mocks.groqInvoke).toHaveBeenCalledTimes(1);
+  expect(mocks.invoke).not.toHaveBeenCalled();
 });
 
 it("allows one configured retry for mocked transient Groq failures", async () => {
@@ -259,6 +354,7 @@ afterAll(() => {
   if (originalStudyAiDb === undefined) delete process.env.STUDYAI_DB; else process.env.STUDYAI_DB = originalStudyAiDb;
   if (originalTutorProvider === undefined) delete process.env.TUTOR_PROVIDER; else process.env.TUTOR_PROVIDER = originalTutorProvider;
   if (originalGroqApiKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = originalGroqApiKey;
+  if (originalGoogleFactCheckApiKey === undefined) delete process.env.GOOGLE_FACT_CHECK_API_KEY; else process.env.GOOGLE_FACT_CHECK_API_KEY = originalGoogleFactCheckApiKey;
   if (originalGroqRetries === undefined) delete process.env.TUTOR_GROQ_RETRIES; else process.env.TUTOR_GROQ_RETRIES = originalGroqRetries;
   if (originalMaxProviderCalls === undefined) delete process.env.TUTOR_MAX_PROVIDER_CALLS; else process.env.TUTOR_MAX_PROVIDER_CALLS = originalMaxProviderCalls;
   if (originalMaxGroqCost === undefined) delete process.env.TUTOR_MAX_GROQ_COST_USD; else process.env.TUTOR_MAX_GROQ_COST_USD = originalMaxGroqCost;

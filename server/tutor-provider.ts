@@ -1,5 +1,5 @@
 export type TutorProvider = "groq" | "ollama";
-export type TutorProviderMode = "auto" | "ollama";
+export type TutorProviderMode = "auto" | "groq" | "ollama";
 
 function positiveNumber(value: string | undefined, fallback: number, name: string): number {
   const result = value === undefined || value.trim() === "" ? fallback : Number(value);
@@ -8,8 +8,10 @@ function positiveNumber(value: string | undefined, fallback: number, name: strin
 }
 
 export function getTutorProviderSettings(env: NodeJS.ProcessEnv = process.env) {
-  const mode: TutorProviderMode = env.TUTOR_PROVIDER?.trim().toLowerCase() === "ollama" ? "ollama" : "auto";
+  const requestedMode = env.TUTOR_PROVIDER?.trim().toLowerCase();
+  const mode: TutorProviderMode = requestedMode === "ollama" || requestedMode === "groq" ? requestedMode : "auto";
   const groqConfigured = Boolean(env.GROQ_API_KEY?.trim());
+  if (mode === "groq" && !groqConfigured) throw new Error("TUTOR_PROVIDER=groq requires GROQ_API_KEY.");
   const retries = Number(env.TUTOR_GROQ_RETRIES ?? 0);
   if (!Number.isInteger(retries) || retries < 0 || retries > 1) throw new Error("TUTOR_GROQ_RETRIES must be 0 or 1.");
   const maxCompletionTokens = Number(env.TUTOR_MAX_COMPLETION_TOKENS ?? 2048);
@@ -22,7 +24,7 @@ export function getTutorProviderSettings(env: NodeJS.ProcessEnv = process.env) {
   const maxGroqCostPerCallUsd = (getContextBudget(env) * groqInputUsdPerMillion + maxCompletionTokens * groqOutputUsdPerMillion) / 1_000_000;
   return {
     mode,
-    provider: mode === "ollama" || !groqConfigured ? "ollama" as const : "groq" as const,
+    provider: mode === "ollama" || (mode === "auto" && !groqConfigured) ? "ollama" as const : "groq" as const,
     groqConfigured,
     groqRetries: retries,
     maxCompletionTokens,

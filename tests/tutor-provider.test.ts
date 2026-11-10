@@ -11,6 +11,11 @@ describe("Tutor inference controls", () => {
     expect(getTutorProviderSettings({ TUTOR_PROVIDER: "ollama", GROQ_API_KEY: "mock-key", OLLAMA_MODEL: "qwen3:8b", GROQ_MODEL: "llama-custom", TUTOR_MAX_COMPLETION_TOKENS: "1024", TUTOR_GROQ_RETRIES: "1", TUTOR_MAX_PROVIDER_CALLS: "4", TUTOR_GROQ_INPUT_USD_PER_1M: "0.2", TUTOR_GROQ_OUTPUT_USD_PER_1M: "0.8" } as NodeJS.ProcessEnv)).toMatchObject({ provider: "ollama", ollamaModel: "qwen3:8b", groqModel: "llama-custom", maxCompletionTokens: 1024, groqRetries: 1, maxProviderCalls: 4, groqInputUsdPerMillion: 0.2, groqOutputUsdPerMillion: 0.8 });
   });
 
+  it("supports Groq-only mode without Ollama fallback", () => {
+    expect(getTutorProviderSettings({ TUTOR_PROVIDER: "groq", GROQ_API_KEY: "mock-key" } as NodeJS.ProcessEnv)).toMatchObject({ mode: "groq", provider: "groq" });
+    expect(() => getTutorProviderSettings({ TUTOR_PROVIDER: "groq" } as NodeJS.ProcessEnv)).toThrow(/requires GROQ_API_KEY/);
+  });
+
   it("uses Ollama when Groq has no configured key and rejects unsafe limits", () => {
     expect(getTutorProviderSettings({} as NodeJS.ProcessEnv).provider).toBe("ollama");
     expect(() => getTutorProviderSettings({ TUTOR_GROQ_RETRIES: "2" } as NodeJS.ProcessEnv)).toThrow(/0 or 1/);

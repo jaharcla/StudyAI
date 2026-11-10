@@ -27,6 +27,12 @@ function contextFrom(messages) {
   try { return content ? JSON.parse(content) : []; } catch { return []; }
 }
 
+function evidenceFrom(messages) {
+  const system = messages.filter((item) => item.role === "system").map((item) => text(item.content)).join("\n");
+  const end = ". Course evidence from the server: ";
+  try { return JSON.parse(system.split(end)[1] ?? "{}"); } catch { return {}; }
+}
+
 function toolCall(name, args) {
   return [{ function: { name, arguments: args } }];
 }
@@ -35,6 +41,7 @@ function tutorReply(body) {
   const messages = body.messages ?? [];
   const query = text([...messages].reverse().find((item) => item.role === "user")?.content);
   const contexts = contextFrom(messages);
+  const evidence = evidenceFrom(messages);
   const valueFor = (description) => {
     let value = contexts.find((item) => item.description === description)?.value;
     if (typeof value === "string") { try { value = JSON.parse(value); } catch {} }
@@ -62,7 +69,13 @@ function tutorReply(body) {
     if (target?.kind === "vector") return { content: "", tool_calls: toolCall("propose_canvas_edit", { boardId, objectId: target.id, patchJson: JSON.stringify({ components: [80, 30, 0] }), reason: "Apply the requested synthetic test vector correction for review." }) };
   }
   if (/STUDYAI-OLLAMA-OK/.test(query)) return { content: "STUDYAI-OLLAMA-OK" };
-  if (/assigned alloy code/i.test(query)) return { content: "The assigned alloy code is ZORBIUM-417, as stated in the imported lecture." };
+  if (/^(?:hi|hello|hey)[.!?]*$/i.test(query.trim())) return { content: "Hello!" };
+  if (/what is on the board/i.test(query)) return { content: "There is a right-pointing arrow with a 50 m label to its right. The diagram does not establish what the arrow represents." };
+  if (/assigned alloy code/i.test(query)) {
+    const source = evidence.results?.[0];
+    const citation = source ? ` [${source.filename}](#studyai-citation=${encodeURIComponent(source.sourceRef)})` : "";
+    return { content: `The assigned alloy code is ZORBIUM-417, as stated in the imported lecture.${citation}` };
+  }
   if (/LEWIS-7042/i.test(query)) return { content: "The lecture marker is LEWIS-7042. Carbon dioxide has two double bonds." };
   if (/Read the vector/i.test(query)) return { content: "The vector has x = 120 and y = 60." };
   return { content: "The requested synthetic study response is available." };
