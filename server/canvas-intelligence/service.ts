@@ -57,16 +57,15 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
     const before = Date.now();
     let cacheHits = 0;
     const results = await Promise.all(imageRequests.map(async (region) => {
-      const selectedOCRProvider = ocrProvider === "local" || !process.env.GROQ_API_KEY ? "local" : "groq";
+      const selectedOCRProvider = ocrProvider === "groq" || (ocrProvider === "auto" && process.env.GROQ_API_KEY) ? "groq" : "local";
       const key = digest({ rev: input.revision, regionId: region.id, sourceIds: "sourceIds" in region ? region.sourceIds : [], image: digest(region.base64), transform: "pixelToWorld" in region ? region.pixelToWorld : undefined, model: models.ocr, provider: selectedOCRProvider, remoteModel: selectedOCRProvider === "groq" ? groqOCRModel() : undefined });
       const hit = ocrCache.get(key);
       if (hit) { cacheHits++; return hit; }
       const local = async () => normalizeOCRText(await ollamaText({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.ocr, image: region.base64, system: "Transcribe only the text and symbols that are visibly present. Return each distinct item on its own line. Preserve capitalization and ambiguous alternatives. Do not describe the image or assign meanings to labels.", prompt: "Read the handwritten words, symbols, numbers, and equations. Output each visible item on its own line." }));
       const cloud = () => groqOCR({ base64: region.base64, mimeType: region.mimeType, fetcher: args.fetcher, signal: args.signal });
       let parsed: OCRResult;
-      if (ocrProvider === "groq") {
-        try { parsed = await cloud(); } catch { parsed = await local(); }
-      } else if (ocrProvider === "auto") {
+      if (ocrProvider === "groq") parsed = await cloud();
+      else if (ocrProvider === "auto") {
         if (process.env.GROQ_API_KEY) { try { parsed = await cloud(); } catch { parsed = await local(); } }
         else parsed = await local();
       } else parsed = await local();

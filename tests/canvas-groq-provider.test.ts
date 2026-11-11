@@ -14,10 +14,11 @@ describe("Canvas inference provider preference", () => {
     expect(groqInferenceModel({ GROQ_MODEL: "custom/model", CANVAS_GROQ_MODEL: "canvas/model" } as NodeJS.ProcessEnv)).toBe("canvas/model");
   });
 
-  it("prefers Groq when configured and allows an explicit Ollama override", () => {
+  it("uses Groq by default and allows an explicit Ollama override", () => {
     expect(canvasInferenceProvider({ GROQ_API_KEY: "test-key" } as NodeJS.ProcessEnv)).toBe("groq");
     expect(canvasInferenceProvider({ GROQ_API_KEY: "test-key", CANVAS_INFERENCE_PROVIDER: "ollama" } as NodeJS.ProcessEnv)).toBe("ollama");
-    expect(canvasInferenceProvider({ CANVAS_INFERENCE_PROVIDER: "groq" } as NodeJS.ProcessEnv)).toBe("ollama");
+    expect(canvasInferenceProvider({ CANVAS_INFERENCE_PROVIDER: "groq" } as NodeJS.ProcessEnv)).toBe("groq");
+    expect(canvasInferenceProvider({} as NodeJS.ProcessEnv)).toBe("groq");
   });
 
   it("uses Groq first when the response validates", async () => {
@@ -36,7 +37,7 @@ describe("Canvas inference provider preference", () => {
     expect(bodies[0]).toMatchObject({ model: "openai/gpt-oss-120b", include_reasoning: false, response_format: { type: "json_object" } });
   });
 
-  it("falls back to the selected Ollama model when Groq fails", async () => {
+  it("surfaces Groq errors without falling back to Ollama", async () => {
     vi.stubEnv("GROQ_API_KEY", "test-key");
     vi.stubEnv("CANVAS_INFERENCE_PROVIDER", "groq");
     const calls: Array<{ url: string; model?: string }> = [];
@@ -47,12 +48,7 @@ describe("Canvas inference provider preference", () => {
       if (target.endsWith("/api/tags")) return Response.json({ models: [{ name: options.model }] });
       return Response.json({ message: { content: JSON.stringify({ value: "ollama" }) } });
     }) as typeof fetch;
-    await expect(canvasInferenceJson({ ...options, fetcher }, schema)).resolves.toEqual({ value: "ollama" });
-    expect(calls.map(({ url }) => url)).toEqual([
-      "https://api.groq.com/openai/v1/chat/completions",
-      "http://127.0.0.1:11434/api/tags",
-      "http://127.0.0.1:11434/api/chat",
-    ]);
-    expect(calls.at(-1)?.model).toBe(options.model);
+    await expect(canvasInferenceJson({ ...options, fetcher }, schema)).rejects.toThrow("Groq inference HTTP 503");
+    expect(calls.map(({ url }) => url)).toEqual(["https://api.groq.com/openai/v1/chat/completions"]);
   });
 });

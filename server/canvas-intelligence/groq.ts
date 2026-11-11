@@ -7,7 +7,7 @@ export type CanvasOCRProvider = "local" | "groq" | "auto";
 export type CanvasInferenceProvider = "groq" | "ollama";
 
 export function canvasOCRProvider(env: NodeJS.ProcessEnv = process.env): CanvasOCRProvider {
-  const mode = env.CANVAS_OCR_PROVIDER || "auto";
+  const mode = env.CANVAS_OCR_PROVIDER || "groq";
   if (mode !== "local" && mode !== "groq" && mode !== "auto") throw new Error("CANVAS_OCR_PROVIDER must be local, groq, or auto");
   return mode;
 }
@@ -15,7 +15,7 @@ export function canvasOCRProvider(env: NodeJS.ProcessEnv = process.env): CanvasO
 export function canvasInferenceProvider(env: NodeJS.ProcessEnv = process.env): CanvasInferenceProvider {
   const mode = env.CANVAS_INFERENCE_PROVIDER || "groq";
   if (mode !== "groq" && mode !== "ollama") throw new Error("CANVAS_INFERENCE_PROVIDER must be groq or ollama");
-  return mode === "groq" && env.GROQ_API_KEY ? "groq" : "ollama";
+  return mode;
 }
 
 export const groqOCRModel = (env: NodeJS.ProcessEnv = process.env) => env.CANVAS_GROQ_OCR_MODEL || "qwen/qwen3.8-27b";
@@ -26,16 +26,7 @@ type GroqInferenceOptions = { model: string; system: string; prompt: string; bas
 
 export async function canvasInferenceJson<T>(options: GroqInferenceOptions, schema: z.ZodType<T>, normalize?: (value: unknown, raw: string) => unknown): Promise<T> {
   if (canvasInferenceProvider() !== "groq") return ollamaJson(options, schema, normalize);
-  try {
-    return await groqJson({ ...options, model: groqInferenceModel() }, schema, normalize);
-  } catch (groqError) {
-    if (options.signal?.aborted) throw groqError;
-    try { return await ollamaJson(options, schema, normalize); }
-    catch (ollamaError) {
-      const reason = (error: unknown) => error instanceof Error ? error.message : "request failed";
-      throw new Error(`Groq inference failed (${reason(groqError)}); Ollama fallback failed (${reason(ollamaError)})`);
-    }
-  }
+  return groqJson({ ...options, model: groqInferenceModel() }, schema, normalize);
 }
 
 async function groqJson<T>(options: GroqInferenceOptions, schema: z.ZodType<T>, normalize?: (value: unknown, raw: string) => unknown): Promise<T> {

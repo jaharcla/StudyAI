@@ -173,6 +173,21 @@ describe("canvas intelligence adapters", () => {
     await expect(understandCanvas({ boardId: "board", snapshot: records, image: { base64: "aW1hZ2U=" }, userQuestion: "Read this", mode: "recognize", models, fetcher })).rejects.toThrow("Required Ollama model is not installed: reason:test");
   });
 
+  it("surfaces Groq OCR failures without calling a local model", async () => {
+    clearCanvasRecognitionCache();
+    vi.stubEnv("CANVAS_INFERENCE_PROVIDER", "groq");
+    vi.stubEnv("CANVAS_OCR_PROVIDER", "groq");
+    vi.stubEnv("GROQ_API_KEY", "test-key");
+    const calls: string[] = [];
+    const fetcher = (async (url: string | URL | Request) => {
+      calls.push(String(url));
+      return new Response("unavailable", { status: 503 });
+    }) as typeof fetch;
+    await expect(understandCanvas({ boardId: "board", snapshot: records, image: { base64: "aW1hZ2U=" }, userQuestion: "Read this", mode: "recognize", models, fetcher })).rejects.toThrow(/Groq (OCR|inference) HTTP 503/);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((url) => url === "https://api.groq.com/openai/v1/chat/completions")).toBe(true);
+  });
+
   it("bounds the recognition cache", () => {
     const cache = new RecognitionCache<number>(2, 10_000);
     cache.set("a", 1); cache.set("b", 2); cache.get("a"); cache.set("c", 3);
