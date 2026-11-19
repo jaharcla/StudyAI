@@ -20,7 +20,7 @@ Date: 2026-11-19
 
 - **Live A/B claim run.** The harness is committed, but the two arms were not executed in this change because they require the dev server and 40 tutor calls with provider budget. No claim-score, citation-rate, or latency numbers are claimed.
 - **Full `npm run verify` exit.** Vitest reported 313/314 passing. `tests/learning.test.ts` timed out at 5000 ms under full-suite load and passed 4/4 when re-run alone; this is unrelated to canvas and is treated as a flaky timeout.
-- **Playwright UI path.** Result is reported in the handoff.
+- **Playwright UI path.** Cancelled by the user before completion. Not a failure, and not evidence of passing. `npx playwright test --list` resolves 32 tests across 21 files.
 - **Visual board rendering.** Not part of this change; the tutor remains text-only.
 - **Handwriting accuracy.** The system reports ambiguity rather than guaranteeing transcription.
 
