@@ -6,6 +6,8 @@ import { normalizeCanvasInput } from "../canvas-intelligence/input.js";
 import { listCanvasRecognitionPrototypes } from "../canvas-intelligence/recognition/store.js";
 import { groupQuickdrawStrokes, selectQuickdrawOCRGroups } from "../canvas-intelligence/regions.js";
 import { OCRImageRegionSchema, type OCRImageRegion } from "../canvas-intelligence/types.js";
+import { isImageEgressAllowed } from "../canvas-intelligence/groq.js";
+import { providerUsageSnapshot } from "../canvas-intelligence/provider-usage.js";
 import { CanvasAnalysisValidationError, createCanvasAnalysisResult, currentCanvasRevision, type AuthoritativeCanvasRevision, type CanvasAnalysisResult } from "./contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./receiver.js";
 import { CANVAS_OCR_DEFAULT_PADDING, CANVAS_OCR_MAX_REGIONS_LIMIT, canvasOCRRegionTransform, clampOCRRegionLimit, planCanvasOCRCrops, sameCanvasRegionBounds } from "../../src/canvas/ocr-regions.js";
@@ -16,6 +18,7 @@ const CanvasAnalysisRequestSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   document: z.unknown(),
   selectedIds: z.array(z.string().min(1).max(512)).max(5000).default([]),
+  allowImageEgress: z.boolean().optional(),
   image: z.object({
     base64: z.string().min(1).max(12_000_000).optional(),
     mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).default("image/png"),
@@ -93,6 +96,7 @@ async function produce(
     expectedSourceRegionIds: sourceRegionGroups.map((group) => group.id),
     userQuestion: "Analyze this persisted board. Separate observed canvas data from uncertain interpretations. Do not infer meaning from coordinates alone or propose edits.",
     mode: "deep",
+    allowImageEgress: input.allowImageEgress,
     recognition: { prototypes: listCanvasRecognitionPrototypes(database, row.courseId) },
   });
   if (!understanding.evidence || !understanding.selectedContext || !understanding.fusion) {
@@ -189,8 +193,9 @@ export function createCanvasAnalysisProducerHandler(database: Database.Database,
       return true;
     }
     try {
+      const usageBefore = usageTotals();
       const analysis = await produceCanvasAnalysisForPersistedBoard(database, { boardId, courseId, lessonId }, input, options);
-      send(200, { analysis });
+      send(200, { analysis, telemetry: { totalMs: analysis.diagnostics.timings?.totalMs ?? 0, imageEgress: isImageEgressAllowed(input.allowImageEgress), usage: usageDelta(usageBefore) } });
     } catch (error) {
       if (error instanceof CanvasAnalysisValidationError) {
         const status = error.code === "scope_mismatch" || error.code === "stale_revision" ? 409 : 400;
@@ -205,6 +210,25 @@ export function createCanvasAnalysisProducerHandler(database: Database.Database,
     }
     return true;
   };
+}
+
+function usageTotals() {
+  return new Map(providerUsageSnapshot().map((entry) => [entry.provider, entry]));
+}
+
+function usageDelta(before: ReturnType<typeof usageTotals>) {
+  return providerUsageSnapshot()
+    .map((entry) => {
+      const previous = before.get(entry.provider);
+      return {
+        provider: entry.provider,
+        calls: entry.calls - (previous?.calls ?? 0),
+        promptTokens: entry.promptTokens - (previous?.promptTokens ?? 0),
+        completionTokens: entry.completionTokens - (previous?.completionTokens ?? 0),
+        costUsd: Number((entry.costUsd - (previous?.costUsd ?? 0)).toFixed(6)),
+      };
+    })
+    .filter((entry) => entry.calls > 0 || entry.promptTokens > 0 || entry.completionTokens > 0);
 }
 
 function readBody(request: IncomingMessage, limit = 20_000_000): Promise<string> {

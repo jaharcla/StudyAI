@@ -64,10 +64,11 @@ function deterministicAnalyze() {
 describe("persisted canvas analysis producer", () => {
   it("uses the authoritative document, adapts existing evidence, and preserves observed versus inferred data", async () => {
     const analyze = deterministicAnalyze();
-    const result = await produceCanvasAnalysisForPersistedBoard(database, scope, request(), { analyze, now: () => new Date("2026-11-08T17:00:00.000Z") });
+    const result = await produceCanvasAnalysisForPersistedBoard(database, scope, { ...request(), allowImageEgress: false }, { analyze, now: () => new Date("2026-11-08T17:00:00.000Z") });
     const args = analyze.mock.calls[0][0];
     expect(args.snapshot).toEqual(snapshot);
     expect(args.mode).toBe("deep");
+    expect(args.allowImageEgress).toBe(false);
     expect(args.image?.base64).toBe("aW1hZ2U=");
     expect(result).toMatchObject({ boardId: board.boardId, courseId: board.courseId, lessonId: board.lessonId, revision: board.revision, revisionHash: currentCanvasRevision(board).revisionHash, analysisStatus: "complete" });
     expect(result.sourceObjectIds).toEqual(expect.arrayContaining(["shape-1", "vector-1"]));
@@ -197,8 +198,8 @@ describe("persisted canvas analysis producer", () => {
       const handled = await handler(req, res);
       return { handled, status: result.status, body: JSON.parse(result.body ?? "{}") as Record<string, any> };
     };
-    const valid = await call(request());
-    expect(valid).toMatchObject({ handled: true, status: 200, body: { analysis: { boardId: board.boardId, revision: board.revision } } });
+    const valid = await call({ ...request(), allowImageEgress: false });
+    expect(valid).toMatchObject({ handled: true, status: 200, body: { analysis: { boardId: board.boardId, revision: board.revision }, telemetry: { totalMs: 8, imageEgress: false } } });
     const stale = await call({ ...request(), expectedRevision: board.revision - 1 });
     expect(stale).toMatchObject({ handled: true, status: 409, body: { code: "stale_revision" } });
     const invalid = await call({ ...request(), expectedRevision: -1 });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { normalizeOCRResponse, normalizeOCRText } from "./ocr.js";
-import { recordProviderUsage } from "./provider-usage.js";
+import { recordProviderBackoff, recordProviderUsage } from "./provider-usage.js";
 import type { CanvasProviderId } from "./providers.js";
 import { OCRResultSchema, type OCRResult } from "./types.js";
 
@@ -64,7 +64,9 @@ async function chat(options: OpenAICompatibleOptions, messages: unknown[], extra
     let response = await request();
     const retryable = new Set([402, 429, 500, 502, 503, 504]);
     for (let attempt = 1; attempt <= 3 && retryable.has(response.status) && !options.signal?.aborted; attempt++) {
-      await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500 * attempt));
+      const delayMs = 1500 * attempt;
+      if (options.provider) recordProviderBackoff(options.provider, delayMs);
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, delayMs));
       response = await request();
     }
     if (!response.ok) {

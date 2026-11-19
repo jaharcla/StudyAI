@@ -45,8 +45,8 @@ Quickdraw snapshot + ScientificObject[]
 | 1 — OCR → structure → fusion correctness | **Mostly complete** | Math/diagram OCR, math structure with OCR, recognition gating, provider usage/cost |
 | 2 — Spatial scene graph | **Complete** | Graph, index, SQLite/FTS, API, tools, recognition candidates, analysis merge, scene context, current-course search, browser e2e |
 | 3 — Interaction and learning loop | **Complete** | Teach UI, accept/correct/reject feedback, prototype updates, scientific-object creation proposals, scene tools bound to the tutor |
-| 4 — Operations, cost, safety | **Not started** | Persisted budgets, cost UI, disclosure, circuit breaker |
-| 5 — Polish and performance | **Not started** | Caching, browser e2e, calibration, performance |
+| 4 — Operations, cost, safety | **Complete** | SQLite-persisted budgets/usage, per-analysis telemetry, egress disclosure/opt-out, circuit breaker + backoff metrics, redacted structured logs |
+| 5 — Polish and performance | **Remaining** | CLIP warmup, abstain-threshold calibration, p95 targets; scene caching and math/diagram/teach e2e are already covered |
 
 ## 4. Completed work
 
@@ -109,9 +109,10 @@ Tests: `tests/canvas-benchmark-score.test.ts`.
 
 ## 5. Verification evidence
 
-- `npm test`: **289 passed** (279 at the first checkpoint, 284 after Phase 2).
+- `npm test`: **297 passed** (295 after the Phase 4 checkpoint).
 - `npm run build`: **passed**.
 - `npx tsc -b`: **passed**.
+- `tests/canvas-providers.test.ts`: **13 passed** (persistence, circuit breaker, egress, log redaction).
 - `npx playwright test tests/e2e/canvas-scene-intelligence.spec.ts`: **passed** (5.8 s).
 - `npx playwright test tests/e2e/canvas-recognition-review.spec.ts`: **passed** (6.5 s).
 - Live benchmark with Gemini free tier (first checkpoint, unchanged):
@@ -123,6 +124,9 @@ Tests: `tests/canvas-benchmark-score.test.ts`.
   - Provider cost **$0** (free tier).
   - OpenCode Go usage **0**; OpenRouter usage **0**.
 - Baseline: `docs/verification/canvas-benchmark-baseline.json`.
+- Phase 4 benchmark gate (unchanged baseline): **0 hard failures**, **4/6 math exact**, math F1 **0.832**, PhysAlign coverage **0.875**; avg latency 43.8 s, cost $0.000634, OpenRouter 3 calls. Gate exited 0.
+- Tutor math-markup gate (after the `server/agent.ts` prompt change): **0 hard failures**, **4/6 math exact**, math F1 **0.91**, PhysAlign coverage **0.875**; avg latency 17.9 s, cost $0. Gate exited 0.
+- Tutor math-markup gate 2 (after the bare-LaTeX normalizer and prompt example): **0 hard failures**, **4/6 math exact**, math F1 **0.91**, PhysAlign coverage **0.875**; avg latency 13.2 s, cost $0. Gate exited 0.
 
 ## 6. What is left
 
@@ -150,20 +154,19 @@ Phase 2 is complete.
 - `server/agent.ts` now exposes `get_canvas_scene`, `search_canvas_evidence`, and `propose_scientific_object` to the model and instructs it to cite at most three exact canvas source refs.
 - Bound by `ADR-2026-11-18-canvas-recognition-feedback.md`.
 
-### Phase 4 — Operations, cost, safety
+### Phase 4 — Operations, cost, safety (completed in the 2026-11-18 continuation)
 
-- Persist provider budgets/usage in SQLite (currently in-memory, resets on restart).
-- Per-analysis cost/latency display.
-- Provider disclosure and opt-out for image egress.
-- Circuit breaker and backoff metrics.
-- Structured logs without raw images or secrets.
+- Provider budgets (`canvas_provider_budgets`) and usage (`canvas_provider_usage`) are persisted in SQLite and bound at server startup, so daily limits survive restarts. The in-memory maps remain the hot path.
+- Every analysis response carries `telemetry: { totalMs, imageEgress, usage[] }` with the per-provider delta; the canvas tools bar shows seconds and cost, with the per-provider breakdown on hover. `GET /api/canvas-providers` now also reports persisted usage and circuit state.
+- Image egress is revocable: `CANVAS_ALLOW_IMAGE_EGRESS=0` or a per-request `allowImageEgress: false` restricts OCR to local providers, and the canvas exposes a persisted "Cloud ink OCR" disclosure checkbox. A blocked region is recorded as failed and analysis continues without OCR.
+- A per-provider circuit breaker opens after 3 consecutive failures for 30 s, then half-opens; reversible by `CANVAS_PROVIDER_CIRCUIT_THRESHOLD` / `CANVAS_PROVIDER_CIRCUIT_COOLDOWN_MS`. Backoff and failure counts are recorded per day.
+- `AI_DIAGNOSTICS=1` emits `canvas_provider_call` logs with stage, provider, model, latency, status, and a truncated error; base64 images and configured API keys are redacted.
+- Bound by `ADR-2026-11-18-provider-operations.md`.
 
-### Phase 5 — Polish and performance
+### Phase 5 — Polish and performance (remaining)
 
-- Cache scene graphs by revision; warm CLIP; lazy-load heavy modules.
-- Calibrate abstain thresholds.
-- Browser e2e for math, diagram, custom classes.
-- Performance targets: p95 deep <15 s, cached <3 s.
+- Optional CLIP warmup and abstain-threshold calibration need live data; keep them explicit. Scene graphs already persist per revision, so repeat queries do not rebuild, and math/diagram/teach browser coverage already exists in `tests/e2e/`.
+- Performance targets (p95 deep <15 s, cached <3 s) still need measurement on the target machine.
 
 ## 7. Known issues and risks
 
@@ -218,10 +221,12 @@ Phase 2 is complete.
 - `docs/decisions/ADR-2026-11-18-math-ink-ocr.md`
 - `docs/decisions/ADR-2026-11-18-spatial-canvas-scene.md`
 - `docs/decisions/ADR-2026-11-18-canvas-recognition-feedback.md`
+- `docs/decisions/ADR-2026-11-18-provider-operations.md`
 
 ### Tests
 - `tests/canvas-recognition.test.ts`
 - `tests/canvas-providers.test.ts`
+- `tests/canvas-analysis-producer.test.ts`
 - `tests/canvas-benchmark-score.test.ts`
 - `tests/canvas-ocr-selection.test.ts`
 - `tests/canvas-scene.test.ts`

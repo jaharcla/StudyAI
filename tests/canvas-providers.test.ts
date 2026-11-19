@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import Database from "better-sqlite3";
 import { z } from "zod";
 import { canvasInferenceJson, canvasOCR, consumeProviderFallbacks, resetProviderFallbacks } from "../server/canvas-intelligence/groq.js";
-import { resetProviderBudgetsForTests } from "../server/canvas-intelligence/provider-budget.js";
+import { allowProviderRequest, configureProviderBudgetDatabase, providerBudgetRemaining, providerBudgetSnapshot, resetProviderBudgetsForTests } from "../server/canvas-intelligence/provider-budget.js";
+import { configureProviderUsageDatabase, consumeProviderUsage, persistedProviderUsageSnapshot, providerCircuitSnapshot, providerUsageSnapshot, recordProviderBackoff, recordProviderFailure, recordProviderSuccess, recordProviderUsage, resetProviderCircuitsForTests, resetProviderUsageForTests } from "../server/canvas-intelligence/provider-usage.js";
 import { providerChain, resolveCompletionProviders, resolveVisionProviders } from "../server/canvas-intelligence/providers.js";
 
 const schema = z.object({ value: z.string() });
 const options = { model: "local:test", system: "Return JSON.", prompt: "Return {value:string}." };
 
 beforeEach(() => {
+  configureProviderBudgetDatabase(null);
+  configureProviderUsageDatabase(null);
   resetProviderBudgetsForTests();
+  resetProviderUsageForTests();
+  resetProviderCircuitsForTests();
   resetProviderFallbacks();
   vi.stubEnv("GROQ_API_KEY", "test-groq");
   vi.stubEnv("OPENCODE_GO_API_KEY", "test-opencode");
@@ -143,5 +149,102 @@ describe("canvas provider chain", () => {
 
     await expect(canvasInferenceJson({ ...options, fetcher }, schema)).rejects.toThrow("Groq inference HTTP 503");
     expect(calls).toEqual(["https://api.groq.com/openai/v1/chat/completions"]);
+  });
+
+  it("persists daily provider budgets and usage in SQLite across restarts", () => {
+    const db = new Database(":memory:");
+    configureProviderBudgetDatabase(db);
+    configureProviderUsageDatabase(db);
+    vi.stubEnv("CANVAS_OPENCODE_GO_MAX_REQUESTS_PER_DAY", "2");
+
+    expect(allowProviderRequest("opencode-go")).toBe(true);
+    expect(providerBudgetRemaining("opencode-go")).toBe(1);
+    recordProviderUsage("opencode-go", { promptTokens: 120, completionTokens: 30, costUsd: 0.00025 });
+    recordProviderBackoff("opencode-go", 1500);
+
+    // Simulate process restart by re-binding to the same SQLite DB
+    configureProviderBudgetDatabase(db);
+    configureProviderUsageDatabase(db);
+    expect(providerBudgetRemaining("opencode-go")).toBe(1);
+    expect(providerBudgetSnapshot()["opencode-go"]).toEqual({ used: 1, limit: 2 });
+    expect(allowProviderRequest("opencode-go")).toBe(true);
+    expect(allowProviderRequest("opencode-go")).toBe(false);
+
+    const persistedUsage = persistedProviderUsageSnapshot();
+    expect(persistedUsage.find((entry) => entry.provider === "opencode-go")).toMatchObject({
+      provider: "opencode-go",
+      calls: 1,
+      promptTokens: 120,
+      completionTokens: 30,
+      costUsd: 0.00025,
+      backoffs: 1,
+      backoffMs: 1500,
+    });
+    db.close();
+  });
+
+  it("trips the provider circuit breaker after consecutive failures and skips open circuits in chains", async () => {
+    vi.stubEnv("CANVAS_PROVIDER_CIRCUIT_THRESHOLD", "2");
+    vi.stubEnv("CANVAS_PROVIDER_CIRCUIT_COOLDOWN_MS", "30000");
+
+    recordProviderFailure("groq", "HTTP 503");
+    expect(providerCircuitSnapshot().groq.state).toBe("closed");
+    recordProviderFailure("groq", "HTTP 503");
+    expect(providerCircuitSnapshot().groq).toMatchObject({
+      state: "open",
+      consecutiveFailures: 2,
+      totalFailures: 2,
+      tripCount: 1,
+      lastError: "HTTP 503",
+    });
+
+    const calls: string[] = [];
+    const fetcher = (async (url: string | URL | Request) => {
+      calls.push(String(url));
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ value: "opencode" }) } }] });
+    }) as typeof fetch;
+
+    await expect(canvasInferenceJson({ ...options, fetcher }, schema)).resolves.toEqual({ value: "opencode" });
+    expect(calls).toEqual(["https://opencode.ai/inference/go/openai/v1/chat/completions"]);
+    expect(consumeProviderFallbacks().join(" ")).toContain("circuit breaker open");
+
+    recordProviderSuccess("groq");
+    expect(providerCircuitSnapshot().groq.state).toBe("closed");
+  });
+
+  it("blocks cloud image egress when CANVAS_ALLOW_IMAGE_EGRESS=0 or opt-out is set", async () => {
+    vi.stubEnv("CANVAS_ALLOW_IMAGE_EGRESS", "0");
+    const calls: string[] = [];
+    const fetcher = (async (url: string | URL | Request) => {
+      calls.push(String(url));
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ items: [] }) } }] });
+    }) as typeof fetch;
+
+    await expect(canvasOCR({ base64: "aW1hZ2U=", mimeType: "image/png", fetcher })).rejects.toThrow(/image egress/i);
+    expect(calls).toEqual([]);
+  });
+
+  it("emits structured diagnostics logs without raw images or API keys", async () => {
+    vi.stubEnv("AI_DIAGNOSTICS", "1");
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "info").mockImplementation((...args) => { logs.push(args.map(String).join(" ")); });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation((...args) => { logs.push(args.map(String).join(" ")); });
+    const secretImage = "c2VjcmV0LWltYWdlLWJhc2U2NC1wYXlsb2Fk";
+    const fetcher = (async () => Response.json({
+      choices: [{ message: { content: JSON.stringify({ items: [{ text: "x = 1", kind: "equation" }], uncertain: false }) } }],
+      usage: { prompt_tokens: 40, completion_tokens: 10 },
+    })) as typeof fetch;
+
+    try {
+      await canvasOCR({ base64: secretImage, mimeType: "image/png", fetcher });
+      const combined = logs.join("\n");
+      expect(combined).toContain("canvas_provider_call");
+      expect(combined).not.toContain(secretImage);
+      expect(combined).not.toContain("test-groq");
+      expect(combined).not.toContain("test-opencode");
+    } finally {
+      spy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

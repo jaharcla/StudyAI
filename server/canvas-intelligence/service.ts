@@ -18,7 +18,7 @@ export type CanvasRecognitionOptions = {
   prototypes?: Record<string, readonly (readonly number[])[]>;
   labels?: readonly string[];
 };
-export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions };
+export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions; allowImageEgress?: boolean };
 export type CanvasUnderstanding = { mode: CanvasMode; revision: string; answer?: string; ocr?: OCRResult; associations?: OCRAssociation[]; structure: StructureResult; fusion?: FusionResult; evidence?: CanvasEvidenceBundle; selectedContext?: SelectedCanvasContext; recognition?: CanvasRecognitionStage | null; partial?: boolean; warnings?: string[]; omittedImageRegionIds?: string[]; failedImageRegionIds?: string[]; latencyMs: Record<string, number>; cached: string[] };
 const ocrCache = new RecognitionCache<OCRResult>();
 const structureCache = new RecognitionCache<StructureResult>();
@@ -91,7 +91,7 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
         const key = digest({ rev: input.revision, regionId: region.id, sourceIds: "sourceIds" in region ? region.sourceIds : [], image: digest(region.base64), transform: "pixelToWorld" in region ? region.pixelToWorld : undefined, model: models.ocr, provider: ocrProvider, chain: process.env.CANVAS_PROVIDER_CHAIN, profile: ocrProfile, remoteModel: ocrProvider === "groq" ? groqOCRModel() : undefined });
         const hit = ocrCache.get(key);
         if (hit) { cacheHits++; return hit; }
-        const parsed = await canvasOCR({ base64: region.base64, mimeType: region.mimeType, model: models.ocr, profile: ocrProfile, fetcher: args.fetcher, signal: args.signal });
+        const parsed = await canvasOCR({ base64: region.base64, mimeType: region.mimeType, model: models.ocr, profile: ocrProfile, allowImageEgress: args.allowImageEgress, fetcher: args.fetcher, signal: args.signal });
         const localized = "pixelToWorld" in region && "worldBounds" in region && "sourceIds" in region ? localizeOCRByRegion(parsed, [region]) : localizeOCRByRegion(parsed, []);
         ocrCache.set(key, localized); return localized;
       } catch (error) {

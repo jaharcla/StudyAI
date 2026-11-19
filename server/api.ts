@@ -20,11 +20,15 @@ import { createCanvasPersistenceHandler } from "./canvas-persistence/http.js";
 import { createCanvasSceneHandler } from "./canvas-intelligence/scene/http.js";
 import { createCanvasRecognitionHandler } from "./canvas-intelligence/recognition/http.js";
 import { countCanvasRecognitionExamples, teachCanvasRecognitionExample } from "./canvas-intelligence/recognition/store.js";
-import { providerBudgetSnapshot } from "./canvas-intelligence/provider-budget.js";
+import { providerBudgetSnapshot, configureProviderBudgetDatabase } from "./canvas-intelligence/provider-budget.js";
+import { configureProviderUsageDatabase, persistedProviderUsageSnapshot, providerCircuitSnapshot } from "./canvas-intelligence/provider-usage.js";
 import { providerChain, resolveCompletionProviders, resolveVisionProviders } from "./canvas-intelligence/providers.js";
+import { isImageEgressAllowed } from "./canvas-intelligence/groq.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
+configureProviderBudgetDatabase(db);
+configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
 const legacyDocuments = await migrateLegacyDocuments(db);
 if (legacyDocuments.failures.length) console.warn("Legacy document indexing failures:", legacyDocuments.failures);
@@ -57,7 +61,7 @@ const server = createServer(async (req, res) => {
     return json(res, result.status, result.body);
   }
   if (req.method === "GET" && url.pathname === "/api/canvas-providers") {
-    return json(res, 200, { chain: providerChain(), completion: resolveCompletionProviders(), vision: resolveVisionProviders(), budgets: providerBudgetSnapshot() });
+    return json(res, 200, { chain: providerChain(), completion: resolveCompletionProviders(), vision: resolveVisionProviders(), budgets: providerBudgetSnapshot(), usage: persistedProviderUsageSnapshot(), circuits: providerCircuitSnapshot(), imageEgress: isImageEgressAllowed() });
   }
   if (req.method === "GET" && url.pathname === "/api/courses") return json(res, 200, db.prepare("SELECT * FROM courses").all());
   if (req.method === "GET" && url.pathname === "/api/canvas-recognition/examples") {

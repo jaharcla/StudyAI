@@ -27,6 +27,7 @@ type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
 type Board = { id: string; name: string; revision: number };
 type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
+type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
 type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 
@@ -72,6 +73,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
+  const [analysisTelemetry, setAnalysisTelemetry] = useState<AnalysisTelemetry>();
+  const [allowImageEgress, setAllowImageEgress] = useState(() => { try { return localStorage.getItem("studyai.canvas.imageEgress") !== "off"; } catch { return true; } });
   const [proposalBusy, setProposalBusy] = useState(false);
   useEffect(() => setToolOpen(!activityMode), [activityMode]);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
@@ -237,6 +240,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     const requestDocument = structuredClone(currentDocument());
     const selectedIds = [...new Set([...selectedShapeIds, ...(selectedId ? [selectedId] : [])])];
     setCanvasAnalysis(undefined);
+    setAnalysisTelemetry(undefined);
     setAnalysisBusy(true);
     try {
       if (!await saveNow()) throw new Error("Save the active board before analysis.");
@@ -247,19 +251,21 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       const response = await fetch(`${API}/canvases/${encodeURIComponent(board.id)}/analysis?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, image: { regions } }),
+        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, allowImageEgress, image: { regions } }),
       });
-      const body = await response.json() as { analysis?: CanvasAnalysisResult; error?: string };
+      const body = await response.json() as { analysis?: CanvasAnalysisResult; telemetry?: AnalysisTelemetry; error?: string };
       if (!response.ok || !body.analysis) throw new Error(body.error ?? "Canvas analysis failed.");
       if (body.analysis.boardId !== board.id || body.analysis.courseId !== courseId || body.analysis.lessonId !== lessonId || body.analysis.revision !== persisted.revision) throw new Error("Canvas analysis returned a mismatched or stale board revision.");
       if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(requestDocument)) throw new Error("The board changed while analysis was running. Analyze the current board again.");
       setCanvasAnalysis(body.analysis);
+      setAnalysisTelemetry(body.telemetry);
       onStatus(body.analysis.omittedRegions.length ? `Canvas analysis is partial; ${body.analysis.omittedRegions.length} ink region(s) were omitted.` : body.analysis.analysisStatus === "partial" ? "Canvas analysis is partial; some ink regions may be unprocessed." : "Canvas analysis is ready for the Tutor");
     } catch (error) {
       setCanvasAnalysis(undefined);
+      setAnalysisTelemetry(undefined);
       onStatus(error instanceof Error ? error.message : "Canvas analysis failed");
     } finally { setAnalysisBusy(false); }
-  }, [analysisBusy, courseId, currentDocument, lessonId, loading, onStatus, proposalBusy, readAuthoritativeBoard, saveNow, selectedId, selectedShapeIds]);
+  }, [allowImageEgress, analysisBusy, courseId, currentDocument, lessonId, loading, onStatus, proposalBusy, readAuthoritativeBoard, saveNow, selectedId, selectedShapeIds]);
 
   const applyTutorProposal = useCallback(async () => {
     const board = boardRef.current;
@@ -731,6 +737,12 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} · Esc cancels</span>}
       {selectedId && <div className="science-selection-actions"><button className="button-soft" aria-label="Inspect selected object" onClick={() => setEditingId(selectedId)}>Inspect</button><button className="button-soft" aria-label="Send scientific object to back" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([object, ...document.objects.filter((item) => item.id !== selectedId)]); }}>Back</button><button className="button-soft" aria-label="Bring scientific object to front" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([...document.objects.filter((item) => item.id !== selectedId), object]); }}>Front</button><button className="button-soft" aria-label="Delete selected scientific object" onClick={() => { replaceObjects(document.objects.filter((item) => item.id !== selectedId)); setSelectedId(undefined); }}>Delete</button></div>}
       <div className="canvas-actions">
+        <label className="canvas-egress" title="When on, cropped ink images may be sent to the configured cloud OCR providers. When off, ink images stay on this device and text-only analysis continues.">
+          <input type="checkbox" checked={allowImageEgress} onChange={(event) => { const next = event.target.checked; setAllowImageEgress(next); try { localStorage.setItem("studyai.canvas.imageEgress", next ? "on" : "off"); } catch { /* storage unavailable */ } }} />Cloud ink OCR
+        </label>
+        {canvasAnalysis && analysisTelemetry && <output className="canvas-analysis-meta" title={analysisTelemetry.usage.length ? analysisTelemetry.usage.map((entry) => `${entry.provider}: ${entry.calls} call(s), ${entry.promptTokens + entry.completionTokens} tokens, $${entry.costUsd.toFixed(6)}`).join("\n") : "No cloud provider calls; deterministic and local stages only."}>
+          {(analysisTelemetry.totalMs / 1000).toFixed(1)} s · {analysisTelemetry.usage.length ? `$${analysisTelemetry.usage.reduce((sum, entry) => sum + entry.costUsd, 0).toFixed(4)}` : "local only"}
+        </output>}
         <button className="button-soft" disabled={!activeBoard || loading || analysisBusy || proposalBusy} title="Select freehand strokes to target their complete ink groups; otherwise the highest-scoring, spatially diverse groups are analyzed." onClick={() => void analyzeBoard()}><Atom size={14} />{analysisBusy ? "Analyzing…" : "Analyze board"}</button>
         <button className="button-soft" aria-label="Review canvas labels" aria-pressed={recognitionOpen} disabled={!activeBoard || loading} title="Teach selected ink a label, then accept, correct, or dismiss recognition candidates." onClick={() => void openRecognition()}><Tag size={14} />Labels</button>
         <button className="icon-button" title="Undo" aria-label="Undo canvas change" disabled={!undoState.canUndo} onClick={undo}><Undo2 size={15} /></button>
