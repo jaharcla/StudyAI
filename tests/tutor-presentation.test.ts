@@ -215,6 +215,12 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).toContain('"label":"4"');
   });
 
+  it("marks a partial board as incomplete and tells the tutor to ask", () => {
+    const projected = JSON.stringify(projectTutorContexts([{ description: "Active canvas scene", value: { selected: [], visible: [], nearbyObjects: [], spatialRelationships: [], truncated: true } }], false));
+    expect(projected).toContain('"incomplete":true');
+    expect(projected).toContain("select or zoom");
+  });
+
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {
     const raw = [{ description: "Active canvas scene", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
     const ordinary = JSON.stringify(projectTutorContexts(raw, false));

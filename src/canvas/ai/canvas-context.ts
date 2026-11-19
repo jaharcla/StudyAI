@@ -276,8 +276,8 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
   const selectedCandidates = [...new Set(options.selectedIds)].map((id) => byId.get(id)).filter((shape): shape is ShapeRecord => Boolean(shape));
   const selected = selectedCandidates.slice(0, maxItems).map(summarize);
   const selectedSet = new Set(selected.map((shape) => shape.id));
-  const visible = all.filter((shape) => !selectedSet.has(shape.id) && intersects(shapeBounds(shape), viewport))
-    .slice(0, maxItems).map(summarize);
+  const visibleCandidates = all.filter((shape) => !selectedSet.has(shape.id) && intersects(shapeBounds(shape), viewport));
+  const visible = visibleCandidates.slice(0, maxItems).map(summarize);
   const focus = [...selected, ...visible];
   for (const shape of focus) {
     if (shape.type === "arrow" && shape.arrow) Object.assign(shape.arrow, arrowConnections(shape.arrow, all, options.objects, shape.id));
@@ -287,7 +287,7 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
     .slice(0, maxItems).map(scientificSummary);
   const spatialRelationships = focus.flatMap((shape) => focus.filter((other) => other.id !== shape.id && gap(shape.bounds, other.bounds) <= nearbyDistance)
     .slice(0, 4).map((other) => ({ fromId: shape.id, relation: relationship(shape.bounds, other.bounds), toId: other.id }))).slice(0, maxItems * 4);
-  const context: CanvasAIContext = { scope: { boardId: options.scope.boardId.slice(0, 160), courseId: options.scope.courseId.slice(0, 160), lessonId: options.scope.lessonId.slice(0, 160), revision: options.scope.revision }, viewport, selected, visible, nearbyObjects, spatialRelationships, truncated: selectedCandidates.length > selected.length };
+  const context: CanvasAIContext = { scope: { boardId: options.scope.boardId.slice(0, 160), courseId: options.scope.courseId.slice(0, 160), lessonId: options.scope.lessonId.slice(0, 160), revision: options.scope.revision }, viewport, selected, visible, nearbyObjects, spatialRelationships, truncated: selectedCandidates.length > selected.length || visibleCandidates.length > visible.length };
   const maxChars = Math.floor(charLimit);
   while (JSON.stringify(context).length > maxChars && (context.nearbyObjects.length || context.spatialRelationships.length || context.visible.length)) {
     context.truncated = true;

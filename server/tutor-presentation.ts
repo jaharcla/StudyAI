@@ -110,6 +110,8 @@ export function projectTutorContexts(contexts: TutorContextItem[], includeRawCan
   });
 }
 
+const INCOMPLETE_CANVAS_REASON = "Only part of the board is included; ask the user to select or zoom to the relevant area before claiming something is absent.";
+
 function projectCanvasSceneContext(value: unknown, labels: Map<string, string>): Record<string, unknown> {
   const source = record(value);
   if (!source.scene) {
@@ -144,7 +146,7 @@ function projectCanvasSceneContext(value: unknown, labels: Map<string, string>):
     nodes,
     edges,
     ...(Array.isArray(source.connections) ? { connections: list(source.connections) } : {}),
-    ...(scene.truncated === true ? { incomplete: true } : {}),
+    ...(scene.truncated === true ? { incomplete: true, incompleteReason: INCOMPLETE_CANVAS_REASON } : {}),
   };
 }
 
@@ -260,7 +262,7 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
     visible: projectedVisible,
     nearbyObjects,
     spatialRelationships: relationships,
-    ...(source.truncated === true ? { incomplete: true } : {}),
+    ...(source.truncated === true ? { incomplete: true, incompleteReason: INCOMPLETE_CANVAS_REASON } : {}),
   };
 }
 

@@ -88,6 +88,16 @@ describe("Quickdraw AI context", () => {
     expect(labels).toEqual([["m"], ["m"]]);
   });
 
+  it("marks the context incomplete when visible shapes are omitted", () => {
+    const store = new Store();
+    for (let index = 0; index < 10; index++) {
+      store.put(shape(`t${index}`, "text", index * 10, 0, { text: `label ${index}`, color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    }
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 300, h: 100 }, objects: [], scope, maxItems: 3 });
+    expect(context.visible.length).toBeLessThanOrEqual(3);
+    expect(context.truncated).toBe(true);
+  });
+
   it("uses Quickdraw rotated bounds and obeys the context character limit", () => {
     const store = new Store();
     store.put(shape("rotated", "geo", 0, 0, { geo: "rectangle", w: 100, h: 20, color: "black", size: "m" }, Math.PI / 4));
