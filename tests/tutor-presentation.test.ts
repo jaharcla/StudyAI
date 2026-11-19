@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { presentTutorResponse, projectTutorContexts, renderTutorResponse } from "../server/tutor-presentation";
 
 const cited = { sourceRef: "source:lecture:2", filename: "chemistry.pdf", unitType: "page", unitNumber: 2, score: -1.5, excerpt: "The supported claim." };
@@ -42,6 +43,27 @@ describe("Tutor student response", () => {
 
     expect(response.answer).toContain(`[chemistry.pdf · page 2](#studyai-citation=${encodeURIComponent(sourceRef)})`);
     expect(response.citations).toEqual([{ sourceRef, filename: cited.filename, unitType: cited.unitType, unitNumber: cited.unitNumber }]);
+  });
+
+  it("canonicalizes reference-style StudyAI links emitted by Groq", () => {
+    const sourceRef = "studyai://document/lecture-2/page/2?chunk=0";
+    const candidate = { ...cited, sourceRef };
+    const answer = "The source supports this claim [lecture excerpt][" + sourceRef + "].";
+    const response = presentTutorResponse(answer, [candidate]);
+
+    expect(response.answer).toContain("[chemistry.pdf · page 2](#studyai-citation=" + encodeURIComponent(sourceRef) + ")");
+    expect(response.answer).not.toContain("[lecture excerpt]");
+    expect(response.citations).toEqual([{ sourceRef, filename: cited.filename, unitType: cited.unitType, unitNumber: cited.unitNumber }]);
+  });
+
+  it("links a uniquely mentioned retrieved source when Groq describes it as plain text", () => {
+    const candidate = { ...cited, filename: "force-motion-lecture.pdf", unitNumber: 1 };
+    const answer = "The calculation gives 4 m/s².\nSource: force‑motion‑lecture.pdf, page 1 – excerpt from the imported lecture.";
+    const response = presentTutorResponse(answer, [candidate], { linkMentionedSource: true });
+
+    expect(response.answer).toContain(`[force-motion-lecture.pdf · page 1](#studyai-citation=${encodeURIComponent(candidate.sourceRef)})`);
+    expect(response.answer).not.toContain("excerpt from the imported lecture");
+    expect(response.citations).toEqual([{ sourceRef: candidate.sourceRef, filename: candidate.filename, unitType: candidate.unitType, unitNumber: candidate.unitNumber }]);
   });
 
   it("maps Groq HTTPS citation aliases only to matching retrieved sources", () => {
@@ -100,6 +122,45 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).toContain("The arrow represents velocity");
     expect(projected).toContain("unverified");
     expect(projected).not.toContain("shape-1");
+  });
+
+  it("projects grounded candidate associations with aliases while withholding internal IDs and coordinates", () => {
+    const contexts = projectTutorContexts([{ description: "StudyAI canvas analysis result", value: {
+      analysisStatus: "complete",
+      observedEvidence: {
+        items: [{
+          id: "ev:ocr", text: "F = 5 N", origin: "ocr", uncertain: true,
+          uncertaintyReasons: ["Groq OCR confidence unavailable", "Region-level proximity is not user-confirmed"],
+          sourceIds: ["stroke-17"], sourceRegionId: "stroke-group:stroke-17", worldRegion: { x: 100, y: 120, width: 80, height: 32 }, locationPrecision: "region",
+          association: { status: "ambiguous", basis: "stroke-region", geometricDistance: 12, candidateRefs: [{ scope: "science", id: "force-a" }, { scope: "science", id: "force-b" }] },
+        }],
+        selectedContext: { sourceRecords: [], scientificObjects: [{ id: "force-a", kind: "force" }, { id: "force-b", kind: "force" }] },
+      },
+    } }], false);
+    const projected = JSON.stringify(contexts);
+
+    expect(projected).toContain("F = 5 N");
+    expect(projected).toContain("ambiguous");
+    expect(projected).toContain("force arrow 1");
+    expect(projected).toContain("force arrow 2");
+    expect(projected).toContain("not user-confirmed");
+    expect(projected).not.toContain("stroke-17");
+    expect(projected).not.toContain("force-a");
+    expect(projected).not.toContain('"worldRegion"');
+    expect(projected).not.toContain('"geometricDistance"');
+  });
+
+  it("redacts raw identifiers in the actual saved-board analysis response", () => {
+    const savedResponse = JSON.parse(readFileSync("tests/fixtures/canvas-grounding/saved-board-analysis-response.json", "utf8"));
+    const projected = JSON.stringify(projectTutorContexts([{ description: "StudyAI canvas analysis result", value: savedResponse }], false));
+
+    expect(projected).toContain("ambiguous");
+    expect(projected).toContain("verified");
+    expect(projected).not.toMatch(/\bmw[a-z0-9]+\b/i);
+    for (const source of savedResponse.observedEvidence.selectedContext.sourceRecords) {
+      expect(projected).not.toContain(source.id);
+      expect(projected).not.toContain(source.id.split(":").at(-1));
+    }
   });
 
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {

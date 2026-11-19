@@ -1,5 +1,7 @@
 # Direct scientific manipulation
 
+> Historical implementation and verification record for the named milestone. The current source status is in [STATUS.md](STATUS.md); branch and merge statements below describe the recorded worktree at that time.
+
 Baseline: `9b7d0568f35f73d736d97d49993209201734dcfa`. Worktree/branch: `canvas-direct-manipulation` / `work/canvas-direct-manipulation`. The verified integration and both original worktrees are preserved.
 
 ## Milestone A — vectors and forces

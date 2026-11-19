@@ -6,10 +6,11 @@ import { OCRResultSchema, StructureResultSchema } from "../server/canvas-intelli
 
 const emptyStructure = () => StructureResultSchema.parse({ objects: [], relationships: [], observations: [], ambiguities: [] });
 const emptyOCR = () => OCRResultSchema.parse({ items: [], uncertain: false, raw: "" });
-const input = (extra: Array<Record<string, unknown>> = []) => normalizeCanvasInput({
+const input = (extra: Array<Record<string, unknown>> = [], image?: Record<string, unknown>) => normalizeCanvasInput({
   boardId: "board", courseId: "CHEM", lessonId: "forces",
   snapshot: { document: { store: { ink: { id: "ink", type: "draw", x: 4, y: 4, width: 10, height: 10 } } } },
   scientificObjects: [{ id: "f", kind: "force", x: 40, y: 0, width: 30, height: 24, label: "F", value: 5, unit: "N" }, ...extra],
+  image: image as never,
 });
 const ocrText = (text: string, options: Record<string, unknown> = {}) => OCRResultSchema.parse({
   items: [{ text, kind: "equation", confidence: 0.95, alternatives: [], sourceIds: ["ink"], imageRegion: { x: 40, y: 0, width: 15, height: 12 }, worldRegion: { x: 40, y: 0, width: 15, height: 12 }, sourceRegionId: null, locationPrecision: "item", uncertain: false, ...options }],
@@ -28,14 +29,13 @@ describe("canvas evidence normalization", () => {
     expect(result.conflicts).toHaveLength(0);
   });
 
-  it("records contradictory OCR quantity and exact native value without selecting a winner", () => {
+  it("does not promote unlocalized OCR quantity to a claim about a structured object", () => {
     const value = input(), ocr = ocrText("F = 50 N");
     const associations = associateOCRLabels(value, ocr);
     expect(associations[0]).toMatchObject({ status: "geometry-supported", candidateIds: ["f"] });
     const result = buildCanvasEvidence(value, ocr, emptyStructure(), associations);
-    const conflict = result.conflicts.find((c) => c.claimKey === "quantity:f");
-    expect(conflict).toMatchObject({ subjectId: "f", values: ["5 n", "50 n"], resolution: "unresolved" });
-    expect(result.evidence.filter((e) => conflict!.evidenceIds.includes(e.id)).map((e) => e.origin).sort()).toEqual(["native", "ocr"]);
+    expect(result.conflicts).toHaveLength(0);
+    expect(result.evidence.find((e) => e.origin === "ocr")).toMatchObject({ subjectId: null, claimValue: null, sourceIds: [], worldRegion: null, uncertain: true });
   });
 
   it("does not assign a crop without precise association as a fact about an object", () => {
@@ -44,6 +44,31 @@ describe("canvas evidence normalization", () => {
     const result = bundle(value, ocr);
     expect(result.conflicts).toHaveLength(0);
     expect(result.evidence.find((e) => e.origin === "ocr")).toMatchObject({ subjectId: null, claimKey: null, uncertain: true, confidence: null });
+  });
+
+  it("preserves source-region provenance and a unique association as an unconfirmed candidate", () => {
+    const worldRegion = { x: 4, y: 4, width: 10, height: 10 };
+    const value = input([], { regions: [{ id: "stroke-group:ink", base64: "cG5n", mimeType: "image/png", sourceIds: ["ink"], worldBounds: worldRegion, cropBounds: { x: -8, y: -8, width: 34, height: 34 }, pixelWidth: 68, pixelHeight: 68, pixelToWorld: { scaleX: 0.5, scaleY: 0.5, offsetX: -8, offsetY: -8 } }] });
+    const ocr = ocrText("F = 5 N", { sourceIds: ["ink"], sourceRegionId: "stroke-group:ink", worldRegion, locationPrecision: "region", imageRegion: null, confidence: null, uncertain: true });
+    const result = bundle(value, ocr);
+    const recognized = result.evidence.find((item) => item.origin === "ocr")!;
+    const association = result.evidence.find((item) => item.origin === "geometry" && item.kind === "association")!;
+
+    expect(recognized).toMatchObject({ sourceRegionId: "stroke-group:ink", worldRegion, sourceRefs: [{ scope: "quickdraw", id: "ink" }], subjectId: null, claimValue: null, confidence: null, locationPrecision: "region", uncertain: true });
+    expect(association).toMatchObject({ association: { status: "geometry-supported", basis: "stroke-region", candidateRefs: [{ scope: "science", id: "f" }] }, uncertain: true });
+    expect(result.conflicts).toHaveLength(0);
+  });
+
+  it("preserves every plausible spatial candidate as an explicit ambiguity", () => {
+    const worldRegion = { x: 4, y: 4, width: 10, height: 10 };
+    const value = input([{ id: "f2", kind: "force", x: 40, y: 0, width: 30, height: 24, label: "F2" }], { regions: [{ id: "stroke-group:ink", base64: "cG5n", mimeType: "image/png", sourceIds: ["ink"], worldBounds: worldRegion, cropBounds: { x: -8, y: -8, width: 34, height: 34 }, pixelWidth: 68, pixelHeight: 68, pixelToWorld: { scaleX: 0.5, scaleY: 0.5, offsetX: -8, offsetY: -8 } }] });
+    const ocr = ocrText("F = 5 N", { sourceIds: ["ink"], sourceRegionId: "stroke-group:ink", worldRegion, locationPrecision: "region", imageRegion: null, confidence: null, uncertain: true });
+    const result = bundle(value, ocr);
+    const association = result.evidence.find((item) => item.origin === "geometry" && item.kind === "association")!;
+
+    expect(association.association).toMatchObject({ status: "ambiguous", candidateRefs: [{ scope: "science", id: "f" }, { scope: "science", id: "f2" }] });
+    expect(association.uncertain).toBe(true);
+    expect(result.evidence.find((item) => item.origin === "ocr")).toMatchObject({ subjectId: null, claimValue: null });
   });
 
   it("labels model predictions as model claims even when the model claims a geometry basis", () => {
@@ -72,10 +97,10 @@ describe("canvas evidence normalization", () => {
 
   it("preserves selected objects and both sides of conflicts under pruning", () => {
     const value = input(Array.from({ length: 40 }, (_, i) => ({ id: `irrelevant-${i}`, kind: "graph", x: 2000 + i * 10, y: 0, width: 8, height: 8 })));
-    const ocr = ocrText("F = 50 N");
-    const whole = bundle(value, ocr);
+    const model = StructureResultSchema.parse({ objects: [{ id: "f", kind: "force", label: "gravity", sourceIds: ["f"], confidence: 0.99, basis: "model" }], relationships: [], observations: [], ambiguities: [] });
+    const whole = bundle(value, emptyOCR(), model);
     const context = selectCanvasContext(whole, { question: "What is the magnitude of F?", selectedIds: ["f"], expectedRevisionHash: value.revision, maxChars: 7200 });
-    const c = context.conflicts.find((x) => x.claimKey === "quantity:f");
+    const c = context.conflicts.find((x) => x.claimKey === "label");
     expect(c).toBeDefined();
     expect(c!.evidenceIds.every((id) => context.evidence.some((e) => e.id === id))).toBe(true);
     expect(context.evidence.some((e) => e.subjectId === "f" && e.origin === "native")).toBe(true);

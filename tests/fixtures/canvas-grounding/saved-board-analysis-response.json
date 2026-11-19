@@ -1,0 +1,79 @@
+{
+  "fixtureSource": "Real Groq Analyze Board response for saved board preserved-quickdraw-sample, revision 95; response returned revision 96 after UI save.",
+  "analysisStatus": "partial",
+  "observedEvidence": {
+    "items": [],
+    "warnings": [
+      "Structure ambiguity: Interpretation of draw strokes (shapes mw877001020vyy, mw878y2d09dp04, mw879ecf0ctiiq, mw87ck9x0i12ol, mw87cl5t0jy8q7, mw87cm0j0knf4i, mw87cn7n0lu386) is unclear",
+      "Structure ambiguity: Relationships between text labels and nearby arrows are not explicitly encoded in the Quickdraw data",
+      "OCR results contain uncertainty.",
+      "4 freehand source region(s) were not captured as localized crops."
+    ],
+    "selectedContext": {
+      "sourceRecords": [
+        {
+          "id": "shape:mw876jkb009vs1",
+          "type": "arrow"
+        },
+        {
+          "id": "shape:mw876t5301grqf",
+          "type": "arrow"
+        },
+        {
+          "id": "shape:mw877001020vyy",
+          "type": "draw"
+        },
+        {
+          "id": "shape:mw8773ts03fb3b",
+          "type": "text"
+        },
+        {
+          "id": "shape:mw878geq06cooq",
+          "type": "line"
+        },
+        {
+          "id": "shape:mw878sqt08koj5",
+          "type": "arrow"
+        },
+        {
+          "id": "shape:mw878y2d09dp04",
+          "type": "draw"
+        },
+        {
+          "id": "shape:mw8791zu0amsgo",
+          "type": "text"
+        },
+        {
+          "id": "shape:mw879a110b1kst",
+          "type": "arrow"
+        },
+        {
+          "id": "shape:mw879ecf0ctiiq",
+          "type": "draw"
+        },
+        {
+          "id": "shape:mw87aky50fiw1k",
+          "type": "text"
+        }
+      ],
+      "scientificObjects": []
+    }
+  },
+  "inferredInterpretations": {
+    "items": [
+      {
+        "statement": "The canvas records two text labels (34° and 70N), a molecule label, several arrows and freehand strokes, and many measured center‑to‑center distances between these shapes; however the OCR‑derived label‑to‑arrow associations (e.g., “J”, “C”) are marked ambiguous and unconfirmed.  Geometry observations (e.g., distance 433.21 units between shape mw878geq06cooq and the molecule) are reliable, while spatial associations of labels to nearby shapes remain uncertain.  Warnings note overall structural ambiguity and OCR uncertainty.",
+        "confidence": null,
+        "uncertainty": [
+          "AI-generated interpretation; not independently verified.",
+          "Spatial associations are ambiguous and unconfirmed (multiple nearby shapes).",
+          "OCR results contain uncertainty; label‑to‑object links are not verified.",
+          "Structure ambiguity warnings indicate unclear interpretation of freehand strokes.",
+          "Unsupported model references were discarded; verify interpretations against observed canvas data.",
+          "Unsupported model association sources were discarded."
+        ],
+        "verificationStatus": "unverified"
+      }
+    ]
+  }
+}

@@ -4,10 +4,19 @@ export const PointSchema = z.object({ x: z.number(), y: z.number() });
 export const BoundsSchema = z.object({ x: z.number(), y: z.number(), width: z.number().nonnegative(), height: z.number().nonnegative() });
 export const OCRItemSchema = z.object({ text: z.string(), kind: z.enum(["word", "symbol", "number", "equation", "unknown"]), confidence: z.number().min(0).max(1).nullable(), alternatives: z.array(z.string()), sourceIds: z.array(z.string()), imageRegion: BoundsSchema.nullable(), sourceRegionId: z.string().nullable().default(null), worldRegion: BoundsSchema.nullable().default(null), locationPrecision: z.enum(["item", "region", "unknown"]).default("unknown"), uncertain: z.boolean().default(false) });
 export const OCRResultSchema = z.object({ items: z.array(OCRItemSchema), uncertain: z.boolean(), raw: z.string() });
-export const StructureObjectSchema = z.object({ id: z.string(), kind: z.string(), label: z.string().nullable(), sourceIds: z.array(z.string()), confidence: z.number().min(0).max(1), basis: z.enum(["native", "model"]) });
-export const StructureRelationshipSchema = z.object({ fromId: z.string(), toId: z.string(), relation: z.string(), sourceIds: z.array(z.string()), confidence: z.number().min(0).max(1), basis: z.enum(["geometry", "model"]) });
-export const StructureResultSchema = z.object({ objects: z.array(StructureObjectSchema), relationships: z.array(StructureRelationshipSchema), observations: z.array(z.object({ description: z.string(), sourceIds: z.array(z.string()), confidence: z.number().min(0).max(1), basis: z.enum(["geometry", "native", "model"]) })), ambiguities: z.array(z.string()), raw: z.string().optional() });
-export const FusionResultSchema = z.object({ answer: z.union([z.string(), z.array(z.string())]).transform((value) => Array.isArray(value) ? value.join("\n") : value), objects: z.array(StructureObjectSchema), relationships: z.array(StructureRelationshipSchema), associations: z.array(z.object({ description: z.string(), sourceIds: z.array(z.string()), confidence: z.number().min(0).max(1) }),), uncertainties: z.union([z.array(z.union([z.string(), z.record(z.string(), z.unknown())])), z.string()]).transform((value) => typeof value === "string" ? [value] : value), proposedAction: z.unknown().optional() });
+export const CanvasSourceObjectRefSchema = z.object({ scope: z.enum(["quickdraw", "science"]), id: z.string().min(1).max(512) }).strict();
+export const CanvasSpatialAssociationSchema = z.object({
+  status: z.enum(["geometry-supported", "ambiguous", "unmatched"]),
+  basis: z.enum(["item-box", "stroke-region", "none"]),
+  candidateRefs: z.array(CanvasSourceObjectRefSchema).max(5000),
+  geometricDistance: z.number().finite().nonnegative().nullable(),
+  verificationStatus: z.literal("unconfirmed"),
+}).strict();
+const modelConfidence = z.number().min(0).max(1).nullable();
+export const StructureObjectSchema = z.object({ id: z.string(), kind: z.string(), label: z.string().nullable(), sourceIds: z.array(z.string()), confidence: modelConfidence, basis: z.enum(["native", "model"]) });
+export const StructureRelationshipSchema = z.object({ fromId: z.string(), toId: z.string(), relation: z.string(), sourceIds: z.array(z.string()), confidence: modelConfidence, basis: z.enum(["geometry", "model"]) });
+export const StructureResultSchema = z.object({ objects: z.array(StructureObjectSchema), relationships: z.array(StructureRelationshipSchema), observations: z.array(z.object({ description: z.string(), sourceIds: z.array(z.string()), confidence: modelConfidence, basis: z.enum(["geometry", "native", "model"]) })), ambiguities: z.array(z.string()), raw: z.string().optional() });
+export const FusionResultSchema = z.object({ answer: z.union([z.string(), z.array(z.string())]).transform((value) => Array.isArray(value) ? value.join("\n") : value), objects: z.array(StructureObjectSchema), relationships: z.array(StructureRelationshipSchema), associations: z.array(z.object({ description: z.string(), sourceIds: z.array(z.string()), confidence: modelConfidence }),), uncertainties: z.union([z.array(z.union([z.string(), z.record(z.string(), z.unknown())])), z.string()]).transform((value) => typeof value === "string" ? [value] : value), proposedAction: z.unknown().optional() });
 
 export function schemasForCanvasIds(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
@@ -17,7 +26,7 @@ export function schemasForCanvasIds(ids: string[]) {
   const object = StructureObjectSchema.extend({ id, sourceIds });
   const relationship = StructureRelationshipSchema.extend({ fromId: id, toId: id, sourceIds });
   const structure = z.object({ objects: z.array(object), relationships: z.array(relationship), observations: StructureResultSchema.shape.observations, ambiguities: z.array(z.string()), raw: z.string().optional() });
-  const fusion = z.object({ answer: FusionResultSchema.shape.answer, objects: z.array(object), relationships: z.array(relationship), associations: z.array(z.object({ description: z.string(), sourceIds, confidence: z.number().min(0).max(1) })), uncertainties: FusionResultSchema.shape.uncertainties, proposedAction: z.unknown().optional() });
+  const fusion = z.object({ answer: FusionResultSchema.shape.answer, objects: z.array(object), relationships: z.array(relationship), associations: z.array(z.object({ description: z.string(), sourceIds, confidence: modelConfidence })), uncertainties: FusionResultSchema.shape.uncertainties, proposedAction: z.unknown().optional() });
   return { structure: structure as unknown as z.ZodType<StructureResult>, fusion: fusion as unknown as z.ZodType<FusionResult> };
 }
 
@@ -33,7 +42,7 @@ export function normalizeCanvasFusionOutput(value: unknown, ids: string[]): unkn
     const item = value as Record<string, unknown>;
     const sourceIds = Array.isArray(item.sourceIds) ? item.sourceIds.filter((id): id is string => typeof id === "string" && ids.includes(id)) : [];
     if (sourceIds.length !== (Array.isArray(item.sourceIds) ? item.sourceIds.length : 0)) rejected = true;
-    return sourceIds.length ? [{ ...item, sourceIds: [...new Set(sourceIds)] }] : [];
+    return sourceIds.length ? [{ ...item, sourceIds: [...new Set(sourceIds)], confidence: typeof item.confidence === "number" ? item.confidence : null }] : [];
   });
   const rawUncertainties = typeof input.uncertainties === "string" ? [input.uncertainties] : Array.isArray(input.uncertainties) ? input.uncertainties : [];
   const warnings = (input.ambiguities as string[]).filter((item) => item.startsWith("Unsupported model"));
@@ -55,20 +64,20 @@ function normalizeCanvasModelReferences(value: unknown, allowed: Set<string>) {
     const item = value as Record<string, unknown>;
     if (typeof item.id !== "string" || !allowed.has(item.id)) { rejected = true; return []; }
     const sourceIds = references(item.sourceIds);
-    return [{ ...item, sourceIds: sourceIds.length ? sourceIds : [item.id], basis: "model" }];
+    return [{ ...item, kind: typeof item.kind === "string" && item.kind.trim() ? item.kind : "unknown", label: typeof item.label === "string" ? item.label : null, sourceIds: sourceIds.length ? sourceIds : [item.id], confidence: typeof item.confidence === "number" ? item.confidence : null, basis: "model" }];
   });
   const relationships = (Array.isArray(input.relationships) ? input.relationships : []).flatMap((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) { rejected = true; return []; }
     const item = value as Record<string, unknown>;
     if (typeof item.fromId !== "string" || typeof item.toId !== "string" || !allowed.has(item.fromId) || !allowed.has(item.toId)) { rejected = true; return []; }
     const sourceIds = references(item.sourceIds);
-    return [{ ...item, sourceIds: sourceIds.length ? sourceIds : [...new Set([item.fromId, item.toId])], basis: "model" }];
+    return [{ ...item, sourceIds: sourceIds.length ? sourceIds : [...new Set([item.fromId, item.toId])], confidence: typeof item.confidence === "number" ? item.confidence : null, basis: "model" }];
   });
   const observations = (Array.isArray(input.observations) ? input.observations : []).flatMap((value) => {
     if (!value || typeof value !== "object" || Array.isArray(value)) { rejected = true; return []; }
     const item = value as Record<string, unknown>, sourceIds = references(item.sourceIds);
     if (!sourceIds.length) { rejected = true; return []; }
-    return [{ ...item, sourceIds, basis: "model" }];
+    return [{ ...item, sourceIds, confidence: typeof item.confidence === "number" ? item.confidence : null, basis: "model" }];
   });
   const ambiguities = Array.isArray(input.ambiguities) ? input.ambiguities.filter((item): item is string => typeof item === "string") : [];
   if (rejected) ambiguities.push("Unsupported model references were discarded; verify interpretations against observed canvas data.");
@@ -80,7 +89,20 @@ export type StructureResult = z.infer<typeof StructureResultSchema>;
 export type FusionResult = z.infer<typeof FusionResultSchema>;
 export type CanvasRecord = { id: string; type: string; bounds?: z.infer<typeof BoundsSchema>; geometry?: unknown; text?: string; raw: unknown };
 export type PixelToWorld = { scaleX: number; scaleY: number; offsetX: number; offsetY: number };
-export type OCRImageRegion = { id: string; base64: string; mimeType?: string; worldBounds: z.infer<typeof BoundsSchema>; cropBounds: z.infer<typeof BoundsSchema>; sourceIds: string[]; pixelToWorld: PixelToWorld };
+export const OCRImageRegionSchema = z.object({
+  id: z.string().min(1).max(12000),
+  base64: z.string().min(1).max(12_000_000),
+  mimeType: z.literal("image/png"),
+  worldBounds: BoundsSchema,
+  cropBounds: BoundsSchema,
+  sourceIds: z.array(z.string().min(1).max(512)).min(1).max(5000),
+  pixelWidth: z.number().int().positive().max(12000),
+  pixelHeight: z.number().int().positive().max(12000),
+  pixelToWorld: z.object({ scaleX: z.number().finite().positive(), scaleY: z.number().finite().positive(), offsetX: z.number().finite(), offsetY: z.number().finite() }).strict(),
+}).strict();
+export const CanvasSourceRegionSchema = OCRImageRegionSchema.omit({ base64: true, mimeType: true });
+export type CanvasSourceRegion = z.infer<typeof CanvasSourceRegionSchema>;
+export type OCRImageRegion = z.infer<typeof OCRImageRegionSchema>;
 export type CanvasImageInput = { base64?: string; mimeType?: string; pixelToWorld?: PixelToWorld; worldBounds?: z.infer<typeof BoundsSchema>; regions?: OCRImageRegion[] };
 export type CanvasInput = {
   boardId: string;

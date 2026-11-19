@@ -5,14 +5,18 @@ import { getStudyAIConfig } from "./server/config.js";
 const config = getStudyAIConfig();
 const webPort = String(config.webPort);
 const testData = resolve(`data/e2e-${Date.now()}`);
+const databasePath = process.env.STUDYAI_E2E_DB ? resolve(process.env.STUDYAI_E2E_DB) : resolve(testData, "studyai.sqlite");
+const wholeBoardExperiment = process.env.STUDYAI_WHOLE_BOARD_SCENE_EXPERIMENT === "1";
+const outputDir = wholeBoardExperiment ? ".experiment-artifacts/whole-board-scene/playwright" : "test-results";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  outputDir,
   workers: 1,
   use: { baseURL: config.webOrigin, ...devices["Desktop Chrome"], trace: "retain-on-failure", screenshot: "only-on-failure" },
-  reporter: [["list"], ["json", { outputFile: "test-results/results.json" }]],
+  reporter: [["list"], ["json", { outputFile: `${outputDir}/results.json` }]],
   webServer: {
-    command: "npm run dev", url: `${config.webOrigin}/api/courses`, reuseExistingServer: false, timeout: 120_000,
-    env: { WEB_PORT: webPort, RUNTIME_PORT: String(config.runtimePort), DATA_PORT: String(config.dataPort), AGENT_PORT: String(config.agentPort), STUDYAI_DB: resolve(testData, "studyai.sqlite"), STUDYAI_DOCUMENTS: resolve(testData, "documents"), STUDYAI_E2E_PRODUCTION: process.env.STUDYAI_E2E_PRODUCTION ?? "0", LANGGRAPH_DEPLOYMENT_URL: config.langgraphDeploymentUrl },
+    command: "npm run dev", url: `${config.webOrigin}/api/copilotkit/info`, reuseExistingServer: false, timeout: 120_000,
+    env: { WEB_PORT: webPort, RUNTIME_PORT: String(config.runtimePort), DATA_PORT: String(config.dataPort), AGENT_PORT: String(config.agentPort), STUDYAI_DB: databasePath, STUDYAI_DOCUMENTS: resolve(testData, "documents"), STUDYAI_E2E_PRODUCTION: process.env.STUDYAI_E2E_PRODUCTION ?? "0", LANGGRAPH_DEPLOYMENT_URL: config.langgraphDeploymentUrl },
   },
 });

@@ -1,5 +1,7 @@
 # Document intelligence and scientific canvas integration
 
+> Historical verification log. Entries below describe the named commits and environments through November 9, 2026; they do not certify the current `main` snapshot (`4c7f8c2`) or the current uncommitted provider changes. See [STATUS.md](STATUS.md) for the workspace source status.
+
 ## Inputs and isolation
 
 - Document branch: `work/document-intelligence`, `7eb5449507946c988cae806a2c2c15d3cd5ad9f9`.

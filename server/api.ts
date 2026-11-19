@@ -17,6 +17,11 @@ import { createLearningActivityHandler } from "./learning/activities/http.js";
 import { createCanvasAnalysisHandler } from "./canvas-analysis/http.js";
 import { createCanvasAnalysisProducerHandler } from "./canvas-analysis/producer.js";
 import { createCanvasPersistenceHandler } from "./canvas-persistence/http.js";
+import { createCanvasSceneHandler } from "./canvas-intelligence/scene/http.js";
+import { createCanvasRecognitionHandler } from "./canvas-intelligence/recognition/http.js";
+import { countCanvasRecognitionExamples, teachCanvasRecognitionExample } from "./canvas-intelligence/recognition/store.js";
+import { providerBudgetSnapshot } from "./canvas-intelligence/provider-budget.js";
+import { providerChain, resolveCompletionProviders, resolveVisionProviders } from "./canvas-intelligence/providers.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
@@ -32,13 +37,17 @@ const activityHandler = createLearningActivityHandler(activityService, config.we
 const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
 const canvasAnalysisProducerHandler = createCanvasAnalysisProducerHandler(db, config.webOrigin);
 const canvasPersistenceHandler = createCanvasPersistenceHandler(db, config.webOrigin, (value) => activityService.validateCanvasSave(value));
+const canvasSceneHandler = createCanvasSceneHandler(db, config.webOrigin);
+const canvasRecognitionHandler = createCanvasRecognitionHandler(db, config.webOrigin);
 
 const server = createServer(async (req, res) => {
   try {
   if (await activityHandler(req, res)) return;
   if (await learningHandler(req, res)) return;
   if (await documentHandler(req, res)) return;
+  if (await canvasRecognitionHandler(req, res)) return;
   if (await canvasPersistenceHandler(req, res)) return;
+  if (await canvasSceneHandler(req, res)) return;
   if (await canvasAnalysisProducerHandler(req, res)) return;
   if (await canvasAnalysisHandler(req, res)) return;
   if (req.method === "OPTIONS") return json(res, 204, {});
@@ -47,7 +56,25 @@ const server = createServer(async (req, res) => {
     const result = await getModelStatus(config.ollamaBaseUrl, config.ollamaModel);
     return json(res, result.status, result.body);
   }
+  if (req.method === "GET" && url.pathname === "/api/canvas-providers") {
+    return json(res, 200, { chain: providerChain(), completion: resolveCompletionProviders(), vision: resolveVisionProviders(), budgets: providerBudgetSnapshot() });
+  }
   if (req.method === "GET" && url.pathname === "/api/courses") return json(res, 200, db.prepare("SELECT * FROM courses").all());
+  if (req.method === "GET" && url.pathname === "/api/canvas-recognition/examples") {
+    const courseId = url.searchParams.get("course") ?? "";
+    if (!courseId || !courseExists(courseId)) return json(res, 404, { error: "Course not found." });
+    return json(res, 200, { courseId, labels: countCanvasRecognitionExamples(db, courseId) });
+  }
+  if (req.method === "POST" && url.pathname === "/api/canvas-recognition/examples") {
+    const input = JSON.parse(await body(req, 8_000_000));
+    if (typeof input.courseId !== "string" || !courseExists(input.courseId)) return json(res, 404, { error: "Course not found." });
+    try {
+      const result = await teachCanvasRecognitionExample(db, { courseId: input.courseId, label: String(input.label ?? ""), pngBase64: String(input.pngBase64 ?? "") });
+      return json(res, 201, result);
+    } catch (error) {
+      return json(res, 400, { error: error instanceof Error ? error.message : "Recognition example could not be saved." });
+    }
+  }
   if (req.method === "POST" && url.pathname === "/api/courses") {
     const input = JSON.parse(await body(req));
     const title = typeof input.title === "string" ? input.title.trim().slice(0, 120) : "";

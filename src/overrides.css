@@ -20,3 +20,14 @@
 .study-chat [data-testid="copilot-user-message"] [class*="prose"]{border:1px solid #ece4df;background:#faf7f4;padding:9px 13px;font-size:12px;line-height:1.55}
 .study-chat a[href^="#studyai-citation="]{color:#8d5d43;font-weight:600;text-decoration:underline;text-underline-offset:2px}
 .dark .study-chat [data-testid="copilot-user-message"] [class*="prose"]{border-color:#44464b;background:#292c31;color:#e2e4e8}
+.canvas-recognition{padding:12px;border:1px solid #b9c8d8;background:#f5f9fd;font-size:12px}
+.canvas-recognition header{display:flex;align-items:center;gap:8px}
+.canvas-recognition header span{color:#5a6a7a;flex:1}
+.canvas-recognition-teach{display:flex;align-items:flex-end;gap:8px;margin:10px 0;flex-wrap:wrap}
+.canvas-recognition-teach label{display:flex;flex-direction:column;gap:4px;font-weight:600}
+.canvas-recognition-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.canvas-recognition-list li{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #d8e2ec;padding:6px 8px}
+.recognition-label{display:flex;align-items:center;gap:6px}
+.recognition-confirmed{color:#1f6f3f;font-weight:700}
+.recognition-actions{display:flex;gap:6px}
+.canvas-recognition-empty,.canvas-recognition-counts{color:#5a6a7a;margin:6px 0 0}

@@ -3,8 +3,12 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import { understandCanvas, type CanvasUnderstanding, type UnderstandCanvasArgs } from "../canvas-intelligence/service.js";
 import { normalizeCanvasInput } from "../canvas-intelligence/input.js";
+import { listCanvasRecognitionPrototypes } from "../canvas-intelligence/recognition/store.js";
+import { groupQuickdrawStrokes, selectQuickdrawOCRGroups } from "../canvas-intelligence/regions.js";
+import { OCRImageRegionSchema, type OCRImageRegion } from "../canvas-intelligence/types.js";
 import { CanvasAnalysisValidationError, createCanvasAnalysisResult, currentCanvasRevision, type AuthoritativeCanvasRevision, type CanvasAnalysisResult } from "./contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./receiver.js";
+import { CANVAS_OCR_DEFAULT_PADDING, CANVAS_OCR_MAX_REGIONS_LIMIT, canvasOCRRegionTransform, clampOCRRegionLimit, planCanvasOCRCrops, sameCanvasRegionBounds } from "../../src/canvas/ocr-regions.js";
 
 type CanvasRow = AuthoritativeCanvasRevision & { name?: string };
 
@@ -13,12 +17,16 @@ const CanvasAnalysisRequestSchema = z.object({
   document: z.unknown(),
   selectedIds: z.array(z.string().min(1).max(512)).max(5000).default([]),
   image: z.object({
-    base64: z.string().min(1).max(12_000_000),
+    base64: z.string().min(1).max(12_000_000).optional(),
     mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).default("image/png"),
-  }).strict(),
+    regions: z.array(OCRImageRegionSchema).max(CANVAS_OCR_MAX_REGIONS_LIMIT).default([]),
+  }).strict().default({ mimeType: "image/png", regions: [] }).superRefine((image, context) => {
+    if (image.base64 && image.regions.length) context.addIssue({ code: "custom", message: "Submit source-linked OCR regions or a legacy full-board image, not both." });
+  }),
 }).strict();
 
-export type CanvasAnalysisRequest = z.infer<typeof CanvasAnalysisRequestSchema>;
+export type CanvasAnalysisRequest = z.input<typeof CanvasAnalysisRequestSchema>;
+type ParsedCanvasAnalysisRequest = z.output<typeof CanvasAnalysisRequestSchema>;
 type AnalyzeCanvas = (args: UnderstandCanvasArgs) => Promise<CanvasUnderstanding>;
 
 export function produceCanvasAnalysisForPersistedBoard(
@@ -27,13 +35,13 @@ export function produceCanvasAnalysisForPersistedBoard(
   input: CanvasAnalysisRequest,
   options: { analyze?: AnalyzeCanvas; now?: () => Date } = {},
 ): Promise<CanvasAnalysisResult> {
-  return produce(database, scope, input, options);
+  return produce(database, scope, CanvasAnalysisRequestSchema.parse(input), options);
 }
 
 async function produce(
   database: Database.Database,
   scope: { boardId: string; courseId: string; lessonId: string },
-  input: CanvasAnalysisRequest,
+  input: ParsedCanvasAnalysisRequest,
   options: { analyze?: AnalyzeCanvas; now?: () => Date },
 ): Promise<CanvasAnalysisResult> {
   const row = database.prepare("SELECT id AS boardId,course_id AS courseId,lesson_id AS lessonId,revision,document FROM canvases WHERE id=? AND course_id=? AND lesson_id=?").get(scope.boardId, scope.courseId, scope.lessonId) as CanvasRow | undefined;
@@ -68,6 +76,12 @@ async function produce(
   });
   const knownIds = new Set([...canvasInput.nativeRecords.map((item) => item.id), ...canvasInput.scientificObjects.map((item) => item.id)]);
   if (input.selectedIds.some((id) => !knownIds.has(id))) throw new CanvasAnalysisValidationError("scope_mismatch", "A selected canvas object is not present in the persisted board.");
+  const allRecordsInput = normalizeCanvasInput({ boardId: row.boardId, courseId: row.courseId, lessonId: row.lessonId, snapshot: document.snapshot, scientificObjects: document.objects, selectedIds: [] });
+  const sourceGroupInput = { ...allRecordsInput, selectedIds: input.selectedIds };
+  const sourceRegionGroups = groupQuickdrawStrokes(allRecordsInput);
+  const cropSelection = selectQuickdrawOCRGroups(allRecordsInput, input.selectedIds, clampOCRRegionLimit(process.env.CANVAS_OCR_MAX_REGIONS));
+  const selectedRegionIds = new Set(cropSelection.selected.map((group) => group.id));
+  validateSourceRegions(sourceGroupInput, input.image.regions, selectedRegionIds);
   const understanding = await (options.analyze ?? understandCanvas)({
     boardId: row.boardId,
     courseId: row.courseId,
@@ -76,17 +90,32 @@ async function produce(
     scientificObjects: document.objects,
     selectedIds: input.selectedIds,
     image: input.image,
+    expectedSourceRegionIds: sourceRegionGroups.map((group) => group.id),
     userQuestion: "Analyze this persisted board. Separate observed canvas data from uncertain interpretations. Do not infer meaning from coordinates alone or propose edits.",
     mode: "deep",
+    recognition: { prototypes: listCanvasRecognitionPrototypes(database, row.courseId) },
   });
   if (!understanding.evidence || !understanding.selectedContext || !understanding.fusion) {
     throw new CanvasAnalysisValidationError("invalid_result", "Canvas Intelligence did not return complete evidence and analysis context.");
   }
 
+  const regionById = new Map([...cropSelection.selected, ...cropSelection.omitted].map((group) => [group.id, group]));
+  const omittedReasons = new Map<string, "not-selected" | "crop-limit" | "not-captured" | "image-size-limit" | "ocr-failed">();
+  for (const region of cropSelection.omitted) omittedReasons.set(region.id, region.reason);
+  const submittedRegionIds = new Set(input.image.regions.map((region) => region.id));
+  if (!input.image.base64) for (const region of cropSelection.selected) if (!submittedRegionIds.has(region.id)) omittedReasons.set(region.id, "not-captured");
+  for (const id of understanding.omittedImageRegionIds ?? []) omittedReasons.set(id, "image-size-limit");
+  for (const id of understanding.failedImageRegionIds ?? []) omittedReasons.set(id, "ocr-failed");
+  const omittedRegions = sourceRegionGroups.flatMap((group) => {
+    const reason = omittedReasons.get(group.id), region = regionById.get(group.id);
+    return reason && region ? [{ id: region.id, sourceIds: region.sourceIds, worldBounds: region.worldBounds, score: region.score, reason }] : [];
+  });
+
   const now = (options.now ?? (() => new Date()))().toISOString();
   const provenance = [
     { id: "prov-canvas", stage: "canvas" as const, provider: "quickdraw" as const, method: "Persisted Quickdraw snapshot and scientific objects", model: null, createdAt: now },
     { id: "prov-geometry", stage: "geometry" as const, provider: "system" as const, method: "Deterministic Canvas Intelligence geometry observations", model: null, createdAt: now },
+    { id: "prov-recognition", stage: "recognition" as const, provider: understanding.recognition?.mode === "clip" ? "local" as const : "system" as const, method: "Canvas recognition adapter over deterministically rendered stroke groups", model: understanding.recognition?.adapterId ?? null, createdAt: now },
     { id: "prov-ocr", stage: "ocr" as const, provider: "system" as const, method: "Canvas Intelligence OCR stage; effective provider is not exposed by understandCanvas", model: null, createdAt: now },
     { id: "prov-structure", stage: "structure" as const, provider: "system" as const, method: "Canvas Intelligence structure stage; effective provider is not exposed by understandCanvas", model: null, createdAt: now },
     { id: "prov-fusion", stage: "fusion" as const, provider: "system" as const, method: "Canvas Intelligence fusion stage; effective provider is not exposed by understandCanvas", model: null, createdAt: now },
@@ -111,7 +140,7 @@ async function produce(
     fixtureId: `canvas-${row.boardId}`,
     pipelineId: "P1",
     pipelineVersion: "canvas-intelligence-contract-adapter/1",
-    status: understanding.evidence.evidence.some((item) => item.origin !== "model") ? "complete" : "partial",
+    status: understanding.partial || !understanding.evidence.evidence.some((item) => item.origin !== "model") ? "partial" : "complete",
     objects: [...understanding.structure.objects, ...understanding.fusion.objects],
     relationships,
     interpretations,
@@ -129,6 +158,7 @@ async function produce(
     evidence: understanding.evidence,
     selectedContext: understanding.selectedContext,
     pipelineResult,
+    omittedRegions,
   });
   return validateCanvasAnalysisAtReceiver(database, result, scope);
 }
@@ -150,16 +180,24 @@ export function createCanvasAnalysisProducerHandler(database: Database.Database,
     const lessonId = url.searchParams.get("lesson") ?? "";
     if (!courseId || !lessonId) { send(400, { error: "course and lesson are required." }); return true; }
     if (!database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(courseId, lessonId)) { send(404, { error: "Lesson not found in this course." }); return true; }
+    let input: ParsedCanvasAnalysisRequest;
     try {
       const body = JSON.parse(await readBody(request));
-      const input = CanvasAnalysisRequestSchema.parse(body);
+      input = CanvasAnalysisRequestSchema.parse(body);
+    } catch {
+      send(400, { error: "Canvas analysis request is invalid.", code: "invalid_request" });
+      return true;
+    }
+    try {
       const analysis = await produceCanvasAnalysisForPersistedBoard(database, { boardId, courseId, lessonId }, input, options);
       send(200, { analysis });
     } catch (error) {
       if (error instanceof CanvasAnalysisValidationError) {
         const status = error.code === "scope_mismatch" || error.code === "stale_revision" ? 409 : 400;
         send(status, { error: error.message, code: error.code });
-      } else if (error instanceof z.ZodError || error instanceof SyntaxError) {
+      } else if (error instanceof z.ZodError) {
+        send(502, { error: "Canvas analysis produced invalid provider or evidence data.", code: "invalid_result" });
+      } else if (error instanceof SyntaxError) {
         send(400, { error: "Canvas analysis request is invalid.", code: "invalid_request" });
       } else {
         send(502, { error: error instanceof Error ? error.message : "Canvas analysis failed.", code: "analysis_failed" });
@@ -180,4 +218,34 @@ function readBody(request: IncomingMessage, limit = 20_000_000): Promise<string>
     request.on("end", () => resolve(value));
     request.on("error", reject);
   });
+}
+
+function validateSourceRegions(input: ReturnType<typeof normalizeCanvasInput>, regions: OCRImageRegion[], allowedRegionIds: Set<string>) {
+  const groups = groupQuickdrawStrokes(input);
+  const plans = new Map(planCanvasOCRCrops(groups, { padding: CANVAS_OCR_DEFAULT_PADDING }).map((plan) => [plan.id, plan]));
+  const inkIds = new Set(input.nativeRecords.filter((record) => record.type === "draw" || record.type === "highlight").map((record) => record.id));
+  for (const region of regions) {
+    const expected = plans.get(region.id);
+    if (!expected || !allowedRegionIds.has(region.id) || region.sourceIds.some((id) => !inkIds.has(id)) || JSON.stringify(region.sourceIds) !== JSON.stringify(expected.sourceIds)) {
+      throw new CanvasAnalysisValidationError("scope_mismatch", "An OCR crop references freehand strokes outside the persisted canvas region.");
+    }
+    if (!sameCanvasRegionBounds(region.worldBounds, expected.worldBounds) || !sameCanvasRegionBounds(region.cropBounds, expected.cropBounds)) {
+      throw new CanvasAnalysisValidationError("scope_mismatch", "An OCR crop's bounds do not match the persisted freehand strokes.");
+    }
+    const transform = canvasOCRRegionTransform(region.cropBounds, region.pixelWidth, region.pixelHeight);
+    const agrees = (actual: number, wanted: number) => Math.abs(actual - wanted) <= Math.max(1, Math.abs(wanted)) * 1e-9;
+    if (region.pixelWidth * region.pixelHeight > 24_000_000 || !Object.entries(transform).every(([key, value]) => agrees(region.pixelToWorld[key as keyof typeof transform], value)) || !validPngDimensions(region.base64, region.pixelWidth, region.pixelHeight)) {
+      throw new CanvasAnalysisValidationError("invalid_result", "An OCR crop's pixel dimensions or coordinate transform are invalid.");
+    }
+  }
+}
+
+function validPngDimensions(base64: string, width: number, height: number) {
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) return false;
+  const bytes = Buffer.from(base64, "base64");
+  return bytes.length >= 24
+    && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    && bytes.toString("ascii", 12, 16) === "IHDR"
+    && bytes.readUInt32BE(16) === width
+    && bytes.readUInt32BE(20) === height;
 }

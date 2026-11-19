@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createObject } from "../src/canvas/model";
-import { applyCanvasProposal, proposeCanvasEdit } from "../src/canvas/tutor";
+import { applyCanvasObjectProposal, applyCanvasProposal, proposeCanvasEdit, proposeCanvasObject } from "../src/canvas/tutor";
 
 describe("tutor canvas proposals", () => {
   const object = createObject("molecule", 100, 100);
@@ -30,8 +30,23 @@ describe("tutor canvas proposals", () => {
     const forms = [{ ...object.resonanceForms[0], bonds: [{ ...object.resonanceForms[0].bonds[0], to: "missing-atom" }] }];
     await expect(proposeCanvasEdit(context, { ...edit, patchJson: JSON.stringify({ resonanceForms: forms }) })).rejects.toThrow("endpoints");
   });
-  it("merges typed Lewis corrections while preserving all atom, bond and resonance IDs", async () => {
-    if (object.kind !== "molecule") throw new Error("Expected molecule fixture");
+  it("proposes adding one validated scientific object and applies it only after approval", () => {
+    const input = { boardId: "board-1", kind: "concept" as const, x: 400, y: 250, fieldsJson: '{"title":"Entropy","definition":"A measure of disorder.","width":240,"height":120}', reason: "Add the concept named in the lesson" };
+    const proposal = proposeCanvasObject(context, input);
+    expect(context.objects).toHaveLength(1);
+    expect(proposal.object).toMatchObject({ kind: "concept", title: "Entropy", definition: "A measure of disorder.", x: 400, y: 250, width: 240, height: 120 });
+    expect(proposal.object.id).toMatch(/^concept-/);
+    const next = applyCanvasObjectProposal(context, proposal);
+    expect(next).toHaveLength(2);
+    expect(next[1].id).toBe(proposal.object.id);
+    expect(() => proposeCanvasObject(context, { ...input, boardId: "other" })).toThrow("board changed");
+    expect(() => proposeCanvasObject(context, { ...input, fieldsJson: '{"id":"fixed"}' })).toThrow("identity");
+    expect(() => proposeCanvasObject(context, { ...input, kind: "not-a-kind" as never })).toThrow();
+    expect(() => proposeCanvasObject(context, { ...input, kind: "equation", fieldsJson: '{"variables":null}' })).toThrow("invalid");
+    expect(() => applyCanvasObjectProposal({ ...context, revision: 5 }, proposal)).toThrow("stale");
+  });
+
+  it("merges typed Lewis corrections while preserving all atom, bond and resonance IDs", async () => {    if (object.kind !== "molecule") throw new Error("Expected molecule fixture");
     const proposal = await proposeCanvasEdit(context, { ...edit, atomEdits: [{ id: object.atoms[0].id, nonbondingElectrons: 6 }], bondEdits: [{ id: object.resonanceForms[0].bonds[0].id, order: 1 }] });
     const next = (await applyCanvasProposal(context, proposal))[0];
     if (next.kind !== "molecule") throw new Error("Expected molecule result");

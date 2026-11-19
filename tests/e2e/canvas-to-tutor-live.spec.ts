@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { createCourseWithLesson, drawCarbonDioxide, selectCourseOnPage } from "./helpers";
+import { drawForce, drawHandwrittenF5N, setForceUnits } from "./canvas-grounding-helpers";
 
-test.skip(process.env.STUDYAI_LIVE_GROQ_E2E !== "1", "Run only for the approved synthetic live Groq validation.");
+test.skip(process.env.STUDYAI_LIVE_GROQ_E2E !== "1", "Set STUDYAI_LIVE_GROQ_E2E=1 and GROQ_API_KEY to run the bounded live OCR validation.");
 
-test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and stale revision guards", async ({ page, request }) => {
+test("live Groq reads actual F = 5 N handwriting beside a force arrow and preserves uncertainty", async ({ page, request }) => {
   test.setTimeout(240_000);
   expect(process.env.GROQ_API_KEY?.trim()).toBeTruthy();
 
@@ -12,8 +13,14 @@ test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await drawCarbonDioxide(page, false);
+  const canvas = (await page.locator(".canvas-board").boundingBox())!;
+  await drawForce(page, { x: canvas.x + 700, y: canvas.y + 500 }, { x: canvas.x + 800, y: canvas.y + 500 });
+  await setForceUnits(page);
+  await page.getByRole("button", { name: "Draw — D", exact: true }).click();
+  await drawHandwrittenF5N(page, canvas.x + 598, canvas.y + 482);
   await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved", { timeout: 15_000 });
-
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Analyze board" })).toBeEnabled();
   const boards = await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
   const savedBoards = await Promise.all(boards.map(async (item: { id: string }) => {
     const board = await request.get(`/api/canvases/${item.id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
@@ -26,12 +33,9 @@ test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and
   expect(molecule?.name).toBe("Carbon dioxide");
   expect(molecule.atoms.map((item: { element: string }) => item.element).sort()).toEqual(["C", "O", "O"]);
   expect(molecule.resonanceForms[0].bonds.map((item: { order: number }) => item.order)).toEqual([2, 2]);
-
-  const textShapeId = `shape:synthetic-ocr-${Date.now()}`;
-  document.snapshot.document.store[textShapeId] = { id: textShapeId, typeName: "shape", type: "text", x: 40, y: 40, rot: 0, z: 1, props: { text: "SYNTHETIC OCR 417 CO2", color: "black", size: "m", font: "draw", autosize: true, scale: 1 } };
-  const seeded = await request.post("/api/canvases", { data: { id: board.id, courseId: course.id, lessonId: lesson.id, name: board.name, document, expectedRevision: board.revision } });
-  expect(seeded.status()).toBe(200);
-  await page.reload();
+  const force = document.objects.find((item: { kind?: string }) => item.kind === "force");
+  expect(force?.units).toBe("N");
+  expect(Math.hypot(...force.components)).toBeCloseTo(5, 5);
   const authoritative = await request.get(`/api/canvases/${board.id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
   await expect(page.getByRole("button", { name: "Analyze board" })).toBeEnabled();
 
@@ -44,7 +48,7 @@ test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and
 
   expect(analysis).toMatchObject({ boardId: board.id, courseId: course.id, lessonId: lesson.id, analysisStatus: "complete" });
   expect(analysis.observedEvidence.sourceScope).toMatchObject({ boardId: board.id, courseId: course.id, lessonId: lesson.id });
-  expect(analysis.revision).toBe(authoritative.revision + 1);
+  expect(analysis.revision).toBe(authoritative.revision);
   const analysisBoard = await request.get(`/api/canvases/${board.id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
   expect(analysisBoard.revision).toBe(analysis.revision);
   expect(analysis.revisionHash).toMatch(/^[a-f0-9]{64}$/);
@@ -55,8 +59,18 @@ test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and
   expect(analysis.diagnostics.timings.stages.structure).toBeGreaterThan(0);
   expect(analysis.diagnostics.timings.stages.fusion).toBeGreaterThan(0);
   expect(analysis.observedEvidence.items.some((item: { origin: string; sourceIds: string[] }) => item.origin === "native" && item.sourceIds.includes(molecule.id))).toBe(true);
-  expect(analysis.observedEvidence.items.some((item: { origin: string; text: string }) => item.origin === "ocr" && /\b417\b/.test(item.text))).toBe(true);
-  expect(analysis.observedEvidence.items.some((item: { origin: string; text: string }) => item.origin === "ocr" && /\bCO2\b/i.test(item.text))).toBe(true);
+  const ocrText = analysis.observedEvidence.items.filter((item: { origin: string }) => item.origin === "ocr").map((item: { text: string }) => item.text).join(" ").replace(/\s+/g, "").toUpperCase();
+  expect(ocrText).toContain("F=5N");
+  const recognizedItems = analysis.observedEvidence.items.filter((item: { origin: string }) => item.origin === "ocr");
+  expect(recognizedItems.length).toBeGreaterThan(0);
+  for (const item of recognizedItems) {
+    expect(item).toMatchObject({ confidence: null, locationPrecision: "region", uncertain: true, sourceRegionId: expect.stringMatching(/^stroke-group:/), sourceRegion: { sourceIds: expect.any(Array) } });
+    expect(item.sourceIds).toEqual(item.sourceRegion.sourceIds);
+    expect(item.worldRegion).toEqual(item.sourceRegion.worldBounds);
+  }
+  const association = analysis.observedEvidence.items.find((item: { kind: string }) => item.kind === "association");
+  expect(association.association).toMatchObject({ status: "geometry-supported", verificationStatus: "unconfirmed", candidateRefs: [{ scope: "science", id: force.id }] });
+  expect(association.uncertain).toBe(true);
   expect(analysis.inferredInterpretations.items.length).toBeGreaterThan(0);
   expect(analysis.inferredInterpretations.items.every((item: { verificationStatus: string; uncertainty: string[] }) => item.verificationStatus === "unverified" && item.uncertainty.length > 0)).toBe(true);
   expect(analysis.inferredInterpretations.evidence.every((item: { origin: string; uncertain: boolean }) => item.origin === "model" && item.uncertain)).toBe(true);
@@ -74,13 +88,15 @@ test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and
   }
 
   const chat = page.getByTestId("copilot-chat-textarea");
-  await chat.fill("Using the latest supplied canvas analysis, state the molecule and its bond pattern. Separate what the canvas directly encodes from AI interpretation, preserve uncertainty, and do not edit the board.");
+  await chat.fill("Using the latest supplied canvas analysis, state the molecule and bond pattern, and report what the handwritten force label may say and which arrow it is near. Separate observed data from interpretation, say the spatial association is unconfirmed, and do not edit the board.");
   await chat.press("Enter");
   const tutor = page.locator(".copilot-slot");
   await expect(tutor).toContainText(/carbon dioxide|CO2|CO₂/i, { timeout: 180_000 });
   await expect(tutor).toContainText(/double bond/i);
   await expect(tutor).toContainText(/observed|encoded|canvas/i);
   await expect(tutor).toContainText(/unverified|not verified|uncertain|interpretation|inferred/i);
+  await expect(tutor).toContainText(/5\s*N/i);
+  await expect(tutor).toContainText(/force arrow/i);
 
   const revision = analysis.revision;
   const latestDocument = JSON.parse(analysisBoard.document);
@@ -95,6 +111,6 @@ test("live Groq validates synthetic Canvas OCR, analysis, Tutor uncertainty, and
   expect(staleAnalysis.status()).toBe(409);
   expect(await staleAnalysis.json()).toMatchObject({ code: "stale_revision" });
   const current = await request.get(`/api/canvases/${board.id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
-  expect(current.revision).toBe(revision + 1);
+  expect(current.revision).toBe(revision);
   expect(current.name).toBe("Synthetic revision check");
 });

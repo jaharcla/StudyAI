@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type Database from "better-sqlite3";
 import { z } from "zod";
 import { parseCanvasDocument } from "../../src/canvas/model.js";
+import { stableJson } from "../../src/canvas/stable-json.js";
 
 const saveCanvasSchema = z.object({
   id: z.string().min(1).max(512).optional(),
@@ -12,7 +13,7 @@ const saveCanvasSchema = z.object({
   expectedRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
 }).strict();
 
-type CanvasRow = { id: string; course_id: string; lesson_id: string; revision: number };
+type CanvasRow = { id: string; course_id: string; lesson_id: string; name: string; document: string; revision: number };
 export type SaveCanvasInput = z.infer<typeof saveCanvasSchema>;
 export type SaveCanvasResult = { status: number; body: { id?: string; revision?: number; error?: string; code?: string; currentRevision?: number } };
 
@@ -33,7 +34,7 @@ export function saveCanvasDocument(database: Database.Database, value: unknown, 
   const serialized = JSON.stringify(document);
 
   const save = database.transaction((): SaveCanvasResult => {
-    const existing = database.prepare("SELECT id,course_id,lesson_id,revision FROM canvases WHERE id=?").get(id) as CanvasRow | undefined;
+    const existing = database.prepare("SELECT id,course_id,lesson_id,name,document,revision FROM canvases WHERE id=?").get(id) as CanvasRow | undefined;
     if (existing && (existing.course_id !== input.courseId || existing.lesson_id !== input.lessonId)) {
       return { status: 409, body: { error: "Canvas belongs to another course or lesson.", code: "scope_mismatch", currentRevision: existing.revision } };
     }
@@ -51,6 +52,9 @@ export function saveCanvasDocument(database: Database.Database, value: unknown, 
     if (input.expectedRevision !== existing.revision) {
       return { status: 409, body: { error: "Canvas revision is stale.", code: "stale_revision", currentRevision: existing.revision } };
     }
+    let sameDocument = false;
+    try { sameDocument = stableJson(document) === stableJson(parseCanvasDocument(JSON.parse(existing.document))); } catch { /* Replace invalid stored data with the validated save. */ }
+    if (input.name === existing.name && sameDocument) return { status: 200, body: { id, revision: existing.revision } };
     const updated = database.prepare("UPDATE canvases SET name=?,document=?,revision=revision+1,updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE id=? AND course_id=? AND lesson_id=? AND revision=?")
       .run(input.name, serialized, id, input.courseId, input.lessonId, input.expectedRevision);
     if (updated.changes !== 1) {

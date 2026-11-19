@@ -45,11 +45,34 @@ describe("canvas persistence compare-and-swap", () => {
     database.close();
   });
 
+  it("does not advance the saved revision when analysis re-saves an unchanged document", () => {
+    const database = createDatabase();
+    const document = emptyCanvasDocument();
+    const created = saveCanvasDocument(database, input(0, document));
+    const noOp = saveCanvasDocument(database, input(1, document));
+
+    expect(created.body.revision).toBe(1);
+    expect(noOp).toMatchObject({ status: 200, body: { id: "board-a", revision: 1 } });
+    expect(database.prepare("SELECT revision FROM canvases WHERE id=?").get("board-a")).toEqual({ revision: 1 });
+    database.close();
+  });
+
+  it("ignores JSON key order when detecting an unchanged board", () => {
+    const database = createDatabase();
+    const document = emptyCanvasDocument();
+    const created = saveCanvasDocument(database, input(0, document));
+    database.prepare("UPDATE canvases SET document=? WHERE id=?").run(JSON.stringify({ objects: document.objects, snapshot: document.snapshot, version: document.version }), created.body.id);
+
+    expect(saveCanvasDocument(database, input(1, document))).toMatchObject({ status: 200, body: { id: "board-a", revision: 1 } });
+    expect(database.prepare("SELECT revision FROM canvases WHERE id=?").get("board-a")).toEqual({ revision: 1 });
+    database.close();
+  });
+
   it("allows only one of two simultaneous saves against the same revision", async () => {
     const database = createDatabase();
     saveCanvasDocument(database, input(0));
-    const first = emptyCanvasDocument();
-    const second = { ...emptyCanvasDocument(), objects: [createObject("concept", 1, 2)] };
+    const first = { ...emptyCanvasDocument(), objects: [createObject("concept", 1, 2)] };
+    const second = { ...emptyCanvasDocument(), objects: [createObject("question", 2, 3)] };
     const results = await Promise.all([
       Promise.resolve().then(() => saveCanvasDocument(database, input(1, first))),
       Promise.resolve().then(() => saveCanvasDocument(database, input(1, second))),

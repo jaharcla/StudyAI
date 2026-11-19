@@ -10,14 +10,18 @@ import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
 import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { objectTitle } from "./SceneGlyph";
-import { applyCanvasProposal, canvasEditSchema, MathProposalValidationError, proposeCanvasEdit, type CanvasProposal } from "./tutor";
-import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Trash2, Undo2, Upload, X } from "lucide-react";
+import { applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, proposeCanvasEdit, proposeCanvasObject, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
+import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
 import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
 import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
+import { invalidateCanvasSceneCache, requestCanvasScene } from "./ai/scene-tools";
+import { recognitionSourceKey, submitRecognitionFeedback, teachSelectedDrawing, type RecognitionFeedbackDecision } from "./ai/recognition-feedback";
+import type { CanvasSceneNode } from "./spatial/types";
 import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
+import { captureQuickdrawOCRRegions } from "./ocr-capture.js";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -54,6 +58,12 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false });
   const [boardMenu, setBoardMenu] = useState(false);
   const [proposal, setProposal] = useState<CanvasProposal>();
+  const [objectProposal, setObjectProposal] = useState<CanvasObjectProposal>();
+  const [recognitionOpen, setRecognitionOpen] = useState(false);
+  const [recognitionBusy, setRecognitionBusy] = useState(false);
+  const [teachLabel, setTeachLabel] = useState("");
+  const [recognitionCandidates, setRecognitionCandidates] = useState<CanvasSceneNode[]>([]);
+  const [exampleCounts, setExampleCounts] = useState<Record<string, number>>({});
   const [scienceMode, setScienceMode] = useState<ScienceMode>(null);
   const [placementPatch, setPlacementPatch] = useState<Partial<ScientificObject>>({});
   const [nativeTool, setNativeTool] = useState("select");
@@ -80,11 +90,41 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       } catch (error) { return error instanceof MathProposalValidationError ? { status: error.status, error: error.message } : { status: "rejected", error: error instanceof Error ? error.message : "Invalid edit" }; }
     },
   }, [courseId, lessonId]);
+  useFrontendTool({
+    name: "propose_scientific_object",
+    description: "Propose adding one validated scientific object to the active board for user review. Provide kind, position, and a JSON field object; id and kind are assigned by the app. The object is not added until the user applies the proposal.",
+    parameters: canvasObjectCreateSchema,
+    handler: async (input) => {
+      try {
+        const currentBoard = boardRef.current;
+        if (!currentBoard) throw new Error("The active board is not ready.");
+        const next = proposeCanvasObject({ boardId: currentBoard.id, courseId, lessonId, revision: currentBoard.revision, objects: documentRef.current.objects }, input);
+        setObjectProposal(next);
+        return { status: "pending_user_review", kind: next.object.kind, reason: next.reason, requiresConfirmation: true };
+      } catch (error) {
+        return { status: "rejected", error: error instanceof Error ? error.message : "Invalid scientific object proposal." };
+      }
+    },
+  }, [courseId, lessonId]);
 
   const filteredTools = useMemo(() => {
     const query = toolSearch.trim().toLowerCase();
     return canvasTools.filter((tool) => !query || `${tool.label} ${tool.description} ${tool.group}`.toLowerCase().includes(query));
   }, [toolSearch]);
+  const recognitionGroups = useMemo(() => {
+    const groups = new Map<string, CanvasSceneNode[]>();
+    for (const node of recognitionCandidates) {
+      const key = recognitionSourceKey(node.sourceRefs.filter((ref) => ref.scope === "quickdraw").map((ref) => ref.id));
+      if (!key) continue;
+      groups.set(key, [...(groups.get(key) ?? []), node]);
+    }
+    return [...groups.entries()].map(([key, nodes]) => ({
+      key,
+      primary: [...nodes].sort((a, b) => Number(b.verificationStatus === "confirmed") - Number(a.verificationStatus === "confirmed") || (b.confidence ?? 0) - (a.confidence ?? 0))[0],
+      count: nodes.length,
+      confirmed: nodes.some((node) => node.verificationStatus === "confirmed"),
+    }));
+  }, [recognitionCandidates]);
   const selectedObject = document.objects.find((item) => item.id === editingId);
 
   useQuickdrawAIBridge({
@@ -117,7 +157,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         }
         if (!response.ok) throw new Error("save failed");
         const result = await response.json() as { revision?: number };
-        if (!Number.isInteger(result.revision) || result.revision! <= expectedRevision) throw new Error("Canvas save did not return a newer revision.");
+        if (!Number.isInteger(result.revision) || result.revision! < expectedRevision) throw new Error("Canvas save returned an invalid revision.");
         revisions.current.set(board.id, result.revision!);
         const update = (current: Board) => current.id === board.id ? { ...current, revision: result.revision! } : current;
         setBoards((current) => current.map(update));
@@ -202,20 +242,19 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       if (!await saveNow()) throw new Error("Save the active board before analysis.");
       const persisted = await readAuthoritativeBoard(board);
       if (stableJson(persisted.document) !== stableJson(requestDocument)) throw new Error("The board changed while saving. Analyze again.");
-      const image = await editor.exportImage({ background: true, scale: 2 });
-      if (!image) throw new Error("The active board could not be rendered for analysis.");
+      const regions = await captureQuickdrawOCRRegions(editor, selectedIds, documentRef.current.objects);
       if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(requestDocument)) throw new Error("The board changed during analysis setup. Try again.");
       const response = await fetch(`${API}/canvases/${encodeURIComponent(board.id)}/analysis?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, image: { base64: await blobToBase64(image), mimeType: image.type || "image/png" } }),
+        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, image: { regions } }),
       });
       const body = await response.json() as { analysis?: CanvasAnalysisResult; error?: string };
       if (!response.ok || !body.analysis) throw new Error(body.error ?? "Canvas analysis failed.");
       if (body.analysis.boardId !== board.id || body.analysis.courseId !== courseId || body.analysis.lessonId !== lessonId || body.analysis.revision !== persisted.revision) throw new Error("Canvas analysis returned a mismatched or stale board revision.");
       if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(requestDocument)) throw new Error("The board changed while analysis was running. Analyze the current board again.");
       setCanvasAnalysis(body.analysis);
-      onStatus("Canvas analysis is ready for the Tutor");
+      onStatus(body.analysis.omittedRegions.length ? `Canvas analysis is partial; ${body.analysis.omittedRegions.length} ink region(s) were omitted.` : body.analysis.analysisStatus === "partial" ? "Canvas analysis is partial; some ink regions may be unprocessed." : "Canvas analysis is ready for the Tutor");
     } catch (error) {
       setCanvasAnalysis(undefined);
       onStatus(error instanceof Error ? error.message : "Canvas analysis failed");
@@ -277,6 +316,88 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     } catch (error) { onStatus(error instanceof Error ? error.message : "Could not apply canvas proposal"); }
     finally { setProposalBusy(false); }
   }, [currentDocument, onStatus, postDocument, proposalBusy, readAuthoritativeBoard, shapeProposal]);
+
+  const applyObjectProposal = useCallback(async () => {
+    const board = boardRef.current;
+    const pending = objectProposal;
+    if (!board || !pending || proposalBusy) return;
+    setProposalBusy(true);
+    try {
+      const sequence = loadSequence.current;
+      const base = structuredClone(currentDocument());
+      const authoritative = await readAuthoritativeBoard(board);
+      if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the proposal was being checked.");
+      const context = { boardId: board.id, courseId, lessonId, objects: base.objects, revision: authoritative.revision };
+      const objects = applyCanvasObjectProposal(context, pending);
+      const next = resolveScene({ ...base, objects });
+      if (!await postDocument({ ...board, revision: authoritative.revision }, next)) return;
+      if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(base)) throw new Error("The active board changed before the approved object could be shown.");
+      objectHistory.current.undo.push(base); objectHistory.current.redo = [];
+      documentRef.current = next;
+      setDocument(next);
+      setCanvasAnalysis(undefined);
+      setObjectProposal(undefined);
+      refreshHistory();
+      onStatus("Scientific object added");
+    } catch (error) { onStatus(error instanceof Error ? error.message : "Could not add scientific object"); }
+    finally { setProposalBusy(false); }
+  }, [courseId, currentDocument, lessonId, objectProposal, onStatus, postDocument, proposalBusy, readAuthoritativeBoard, refreshHistory]);
+
+  const refreshRecognition = useCallback(async () => {
+    const board = activeBoard;
+    if (!board) return;
+    try {
+      const graph = await requestCanvasScene({ boardId: board.id, courseId, lessonId, revision: board.revision });
+      setRecognitionCandidates(graph.nodes.filter((node) => node.kind === "recognition-candidate"));
+      const response = await fetch(`${API}/canvas-recognition/examples?course=${encodeURIComponent(courseId)}`);
+      if (response.ok) setExampleCounts((await response.json() as { labels?: Record<string, number> }).labels ?? {});
+    } catch {
+      setRecognitionCandidates([]);
+    }
+  }, [activeBoard, courseId, lessonId]);
+
+  const openRecognition = useCallback(async () => {
+    if (recognitionOpen) { setRecognitionOpen(false); return; }
+    setRecognitionOpen(true);
+    await refreshRecognition();
+  }, [recognitionOpen, refreshRecognition]);
+
+  const teachSelection = useCallback(async () => {
+    const board = boardRef.current;
+    const label = teachLabel.trim();
+    if (!board || !label || !selectedShapeIds.length || recognitionBusy) return;
+    setRecognitionBusy(true);
+    try {
+      const result = await teachSelectedDrawing({ boardId: board.id, courseId, lessonId }, selectedShapeIds, label);
+      setTeachLabel("");
+      invalidateCanvasSceneCache();
+      await refreshRecognition();
+      onStatus(`Taught “${result.label}” (${result.examples} example${result.examples === 1 ? "" : "s"})`);
+    } catch (error) { onStatus(error instanceof Error ? error.message : "Teaching failed"); }
+    finally { setRecognitionBusy(false); }
+  }, [courseId, lessonId, onStatus, recognitionBusy, refreshRecognition, selectedShapeIds, teachLabel]);
+
+  const reviewCandidate = useCallback(async (node: CanvasSceneNode, decision: RecognitionFeedbackDecision, label?: string) => {
+    const board = boardRef.current;
+    const strokeIds = node.sourceRefs.filter((ref) => ref.scope === "quickdraw").map((ref) => ref.id);
+    if (!board || !strokeIds.length || recognitionBusy) return;
+    setRecognitionBusy(true);
+    try {
+      const result = await submitRecognitionFeedback({ boardId: board.id, courseId, lessonId }, { strokeIds, decision, ...(label ? { label } : {}) });
+      invalidateCanvasSceneCache();
+      await refreshRecognition();
+      const suffix = result.warnings.length ? ` ${result.warnings[0]}` : "";
+      onStatus(`${decision === "accept" ? "Label accepted" : decision === "correct" ? "Correction saved" : "Candidate dismissed"}${suffix}`);
+    } catch (error) { onStatus(error instanceof Error ? error.message : "Recognition feedback failed"); }
+    finally { setRecognitionBusy(false); }
+  }, [courseId, lessonId, onStatus, recognitionBusy, refreshRecognition]);
+
+  const correctionPrompt = async (node: CanvasSceneNode) => {
+    const label = window.prompt("Correct label for this drawing (leave empty to just dismiss):", node.text ?? "");
+    if (label === null) return;
+    if (label.trim()) await reviewCandidate(node, "correct", label.trim());
+    else await reviewCandidate(node, "reject");
+  };
 
   const loadBoard = useCallback(async (board: Board) => {
     const sequence = ++loadSequence.current;
@@ -584,6 +705,24 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
       void applyQuickdrawProposal();
     }}>{proposalBusy ? "Saving approved proposal…" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
+    {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>{objectProposal.reason}</strong><p>Add {objectProposal.object.kind} object</p><pre>{JSON.stringify(objectProposal.object, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved object…" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
+    {recognitionOpen && <section className="canvas-recognition" role="region" aria-label="Canvas recognition review">
+      <header><strong>Canvas labels</strong><span>Teach selected ink, then confirm or correct labels</span><button className="icon-button" aria-label="Close canvas label review" onClick={() => setRecognitionOpen(false)}><X size={14} /></button></header>
+      <div className="canvas-recognition-teach">
+        <label>Label the selected ink<input aria-label="Recognition label" maxLength={80} value={teachLabel} placeholder="e.g. spring, μ, integral" onChange={(event) => setTeachLabel(event.target.value)} /></label>
+        <button className="button-primary" disabled={!selectedShapeIds.length || !teachLabel.trim() || recognitionBusy} onClick={() => void teachSelection()}>{recognitionBusy ? "Saving…" : "Teach selected drawing"}</button>
+        <small>{selectedShapeIds.length ? `${selectedShapeIds.length} stroke(s) selected` : "Select freehand strokes on the board first"}</small>
+      </div>
+      {recognitionGroups.length ? <ul className="canvas-recognition-list">{recognitionGroups.map(({ key, primary, count, confirmed }) => primary && <li key={key}>
+        <div className="recognition-label"><b>{primary.text ?? "unlabeled"}</b>{confirmed ? <span className="recognition-confirmed">confirmed</span> : primary.confidence !== null ? <span>{Math.round(primary.confidence * 100)}%</span> : null}{count > 1 && !confirmed ? <span>+{count - 1} alternative</span> : null}</div>
+        {confirmed ? null : <div className="recognition-actions">
+          <button className="button-soft" disabled={recognitionBusy || !primary.text} onClick={() => void reviewCandidate(primary, "accept", primary.text ?? undefined)}>Accept</button>
+          <button className="button-soft" disabled={recognitionBusy} onClick={() => void correctionPrompt(primary)}>Correct…</button>
+          <button className="button-soft" disabled={recognitionBusy} onClick={() => void reviewCandidate(primary, "reject")}>Dismiss</button>
+        </div>}
+      </li>)}</ul> : <p className="canvas-recognition-empty">No recognition candidates on this revision. Teach a label to improve them.</p>}
+      {Object.keys(exampleCounts).length ? <p className="canvas-recognition-counts">Taught labels: {Object.entries(exampleCounts).map(([label, total]) => `${label} (${total})`).join(", ")}</p> : null}
+    </section>}
     <div className="canvas-tools-bar">
       <div className="canvas-board-selector">
         <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label="Choose canvas board"><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
@@ -592,7 +731,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} · Esc cancels</span>}
       {selectedId && <div className="science-selection-actions"><button className="button-soft" aria-label="Inspect selected object" onClick={() => setEditingId(selectedId)}>Inspect</button><button className="button-soft" aria-label="Send scientific object to back" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([object, ...document.objects.filter((item) => item.id !== selectedId)]); }}>Back</button><button className="button-soft" aria-label="Bring scientific object to front" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([...document.objects.filter((item) => item.id !== selectedId), object]); }}>Front</button><button className="button-soft" aria-label="Delete selected scientific object" onClick={() => { replaceObjects(document.objects.filter((item) => item.id !== selectedId)); setSelectedId(undefined); }}>Delete</button></div>}
       <div className="canvas-actions">
-        <button className="button-soft" disabled={!activeBoard || loading || analysisBusy || proposalBusy} title="Analyze the saved active board and share its validated evidence with the Tutor" onClick={() => void analyzeBoard()}><Atom size={14} />{analysisBusy ? "Analyzing…" : "Analyze board"}</button>
+        <button className="button-soft" disabled={!activeBoard || loading || analysisBusy || proposalBusy} title="Select freehand strokes to target their complete ink groups; otherwise the highest-scoring, spatially diverse groups are analyzed." onClick={() => void analyzeBoard()}><Atom size={14} />{analysisBusy ? "Analyzing…" : "Analyze board"}</button>
+        <button className="button-soft" aria-label="Review canvas labels" aria-pressed={recognitionOpen} disabled={!activeBoard || loading} title="Teach selected ink a label, then accept, correct, or dismiss recognition candidates." onClick={() => void openRecognition()}><Tag size={14} />Labels</button>
         <button className="icon-button" title="Undo" aria-label="Undo canvas change" disabled={!undoState.canUndo} onClick={undo}><Undo2 size={15} /></button>
         <button className="icon-button" title="Redo" aria-label="Redo canvas change" disabled={!undoState.canRedo} onClick={redo}><Redo2 size={15} /></button>
         <button className="icon-button" title="Import canvas JSON" aria-label="Import canvas JSON" onClick={() => importRef.current?.click()}><Upload size={15} /></button>
@@ -630,13 +770,6 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 function CanvasAnalysisTutorContext({ analysis }: { analysis: CanvasAnalysisResult }) {
   useAgentContext({ description: "StudyAI canvas analysis result", value: analysis as never });
   return null;
-}
-
-async function blobToBase64(blob: Blob): Promise<string> {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  return btoa(binary);
 }
 
 function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreateLinkedGraph }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void; onCreateLinkedGraph: () => void }) {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecognitionCache } from "../server/canvas-intelligence/cache.js";
 import { summarizeCanvasBenchmark } from "../server/canvas-intelligence/benchmark.js";
 import { scoreCanvasLiveOutput } from "../server/canvas-intelligence/benchmark-score.js";
-import { geometryObservations, normalizeCanvasInput } from "../server/canvas-intelligence/input.js";
+import { geometryObservations, normalizeCanvasInput, quickdrawRecordsForStructure } from "../server/canvas-intelligence/input.js";
 import { normalizeOCRResponse, normalizeOCRText } from "../server/canvas-intelligence/ocr.js";
 import { understandCanvas, clearCanvasRecognitionCache } from "../server/canvas-intelligence/service.js";
 import { validateCanvasScience } from "../server/canvas-intelligence/validation.js";
@@ -11,6 +11,8 @@ import { makeMolecule } from "../src/canvas/model.js";
 import { Store } from "@quickdrawjs/react";
 import { captureSelectedStrokeRegions, groupQuickdrawStrokes, localizeOCRByRegion, associateOCRLabels } from "../server/canvas-intelligence/regions.js";
 import { quickdrawPixelToWorld } from "../server/canvas-intelligence/input.js";
+import { groqOCR } from "../server/canvas-intelligence/groq.js";
+import { planCanvasOCRCrops } from "../src/canvas/ocr-regions.js";
 import { FusionResultSchema, StructureResultSchema, normalizeCanvasFusionOutput, normalizeCanvasStructureOutput, schemasForCanvasIds } from "../server/canvas-intelligence/types.js";
 
 const records = { document: { store: {
@@ -39,6 +41,35 @@ function mockFetcher(calls: Array<{ url: string; body?: any }>, tracking?: { act
 }
 
 describe("canvas intelligence adapters", () => {
+  it("represents missing model object labels as unknown instead of rejecting otherwise grounded objects", () => {
+    const normalized = normalizeCanvasStructureOutput({ objects: [{ id: "shape-1", kind: "arrow", sourceIds: ["shape-1"], confidence: 0.9, basis: "record" }], relationships: [], observations: [], ambiguities: [] }, ["shape-1"]) as { objects: Array<{ label: string | null; basis: string }> };
+    expect(normalized.objects[0]).toMatchObject({ label: null, basis: "model" });
+  });
+
+  it("defaults a missing model object kind instead of failing the whole analysis", () => {
+    const normalized = normalizeCanvasStructureOutput({ objects: [{ id: "shape-1", sourceIds: ["shape-1"], confidence: 0.9 }], relationships: [], observations: [], ambiguities: [] }, ["shape-1"]) as { objects: Array<{ kind: string; label: string | null; basis: string }> };
+    expect(normalized.objects[0]).toMatchObject({ kind: "unknown", label: null, basis: "model" });
+  });
+
+  it("preserves unavailable model confidence as null", () => {
+    const ids = ["molecule:co2", "shape:label"];
+    const normalized = normalizeCanvasFusionOutput({ answer: "Possible molecule", objects: [{ id: "molecule:co2", kind: "molecule", sourceIds: ["molecule:co2"], confidence: null }], relationships: [], associations: [{ description: "Possible label", sourceIds: ["shape:label"], confidence: null }], uncertainties: [] }, ids);
+    const fusion = schemasForCanvasIds(ids).fusion.parse(normalized);
+
+    expect(fusion.objects[0].confidence).toBeNull();
+    expect(fusion.associations[0].confidence).toBeNull();
+    expect(fusion.objects[0].label).toBeNull();
+  });
+
+  it("avoids duplicating stroke points in the structure prompt while retaining original QuickDraw evidence", () => {
+    const raw = { id: "ink-1", typeName: "shape", type: "draw", x: 10, y: 20, props: { pts: [0, 0, 0.5, 4, 5, 0.5] } };
+    const record = { id: "ink-1", type: "draw", bounds: { x: 10, y: 20, width: 4, height: 5 }, geometry: { kind: "stroke", points: [{ x: 10, y: 20 }, { x: 14, y: 25 }] }, raw } as Parameters<typeof quickdrawRecordsForStructure>[0][number];
+    const records = quickdrawRecordsForStructure([record]);
+
+    expect(records[0]).toMatchObject({ id: "ink-1", props: { pts: raw.props.pts }, normalized: { geometry: { kind: "stroke", pointCount: 2 } } });
+    expect(records[0].normalized.geometry).not.toHaveProperty("points");
+  });
+
   it("normalizes the installed GLM-OCR response without inventing image boxes", () => {
     const result = normalizeOCRResponse({ items: [{ text: "Fn", kind: "force", confidence: "0.95", alternatives: [], sourceIds: [] }] }, '{"items":[]}');
     expect(result.items[0]).toMatchObject({ text: "Fn", kind: "word", confidence: 0.95, imageRegion: null });
@@ -46,6 +77,15 @@ describe("canvas intelligence adapters", () => {
     expect(result.raw).toBe('{"items":[]}');
     expect(normalizeOCRText("Fn\nFa\nmg")).toMatchObject({ items: [{ text: "Fn", confidence: null, imageRegion: null, uncertain: true }, { text: "Fa" }, { text: "mg" }], uncertain: true });
     expect(normalizeOCRResponse({ items: [], uncertain: false }, "{}").uncertain).toBe(true);
+  });
+
+  it("discards provider-supplied OCR coordinates and source identifiers", async () => {
+    vi.stubEnv("GROQ_API_KEY", "test-key");
+    vi.stubEnv("CANVAS_GROQ_MAX_REQUESTS_PER_MINUTE", "20");
+    const fetcher = (async () => Response.json({ choices: [{ message: { content: JSON.stringify({ items: [{ text: "F = 5 N", kind: "equation", confidence: 0.99, sourceIds: ["ink"], imageRegion: { x: 1, y: 2, width: 30, height: 12 }, worldRegion: { x: 999, y: 999, width: 30, height: 12 } }], uncertain: false }) } }] })) as typeof fetch;
+    const result = await groqOCR({ base64: "aW1hZ2U=", fetcher });
+
+    expect(result.items[0]).toMatchObject({ text: "F = 5 N", confidence: null, sourceIds: [], imageRegion: null, worldRegion: null, locationPrecision: "unknown", uncertain: true });
   });
 
   it("normalizes sparse Qwen JSON while retaining its ambiguity", () => {
@@ -99,17 +139,18 @@ describe("canvas intelligence adapters", () => {
     const groups = groupQuickdrawStrokes(input);
     expect(groups).toHaveLength(1);
     const regions = await captureSelectedStrokeRegions(input, async (plan) => ({ base64: "Y3JvcA==", width: plan.width, height: plan.height }));
-    expect(regions[0]).toMatchObject({ sourceIds: ["letter-a", "letter-b"], worldBounds: { x: 10, y: 20, width: 9, height: 4 } });
+    expect(regions[0]).toMatchObject({ sourceIds: ["letter-a", "letter-b"], worldBounds: { x: 7, y: 17, width: 15, height: 10 } });
     const localized = localizeOCRByRegion(normalizeOCRText("Fn"), regions);
     expect(localized.items[0]).toMatchObject({ text: "Fn", sourceRegionId: regions[0].id, worldRegion: regions[0].worldBounds, locationPrecision: "region", uncertain: true });
     expect(localized.uncertain).toBe(true);
   });
 
-  it("maps model-provided OCR boxes through the crop transform without reducing precision", () => {
-    const region = { id: "crop", base64: "Y3JvcA==", worldBounds: { x: 100, y: 200, width: 20, height: 10 }, cropBounds: { x: 100, y: 200, width: 20, height: 10 }, sourceIds: ["ink"], pixelToWorld: { scaleX: 0.5, scaleY: 0.25, offsetX: 100, offsetY: 200 } };
+  it("ignores unverified provider boxes and localizes only to a source-linked crop", () => {
+    const region = { id: "crop", base64: "Y3JvcA==", mimeType: "image/png" as const, worldBounds: { x: 100, y: 200, width: 20, height: 10 }, cropBounds: { x: 100, y: 200, width: 20, height: 10 }, sourceIds: ["ink"], pixelWidth: 40, pixelHeight: 40, pixelToWorld: { scaleX: 0.5, scaleY: 0.25, offsetX: 100, offsetY: 200 } };
     const recognized = normalizeOCRResponse({ items: [{ text: "Fn", confidence: 0.95, imageRegion: { x: 10, y: 20, width: 5, height: 4 } }] }, "");
     const localized = localizeOCRByRegion(recognized, [region]);
-    expect(localized.items[0]).toMatchObject({ worldRegion: { x: 105, y: 205, width: 2.5, height: 1 }, locationPrecision: "item", uncertain: false, sourceIds: ["ink"] });
+    expect(localized.items[0]).toMatchObject({ worldRegion: region.worldBounds, imageRegion: null, sourceRegionId: "crop", locationPrecision: "region", uncertain: true, sourceIds: ["ink"] });
+    expect(localized.items[0].worldRegion).not.toEqual({ x: 105, y: 205, width: 2.5, height: 1 });
   });
 
   it("associates a localized label by nearest object and marks close candidates ambiguous", () => {
@@ -173,19 +214,59 @@ describe("canvas intelligence adapters", () => {
     await expect(understandCanvas({ boardId: "board", snapshot: records, image: { base64: "aW1hZ2U=" }, userQuestion: "Read this", mode: "recognize", models, fetcher })).rejects.toThrow("Required Ollama model is not installed: reason:test");
   });
 
-  it("surfaces Groq OCR failures without calling a local model", async () => {
+  it("reports failed Groq OCR regions as partial without calling a local model", async () => {
     clearCanvasRecognitionCache();
     vi.stubEnv("CANVAS_INFERENCE_PROVIDER", "groq");
     vi.stubEnv("CANVAS_OCR_PROVIDER", "groq");
     vi.stubEnv("GROQ_API_KEY", "test-key");
     const calls: string[] = [];
-    const fetcher = (async (url: string | URL | Request) => {
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
       calls.push(String(url));
-      return new Response("unavailable", { status: 503 });
+      if (String(init?.body).includes("image_url")) return new Response("unavailable", { status: 503 });
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ objects: [], relationships: [], observations: [], ambiguities: [] }) } }] });
     }) as typeof fetch;
-    await expect(understandCanvas({ boardId: "board", snapshot: records, image: { base64: "aW1hZ2U=" }, userQuestion: "Read this", mode: "recognize", models, fetcher })).rejects.toThrow(/Groq (OCR|inference) HTTP 503/);
+    const result = await understandCanvas({ boardId: "board", snapshot: records, image: { base64: "aW1hZ2U=" }, userQuestion: "Read this", mode: "recognize", models, fetcher });
+    expect(result.partial).toBe(true);
+    expect(result.evidence?.warnings).toContain("1 OCR region(s) could not be processed; provider output was omitted.");
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.every((url) => url === "https://api.groq.com/openai/v1/chat/completions")).toBe(true);
+  });
+
+  it("uses one expression region for a pure-ink math board", () => {
+    const snapshot = { document: { store: Object.fromEntries(Array.from({ length: 3 }, (_, index) => [`ink-${index}`, { id: `ink-${index}`, type: "draw", x: index * 100, y: 0, width: 10, height: 10 }])) } };
+    const input = normalizeCanvasInput({ boardId: "math-ink", snapshot });
+    const groups = groupQuickdrawStrokes(input);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].id).toContain("stroke-group:expression:");
+    expect(groups[0].sourceIds).toEqual(["ink-0", "ink-1", "ink-2"]);
+  });
+
+  it("limits one analysis to three OCR image requests and reports the omitted source region", async () => {
+    clearCanvasRecognitionCache();
+    vi.stubEnv("CANVAS_INFERENCE_PROVIDER", "groq"); vi.stubEnv("CANVAS_OCR_PROVIDER", "groq");
+    vi.stubEnv("GROQ_API_KEY", "test-key"); vi.stubEnv("CANVAS_GROQ_MAX_REQUESTS_PER_MINUTE", "100");
+    vi.stubEnv("CANVAS_OCR_MAX_REGIONS", "3");
+    const snapshot = { document: { store: {
+      ...Object.fromEntries(Array.from({ length: 4 }, (_, index) => [`ink-${index}`, { id: `ink-${index}`, type: "draw", x: index * 100, y: 0, width: 10, height: 10 }])),
+      label: { id: "label", type: "text", x: 0, y: 40, width: 40, height: 16, props: { text: "F", size: "m", scale: 1 } },
+    } } };
+    const input = normalizeCanvasInput({ boardId: "bounded", snapshot });
+    const plans = planCanvasOCRCrops(groupQuickdrawStrokes(input));
+    const regions = plans.map((plan) => ({ ...plan, base64: "aW1hZ2U=", mimeType: "image/png" as const, pixelWidth: plan.width, pixelHeight: plan.height }));
+    let ocrRequests = 0;
+    const fetcher = (async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      if (Array.isArray(body.messages?.[1]?.content)) {
+        ocrRequests++;
+        return Response.json({ choices: [{ message: { content: JSON.stringify({ items: [], uncertain: false }) } }] });
+      }
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ objects: [], relationships: [], observations: [], ambiguities: [] }) } }] });
+    }) as typeof fetch;
+    const result = await understandCanvas({ boardId: "bounded", snapshot, image: { regions }, userQuestion: "Analyze these marks", mode: "recognize", models, fetcher });
+
+    expect(ocrRequests).toBe(3);
+    expect(result.partial).toBe(true);
+    expect(result.warnings).toContain("1 OCR region(s) were omitted by the per-analysis region or image-size limit.");
   });
 
   it("bounds the recognition cache", () => {

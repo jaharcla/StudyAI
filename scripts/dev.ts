@@ -11,6 +11,6 @@ const { result } = concurrently([
   { name: "agent", command: `langgraphjs dev --host ${LOOPBACK_HOST} --port ${config.agentPort} --no-browser --no-reload` },
   { name: "runtime", command: "tsx server/runtime.ts" },
   { name: "data", command: "tsx server/api.ts" },
-  { name: "web", command: process.env.STUDYAI_E2E_PRODUCTION === "1" ? `vite preview --host ${LOOPBACK_HOST}` : `vite --host ${LOOPBACK_HOST}` },
+  { name: "web", command: `tsx scripts/wait-for-services.ts && ${process.env.STUDYAI_E2E_PRODUCTION === "1" ? `vite preview --host ${LOOPBACK_HOST}` : `vite --host ${LOOPBACK_HOST}`}` },
 ], { killOthersOn: ["failure", "success"] });
 await result.catch(() => { process.exitCode = 1; });

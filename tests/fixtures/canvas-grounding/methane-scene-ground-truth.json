@@ -1,0 +1,53 @@
+{
+  "sourceHash": "69e78fdf7e4adeebee4a3323cbf1593517568ad1e41af0660540d92919f90df5",
+  "review": {
+    "method": "Single-operator review of the exact saved-board render and preserved OCR crops",
+    "independentReviewCount": 1,
+    "independentReviewComplete": false,
+    "scope": "The freehand molecular sketch at the left side of the board. A separate native QuickDraw molecule with similar labels is visible elsewhere and is a distractor, not evidence for this target."
+  },
+  "expectedFormula": {
+    "formula": "CH4",
+    "status": "conditional-on-left-connector",
+    "reason": "Three connections are visually clear. The horizontal left connector is aligned between the left H and C but visibly separated from both; treating it as a bond remains uncertain."
+  },
+  "targetSourceIds": [
+    "shape:mw87ck9x0i12ol", "shape:mw87cl5t0jy8q7", "shape:mw87cm0j0knf4i", "shape:mw87cn7n0lu386",
+    "shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2", "shape:mw87cq2d0ozkbh", "shape:mw87cql70pnyo8",
+    "shape:mw87cqzk0qpqpz", "shape:mw87crfz0reejf", "shape:mw87cscx0szd4r", "shape:mw87ct2o0thns6",
+    "shape:mw87ctom0umjro", "shape:mw87cud10v3d97", "shape:mw87cvsu0wd4cv", "shape:mw87cwxz0xm8yh",
+    "shape:mw87cxfr0yjyqr", "shape:mw87cy3l0ztxko"
+  ],
+  "textItems": [
+    { "id": "ink-h-top", "text": "H", "kind": "symbol", "sourceIds": ["shape:mw87ck9x0i12ol", "shape:mw87cl5t0jy8q7", "shape:mw87cm0j0knf4i"], "state": "clear" },
+    { "id": "ink-carbon", "text": "C", "kind": "symbol", "sourceIds": ["shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2"], "state": "clear" },
+    { "id": "ink-h-right", "text": "H", "kind": "symbol", "sourceIds": ["shape:mw87cql70pnyo8", "shape:mw87cqzk0qpqpz", "shape:mw87crfz0reejf"], "state": "clear" },
+    { "id": "ink-h-bottom", "text": "H", "kind": "symbol", "sourceIds": ["shape:mw87cwxz0xm8yh", "shape:mw87cxfr0yjyqr", "shape:mw87cy3l0ztxko"], "state": "clear" },
+    { "id": "ink-h-left", "text": "H", "kind": "symbol", "sourceIds": ["shape:mw87ct2o0thns6", "shape:mw87ctom0umjro", "shape:mw87cud10v3d97"], "state": "clear" }
+  ],
+  "relations": [
+    { "id": "bond-top", "from": "ink-h-top", "to": "ink-carbon", "relation": "bond", "connectorId": "shape:mw87cn7n0lu386", "evidenceIds": ["shape:mw87cn7n0lu386", "shape:mw87ck9x0i12ol", "shape:mw87cl5t0jy8q7", "shape:mw87cm0j0knf4i", "shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2"], "state": "clear" },
+    { "id": "bond-right", "from": "ink-carbon", "to": "ink-h-right", "relation": "bond", "connectorId": "shape:mw87cq2d0ozkbh", "evidenceIds": ["shape:mw87cq2d0ozkbh", "shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2", "shape:mw87cql70pnyo8", "shape:mw87cqzk0qpqpz", "shape:mw87crfz0reejf"], "state": "clear" },
+    { "id": "bond-bottom", "from": "ink-carbon", "to": "ink-h-bottom", "relation": "bond", "connectorId": "shape:mw87cvsu0wd4cv", "evidenceIds": ["shape:mw87cvsu0wd4cv", "shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2", "shape:mw87cwxz0xm8yh", "shape:mw87cxfr0yjyqr", "shape:mw87cy3l0ztxko"], "state": "clear" },
+    { "id": "bond-left", "from": "ink-h-left", "to": "ink-carbon", "relation": "bond", "connectorId": "shape:mw87cscx0szd4r", "evidenceIds": ["shape:mw87cscx0szd4r", "shape:mw87ct2o0thns6", "shape:mw87ctom0umjro", "shape:mw87cud10v3d97", "shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2"], "state": "uncertain", "ambiguityReason": "The horizontal mark is aligned between H and C but its endpoints are visibly separated from both glyphs; it could be an intended bond or an unrelated stroke." }
+  ],
+  "strokeGroups": [
+    { "id": "ink-h-top", "sourceIds": ["shape:mw87ck9x0i12ol", "shape:mw87cl5t0jy8q7", "shape:mw87cm0j0knf4i"], "state": "clear" },
+    { "id": "ink-carbon", "sourceIds": ["shape:mw87cnwt0mulmu", "shape:mw87cpaf0n4jx2"], "state": "clear" },
+    { "id": "ink-h-right", "sourceIds": ["shape:mw87cql70pnyo8", "shape:mw87cqzk0qpqpz", "shape:mw87crfz0reejf"], "state": "clear" },
+    { "id": "ink-h-bottom", "sourceIds": ["shape:mw87cwxz0xm8yh", "shape:mw87cxfr0yjyqr", "shape:mw87cy3l0ztxko"], "state": "clear" },
+    { "id": "ink-h-left", "sourceIds": ["shape:mw87ct2o0thns6", "shape:mw87ctom0umjro", "shape:mw87cud10v3d97"], "state": "clear" },
+    { "id": "bond-top", "sourceIds": ["shape:mw87cn7n0lu386"], "state": "clear" },
+    { "id": "bond-right", "sourceIds": ["shape:mw87cq2d0ozkbh"], "state": "clear" },
+    { "id": "bond-bottom", "sourceIds": ["shape:mw87cvsu0wd4cv"], "state": "clear" },
+    { "id": "bond-left", "sourceIds": ["shape:mw87cscx0szd4r"], "state": "clear" },
+    { "id": "freehand-angle-mark-1", "sourceIds": ["shape:mw877001020vyy"], "state": "clear" },
+    { "id": "freehand-angle-mark-2", "sourceIds": ["shape:mw878y2d09dp04"], "state": "clear" },
+    { "id": "freehand-curved-mark-250", "sourceIds": ["shape:mw879ecf0ctiiq"], "state": "clear" },
+    { "id": "freehand-graph-curve", "sourceIds": ["shape:mw883h4x00j8tb"], "state": "clear" }
+  ],
+  "nonTargetStructuredMoleculeSourceIds": [
+    "shape:mw87d7r1107j49", "shape:mw87dbrb11gqqd", "shape:mw87df8512j9y6", "shape:mw87dhhz13pgyg", "shape:mw87dntl14zmxx",
+    "shape:mw87dsmy15zlnq", "shape:mw87dvo9160bh8", "shape:mw87dxhq17uols", "shape:mw87dzpg18jmb5"
+  ]
+}

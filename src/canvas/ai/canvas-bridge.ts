@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { Bounds, Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
+import type { CanvasSceneGraph } from "../spatial/types";
 import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
+import { boundedSceneSlice, canvasEvidenceSearchSchema, canvasSceneReadSchema, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
+import { buildCanvasSceneAIContext } from "./scene-context";
 import { buildCanvasAIContext, type CanvasScope } from "./canvas-context";
 
 export type QuickdrawAIBridgeOptions = {
@@ -23,7 +27,16 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     scope: options.scope,
     maxChars: options.maxContextChars,
   }) : { scope: options.scope, viewport: options.viewport, selected: [], visible: [], nearbyObjects: [], spatialRelationships: [], truncated: false };
-  useAgentContext({ description: "Active Quickdraw board context", value: context as never });
+  const [scene, setScene] = useState<CanvasSceneGraph | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setScene(null);
+    if (!options.scope.boardId || options.scope.revision === undefined) return;
+    requestCanvasScene(options.scope).then((graph) => { if (!cancelled) setScene(graph); }).catch(() => { if (!cancelled) setScene(null); });
+    return () => { cancelled = true; };
+  }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
+  const sceneContext = scene ? buildCanvasSceneAIContext(scene) : null;
+  useAgentContext({ description: "Active Quickdraw board context", value: { ...context, scene: sceneContext } as never });
   useFrontendTool({
     name: "propose_canvas_action",
     description: "Propose up to 30 native QuickDraw shape actions for user review. Supports createShape, createText, createArrow, updateShape, deleteShape, moveShape, highlightShape and selectShapes. groupShapes is unsupported by QuickDraw. Every proposal is scoped to the current board and is not applied until approved.",
@@ -48,4 +61,33 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
       catch (error) { return { error: error instanceof Error ? error.message : "Canvas state unavailable." }; }
     },
   }, [options.store, options.scope.boardId]);
+  useFrontendTool({
+    name: "get_canvas_scene",
+    description: "Read a bounded, revision-bound spatial scene graph for the active board. Use it for what is near, overlapping, or spatially related. Node IDs are read-only; use raw QuickDraw/science IDs for proposals.",
+    parameters: canvasSceneReadSchema,
+    handler: async ({ boardId, maxNodes, nodeKinds }) => {
+      try {
+        if (boardId !== options.scope.boardId) throw new Error("The active board changed.");
+        const graph = await requestCanvasScene(options.scope);
+        return boundedSceneSlice(graph, { maxNodes, nodeKinds });
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : "Canvas scene unavailable." };
+      }
+    },
+  }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
+  useFrontendTool({
+    name: "search_canvas_evidence",
+    description: "Search revision-bound scene evidence by text. Pass the active boardId for this board's current revision, or omit boardId to search every board in the current course whose latest revision has a built scene; pass lessonId to narrow a course search to one lesson. Returns source-linked nodes with incident edges and board attribution. Results are evidence, not verified labels.",
+    parameters: canvasEvidenceSearchSchema,
+    handler: async ({ boardId, lessonId, query, limit }) => {
+      try {
+        if (boardId && boardId !== options.scope.boardId) throw new Error("The active board changed.");
+        return boardId
+          ? await searchCanvasEvidence(options.scope, query, limit)
+          : await searchCourseCanvasEvidence({ courseId: options.scope.courseId, lessonId }, query, limit);
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : "Canvas evidence search unavailable." };
+      }
+    },
+  }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
 }

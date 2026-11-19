@@ -3,7 +3,7 @@ import { z } from "zod";
 import { canvasFixtureSchema, pipelineResultSchema } from "../../src/canvas/research.js";
 import { CanvasEvidenceBundleSchema, CanvasEvidenceSchema, EvidenceConflictSchema, SelectedCanvasContextSchema } from "../canvas-intelligence/evidence.js";
 import { normalizeCanvasInput } from "../canvas-intelligence/input.js";
-import { FusionResultSchema, StructureRelationshipSchema, StructureResultSchema, type CanvasInput } from "../canvas-intelligence/types.js";
+import { BoundsSchema, FusionResultSchema, StructureRelationshipSchema, StructureResultSchema, type CanvasInput } from "../canvas-intelligence/types.js";
 import type { ObjectAnchor } from "../../src/canvas/scene.js";
 
 const identifier = z.string().min(1).max(512);
@@ -14,14 +14,22 @@ export const AuthoritativeCanvasRevisionSchema = canvasFixtureSchema.shape.sourc
 
 export const CanvasAnalysisProvenanceSchema = z.object({
   id: identifier,
-  stage: z.enum(["canvas", "geometry", "ocr", "structure", "fusion", "validation"]),
+  stage: z.enum(["canvas", "geometry", "ocr", "recognition", "structure", "fusion", "validation"]),
   provider: z.enum(["quickdraw", "local", "groq", "system"]),
   method: identifier,
   model: z.string().min(1).nullable(),
   createdAt: z.iso.datetime(),
 }).strict();
 
-export const CanvasAnalysisEvidenceSchema = CanvasEvidenceSchema.extend({ provenanceIds: references }).strict();
+export const CanvasAnalysisOmittedRegionSchema = z.object({
+  id: identifier,
+  sourceIds: z.array(identifier).min(1).max(5000),
+  worldBounds: BoundsSchema,
+  score: z.object({ total: z.number().finite().min(0).max(100), textContent: confidence, strokeComposition: confidence, spatialRelevance: confidence, visualComplexity: confidence }).strict(),
+  reason: z.enum(["not-selected", "crop-limit", "not-captured", "image-size-limit", "ocr-failed"]),
+}).strict();
+
+export const CanvasAnalysisEvidenceSchema = CanvasEvidenceSchema.safeExtend({ provenanceIds: references }).strict();
 export type CanvasSourceObjectRef = Pick<ObjectAnchor, "scope" | "id">;
 export const CanvasSourceObjectRefSchema: z.ZodType<CanvasSourceObjectRef> = z.object({ scope: z.enum(["quickdraw", "science"]), id: identifier }).strict();
 
@@ -84,6 +92,7 @@ export const CanvasAnalysisResultSchema = z.object({
   relationships: z.array(CanvasAnalysisRelationshipSchema).max(5000),
   uncertainty: FusionResultSchema.shape.uncertainties,
   provenance: z.array(CanvasAnalysisProvenanceSchema).min(1).max(1000),
+  omittedRegions: z.array(CanvasAnalysisOmittedRegionSchema).max(5000).default([]),
   analysisStatus: pipelineResultSchema.shape.status,
   pipelineVersion: identifier,
   diagnostics: z.object({ errors: pipelineResultSchema.shape.errors, timings: pipelineResultSchema.shape.timings }).strict(),
@@ -96,6 +105,9 @@ export const CanvasAnalysisResultSchema = z.object({
   const unique = (values: string[]) => new Set(values).size === values.length;
   const checkObjectIds = (ids: string[], path: (string | number)[]) => {
     for (const id of ids) if (!objectIds.has(id)) context.addIssue({ code: "custom", path, message: `Unknown canvas source object ID: ${id}` });
+  };
+  const checkSourceRefs = (refs: Array<{ scope: "quickdraw" | "science"; id: string }>, path: (string | number)[]) => {
+    for (const ref of refs) if (!sourceRefs.has(`${ref.scope}:${ref.id}`)) context.addIssue({ code: "custom", path, message: "Evidence contains a scoped reference outside the captured canvas source set." });
   };
   const checkProvenance = (ids: string[], path: (string | number)[]) => {
     for (const id of ids) if (!provenanceIds.has(id)) context.addIssue({ code: "custom", path, message: `Unknown provenance ID: ${id}` });
@@ -120,11 +132,17 @@ export const CanvasAnalysisResultSchema = z.object({
   const allEvidenceById = new Map(evidence.map((item) => [item.id, item]));
   result.observedEvidence.items.forEach((item, index) => {
     checkObjectIds(item.sourceIds, ["observedEvidence", "items", index, "sourceIds"]);
+    checkSourceRefs(item.sourceRefs, ["observedEvidence", "items", index, "sourceRefs"]);
+    if (item.sourceRegion) checkSourceRefs(item.sourceRegion.sourceIds.map((id) => ({ scope: "quickdraw", id })), ["observedEvidence", "items", index, "sourceRegion", "sourceIds"]);
+    if (item.association) checkSourceRefs(item.association.candidateRefs, ["observedEvidence", "items", index, "association", "candidateRefs"]);
     checkProvenance(item.provenanceIds, ["observedEvidence", "items", index, "provenanceIds"]);
     if (item.revisionHash !== result.observedEvidence.sourceScope.revisionHash) context.addIssue({ code: "custom", path: ["observedEvidence", "items", index, "revisionHash"], message: "Evidence item revision does not match its bundle." });
   });
   result.inferredInterpretations.evidence.forEach((item, index) => {
     checkObjectIds(item.sourceIds, ["inferredInterpretations", "evidence", index, "sourceIds"]);
+    checkSourceRefs(item.sourceRefs, ["inferredInterpretations", "evidence", index, "sourceRefs"]);
+    if (item.sourceRegion) checkSourceRefs(item.sourceRegion.sourceIds.map((id) => ({ scope: "quickdraw", id })), ["inferredInterpretations", "evidence", index, "sourceRegion", "sourceIds"]);
+    if (item.association) checkSourceRefs(item.association.candidateRefs, ["inferredInterpretations", "evidence", index, "association", "candidateRefs"]);
     checkProvenance(item.provenanceIds, ["inferredInterpretations", "evidence", index, "provenanceIds"]);
     if (item.revisionHash !== result.observedEvidence.sourceScope.revisionHash) context.addIssue({ code: "custom", path: ["inferredInterpretations", "evidence", index, "revisionHash"], message: "Evidence item revision does not match its bundle." });
   });
@@ -184,11 +202,13 @@ export function createCanvasAnalysisResult(input: {
   evidence: z.infer<typeof CanvasEvidenceBundleSchema>;
   selectedContext: z.infer<typeof SelectedCanvasContextSchema>;
   pipelineResult: unknown;
+  omittedRegions?: Array<z.input<typeof CanvasAnalysisOmittedRegionSchema>>;
 }): CanvasAnalysisResult {
   const board = AuthoritativeCanvasRevisionSchema.parse(input.board);
   const pipeline = pipelineResultSchema.parse(input.pipelineResult);
   const evidence = CanvasEvidenceBundleSchema.parse(input.evidence);
   const selectedContext = SelectedCanvasContextSchema.parse(input.selectedContext);
+  const omittedRegions = z.array(CanvasAnalysisOmittedRegionSchema).max(5000).parse(input.omittedRegions ?? []);
   if (input.canvasInput.boardId !== board.boardId || input.canvasInput.courseId !== board.courseId || input.canvasInput.lessonId !== board.lessonId) {
     throw new CanvasAnalysisValidationError("scope_mismatch", "Canvas input scope does not match the authoritative board.");
   }
@@ -218,7 +238,7 @@ export function createCanvasAnalysisResult(input: {
     ...input.canvasInput.scientificObjects.map((item) => ({ scope: "science" as const, id: item.id })),
   ].filter((item, index, all) => all.findIndex((candidate) => candidate.scope === item.scope && candidate.id === item.id) === index);
   const withProvenance = (item: z.infer<typeof CanvasEvidenceSchema>) => {
-    const stages = item.origin === "native" ? ["canvas"] : item.origin === "geometry" ? ["geometry"] : item.origin === "ocr" ? ["ocr"] : ["structure", "fusion"];
+    const stages = item.origin === "native" ? ["canvas"] : item.origin === "geometry" ? ["geometry"] : item.origin === "ocr" ? ["ocr"] : item.origin === "recognition" ? ["recognition"] : ["structure", "fusion"];
     const provenanceIds = provenance.filter((entry) => stages.includes(entry.stage)).map((entry) => entry.id);
     if (!provenanceIds.length) throw new CanvasAnalysisValidationError("invalid_result", `No provenance is recorded for ${item.origin} canvas evidence.`);
     return CanvasAnalysisEvidenceSchema.parse({ ...item, provenanceIds });
@@ -280,6 +300,7 @@ export function createCanvasAnalysisResult(input: {
     relationships,
     uncertainty,
     provenance,
+    omittedRegions,
     analysisStatus: pipeline.status,
     pipelineVersion: pipeline.pipelineVersion,
     diagnostics: { errors: pipeline.errors, ...(pipeline.timings ? { timings: pipeline.timings } : {}) },
@@ -298,6 +319,20 @@ export function validateCanvasAnalysisForBoard(input: unknown, source: Authorita
   const current = currentCanvasRevision(board);
   if (result.revision !== current.revision || result.snapshotHash !== current.snapshotHash || result.revisionHash !== current.revisionHash) {
     throw new CanvasAnalysisValidationError("stale_revision", "Canvas analysis is stale; analyze the current board again.", { currentRevision: current.revision, currentRevisionHash: current.revisionHash });
+  }
+  const authoritative = record(parseAuthoritativeDocument(board.document));
+  const fullInput = normalizeCanvasInput({
+    boardId: board.boardId,
+    courseId: board.courseId,
+    lessonId: board.lessonId,
+    snapshot: authoritative.snapshot,
+    scientificObjects: Array.isArray(authoritative.objects) ? authoritative.objects : [],
+  });
+  const authoritativeInkIds = new Set(fullInput.nativeRecords.filter((item) => item.type === "draw" || item.type === "highlight").map((item) => item.id));
+  for (const region of result.omittedRegions) {
+    if (region.sourceIds.some((id) => !authoritativeInkIds.has(id))) {
+      throw new CanvasAnalysisValidationError("invalid_result", "An omitted region references a stroke ID outside the persisted board.", region.sourceIds);
+    }
   }
   return result;
 }

@@ -5,6 +5,7 @@ data/
 *.log
 playwright-report/
 test-results/
+.experiment-artifacts/
 
 # LangGraph API
 .langgraph_api
