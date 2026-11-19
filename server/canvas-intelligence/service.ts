@@ -18,12 +18,23 @@ export type CanvasRecognitionOptions = {
   prototypes?: Record<string, readonly (readonly number[])[]>;
   labels?: readonly string[];
 };
-export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions; allowImageEgress?: boolean };
+export type CanvasOCRPolicy = "off" | "unresolved" | "all";
+export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; ocrPolicy?: CanvasOCRPolicy; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions; allowImageEgress?: boolean };
 export type CanvasUnderstanding = { mode: CanvasMode; revision: string; answer?: string; ocr?: OCRResult; associations?: OCRAssociation[]; structure: StructureResult; fusion?: FusionResult; evidence?: CanvasEvidenceBundle; selectedContext?: SelectedCanvasContext; recognition?: CanvasRecognitionStage | null; partial?: boolean; warnings?: string[]; omittedImageRegionIds?: string[]; failedImageRegionIds?: string[]; latencyMs: Record<string, number>; cached: string[] };
 const ocrCache = new RecognitionCache<OCRResult>();
 const structureCache = new RecognitionCache<StructureResult>();
 const fusionCache = new RecognitionCache<FusionResult>();
 const digest = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
+
+export function ocrRequestsForPolicy<T extends { id: string }>(
+  requests: readonly T[],
+  policy: CanvasOCRPolicy,
+  confidentGroupIds: ReadonlySet<string>,
+): T[] {
+  if (policy === "off") return [];
+  if (policy === "unresolved") return requests.filter((request) => !confidentGroupIds.has(request.id));
+  return [...requests];
+}
 
 export async function understandCanvas(args: UnderstandCanvasArgs): Promise<CanvasUnderstanding> {
   const started = performance.now(), normalizationStarted = performance.now(), input = normalizeCanvasInput(args), mode = args.mode ?? "fast";
@@ -82,11 +93,14 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   if (!regions.length && input.image?.base64) analysisWarnings.push("The full-board OCR image has no verified source-region mapping.");
   let failedOCRRegions = 0;
   const failedImageRegionIds = new Set<string>();
+  const ocrPolicy = args.ocrPolicy ?? "all";
 
-  const runOcr = async () => {
+  const runOcr = async (confidentGroupIds: ReadonlySet<string> = new Set()) => {
     const before = Date.now();
     let cacheHits = 0;
-    const results = await Promise.all(imageRequests.map(async (region) => {
+    const requests = ocrRequestsForPolicy(imageRequests, ocrPolicy, confidentGroupIds);
+    if (!requests.length) return OCRResultSchema.parse({ items: [], uncertain: true, raw: "" });
+    const results = await Promise.all(requests.map(async (region) => {
       try {
         const key = digest({ rev: input.revision, regionId: region.id, sourceIds: "sourceIds" in region ? region.sourceIds : [], image: digest(region.base64), transform: "pixelToWorld" in region ? region.pixelToWorld : undefined, model: models.ocr, provider: ocrProvider, chain: process.env.CANVAS_PROVIDER_CHAIN, profile: ocrProfile, remoteModel: ocrProvider === "groq" ? groqOCRModel() : undefined });
         const hit = ocrCache.get(key);
@@ -103,7 +117,7 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
     }));
     if (results.length && cacheHits === results.length) cached.push("ocr");
     else if (cacheHits) cached.push("ocr-partial");
-    const combined = OCRResultSchema.parse({ items: results.flatMap((result) => result.items), uncertain: results.some((result) => result.uncertain), raw: results.map((result, index) => `[${imageRequests[index].id}]\n${result.raw}`).join("\n") });
+    const combined = OCRResultSchema.parse({ items: results.flatMap((result) => result.items), uncertain: results.some((result) => result.uncertain), raw: results.map((result, index) => `[${requests[index].id}]\n${result.raw}`).join("\n") });
     latencyMs.ocr = Date.now() - before; return combined;
   };
   const runStructure = async (ocrForStructure?: OCRResult) => {
@@ -138,7 +152,16 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   let ocr: OCRResult;
   let structure: StructureResult;
   let recognition: CanvasRecognitionStage | null;
-  if (mathInk) {
+  if (ocrPolicy === "unresolved") {
+    recognition = await runRecognition();
+    const confident = new Set<string>();
+    for (const result of recognition?.results ?? []) {
+      const best = Math.max(0, ...result.candidates.map((candidate) => candidate.confidence));
+      if (best >= Number(process.env.CANVAS_OCR_SKIP_CONFIDENCE || 0.55)) confident.add(result.groupId);
+    }
+    ocr = await runOcr(confident);
+    structure = await runStructure(ocr);
+  } else if (mathInk) {
     ocr = await runOcr();
     structure = await runStructure(ocr);
     recognition = await runRecognition();

@@ -96,6 +96,7 @@ async function produce(
     expectedSourceRegionIds: sourceRegionGroups.map((group) => group.id),
     userQuestion: "Analyze this persisted board. Separate observed canvas data from uncertain interpretations. Do not infer meaning from coordinates alone or propose edits.",
     mode: "deep",
+    ocrPolicy: "all",
     allowImageEgress: input.allowImageEgress,
     recognition: { prototypes: listCanvasRecognitionPrototypes(database, row.courseId) },
   });

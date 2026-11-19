@@ -11,6 +11,7 @@ import { FusionResultSchema, OCRResultSchema, StructureResultSchema } from "../s
 import { CanvasAnalysisValidationError, currentCanvasRevision, validateCanvasAnalysisForBoard } from "../server/canvas-analysis/contract.js";
 import { createCanvasAnalysisProducerHandler, produceCanvasAnalysisForPersistedBoard, type CanvasAnalysisRequest } from "../server/canvas-analysis/producer.js";
 import type { UnderstandCanvasArgs } from "../server/canvas-intelligence/service.js";
+import { ocrRequestsForPolicy } from "../server/canvas-intelligence/service.js";
 
 const snapshot = { document: { store: {
   "shape-1": { id: "shape-1", type: "arrow", x: 0, y: 0, width: 20, height: 20, geometry: { start: { x: 0, y: 0 }, end: { x: 10, y: 10 } } },
@@ -210,5 +211,14 @@ describe("persisted canvas analysis producer", () => {
     const res = { writeHead(status: number) { result.status = status; }, end(body: string) { result.body = body; } } as unknown as ServerResponse;
     await invalidProvider(req, res);
     expect({ status: result.status, body: JSON.parse(result.body ?? "{}") }).toMatchObject({ status: 502, body: { code: "invalid_result" } });
+  });
+});
+
+describe("canvas OCR policy", () => {
+  it("skips all OCR when off and skips confident groups when unresolved", () => {
+    const requests = [{ id: "a" }, { id: "b" }];
+    expect(ocrRequestsForPolicy(requests, "off", new Set())).toEqual([]);
+    expect(ocrRequestsForPolicy(requests, "unresolved", new Set(["a"]))).toEqual([{ id: "b" }]);
+    expect(ocrRequestsForPolicy(requests, "all", new Set(["a"]))).toEqual(requests);
   });
 });
