@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { Store, type ShapeRecord } from "@quickdrawjs/core";
 import { approveCanvasProposal, MAX_CANVAS_STATE_CHARS, proposeCanvasAction, readCanvasState, validateCanvasAction } from "../src/canvas/ai/canvas-actions";
 import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context";
+import { buildTutorCanvasContext } from "../src/canvas/ai/tutor-canvas-context";
+import { CanvasSceneGraphSchema } from "../src/canvas/spatial/types";
 import type { ScientificObject } from "../src/canvas/model";
 
 function shape(id: string, type: ShapeRecord["type"], x: number, y: number, props: Record<string, unknown>, rot = 0): ShapeRecord {
@@ -176,5 +178,41 @@ describe("Quickdraw AI action proposals", () => {
     approveCanvasProposal(store, scope.boardId, proposal, editor, scope.revision);
     expect(editor.setSelection).toHaveBeenCalledWith(["label"]);
     expect(store.undos).toHaveLength(undoCount);
+  });
+});
+
+describe("Tutor canvas context", () => {
+  function fixtureScene() {
+    return CanvasSceneGraphSchema.parse({
+      schemaVersion: 1,
+      scope: { boardId: "board-a", courseId: "bio-130", lessonId: "cell" },
+      revision: 7,
+      revisionHash: "rev-7",
+      snapshotHash: "snap-7",
+      builderVersion: "test",
+      builtAt: "2026-11-19T00:00:00.000Z",
+      nodes: [{
+        id: "q:label", kind: "native-object", ref: { scope: "quickdraw", id: "label" },
+        bounds: { x: 10, y: 20, width: 40, height: 20 }, boundsBasis: "source",
+        text: "mitochondrion", recordType: "text", origin: "quickdraw",
+        verificationStatus: "source", confidence: 1, sourceRefs: [], geometry: null, uncertaintyReasons: [],
+      }],
+      edges: [],
+      warnings: [],
+      truncated: false,
+    });
+  }
+
+  it("sends one scene context and no sampled stroke points", () => {
+    const context = buildTutorCanvasContext({ scene: fixtureScene(), selectedIds: ["label"], viewport: { x: 0, y: 0, w: 200, h: 200 } });
+    expect(JSON.stringify(context)).not.toMatch(/simplified|strokeSummary/);
+    expect(context.scene?.nodes.some((node) => node.text === "mitochondrion")).toBe(true);
+    expect(context.selectedIds).toEqual(["label"]);
+  });
+
+  it("reports an unavailable scene instead of inventing one", () => {
+    const context = buildTutorCanvasContext({ scene: null, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 } });
+    expect(context.scene).toBeNull();
+    expect(context.warnings.join(" ")).toMatch(/unavailable/i);
   });
 });

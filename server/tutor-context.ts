@@ -18,7 +18,7 @@ const protectedDescriptions = new Set([
   "StudyAI current workspace and structured canvas metadata",
   "StudyAI selected model",
   "StudyAI active scientific canvas objects",
-  "Active Quickdraw board context",
+  "Active canvas scene",
   "StudyAI canvas analysis result",
   "StudyAI active learning activity",
 ]);

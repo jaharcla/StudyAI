@@ -5,8 +5,8 @@ import type { ScientificObject } from "../model";
 import type { CanvasSceneGraph } from "../spatial/types";
 import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
 import { boundedSceneSlice, canvasEvidenceSearchSchema, canvasSceneReadSchema, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
-import { buildCanvasSceneAIContext } from "./scene-context";
-import { buildCanvasAIContext, type CanvasScope } from "./canvas-context";
+import { buildTutorCanvasContext } from "./tutor-canvas-context";
+import type { CanvasScope } from "./canvas-context";
 
 export type QuickdrawAIBridgeOptions = {
   store: Store | null;
@@ -19,14 +19,6 @@ export type QuickdrawAIBridgeOptions = {
 };
 
 export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
-  const context = options.store ? buildCanvasAIContext({
-    source: options.store,
-    selectedIds: options.selectedIds,
-    viewport: options.viewport,
-    objects: options.objects,
-    scope: options.scope,
-    maxChars: options.maxContextChars,
-  }) : { scope: options.scope, viewport: options.viewport, selected: [], visible: [], nearbyObjects: [], spatialRelationships: [], truncated: false };
   const [scene, setScene] = useState<CanvasSceneGraph | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -35,8 +27,8 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     requestCanvasScene(options.scope).then((graph) => { if (!cancelled) setScene(graph); }).catch(() => { if (!cancelled) setScene(null); });
     return () => { cancelled = true; };
   }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
-  const sceneContext = scene ? buildCanvasSceneAIContext(scene) : null;
-  useAgentContext({ description: "Active Quickdraw board context", value: { ...context, scene: sceneContext } as never });
+  const tutorContext = buildTutorCanvasContext({ scene, selectedIds: options.selectedIds, viewport: options.viewport });
+  useAgentContext({ description: "Active canvas scene", value: tutorContext });
   useFrontendTool({
     name: "propose_canvas_action",
     description: "Propose up to 30 native QuickDraw shape actions for user review. Supports createShape, createText, createArrow, updateShape, deleteShape, moveShape, highlightShape and selectShapes. groupShapes is unsupported by QuickDraw. Every proposal is scoped to the current board and is not applied until approved.",
