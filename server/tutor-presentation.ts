@@ -119,6 +119,7 @@ function projectCanvasSceneContext(value: unknown, labels: Map<string, string>):
     const text = string(item.text);
     const confidence = typeof item.confidence === "number" ? item.confidence : null;
     return {
+      ...(item.kind === "stroke-group" ? { id: string(item.id) } : {}),
       kind: string(item.kind) ?? "unknown",
       ...(text ? { text } : {}),
       status: string(item.verificationStatus) ?? "unconfirmed",

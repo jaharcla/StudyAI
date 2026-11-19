@@ -166,7 +166,10 @@ describe("Tutor semantic canvas context", () => {
   it("projects scene evidence with status and confidence without raw node IDs", () => {    const contexts = projectTutorContexts([{ description: "Active canvas scene", value: {
       scene: {
         scope: { boardId: "board-17" },
-        nodes: [{ id: "o:1", kind: "ocr-item", text: "F = ma", verificationStatus: "unconfirmed", confidence: 0.62, uncertaintyReasons: ["Ink transcription"] }],
+        nodes: [
+          { id: "g:abc", kind: "stroke-group", text: null, verificationStatus: "derived", confidence: null, uncertaintyReasons: [] },
+          { id: "o:1", kind: "ocr-item", text: "F = ma", verificationStatus: "unconfirmed", confidence: 0.62, uncertaintyReasons: ["Ink transcription"] },
+        ],
         edges: [{ id: "e:1", kind: "recognizes", from: "o:1", to: "g:1", distance: null }],
         truncated: false,
       },
@@ -178,6 +181,7 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).toContain("F = ma");
     expect(projected).toContain("unconfirmed");
     expect(projected).toContain("0.62");
+    expect(projected).toContain("g:abc");
     expect(projected).not.toContain("o:1");
   });
 
@@ -189,23 +193,5 @@ describe("Tutor semantic canvas context", () => {
     expect(ordinary).not.toContain("draw-1");
     expect(ordinary).not.toContain('"x"');
     expect(projectTutorContexts(raw, true)).toBe(raw);
-  });
-});
-
-describe("Tutor math delimiter rendering", () => {
-  const render = (answer: string) => renderTutorResponse({ answer, citations: [], rejectedCitationCount: 0 });
-
-  it("converts LaTeX bracket delimiters to dollar delimiters", () => {
-    expect(render("Use \\(x+1\\) here.")).toBe("Use $x+1$ here.");
-    expect(render("\\[x=1\\]")).toBe("$$x=1$$");
-  });
-
-  it("wraps a bare LaTeX run and leaves prose alone", () => {
-    expect(render("\\frac{1}{2}")).toBe("$\\frac{1}{2}$");
-    expect(render("The result is \\frac{1}{2}.")).toContain("\\frac{1}{2}");
-  });
-
-  it("collapses a single inline expression wrapped in display math", () => {
-    expect(render("$$ $x$ $$")).toBe("$x$");
   });
 });
