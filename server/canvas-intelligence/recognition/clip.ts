@@ -113,6 +113,14 @@ export async function loadClipRuntime(): Promise<ClipRuntime> {
   return runtimePromise;
 }
 
+// Opt-in only: tests, benchmarks and short-lived scripts must never pay the model
+// load (or a download) just by importing this module.
+export async function warmClipRuntime(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (env.CANVAS_CLIP_WARMUP !== "1") return false;
+  await loadClipRuntime();
+  return true;
+}
+
 async function imageFromBase64(runtime: ClipRuntime, pngBase64: string) {
   const { default: sharp } = await import("sharp");
   const normalized = await sharp(Buffer.from(pngBase64, "base64"), { limitInputPixels: 40_000_000 })

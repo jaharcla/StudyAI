@@ -4,6 +4,7 @@ import { createCanvasAnalysisResult } from "../server/canvas-analysis/contract.j
 import { buildCanvasEvidence, selectCanvasContext } from "../server/canvas-intelligence/evidence.js";
 import { normalizeCanvasInput } from "../server/canvas-intelligence/input.js";
 import { BaselineCanvasRecognitionAdapter, strokeGeometryFeatures } from "../server/canvas-intelligence/recognition/baseline.js";
+import { warmClipRuntime } from "../server/canvas-intelligence/recognition/clip.js";
 import { recognizeCanvasStrokes } from "../server/canvas-intelligence/recognition/index.js";
 import { renderStrokeGroupPng, strokeGroupSvg } from "../server/canvas-intelligence/recognition/render.js";
 import { initializeCanvasRecognitionSchema, listCanvasRecognitionPrototypes } from "../server/canvas-intelligence/recognition/store.js";
@@ -65,6 +66,14 @@ describe("deterministic baseline recognition", () => {
 
   it("rejects malformed recognition results", () => {
     expect(() => CanvasRecognitionResultSchema.parse({ groupId: "g", sourceIds: [], bounds: { x: 0, y: 0, width: 1, height: 1 }, candidates: [], uncertain: true, uncertaintyReasons: [], extra: true })).toThrow();
+  });
+});
+
+describe("CLIP warmup", () => {
+  it("stays off unless CANVAS_CLIP_WARMUP is exactly 1", async () => {
+    await expect(warmClipRuntime({})).resolves.toBe(false);
+    await expect(warmClipRuntime({ CANVAS_CLIP_WARMUP: "0" })).resolves.toBe(false);
+    await expect(warmClipRuntime({ CANVAS_CLIP_WARMUP: "true" })).resolves.toBe(false);
   });
 });
 

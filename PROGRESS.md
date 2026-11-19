@@ -193,3 +193,26 @@ Added `scripts/benchmark-canvas-cached-scene.ts`:
 | `npx tsx scripts/benchmark-canvas-cached-scene.ts` | numbers above |
 
 Remaining limit for items 10-14: deep p95 is provider-bound and misses the 15 s target on this connection; the cache path already clears its target, so the remaining performance work belongs to provider routing/model choice, not the scene index.
+
+## Item 8 - Optional CLIP warmup at server start
+
+Changes:
+
+- `server/canvas-intelligence/recognition/clip.ts`: added `warmClipRuntime(env = process.env)`. It returns `false` without touching the runtime unless `CANVAS_CLIP_WARMUP` is exactly `"1"`, then awaits the existing module-level `loadClipRuntime()` singleton and returns `true`. No new model state, no second loader.
+- `server/api.ts`: after `server.listen(...)`, a fire-and-forget `warmClipRuntime()` logs `CLIP recognition runtime warmed.` on success and a warning on failure. Startup is never blocked and a warmup failure cannot crash the data API.
+- `.env.example`: documented `CANVAS_CLIP_WARMUP=0` (off by default).
+- `tests/canvas-recognition.test.ts`: one test proves unset / `"0"` / `"true"` all resolve `false`.
+
+Verification:
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -b` | exit 0, "No errors found" |
+| `npx vitest run tests/canvas-recognition.test.ts` | pass, 11 tests |
+| `npx vitest run` | pass, 44 files / 302 tests (301 + the new warmup test) |
+| flag-off probe (`CANVAS_CLIP_WARMUP=0`) | `warmed: false`, 0 ms, transformers never imported |
+| flag-on probe (`CANVAS_CLIP_WARMUP=1`) | `warmed: true`, 2,109 ms loading the cached ONNX model from `data/models` |
+
+- Impact check on `loadClipRuntime` reports CRITICAL with 12 upstream symbols / 7 processes, but the edit adds a caller and leaves `loadClipRuntime` itself byte-identical, so no existing path changes behavior; the default is off.
+- The full server was not launched to observe the log line: `server/api.ts` opens and migrates the real `data/studyai.sqlite`, which this item does not need to touch. The same function was exercised directly with both flag values instead.
+- `detect_changes` still reports critical for the pre-existing uncommitted tutor/runtime/App changes left in the worktree since item 2; this commit contains only the warmup files.

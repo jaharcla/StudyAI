@@ -19,6 +19,7 @@ import { createCanvasAnalysisProducerHandler } from "./canvas-analysis/producer.
 import { createCanvasPersistenceHandler } from "./canvas-persistence/http.js";
 import { createCanvasSceneHandler } from "./canvas-intelligence/scene/http.js";
 import { createCanvasRecognitionHandler } from "./canvas-intelligence/recognition/http.js";
+import { warmClipRuntime } from "./canvas-intelligence/recognition/clip.js";
 import { countCanvasRecognitionExamples, teachCanvasRecognitionExample } from "./canvas-intelligence/recognition/store.js";
 import { providerBudgetSnapshot, configureProviderBudgetDatabase } from "./canvas-intelligence/provider-budget.js";
 import { configureProviderUsageDatabase, persistedProviderUsageSnapshot, providerCircuitSnapshot } from "./canvas-intelligence/provider-usage.js";
@@ -204,6 +205,9 @@ const server = createServer(async (req, res) => {
   } catch (error) { return json(res, 400, { error: error instanceof Error ? error.message : "Invalid request" }); }
 });
 server.listen(port, LOOPBACK_HOST, () => console.log(`StudyAI local data API on http://${LOOPBACK_HOST}:${port}`));
+void warmClipRuntime()
+  .then((warmed) => { if (warmed) console.log("CLIP recognition runtime warmed."); })
+  .catch((error: unknown) => console.warn("CLIP warmup failed:", error instanceof Error ? error.message : error));
 function body(req: import("node:http").IncomingMessage, limit = 1_000_000) { return new Promise<string>((resolveBody, reject) => { let value = ""; req.setEncoding("utf8"); req.on("data", (chunk) => { value += chunk; if (value.length > limit) reject(new Error("payload too large")); }); req.on("end", () => resolveBody(value)); req.on("error", reject); }); }
 
 function courseExists(courseId: string): boolean { return Boolean(db.prepare("SELECT 1 FROM courses WHERE id=?").get(courseId)); }
