@@ -24,6 +24,10 @@ Date: 2026-11-19
 - **Visual board rendering.** Not part of this change; the tutor remains text-only.
 - **Handwriting accuracy.** The system reports ambiguity rather than guaranteeing transcription.
 
+## Post-implementation user test
+
+An energy-level board (levels n=4,3,2,1; arrows a/b/c) still produced “no numerical values” answers. Root cause: the tutor context collapsed every arrow to `{kind:"arrow", direction:"down"}` and dropped the endpoints, so a, b, and c were indistinguishable and their level transitions were absent. Fixed by enriching native arrows with `length`, the nearest letter `label`, and `fromLevel`/`toLevel`, and by sending that shape projection alongside the scene evidence. Verified against the saved Board 2: a = 4→2, b = 2→1, c = 4→3. The tutor prompt now says to compare labeled levels, not drawn arrow length.
+
 ## Known limits
 
 - OCR still depends on the configured provider chain; with image egress disabled and no local provider, the tool returns a warning and no text.
