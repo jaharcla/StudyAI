@@ -8,7 +8,7 @@
 - [x] 6. Run the scene index benchmark and tune cell size / overflow if p95 misses 5 ms; record the result
 - [x] 7. Measure end-to-end deep-analysis and cached-scene p95 on the target machine against the targets (deep < 15 s, cached < 3 s) and record them
 - [x] 8. Add optional CLIP warmup at server start (the runtime is already a module-level singleton in `recognition/clip.ts`), behind an env flag so tests and short-lived processes skip it
-- [ ] 9. Calibrate the CLIP abstain thresholds using recorded teach/accept/correct/dismiss decisions; sweep `CANVAS_RECOGNITION_MIN_CONFIDENCE` / `CANVAS_RECOGNITION_MIN_MARGIN` and only change the defaults in `recognition/types.ts` with data
+- [x] 9. Calibrate the CLIP abstain thresholds using recorded teach/accept/correct/dismiss decisions; sweep `CANVAS_RECOGNITION_MIN_CONFIDENCE` / `CANVAS_RECOGNITION_MIN_MARGIN` and only change the defaults in `recognition/types.ts` with data
 - [ ] 10. Fix the nested-logistic OCR μ/σ ambiguity (0.625 F1) with a targeted crop/preprocess or prompt change, and re-run the benchmark gate
 - [ ] 11. Fix PhysAlign `F/N` → `A E / N` diagram OCR misread and raise concept coverage from 0.75 to the 0.8 target
 - [ ] 12. Re-run `npm run benchmark:canvas` after each OCR/prompt/model change and quote the four gate numbers; update the baseline only on explicit request

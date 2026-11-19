@@ -216,3 +216,37 @@ Verification:
 - Impact check on `loadClipRuntime` reports CRITICAL with 12 upstream symbols / 7 processes, but the edit adds a caller and leaves `loadClipRuntime` itself byte-identical, so no existing path changes behavior; the default is off.
 - The full server was not launched to observe the log line: `server/api.ts` opens and migrates the real `data/studyai.sqlite`, which this item does not need to touch. The same function was exercised directly with both flag values instead.
 - `detect_changes` still reports critical for the pre-existing uncommitted tutor/runtime/App changes left in the worktree since item 2; this commit contains only the warmup files.
+
+## Item 9 - CLIP abstain-threshold calibration
+
+There is no recorded decision data to calibrate from, so the defaults were **not** changed. Query of every SQLite database under `data/` on 2026-11-19:
+
+| Database | `canvas_recognition_feedback` | `canvas_recognition_examples` |
+| --- | --- | --- |
+| `data/studyai.sqlite` | 0 rows | 0 rows |
+| `data/canvas-dataset-benchmark/studyai.sqlite` | table absent | table absent |
+| 15 `data/e2e-*/studyai.sqlite` | 0 rows | 0 rows |
+
+`canvas-recognition-review.spec.ts` intercepts `/recognition/feedback` with `page.route`, so even e2e runs record nothing. The only label source in the repo (MathWriting/PhysAlign ground truth) is whole-board OCR text, not per-group accept/correct/dismiss decisions, and the plan/ADR forbid inventing threshold data.
+
+Changes:
+
+- `server/canvas-intelligence/recognition/calibration.ts` (new): pure sweep logic. `offersCandidate` applies the same `top >= minConfidence && top - second >= minMargin` rule as `ClipCanvasRecognitionAdapter`; `evaluateThresholdPoint` reports accept coverage, correct/reject false-offer rate, label agreement, and `balanced = coverage - falseOfferRate`; `sweepThresholdGrid` + `calibrationGrid` (0-0.5 confidence, 0-0.2 margin, step 0.01) cover 1,071 cells; `recommendThresholds` changes nothing unless both classes are recorded (>= 20 accept, >= 5 correct/reject) **and** the best cell beats the current defaults by 0.05 balanced accuracy, with deterministic tie-breaks.
+- `scripts/calibrate-clip-thresholds.ts` (new): replays each recorded decision from the named database. It reads `canvas_recognition_feedback`, reloads each board, extracts points with `persistedStrokePoints`, renders with `renderStrokeGroupPng` (the same rasterizer as recognition), probes CLIP with `minConfidence: 0 / minMargin: 0 / maxCandidates: 2` so top/second probabilities are threshold-independent, loads per-course taught prototypes, prints the 10x6 sweep table and the recommendation, and is report-only (exit 0, timing/threshold changes never gate the run). `--db=` and `--course=` scope it.
+- `tests/canvas-recognition-calibration.test.ts` (new, 5 cases): margin/threshold rule, positive/negative counting, grid size and insufficient-data refusal, a clean separation that recommends a higher confidence floor, and a case where the defaults already win.
+- `docs/QUICKDRAW_AI_BRIDGE.md`: the abstain bullet now states the defaults stay 0.18 / 0.03 until the script shows a winning cell on real decisions.
+
+Verification:
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -b` | exit 0, "No errors found" |
+| `npx vitest run` | exit 0, 45 files / 307 tests passed (302 + 5 new) |
+| `npm run build` | exit 0, built in 44.47 s (pre-existing chunk-size warning) |
+| `npx tsx scripts/calibrate-clip-thresholds.ts` | exit 0: "Boards read: 0; recorded decisions: 0; replayed samples: 0 ... Defaults stay at minConfidence=0.18, minMargin=0.03" |
+
+- The full replay path was exercised on a throwaway DB built from the benchmark boards with 42 *synthetic* rows: 7 boards, 42 replayed samples, CLIP ready in 1.9 s, sweep table and a CHANGE recommendation printed. That DB was deleted; its recommendation is deliberately ignored because fabricated rows are not calibration evidence. The first attempt failed because the probe inputs lacked `pngBase64`, which the adapter skips as "no rendered image"; the script now renders every replayed group itself.
+- The script opens the DB read-write only because the reused `listCanvasRecognitionPrototypes` runs its idempotent `CREATE TABLE IF NOT EXISTS`; it never inserts, updates, or deletes. `fileMustExist` stops a typo from creating an empty database.
+- Running the script on `data/studyai.sqlite` leaves it unchanged; no table is created when zero decisions exist.
+- `detect_changes` reports `high` for the pre-existing uncommitted tutor/App/runtime changes (unchanged since item 2); the new files are untracked and not yet in the index, and no existing function was edited.
+- Re-run once real decisions exist: record through the Labels panel, then `npx tsx scripts/calibrate-clip-thresholds.ts`, and only with a CHANGE recommendation edit `RECOGNITION_LIMITS` in `recognition/types.ts` plus re-run `npm run benchmark:canvas` (item 12).
