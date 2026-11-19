@@ -52,3 +52,19 @@ Verification of the isolated commit in a clean worktree at `757020b` (node_modul
 | `npm run build` | exit 0, built in 49.88 s (pre-existing chunk-size warning) |
 
 293 here vs 301 in item 1 is exactly the 8 tutor-presentation tests that stay in the worktree, which confirms the commit is self-contained. `detect_changes` reports `critical` risk only for the still-uncommitted `server/tutor-presentation.ts`, `server/runtime.ts`, and `server/agent.ts` symbols, not for the committed canvas set.
+
+## Item 3 — Refresh the stale GitNexus index
+
+Ran `node .gitnexus/run.cjs analyze --index-only` (analyzer 1.6.12) at commit `3d50fec`. Result:
+
+- Indexed in 47.6 s: 6,178 nodes | 13,846 edges | 180 clusters | 443 flows.
+- Incremental pass found changed=27, added=11, deleted=0; the write set covered 54% of files, so the run switched to a full DB write (wipe + bulk COPY) by design.
+- Process trace warnings are expected on this repo: 257 of 457 candidate entry points never ranked in, 979 callees skipped at maxBranching, 21 walks cut by the per-entry budget. An absent flow still does not mean the path does not exist.
+
+Verification (`node .gitnexus/run.cjs status`):
+
+- Indexed commit `3d50fec` == current commit; `Index content: matches all 269 covered file(s)`; `Status: up-to-date`.
+- Spot-checked the graph actually answers: `context "parseCanvasDocument"` returned the symbol with real incoming callers (`server/api.ts`, `scene/service.ts`, six test files, …), so the rebuilt DB is populated, not empty.
+- The older CLAUDE.md headline (167,301 symbols / 547,618 relationships) came from a different index snapshot/version; node counts are not comparable across analyzer builds. Functionality is what was checked.
+- The shell wrapper reports exit 1 because GitNexus writes progress to stderr and PowerShell treats that as a native-command error; `cmd /c ... & echo EXITCODE=%ERRORLEVEL%` shows the real code is 0.
+- No source files changed, so no tsc/test/build re-run is required for this item.
