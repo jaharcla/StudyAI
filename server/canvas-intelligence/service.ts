@@ -11,7 +11,7 @@ import { canvasInferenceJson, canvasInferenceProvider, canvasOCRProvider, groqIn
 import { OCRResultSchema, StructureResultSchema, getCanvasIntelligenceModels, normalizeCanvasFusionOutput, normalizeCanvasStructureOutput, schemasForCanvasIds, type CanvasIntelligenceModels, type CanvasInput, type FusionResult, type OCRImageRegion, type OCRResult, type StructureResult } from "./types.js";
 
 export type CanvasMode = "fast" | "recognize" | "deep";
-export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels };
+export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; courseContext?: string; skipOcr?: boolean; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels };
 export type CanvasUnderstanding = { mode: CanvasMode; revision: string; answer?: string; ocr?: OCRResult; associations?: OCRAssociation[]; structure: StructureResult; fusion?: FusionResult; evidence?: CanvasEvidenceBundle; selectedContext?: SelectedCanvasContext; latencyMs: Record<string, number>; cached: string[] };
 const ocrCache = new RecognitionCache<OCRResult>();
 const structureCache = new RecognitionCache<StructureResult>();
@@ -48,12 +48,13 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   const regions = imageRegionsFromInput(input);
   latencyMs.regionPreparation = performance.now() - regionPreparationStarted;
   const imageRequests: Array<OCRImageRegion | { id: string; base64: string; mimeType?: string }> = regions.length ? regions : input.image?.base64 ? [{ id: "canvas-region", base64: input.image.base64, mimeType: input.image.mimeType }] : [];
-  if (!imageRequests.length) throw new Error(`Canvas mode "${mode}" requires a rendered image for the selected canvas region.`);
+  if (!imageRequests.length && !args.skipOcr) throw new Error(`Canvas mode "${mode}" requires a rendered image for the selected canvas region.`);
   const maxImageBytes = Number(process.env.CANVAS_MAX_IMAGE_BYTES || 8 * 1024 * 1024);
   const totalImageBytes = imageRequests.reduce((sum, region) => sum + Math.floor(region.base64.length * 0.75), 0);
   if (totalImageBytes > maxImageBytes) throw new Error(`Canvas images exceed CANVAS_MAX_IMAGE_BYTES (${maxImageBytes}); select fewer strokes or render smaller crops.`);
 
   const runOcr = async () => {
+    if (args.skipOcr) return OCRResultSchema.parse({ items: [], uncertain: false, raw: "" });
     const before = Date.now();
     let cacheHits = 0;
     const results = await Promise.all(imageRequests.map(async (region) => {
