@@ -2,13 +2,18 @@ name: canvas
 
 on:
   push:
-    branches:
-      - main
-      - "codex/**"
-      - "work/**"
-      - "control/**"
+    # Every branch, not an enumerated list of prefixes. An enumerated list means a
+    # new prefix (fix/**, ci/**, feat/**) silently gets no CI: that is how six
+    # commits on fix-canvas-intelligence-recovery were never built or tested.
+    # The repo is public, so the extra push run alongside the pull_request run
+    # costs no Actions minutes.
+    branches: ["**"]
   pull_request:
   workflow_dispatch:
+
+# Read-only token: this job only checks out and runs tests.
+permissions:
+  contents: read
 
 concurrency:
   group: canvas-${{ github.ref }}
