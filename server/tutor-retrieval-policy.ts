@@ -10,10 +10,18 @@ export function isExactOutputRequest(query: string): boolean {
 
 export function requestsCanvasAction(query: string): boolean {
   if (/\b(?:propose_canvas_(?:edit|action)|get_canvas_state)\b/i.test(query)) return true;
-  for (const match of query.matchAll(/\b(?:draw|create|add|edit|change|move|delete|highlight|annotate|select|correct|fix|show me where)\b/gi)) {
-    const before = query.slice(Math.max(0, (match.index ?? 0) - 48), match.index);
+  const text = query.trim();
+  const questionStart = /^(?:what|which|why|how|when|where|who|is|are|does|do|can|could|would|should)\b/i.test(text);
+  const requestPhrase = /\b(?:can you|could you|would you|please|i want you to|i need you to|help me|go ahead|let's)\b/i.test(text);
+  if (questionStart && !requestPhrase) return false;
+  const canvasNoun = /\b(?:canvas|board|shape|shapes|arrow|arrows|line|lines|text|label|labels|note|notes|diagram|selection)\b/i;
+  for (const match of text.matchAll(/\b(?:draw|create|add|edit|change|move|delete|highlight|annotate|select|correct|fix|show me where)\b/gi)) {
+    const index = match.index ?? 0;
+    const before = text.slice(Math.max(0, index - 48), index);
     if (/\b(?:do not|don't|dont|never|without|not to|no need to)(?:\s+(?:please|the|a|an|my|any|canvas|board|make|perform|apply|change|changes|edit|edits))*\s*$/i.test(before)) continue;
-    return true;
+    const atStart = /^\s*$/.test(before);
+    const after = text.slice(index, index + 80);
+    if (atStart || canvasNoun.test(after) || canvasNoun.test(before.slice(-40))) return true;
   }
   return false;
 }
