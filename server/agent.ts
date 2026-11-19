@@ -68,7 +68,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
         const viewport = { x: 0, y: 0, w: 4000, h: 3000 };
         const selectedIds = Array.isArray(quickdrawContext.selectedIds) ? quickdrawContext.selectedIds.filter((id): id is string => typeof id === "string") : [];
         const savedCount = Object.keys(saved.snapshot.document.store).length;
-        if (selectedIds.length === 0 && savedCount > 40) {
+        if (selectedIds.length === 0 && savedCount > 80) {
           promptCanvasContext = { ...quickdrawContext, shapes: { ...objectValue(quickdrawContext.shapes), truncated: true }, warnings: [] };
         } else {
           const shapes = buildCanvasAIContext({
