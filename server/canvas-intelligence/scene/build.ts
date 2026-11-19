@@ -1,6 +1,7 @@
 import type { CanvasInput } from "../types.js";
 import type { CanvasRecognitionStage } from "../recognition/types.js";
 import { normalizeRecognitionLabel, type CanvasRecognitionFeedback } from "../recognition/feedback.js";
+import { normalizeInkText } from "./ink.js";
 import { groupQuickdrawStrokes } from "../regions.js";
 import { createCanvasSpatialIndex } from "../../../src/canvas/spatial/index.js";
 import { sceneEdgeId, shortHash } from "../../../src/canvas/spatial/identity.js";
@@ -313,7 +314,7 @@ export function buildCanvasSceneGraph(input: {
         ref: { scope: "scene", id: nodeId },
         bounds: { x: Number(bounds.x), y: Number(bounds.y), width: Number(bounds.width), height: Number(bounds.height) },
         boundsBasis: "region",
-        text: typeof item.text === "string" ? item.text.slice(0, 2000) : null,
+        text: typeof item.text === "string" ? normalizeInkText(item.text) || null : null,
         recordType: typeof item.kind === "string" ? item.kind.slice(0, 64) : kind,
         origin,
         verificationStatus: "unconfirmed",
