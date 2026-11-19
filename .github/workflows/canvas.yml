@@ -1,0 +1,41 @@
+name: canvas
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+      - "work/**"
+      - "control/**"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: canvas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck and build
+        run: npm run build
+
+      - name: Unit tests
+        run: npx vitest run --reporter=dot
+
+# Not in CI:
+#   - tests/e2e: needs the loopback services, a real model provider and a Chromium session.
+#   - npm run benchmark:canvas: needs provider keys and data/canvas-dataset-benchmark,
+#     which is gitignored. Run both locally with /canvas-verify before a canvas PR.
