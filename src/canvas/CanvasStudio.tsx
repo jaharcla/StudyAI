@@ -203,12 +203,12 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       const persisted = await readAuthoritativeBoard(board);
       if (stableJson(persisted.document) !== stableJson(requestDocument)) throw new Error("The board changed while saving. Analyze again.");
       const image = await editor.exportImage({ background: true, scale: 2 });
-      if (!image) throw new Error("The active board could not be rendered for analysis.");
+      if (!image && !requestDocument.objects.length) throw new Error("Add a drawing or scientific object before analysis.");
       if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(requestDocument)) throw new Error("The board changed during analysis setup. Try again.");
       const response = await fetch(`${API}/canvases/${encodeURIComponent(board.id)}/analysis?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, image: { base64: await blobToBase64(image), mimeType: image.type || "image/png" } }),
+        body: JSON.stringify({ expectedRevision: persisted.revision, document: requestDocument, selectedIds, image: image ? { base64: await blobToBase64(image), mimeType: image.type || "image/png" } : undefined }),
       });
       const body = await response.json() as { analysis?: CanvasAnalysisResult; error?: string };
       if (!response.ok || !body.analysis) throw new Error(body.error ?? "Canvas analysis failed.");
