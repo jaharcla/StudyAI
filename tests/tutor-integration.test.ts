@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, expect, it, vi } from "vitest";
+﻿import { afterAll, afterEach, beforeEach, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -138,7 +138,7 @@ it("executes deterministic tutor calculations and returns the result to the mode
 });
 
 it("makes context omitted under the token budget visible in the tutor answer", async () => {
-  process.env.TUTOR_CONTEXT_BUDGET = "2048";
+  process.env.TUTOR_CONTEXT_BUDGET = "2300";
   process.env.TUTOR_MAX_COMPLETION_TOKENS = "256";
   mocks.invoke.mockResolvedValue(new AIMessage("Answer based on current context."));
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
@@ -157,8 +157,32 @@ it("flags canvas context already marked truncated by its producer", async () => 
   expect(tutorMetadata(result).context.incompleteCanvasContextCount).toBe(1);
 });
 
-it("forwards a registered canvas tool call through LangGraph for browser review", async () => {
-  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
+it("serializes arrow attachments into the tutor prompt", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("b"));
+  const active = {
+    description: "Active canvas scene",
+    value: {
+      scene: null,
+      shapes: {
+        selected: [],
+        visible: [{ kind: "arrow", arrow: { from: { x: 0, y: 0 }, to: { x: 0, y: 10 }, bend: 0, length: 138, label: "b", startAttached: [{ kind: "line", label: "2", distance: 1, confidence: 0.8 }], endAttached: [{ kind: "line", label: "1", distance: 1, confidence: 0.8 }] } }],
+        nearbyObjects: [],
+        spatialRelationships: [],
+      },
+      selectedIds: [],
+      viewport: { x: 0, y: 0, w: 100, h: 100 },
+      warnings: [],
+    },
+  };
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Which photon has the shortest wavelength?")] });
+  expect(result.messages.at(-1)?.content).toBe("b");
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(prompt).toContain("startAttached");
+  expect(prompt).toContain('"label":"2"');
+  expect(prompt).toContain('"label":"1"');
+});
+
+it("forwards a registered canvas tool call through LangGraph for browser review", async () => {  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
@@ -372,3 +396,4 @@ afterAll(() => {
   if (originalGroqOutputRate === undefined) delete process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M; else process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = originalGroqOutputRate;
   if (originalDiagnostics === undefined) delete process.env.AI_DIAGNOSTICS; else process.env.AI_DIAGNOSTICS = originalDiagnostics;
 });
+

@@ -132,6 +132,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   useQuickdrawAIBridge({
     store: editorRef.current?.store ?? null,
+    snapshot: document.snapshot,
     selectedIds: selectedShapeIds,
     viewport: editorRef.current?.viewportPageBounds() ?? { x: 0, y: 0, w: 1, h: 1 },
     objects: document.objects,

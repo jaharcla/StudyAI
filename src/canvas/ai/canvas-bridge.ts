@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
-import type { Bounds, Store } from "@quickdrawjs/core";
+import type { Bounds, Snapshot, Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
 import type { CanvasSceneGraph } from "../spatial/types";
 import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
@@ -10,6 +10,7 @@ import { buildCanvasAIContext, type CanvasScope } from "./canvas-context";
 
 export type QuickdrawAIBridgeOptions = {
   store: Store | null;
+  snapshot?: Snapshot | null;
   selectedIds: readonly string[];
   viewport: Bounds;
   objects: readonly ScientificObject[];
@@ -27,8 +28,9 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     requestCanvasScene(options.scope).then((graph) => { if (!cancelled) setScene(graph); }).catch(() => { if (!cancelled) setScene(null); });
     return () => { cancelled = true; };
   }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
-  const legacy = options.store ? buildCanvasAIContext({
-    source: options.store,
+  const source = options.store ?? options.snapshot ?? null;
+  const legacy = source ? buildCanvasAIContext({
+    source,
     selectedIds: options.selectedIds,
     viewport: options.viewport,
     objects: options.objects,

@@ -202,6 +202,19 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).not.toContain('"x":330');
   });
 
+  it("projects shapes when the scene is unavailable", () => {
+    const value = {
+      scene: null,
+      shapes: {
+        selected: [], nearbyObjects: [], spatialRelationships: [],
+        visible: [{ kind: "arrow", direction: "down", arrow: { from: { x: 0, y: 0 }, to: { x: 0, y: 10 }, bend: 0, length: 10, label: "a", startAttached: [{ kind: "line", label: "4", distance: 1, confidence: 0.95 }] } }],
+      },
+    };
+    const projected = JSON.stringify(projectTutorContexts([{ description: "Active canvas scene", value }], false));
+    expect(projected).toContain('"startAttached"');
+    expect(projected).toContain('"label":"4"');
+  });
+
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {
     const raw = [{ description: "Active canvas scene", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
     const ordinary = JSON.stringify(projectTutorContexts(raw, false));

@@ -112,7 +112,9 @@ export function projectTutorContexts(contexts: TutorContextItem[], includeRawCan
 
 function projectCanvasSceneContext(value: unknown, labels: Map<string, string>): Record<string, unknown> {
   const source = record(value);
-  if (!source.scene) return projectQuickdrawContext(value, labels);
+  if (!source.scene) {
+    return source.shapes ? projectQuickdrawContext(source.shapes, labels) : projectQuickdrawContext(value, labels);
+  }
   const scene = record(source.scene);
   const diagram = source.shapes ? projectQuickdrawContext(source.shapes, labels) : {};
   const nodes = list(scene.nodes).map((node) => {
