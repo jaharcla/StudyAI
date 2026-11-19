@@ -86,3 +86,24 @@ Verification:
 - Replayed the percentile helper over the last run in `data/canvas-benchmark/latest.json` (7 boards): p50 21,613 ms, p95 40,148 ms, avg 23,461 ms — p95 exposes the slow tail the average hid.
 - The full `npm run benchmark:canvas` was not re-run: it makes live paid provider calls and item 12 reserves that for OCR/prompt/model changes; nothing here touches those.
 - New fields are informational only; `docs/verification/canvas-benchmark-baseline.json` was not refreshed (baselines only update on explicit request).
+
+## Item 5 — Scene index benchmark script
+
+Added `scripts/benchmark-canvas-scene.ts`:
+
+- Deterministic mulberry32 seed builds 10,000 synthetic nodes on a 4,000×3,000 board; one in ten nodes is a wide object (600–1,200 × 400–800) so the overflow path is exercised, the rest are stroke-sized.
+- 1,000 mixed queries (500 rect queries of random 32–512 unit size, 500 nearest-6 queries), preceded by 100 unmeasured warmup queries.
+- Prints node count, build time, query p50/p95/p99/max, and the active cell size / max cells / linear threshold; accepts `--cell-size=`, `--max-cells=`, `--linear-threshold=` for the item 6 tuning pass.
+- Timing never changes the exit code (ADR: report, don't fail).
+- Nearest-rank percentile helper, matching the one added to `scripts/benchmark-canvas.ts` in item 4.
+
+Verification:
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -b` | exit 0, "No errors found" |
+| `npx tsx scripts/benchmark-canvas-scene.ts` | 10,000 nodes, build 12.740 ms, p50 0.695 ms, p95 2.897 ms, p99 3.138 ms, max 3.983 ms — ADR target p95 < 5 ms: pass |
+| `npx vitest run` | exit 0, 44 files / 301 tests passed |
+
+- A first full `vitest` run reported 4 SQLite-backed suites as collection errors (`STACK_TRACE_ERROR`); each passed in isolation and the full re-run was green, so it was parallel-run flake, not a code regression.
+- Observed but not fixed (out of scope for this item): `CanvasGridSpatialIndex.insert` only adds nodes to the grid after `linearThreshold` is exceeded, so on boards larger than 256 nodes the first 256 inserted nodes remain in `nodes` but never enter `cells` and are invisible to `query`. Affects `buildCanvasSceneGraph` only when a board exceeds 256 source nodes. Timing was unaffected; a backfill-on-threshold-crossing fix plus a test is worth its own item.
