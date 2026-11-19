@@ -182,6 +182,27 @@ it("serializes arrow attachments into the tutor prompt", async () => {
   expect(prompt).toContain('"label":"1"');
 });
 
+it("rebuilds arrow attachments from the saved board when the client omits shapes", async () => {
+  const shape = (id: string, type: string, x: number, y: number, props: Record<string, unknown>) => ({ id, typeName: "shape", type, x, y, rot: 0, z: 1, props });
+  const snapshot = { document: { store: {
+    l1: shape("l1", "line", 0, 0, { dx: 100, dy: 0, color: "black", size: "m", dash: "solid" }),
+    l2: shape("l2", "line", 0, 50, { dx: 100, dy: 0, color: "black", size: "m", dash: "solid" }),
+    t4: shape("t4", "text", -20, -5, { text: "4", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    t2: shape("t2", "text", -20, 45, { text: "2", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    a: shape("a", "arrow", 50, 0, { dx: 0, dy: 50, bend: 0, color: "black", size: "m", dash: "solid" }),
+    ta: shape("ta", "text", 55, 20, { text: "a", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+  } } };
+  db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run("board-fallback", "chem-120", "lesson-03", "Fallback", JSON.stringify({ version: 1, snapshot, objects: [] }), 1);
+  mocks.invoke.mockResolvedValue(new AIMessage("b"));
+  const active = { description: "Active canvas scene", value: { scene: null, shapes: null, scope: { boardId: "board-fallback", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [] } };
+  await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Which change in orbit level produces the shortest wavelength?")] });
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(prompt).toContain("startAttached");
+  expect(prompt).toContain('"label":"4"');
+  expect(prompt).toContain('"label":"2"');
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-fallback");
+});
+
 it("forwards a registered canvas tool call through LangGraph for browser review", async () => {  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });

@@ -12,6 +12,8 @@ import { retrieveCourseDocuments, type RetrievalResult } from "./document-intell
 import { canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError } from "../src/canvas/tutor.js";
 import { canvasActionSchema, canvasReadSchema } from "../src/canvas/ai/canvas-actions.js";
 import { canvasEvidenceSearchSchema, canvasSceneReadSchema, readCanvasInkSchema } from "../src/canvas/ai/scene-tools.js";
+import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context.js";
+import { parseCanvasDocument } from "../src/canvas/model.js";
 import { CanvasAnalysisValidationError } from "./canvas-analysis/contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./canvas-analysis/receiver.js";
 import { aiRequestQueues, AIRequestQueueFullError, type AIProvider } from "./ai-requests.js";
@@ -56,6 +58,27 @@ async function tutor(state: typeof State.State, config?: unknown) {
   const quickdrawContext = objectValue(contexts.find((item) => item.description === "Active canvas scene")?.value);
   const quickdrawScope = objectValue(objectValue(quickdrawContext.scene).scope ?? quickdrawContext.scope);
   const sameCanvasScope = Boolean(course && lesson && quickdrawScope.courseId === course.id && quickdrawScope.lessonId === workspace.lessonId && typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId.length > 0);
+  let promptCanvasContext = quickdrawContext;
+  if (sameCanvasScope && course && !objectValue(quickdrawContext.shapes).visible) {
+    try {
+      const row = db.prepare("SELECT document FROM canvases WHERE id=? AND course_id=? AND lesson_id=?").get(String(quickdrawScope.boardId), course.id, String(workspace.lessonId)) as { document: string } | undefined;
+      if (row) {
+        const saved = parseCanvasDocument(JSON.parse(row.document));
+        const viewport = { x: 0, y: 0, w: 4000, h: 3000 };
+        const selectedIds = Array.isArray(quickdrawContext.selectedIds) ? quickdrawContext.selectedIds.filter((id): id is string => typeof id === "string") : [];
+        const shapes = buildCanvasAIContext({
+          source: saved.snapshot,
+          selectedIds,
+          viewport,
+          objects: saved.objects,
+          scope: { boardId: String(quickdrawScope.boardId), courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
+        });
+        promptCanvasContext = { ...quickdrawContext, shapes, selectedIds, viewport, warnings: [] };
+      }
+    } catch {
+      // Keep the client-supplied context; the model will report missing attachments.
+    }
+  }
   const canvasAnalysisContext = contexts.find((item) => item.description === "StudyAI canvas analysis result");
   const rawActivityContext = objectValue(contexts.find((item) => item.description === "StudyAI active learning activity")?.value);
   let trustedActivityContext: unknown;
@@ -89,9 +112,10 @@ async function tutor(state: typeof State.State, config?: unknown) {
   let evidence: RetrievalResult | null = null;
   if (course && retrievalRequested) evidence = retrieveCourseDocuments(db, course.id, query);
 
+  const contextsWithCanvas = contexts.map((item) => item.description === "Active canvas scene" ? { ...item, value: promptCanvasContext } : item);
   const validatedCanvasContexts = canvasAnalysisContext
-    ? [...contexts.filter((item) => item.description !== "StudyAI canvas analysis result"), { description: canvasAnalysisContext.description, value: validatedCanvasAnalysis }]
-    : contexts;
+    ? [...contextsWithCanvas.filter((item) => item.description !== "StudyAI canvas analysis result"), { description: canvasAnalysisContext.description, value: validatedCanvasAnalysis }]
+    : contextsWithCanvas;
   const rawPromptContexts = [
     ...validatedCanvasContexts.filter((item) => item.description !== "StudyAI active learning activity"),
     ...(trustedActivityContext ? [{ description: "StudyAI active learning activity", value: trustedActivityContext }] : []),
