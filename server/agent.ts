@@ -350,7 +350,9 @@ class TutorRequestLimitError extends Error {
 
 function createChatModel(provider: TutorProvider, model: string, settings: ReturnType<typeof getTutorProviderSettings>): ChatOllama | ChatGroq {
   if (provider === "groq") return new ChatGroq({ apiKey: process.env.GROQ_API_KEY, model: settings.groqModel, temperature: 0.2, maxRetries: 0, maxTokens: settings.maxCompletionTokens, ...(settings.groqModel.startsWith("openai/gpt-oss-") ? { reasoningEffort: "low" as const } : {}) });
-  return new ChatOllama({ baseUrl: process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434", model, temperature: 0.2, think: false, numPredict: settings.maxCompletionTokens });
+  const requestedContext = Number(process.env.TUTOR_OLLAMA_NUM_CTX || process.env.TUTOR_CONTEXT_BUDGET || 16384);
+  const numCtx = Number.isFinite(requestedContext) ? Math.max(4096, Math.min(32768, Math.floor(requestedContext))) : 16384;
+  return new ChatOllama({ baseUrl: process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434", model, temperature: 0.2, think: false, numCtx, numPredict: settings.maxCompletionTokens });
 }
 
 function bindTutorTools(model: ChatOllama | ChatGroq, tools: Array<{ name: string; schema: ZodType<any> }>) {

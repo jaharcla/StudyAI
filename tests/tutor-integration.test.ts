@@ -241,6 +241,12 @@ it("prefers the current shape scope over a stale scene scope", async () => {
   db.prepare("DELETE FROM canvases WHERE id=?").run("board-shapes");
 });
 
+it("sets the Ollama context window to the tutor budget", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("ok"));
+  await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });
+  expect(mocks.ollamaOptions[0]).toMatchObject({ numCtx: 16384 });
+});
+
 it("forwards a registered canvas tool call through LangGraph for browser review", async () => {  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });
