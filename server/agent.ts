@@ -73,6 +73,8 @@ async function tutor(state: typeof State.State, config?: unknown) {
           selectedIds,
           viewport,
           objects: saved.objects,
+          maxItems: 80,
+          maxChars: 24_000,
           scope: { boardId: canvasBoardId, courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
         });
         promptCanvasContext = { ...quickdrawContext, shapes, selectedIds, viewport, warnings: [] };
@@ -198,6 +200,12 @@ async function tutor(state: typeof State.State, config?: unknown) {
           await delay(100 * invocationRetries, requestSignal);
           continue;
         }
+        if (provider === "ollama" && invocationRetries < 1 && retryableOllamaFailure(error)) {
+          invocationRetries++;
+          run.retries++;
+          await delay(150, requestSignal);
+          continue;
+        }
         if (provider !== "groq" || providerSettings.mode === "groq") throw error;
         run.fallbackReason = failure;
         run.provider = "ollama";
@@ -264,9 +272,12 @@ async function tutor(state: typeof State.State, config?: unknown) {
     return { activeScope, scopeStart, messages: [new AIMessage("The model returned an empty answer. Retry with a larger response limit.")] };
   }
   if ((quickdrawActions || quickdrawRead || canvasTool) && requestsCanvasAction(query)) return { activeScope, scopeStart, messages: [new AIMessage("I did not receive a structured canvas tool call, so the canvas was not changed. This model may not support tool calling; try a model with tool-calling support.")] };
+  const redactedBody = rawCanvasMetadataRequested || isExactOutputRequest(query)
+    ? body
+    : body.replace(/\b(?:q|s|g|o|c):[A-Za-z0-9:_-]{3,}/g, "the referenced canvas item");
   const studentResponse = isExactOutputRequest(query)
-    ? { answer: body, citations: [], rejectedCitationCount: 0 }
-    : presentTutorResponse(body, [...candidateByRef.values()], { linkMentionedSource: /\b(?:cite|citation|source|reference)\b/i.test(query) });
+    ? { answer: redactedBody, citations: [], rejectedCitationCount: 0 }
+    : presentTutorResponse(redactedBody, [...candidateByRef.values()], { linkMentionedSource: /\b(?:cite|citation|source|reference)\b/i.test(query) });
   const incompleteCanvasContextCount = promptContexts.filter((item) => budgeted.contexts.includes(item) && hasTruncatedCanvasContext(item.value)).length;
   const responseMetadata = {
     ...objectValue(response.response_metadata),
@@ -335,6 +346,12 @@ function classifyModelFailure(error: unknown): ModelFailure | TutorLimitFailure 
   if (/does not support (tools?|tool calling|function calling)|tool calling is not supported|unsupported.*(tool|function) call/.test(message)) return "tool_call_unsupported";
   if (/econnrefused|enotfound|fetch failed|ollama.*unavailable|connection refused/.test(message)) return "model_unavailable";
   return "provider_failure";
+}
+
+function retryableOllamaFailure(error: unknown): boolean {
+  const value = error && typeof error === "object" ? error as { message?: unknown; cause?: unknown } : {};
+  const message = `${String(value.message ?? "")} ${String(value.cause ?? "")}`.toLowerCase();
+  return /econnreset|econnrefused|fetch failed|socket hang up|timed out|timeout|network error/.test(message);
 }
 
 function retryableGroqFailure(error: unknown): boolean {

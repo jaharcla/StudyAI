@@ -203,6 +203,20 @@ it("rebuilds arrow attachments from the saved board when the client omits shapes
   db.prepare("DELETE FROM canvases WHERE id=?").run("board-fallback");
 });
 
+it("redacts internal canvas node IDs from ordinary answers", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("The label is near q:shape:mw877vh004pyqs."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("What is the label near?")] });
+  expect(result.messages.at(-1)?.content).not.toContain("q:shape:mw877vh004pyqs");
+  expect(result.messages.at(-1)?.content).toContain("the referenced canvas item");
+});
+
+it("retries one transient Ollama failure", async () => {
+  mocks.invoke.mockRejectedValueOnce(new Error("fetch failed")).mockResolvedValueOnce(new AIMessage("Recovered."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });
+  expect(result.messages.at(-1)?.content).toBe("Recovered.");
+  expect(mocks.invoke).toHaveBeenCalledTimes(2);
+});
+
 it("forwards a registered canvas tool call through LangGraph for browser review", async () => {  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });
