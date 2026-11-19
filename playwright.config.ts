@@ -16,7 +16,7 @@ export default defineConfig({
   use: { baseURL: config.webOrigin, ...devices["Desktop Chrome"], trace: "retain-on-failure", screenshot: "only-on-failure" },
   reporter: [["list"], ["json", { outputFile: `${outputDir}/results.json` }]],
   webServer: {
-    command: "npm run dev", url: `${config.webOrigin}/api/copilotkit/info`, reuseExistingServer: false, timeout: 120_000,
+    command: "npm run dev", url: `${config.webOrigin}/api/copilotkit/info`, reuseExistingServer: !process.env.CI, timeout: 120_000,
     env: { WEB_PORT: webPort, RUNTIME_PORT: String(config.runtimePort), DATA_PORT: String(config.dataPort), AGENT_PORT: String(config.agentPort), STUDYAI_DB: databasePath, STUDYAI_DOCUMENTS: resolve(testData, "documents"), STUDYAI_E2E_PRODUCTION: process.env.STUDYAI_E2E_PRODUCTION ?? "0", LANGGRAPH_DEPLOYMENT_URL: config.langgraphDeploymentUrl },
   },
 });

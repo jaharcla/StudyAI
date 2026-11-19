@@ -49,7 +49,7 @@ type GroqInferenceOptions = { model: string; system: string; prompt: string; bas
 
 const OCR_SYSTEM = "Transcribe visible handwritten scientific text only. Return JSON {items:[{text,kind,confidence,alternatives}],uncertain:boolean}. Each kind is word, symbol, number, equation, or unknown. Use null for uncalibrated confidence. Do NOT infer a label's arrow or position. Do NOT fabricate pixel coordinates or object IDs.";
 const OCR_PROMPT = "Extract actual visible characters, one JSON item per label or expression. Return only JSON.";
-const MATH_OCR_SYSTEM = "Transcribe the handwritten mathematical expression in the image as LaTeX. Preserve fractions, roots, sums, integrals, subscripts, superscripts, Greek letters, delimiters, and grouping. Return only the LaTeX expression, with no explanation or markdown fences.";
+const MATH_OCR_SYSTEM = "Transcribe the handwritten mathematical expression in the image as LaTeX. Preserve fractions, roots, sums, integrals, subscripts, superscripts, Greek letters, delimiters, and grouping. This expression is mathematical handwriting, not prose: Greek letters are common and Latin lookalikes are rare. Read a u-shaped glyph with a descender as \\mu, and an epsilon-like or o-like glyph in a fraction as \\sigma. Prefer the Greek reading whenever the glyph is ambiguous. Return only the LaTeX expression, with no explanation or markdown fences.";
 const MATH_OCR_PROMPT = "Write the visible handwritten mathematical expression as one LaTeX string. Do not describe the image.";
 
 function providerLabel(provider: CanvasProviderId) {

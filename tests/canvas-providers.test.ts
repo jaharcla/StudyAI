@@ -107,6 +107,22 @@ describe("canvas provider chain", () => {
     expect(JSON.stringify(bodies[0].messages)).toContain("LaTeX");
   });
 
+  it("asks math OCR to disambiguate Greek letters from Latin lookalikes", async () => {
+    vi.stubEnv("CANVAS_MATH_OCR_PROVIDER", "openrouter");
+    vi.stubEnv("CANVAS_MATH_OCR_MODEL", "google/gemini-3.1-flash-lite");
+    const bodies: Array<{ messages?: Array<{ role: string; content: unknown }> }> = [];
+    const fetcher = (async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as { messages?: Array<{ role: string; content: unknown }> });
+      return Response.json({ choices: [{ message: { content: "\\frac{1}{1+e^{-\\frac{x_i-\\mu_i}{\\sigma_i}}}" } }] });
+    }) as typeof fetch;
+
+    await canvasOCR({ base64: "aW1hZ2U=", mimeType: "image/png", profile: "math", fetcher });
+    const system = String(bodies[0].messages?.[0]?.content ?? "");
+    expect(system).toContain("\\mu");
+    expect(system).toContain("\\sigma");
+    expect(system).toMatch(/ambiguous/i);
+  });
+
   it("uses the Groq OCR model rather than an Ollama model name", async () => {
     vi.stubEnv("CANVAS_OCR_PROVIDER", "groq");
     const bodies: Array<Record<string, unknown>> = [];

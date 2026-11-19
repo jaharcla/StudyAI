@@ -91,8 +91,62 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
   return { answer: cleaned.replace(sourceLine[0], linkedSourceLine), citations: [citation], rejectedCitationCount };
 }
 
+function sanitizeMathDelimiters(line: string): string {
+  // Normalize math delimiters so KaTeX never sees a '$' inside math mode.
+  // A '$$...$$' block that only wrapped a single inline expression (the model
+  // sometimes nests '$...$' inside '$$...$$') is collapsed back to inline math
+  // so the result reads naturally instead of becoming a displayed equation.
+  return line.replace(/\$\$([\s\S]*?)\$\$/g, (_m, body: string) => {
+    const hadInnerDollar = body.includes("$");
+    const cleaned = body.replace(/\$/g, "").trim();
+    if (!cleaned) return "";
+    if (hadInnerDollar && !cleaned.includes("\n")) return `$${cleaned}$`;
+    if (cleaned.includes("\n")) return `$$\n${cleaned}\n$$`;
+    return `$$${cleaned}$$`;
+  })
+  .replace(/\$([^\n$]*?)\$/g, (_m, body: string) => `$${body.replace(/\$/g, "")}$`);
+}
+
+function hasProse(run: string): boolean {
+  const stripped = run.replace(/\\[a-zA-Z]+\{[^}]*\}/g, "").replace(/\\[a-zA-Z]+/g, "");
+  return /[A-Za-z]{2,}/.test(stripped);
+}
+
+function wrapBareRun(run: string): string {
+  if (run.includes("$")) return run;
+  const match = run.match(/^(.*?)([.!?]+\s*)$/);
+  const body = match ? match[1] : run;
+  const punct = match ? match[2] : "";
+  return `$${body.trim().replace(/\$/g, "")}$${punct}`;
+}
+
 export function renderTutorResponse(response: TutorStudentResponse): string {
-  return response.answer;
+  return response.answer
+    .split(/(```[\s\S]*?```)/)
+    .map((part, index) => {
+      if (index % 2 === 1) return part;
+      const segments = part.split(/(\$\$[\s\S]+?\$\$|\$[^\n$]+?\$)/);
+      return segments.map((seg, j) => {
+        if (j % 2 === 1) return sanitizeMathDelimiters(seg);
+        let out = seg.replace(/\\\[([\s\S]+?)\\\]/g, (_m, body: string) => `$$${body.replace(/\$/g, "")}$$`);
+        out = out.replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body.replace(/\$/g, "")}$`);
+        out = out.split("\n").map((line) => {
+          if (/^\s*\$\$[\s\S]*\$\$\s*$/.test(line)) return sanitizeMathDelimiters(line);
+          if (/^\s*\$[^\n$]*\$$/.test(line)) return sanitizeMathDelimiters(line);
+          if (line.includes("$")) line = sanitizeMathDelimiters(line);
+          if (line.includes("$")) return line;
+          if (!/\\[a-zA-Z]/.test(line)) return line;
+          if (hasProse(line)) return line;
+          return line.replace(/([^\n]*?\\[a-zA-Z]+[^\n]*?)(?=\n|$)/g, (run) => {
+            if (run.includes("$")) return run;
+            if (!/\\[a-zA-Z]/.test(run)) return run;
+            if (hasProse(run)) return run;
+            return wrapBareRun(run);
+          });
+        }).join("\n");
+        return out;
+      }).join("").replace(/\$\$(?=\$)/g, () => "$$\n").replace(/\$(?=\$\$)/g, () => "$\n").replace(/\n{3,}/g, "\n\n");
+    }).join("");
 }
 
 export function projectTutorContexts(contexts: TutorContextItem[], includeRawCanvasMetadata: boolean): TutorContextItem[] {

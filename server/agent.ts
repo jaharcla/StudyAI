@@ -129,10 +129,10 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ? { name: "get_canvas_state", description: "Read native QuickDraw shape IDs, coordinates and properties from the active board. Use shapeIds from current context for targeted follow-up details and the exact current boardId.", schema: canvasReadSchema } : undefined;
   const canvasSceneRead = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "get_canvas_scene")
     ? { name: "get_canvas_scene", description: "Read the active board's revision-bound spatial scene graph: what is near, overlapping, or spatially related. Returns source-linked nodes and edges; recognition and OCR labels stay unconfirmed unless the user confirmed them.", schema: canvasSceneReadSchema } : undefined;
-  const canvasEvidenceSearch = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "search_canvas_evidence")
-    ? { name: "search_canvas_evidence", description: "Search canvas scene evidence by text on the active board, or across every current board in the course when boardId is omitted. Returns source-linked nodes, incident edges, and board attribution. Cite at most three returned source refs for canvas claims.", schema: canvasEvidenceSearchSchema } : undefined;
   const canvasInkRead = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "read_canvas_ink")
     ? { name: "read_canvas_ink", description: "Transcribe up to eight requested freehand groups from the active board. Returns source-linked text with confidence and an explicit unconfirmed flag. Call only for groups whose text the answer depends on; do not transcribe the whole board.", schema: readCanvasInkSchema } : undefined;
+  const canvasEvidenceSearch = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "search_canvas_evidence")
+    ? { name: "search_canvas_evidence", description: "Search canvas scene evidence by text on the active board, or across every current board in the course when boardId is omitted. Returns source-linked nodes, incident edges, and board attribution. Cite at most three returned source refs for canvas claims.", schema: canvasEvidenceSearchSchema } : undefined;
   const canvasObjectCreate = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "propose_scientific_object")
     ? { name: "propose_scientific_object", description: "Propose adding one scientific object to the active board for user review. Provide kind, position, and a JSON field object; the object is validated and stays pending until the user applies it. Do not create objects the user did not ask for.", schema: canvasObjectCreateSchema } : undefined;
   let evidence: RetrievalResult | null = null;
@@ -159,7 +159,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     return { activeScope, scopeStart, messages: [new AIMessage("Tutor provider limits are invalid. No model request was sent; check the Tutor configuration.")] };
   }
   const instructions =
-    "You are StudyAI, a careful scientific tutor. Answer naturally and directly; simple questions need short answers. For simple canvas descriptions, use one or two plain sentences without tables or generated labels such as 'arrow 1'. Use a worked example, structure, Markdown, or equations when they help. Do not end every answer with a question. Respect exact-output instructions without adding citations or extra text. " +
+    "You are StudyAI, a careful scientific tutor. Answer naturally and directly; simple questions need short answers. For simple canvas descriptions, use one or two plain sentences without tables or generated labels such as 'arrow 1'. Use a worked example, structure, Markdown, or equations when they help. Write every equation and symbol as LaTeX between dollar delimiters: $...$ inline and $$...$$ on its own lines; never use \\( \\) or \\[ \\], and never leave a backslash command such as \\text or \\frac outside delimiters. Use $...$ for inline math and $$ on their own lines for display math. Never put $ inside a $$ block. Use standard LaTeX only. Give one clean answer: do not repeat an equation in both plain text and LaTeX, and do not use \\begin{aligned} outside delimiters. Example: The speed is $v = 10\\,\\text{m}\\cdot\\text{s}^{-1}$. When a canvas is active, its board ID is in the 'Active canvas scene' under scene.scope.boardId; use that exact value with get_canvas_state, propose_canvas_action, or propose_canvas_edit, and never ask the user for a board ID you already have. Do not end every answer with a question. Respect exact-output instructions without adding citations or extra text. " +
     "Use the supplied workspace context and inference provider " + providerSettings.provider + ". Limit each completion to " + providerSettings.maxCompletionTokens + " tokens. The selected local model is used only for Ollama requests. " +
     "The selected course is validated by the server. Course excerpts may be supplied when a request needs course grounding; they are candidate evidence, not verified answers. For course-specific questions, use relevant supplied excerpts and distinguish source-supported statements from general model knowledge. If a course-specific question has no matching supplied excerpt, say so briefly before giving general knowledge. Do not imply that an excerpt proves a claim. When documents were not retrieved for a greeting or canvas description, do not mention retrieval. " +
     "Never invent course citations, page numbers, slide numbers, or document names. For course evidence, cite only exact sourceRef values returned by search, with links in the form [document name · page or slide](#studyai-citation=URL_ENCODED_SOURCE_REF). " +
@@ -372,17 +372,17 @@ function classifyModelFailure(error: unknown): ModelFailure | TutorLimitFailure 
   return "provider_failure";
 }
 
-function retryableOllamaFailure(error: unknown): boolean {
-  const value = error && typeof error === "object" ? error as { message?: unknown; cause?: unknown } : {};
-  const message = `${String(value.message ?? "")} ${String(value.cause ?? "")}`.toLowerCase();
-  return /econnreset|econnrefused|fetch failed|socket hang up|timed out|timeout|network error/.test(message);
-}
-
 function retryableGroqFailure(error: unknown): boolean {
   const value = error && typeof error === "object" ? error as { status?: unknown; statusCode?: unknown; message?: unknown } : {};
   const status = Number(value.status ?? value.statusCode);
   const message = `${String(value.message ?? "")} ${String((error as { cause?: unknown })?.cause ?? "")}`.toLowerCase();
   return status === 429 || status >= 500 || /econnreset|network error|fetch failed|temporarily unavailable/.test(message);
+}
+
+function retryableOllamaFailure(error: unknown): boolean {
+  const value = error && typeof error === "object" ? error as { message?: unknown; cause?: unknown } : {};
+  const message = `${String(value.message ?? "")} ${String(value.cause ?? "")}`.toLowerCase();
+  return /econnreset|econnrefused|fetch failed|socket hang up|timed out|timeout|network error/.test(message);
 }
 
 function signalFromConfig(config: unknown): AbortSignal | undefined {
