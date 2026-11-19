@@ -3,7 +3,7 @@
 - [x] 1. Verify the checkpoint: run `npx tsc -b`, `npm test`, `npm run build`, and `npm run benchmark:canvas`; record the four gate numbers (hard failures, math exact, math F1, PhysAlign coverage)
 - [x] 2. Isolate and commit the canvas intelligence checkpoint (phases 0–4) without touching the unrelated pre-existing worktree changes
 - [x] 3. Refresh the stale GitNexus index (`node .gitnexus/run.cjs analyze --index-only`) so later `impact` checks are trustworthy
-- [ ] 4. Add p50/p95 latency to the canvas benchmark output in `scripts/benchmark-canvas.ts` instead of only per-board and average latency
+- [x] 4. Add p50/p95 latency to the canvas benchmark output in `scripts/benchmark-canvas.ts` instead of only per-board and average latency
 - [ ] 5. Create `scripts/benchmark-canvas-scene.ts` building 10,000 synthetic nodes and 1,000 mixed queries, printing build time and p95 query time (ADR target: p95 < 5 ms)
 - [ ] 6. Run the scene index benchmark and tune cell size / overflow if p95 misses 5 ms; record the result
 - [ ] 7. Measure end-to-end deep-analysis and cached-scene p95 on the target machine against the targets (deep < 15 s, cached < 3 s) and record them

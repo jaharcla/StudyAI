@@ -68,3 +68,21 @@ Verification (`node .gitnexus/run.cjs status`):
 - The older CLAUDE.md headline (167,301 symbols / 547,618 relationships) came from a different index snapshot/version; node counts are not comparable across analyzer builds. Functionality is what was checked.
 - The shell wrapper reports exit 1 because GitNexus writes progress to stderr and PowerShell treats that as a native-command error; `cmd /c ... & echo EXITCODE=%ERRORLEVEL%` shows the real code is 0.
 - No source files changed, so no tsc/test/build re-run is required for this item.
+
+## Item 4 — p50/p95 latency in the canvas benchmark summary
+
+Changed `scripts/benchmark-canvas.ts`:
+
+- Added a nearest-rank `percentile(values, fraction)` helper (no existing percentile utility in the repo).
+- Summary now emits `latencyP50Ms` and `latencyP95Ms` alongside `averageLatencyMs`; per-board `latencyMs` and the `results` array are unchanged, and no gate compares the new fields.
+
+Verification:
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -b` | exit 0, no errors |
+| `npx vitest run` | exit 0, 44 files / 301 tests passed |
+
+- Replayed the percentile helper over the last run in `data/canvas-benchmark/latest.json` (7 boards): p50 21,613 ms, p95 40,148 ms, avg 23,461 ms — p95 exposes the slow tail the average hid.
+- The full `npm run benchmark:canvas` was not re-run: it makes live paid provider calls and item 12 reserves that for OCR/prompt/model changes; nothing here touches those.
+- New fields are informational only; `docs/verification/canvas-benchmark-baseline.json` was not refreshed (baselines only update on explicit request).

@@ -154,6 +154,13 @@ for (const board of boards) {
   await new Promise((resolveDelay) => setTimeout(resolveDelay, 1500));
 }
 
+function percentile(values: number[], fraction: number) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(fraction * sorted.length) - 1))];
+}
+
+const latencies = results.map((result) => Number(result.latencyMs));
 const math = results.filter((result) => result.mathScore && !String(result.name).startsWith("PhysAlign"));
 const summary = {
   boardCount: results.length,
@@ -161,7 +168,9 @@ const summary = {
   mathExactCount: math.filter((result) => (result.mathScore as { exact: boolean }).exact).length,
   mathAverageF1: Number((math.reduce((sum, result) => sum + Number((result.mathScore as { tokenF1: number }).tokenF1), 0) / Math.max(1, math.length)).toFixed(3)),
   physAlignStructureCoverage: Number(results.find((result) => String(result.name).startsWith("PhysAlign"))?.structureScore ? (results.find((result) => String(result.name).startsWith("PhysAlign"))!.structureScore as { rate: number }).rate : 0),
-  averageLatencyMs: Math.round(results.reduce((sum, result) => sum + Number(result.latencyMs), 0) / Math.max(1, results.length)),
+  averageLatencyMs: Math.round(latencies.reduce((sum, latency) => sum + latency, 0) / Math.max(1, latencies.length)),
+  latencyP50Ms: percentile(latencies, 0.5),
+  latencyP95Ms: percentile(latencies, 0.95),
   totalCostUsd: Number(results.reduce((sum, result) => sum + Number(result.costUsd), 0).toFixed(6)),
   providerBudget: providerBudgetSnapshot(),
 };
