@@ -13,6 +13,8 @@ export type CanvasContextOptions = {
   maxItems?: number;
   maxChars?: number;
 };
+export type CanvasAttachment = { kind: string; label?: string; distance: number; confidence: number };
+
 export type CanvasShapeContext = {
   id: string;
   type: ShapeRecord["type"];
@@ -20,7 +22,17 @@ export type CanvasShapeContext = {
   bounds: Bounds;
   boundsEstimate?: "text-layout-approximation";
   text?: string;
-  arrow?: { from: { x: number; y: number }; to: { x: number; y: number }; bend: number; length?: number; label?: string; fromLevel?: string; toLevel?: string };
+  arrow?: {
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+    bend: number;
+    length?: number;
+    label?: string;
+    labels?: Array<{ text: string; distance: number; confidence: number }>;
+    startAttached?: CanvasAttachment[];
+    endAttached?: CanvasAttachment[];
+    unattached?: boolean;
+  };
   strokeSummary?: { pointCount: number; bounds: Bounds; simplified: Array<{ x: number; y: number }> };
 };
 export type CanvasAIContext = {
@@ -112,35 +124,122 @@ function pointSegmentDistance(point: { x: number; y: number }, a: { x: number; y
   return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
 }
 
-function arrowDiagramInfo(arrow: NonNullable<CanvasShapeContext["arrow"]>, all: readonly ShapeRecord[]) {
-  const length = Math.round(Math.hypot(arrow.to.x - arrow.from.x, arrow.to.y - arrow.from.y));
-  const texts = all
-    .filter((shape) => (shape.type === "text" || shape.type === "note") && String(shape.props.text ?? "").trim())
-    .map((shape) => ({ text: String(shape.props.text).trim(), bounds: shapeBounds(shape) }));
-  const label = texts
-    .filter((item) => item.text.length <= 8 && !/^\d+$/.test(item.text))
-    .map((item) => ({ ...item, distance: pointSegmentDistance(center(item.bounds), arrow.from, arrow.to) }))
+type Segment = { start: { x: number; y: number }; end: { x: number; y: number } };
+
+function shapeSegment(shape: ShapeRecord): Segment {
+  return {
+    start: { x: shape.x, y: shape.y },
+    end: { x: shape.x + Number(shape.props.dx || 0), y: shape.y + Number(shape.props.dy || 0) },
+  };
+}
+
+function boundsDistance(point: { x: number; y: number }, bounds: Bounds): number {
+  const dx = Math.max(bounds.x - point.x, 0, point.x - (bounds.x + bounds.w));
+  const dy = Math.max(bounds.y - point.y, 0, point.y - (bounds.y + bounds.h));
+  return Math.hypot(dx, dy);
+}
+
+function boundsBoundaryDistance(point: { x: number; y: number }, bounds: Bounds): number {
+  const inside = point.x >= bounds.x && point.x <= bounds.x + bounds.w && point.y >= bounds.y && point.y <= bounds.y + bounds.h;
+  if (!inside) return boundsDistance(point, bounds);
+  return Math.min(point.x - bounds.x, bounds.x + bounds.w - point.x, point.y - bounds.y, bounds.y + bounds.h - point.y);
+}
+
+function elementDistance(point: { x: number; y: number }, shape: ShapeRecord): number {
+  if (shape.type === "line" || shape.type === "arrow") {
+    const segment = shapeSegment(shape);
+    return pointSegmentDistance(point, segment.start, segment.end);
+  }
+  return shape.type === "geo" || shape.type === "image"
+    ? boundsBoundaryDistance(point, shapeBounds(shape))
+    : boundsDistance(point, shapeBounds(shape));
+}
+
+function objectLabel(object: ScientificObject): string | undefined {
+  const value = object as unknown as Record<string, unknown>;
+  for (const key of ["label", "name", "title", "definition", "prompt", "front", "back"]) {
+    const text = value[key];
+    if (typeof text === "string" && text.trim()) return text.trim().slice(0, 40);
+  }
+  return undefined;
+}
+
+function nearestTextToShape(shape: ShapeRecord, all: readonly ShapeRecord[], tolerance: number) {
+  const segment = shapeSegment(shape);
+  const horizontal = Math.abs(segment.end.y - segment.start.y) < 2;
+  const rightEdge = Math.max(segment.start.x, segment.end.x) + 20;
+  return all
+    .filter((candidate) => (candidate.type === "text" || candidate.type === "note") && String(candidate.props.text ?? "").trim())
+    .map((candidate) => {
+      const point = center(shapeBounds(candidate));
+      const distance = horizontal
+        ? point.x <= rightEdge ? Math.abs(point.y - segment.start.y) : Infinity
+        : pointSegmentDistance(point, segment.start, segment.end);
+      return { text: String(candidate.props.text).trim(), distance };
+    })
+    .filter((item) => item.distance <= tolerance)
     .sort((left, right) => left.distance - right.distance)
-    .find((item) => item.distance <= 60)?.text;
-  const numerals = texts.filter((item) => /^\d+$/.test(item.text));
-  const levels = all
-    .filter((shape) => shape.type === "line" && Math.abs(Number(shape.props.dy || 0)) < 2 && Math.abs(Number(shape.props.dx || 0)) > 30)
-    .map((shape) => {
-      const nearest = numerals
-        .map((item) => ({ text: item.text, distance: Math.abs(center(item.bounds).y - shape.y) }))
-        .sort((left, right) => left.distance - right.distance)[0];
-      return { y: shape.y, level: nearest && nearest.distance <= 40 ? nearest.text : undefined };
-    });
-  const nearestLevel = (y: number) => levels
-    .map((level) => ({ ...level, distance: Math.abs(level.y - y) }))
-    .sort((left, right) => left.distance - right.distance)[0];
-  const start = nearestLevel(arrow.from.y);
-  const end = nearestLevel(arrow.to.y);
+    .slice(0, 2);
+}
+
+function arrowConnections(
+  arrow: NonNullable<CanvasShapeContext["arrow"]>,
+  all: readonly ShapeRecord[],
+  objects: readonly ScientificObject[],
+  selfId: string,
+) {
+  const length = Math.round(Math.hypot(arrow.to.x - arrow.from.x, arrow.to.y - arrow.from.y));
+  const bounds = all.map(shapeBounds);
+  const minX = Math.min(...bounds.map((item) => item.x), 0), maxX = Math.max(...bounds.map((item) => item.x + item.w), 1);
+  const minY = Math.min(...bounds.map((item) => item.y), 0), maxY = Math.max(...bounds.map((item) => item.y + item.h), 1);
+  const diagonal = Math.hypot(maxX - minX, maxY - minY);
+  const portTolerance = Math.max(10, diagonal * 0.015);
+  const labelTolerance = Math.max(48, diagonal * 0.08);
+  const labels = all
+    .filter((shape) => (shape.type === "text" || shape.type === "note") && String(shape.props.text ?? "").trim())
+    .map((shape) => ({
+      text: String(shape.props.text).trim(),
+      distance: pointSegmentDistance(center(shapeBounds(shape)), arrow.from, arrow.to),
+    }))
+    .filter((item) => item.text.length <= 8 && !/^\d+$/.test(item.text) && item.distance <= labelTolerance)
+    .sort((left, right) => left.distance - right.distance)
+    .slice(0, 2)
+    .map((item) => ({ ...item, confidence: item.distance <= 12 ? 0.95 : item.distance <= 30 ? 0.75 : 0.5 }));
+
+  const attach = (point: { x: number; y: number }): CanvasAttachment[] => {
+    const shapeCandidates = all
+      .filter((shape) => shape.id !== selfId)
+      .map((shape) => ({ shape, distance: elementDistance(point, shape) }))
+      .filter((item) => item.distance <= portTolerance)
+      .sort((left, right) => left.distance - right.distance);
+    const objectCandidates = objects
+      .map((object) => ({ object, distance: boundsBoundaryDistance(point, { x: object.x, y: object.y, w: object.width, h: object.height }) }))
+      .filter((item) => item.distance <= portTolerance)
+      .sort((left, right) => left.distance - right.distance);
+    const candidates: Array<{ kind: string; label?: string; distance: number }> = [
+      ...shapeCandidates.map(({ shape, distance }) => {
+        const text = shape.type === "text" || shape.type === "note"
+          ? String(shape.props.text ?? "").trim()
+          : nearestTextToShape(shape, all, labelTolerance)[0]?.text;
+        return { kind: shape.type, ...(text ? { label: text.slice(0, 40) } : {}), distance };
+      }),
+      ...objectCandidates.map(({ object, distance }) => ({ kind: object.kind, ...(objectLabel(object) ? { label: objectLabel(object) } : {}), distance })),
+    ];
+    const best = candidates[0]?.distance ?? Infinity;
+    return candidates
+      .filter((item) => item.distance <= best + 4)
+      .slice(0, 2)
+      .map((item) => ({ ...item, distance: Math.round(item.distance * 10) / 10, confidence: item.distance <= 2 ? 0.95 : item.distance <= 8 ? 0.8 : 0.55 }));
+  };
+
+  const startAttached = attach(arrow.from);
+  const endAttached = attach(arrow.to);
   return {
     length,
-    ...(label ? { label } : {}),
-    ...(start && start.distance <= 40 && start.level ? { fromLevel: start.level } : {}),
-    ...(end && end.distance <= 40 && end.level ? { toLevel: end.level } : {}),
+    ...(labels.length ? { labels, label: labels[0].text } : {}),
+    ...(startAttached.length ? { startAttached } : {}),
+    ...(endAttached.length ? { endAttached } : {}),
+    ...(!startAttached.length || !endAttached.length ? { unattached: true } : {}),
   };
 }
 
@@ -181,7 +280,7 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
     .slice(0, maxItems).map(summarize);
   const focus = [...selected, ...visible];
   for (const shape of focus) {
-    if (shape.type === "arrow" && shape.arrow) Object.assign(shape.arrow, arrowDiagramInfo(shape.arrow, all));
+    if (shape.type === "arrow" && shape.arrow) Object.assign(shape.arrow, arrowConnections(shape.arrow, all, options.objects, shape.id));
   }
   const nearbyDistance = distance;
   const nearbyObjects = options.objects.filter((object) => [object.x, object.y, object.width, object.height].every(Number.isFinite) && object.width > 0 && object.height > 0 && focus.some((shape) => gap(shape.bounds, { x: object.x, y: object.y, w: object.width, h: object.height }) <= nearbyDistance))

@@ -26,7 +26,7 @@ Date: 2026-11-19
 
 ## Post-implementation user test
 
-An energy-level board (levels n=4,3,2,1; arrows a/b/c) still produced “no numerical values” answers. Root cause: the tutor context collapsed every arrow to `{kind:"arrow", direction:"down"}` and dropped the endpoints, so a, b, and c were indistinguishable and their level transitions were absent. Fixed by enriching native arrows with `length`, the nearest letter `label`, and `fromLevel`/`toLevel`, and by sending that shape projection alongside the scene evidence. Verified against the saved Board 2: a = 4→2, b = 2→1, c = 4→3. The tutor prompt now says to compare labeled levels, not drawn arrow length.
+An energy-level board (levels n=4,3,2,1; arrows a/b/c) produced “no numerical values” answers. Root cause: the tutor context collapsed every arrow to `{kind:"arrow", direction:"down"}` and dropped the endpoints, so a, b, and c were indistinguishable and their level transitions were absent. Fixed generically: arrows and lines now expose `labels`, `startAttached`, `endAttached`, and `unattached`, where an attachment is a geometric target (`line` with its nearest label, `text`, `geo`, or scientific object) plus distance and confidence. No energy-level rule remains in the code or prompt. Verified against the saved Board 2: a attaches 4→2, b 2→1, c 4→3. The tutor is instructed to treat attachments as geometry, not meaning, and to ask one short question when a port is unattached or has alternatives.
 
 ## Known limits
 
@@ -34,3 +34,4 @@ An energy-level board (levels n=4,3,2,1; arrows a/b/c) still produced “no nume
 - The scene builder continues to run baseline recognition for structural evidence; OCR is the on-demand escalation.
 - `read_canvas_ink` returns at most eight groups and four OCR items per group, with 2 KB per text item.
 - The legacy analysis path and the on-demand path share evidence rules but not one node-creation function; both emit unconfirmed nodes with `recognizes` edges.
+- Clarifications are conversational for now. User-confirmed connection feedback and board notes are not persisted; add them only if repeated clarifications justify the store. The tutor may ask one short question when an attachment is missing or ambiguous.

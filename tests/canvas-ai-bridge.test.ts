@@ -57,11 +57,35 @@ describe("Quickdraw AI context", () => {
     store.put(shape("tc", "text", 400, 91, { text: "c", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
     const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 800, h: 500 }, objects: [], scope });
     const arrows = context.visible.filter((item) => item.type === "arrow").map((item) => item.arrow);
-    expect(arrows).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: "a", fromLevel: "4", toLevel: "2", length: 178 }),
-      expect.objectContaining({ label: "b", fromLevel: "2", toLevel: "1", length: 138 }),
-      expect.objectContaining({ label: "c", fromLevel: "4", toLevel: "3", length: 89 }),
-    ]));
+    const byLabel = new Map(arrows.map((arrow) => [arrow?.label, arrow]));
+    expect(byLabel.get("a")).toMatchObject({ length: 178 });
+    expect(byLabel.get("a")?.startAttached?.[0]).toMatchObject({ kind: "line", label: "4" });
+    expect(byLabel.get("a")?.endAttached?.[0]).toMatchObject({ kind: "line", label: "2" });
+    expect(byLabel.get("b")?.startAttached?.[0]).toMatchObject({ kind: "line", label: "2" });
+    expect(byLabel.get("b")?.endAttached?.[0]).toMatchObject({ kind: "line", label: "1" });
+    expect(byLabel.get("c")?.startAttached?.[0]).toMatchObject({ kind: "line", label: "4" });
+    expect(byLabel.get("c")?.endAttached?.[0]).toMatchObject({ kind: "line", label: "3" });
+  });
+
+  it("marks an arrow that touches nothing as unattached", () => {
+    const store = new Store();
+    store.put(shape("box", "geo", 0, 0, { geo: "rectangle", w: 200, h: 120, color: "black", size: "m" }));
+    store.put(shape("inner", "arrow", 60, 40, { dx: 40, dy: 0, bend: 0, color: "black", size: "m", dash: "solid" }));
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 300, h: 200 }, objects: [], scope });
+    const arrow = context.visible.find((item) => item.type === "arrow")?.arrow;
+    expect(arrow?.startAttached).toBeUndefined();
+    expect(arrow?.endAttached).toBeUndefined();
+    expect(arrow?.unattached).toBe(true);
+  });
+
+  it("reports competing labels when a label sits between two arrows", () => {
+    const store = new Store();
+    store.put(shape("x", "arrow", 0, 0, { dx: 100, dy: 0, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("y", "arrow", 0, 40, { dx: 100, dy: 0, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("label", "text", 45, 18, { text: "m", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 200, h: 100 }, objects: [], scope });
+    const labels = context.visible.filter((item) => item.type === "arrow").map((item) => item.arrow?.labels?.map((label) => label.text));
+    expect(labels).toEqual([["m"], ["m"]]);
   });
 
   it("uses Quickdraw rotated bounds and obeys the context character limit", () => {

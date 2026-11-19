@@ -185,19 +185,21 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).not.toContain("o:1");
   });
 
-  it("includes transition lengths and levels from the native shape projection", () => {
+  it("projects arrow attachments and lengths without raw coordinates", () => {
     const shapes = {
       scope: { boardId: "board-17" }, selected: [], nearbyObjects: [], spatialRelationships: [],
       visible: [
         { kind: "line", direction: "right" },
-        { kind: "arrow", direction: "down", arrow: { from: { x: 330, y: 66 }, to: { x: 330, y: 245 }, bend: 0, length: 178, label: "a", fromLevel: "4", toLevel: "2" } },
+        { kind: "arrow", direction: "down", arrow: { from: { x: 330, y: 66 }, to: { x: 330, y: 245 }, bend: 0, length: 178, label: "a", startAttached: [{ kind: "line", label: "4", distance: 2, confidence: 0.95 }], endAttached: [{ kind: "line", label: "2", distance: 3, confidence: 0.95 }] } },
       ],
     };
     const projected = JSON.stringify(projectTutorContexts([{ description: "Active canvas scene", value: { scene: { scope: { boardId: "board-17" }, nodes: [], edges: [], truncated: false }, shapes, selectedIds: [] } }], false));
     expect(projected).toContain('"label":"a"');
-    expect(projected).toContain('"fromLevel":"4"');
-    expect(projected).toContain('"toLevel":"2"');
+    expect(projected).toContain('"kind":"line"');
+    expect(projected).toContain('"label":"4"');
+    expect(projected).toContain('"label":"2"');
     expect(projected).toContain('"length":178');
+    expect(projected).not.toContain('"x":330');
   });
 
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {

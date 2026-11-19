@@ -30,6 +30,12 @@ The scene graph already supports `ocr-item`, `recognition-candidate`, `model-obs
 - Handwriting remains ambiguous. The system surfaces "unreadable" or asks, rather than inventing a transcription.
 - Photos and imported images without source strokes still require a vision path; this ADR does not solve them.
 
+## Connection attachments
+
+Native arrows and lines expose `labels`, `startAttached`, `endAttached`, and `unattached` in the shape projection sent with the scene. An attachment is a geometric target (a line with its nearest text label, a text, a geo, or a scientific object), distance, and confidence. It is not a semantic relation: the tutor must not infer “transition,” “force,” or “wire” from proximity alone. When a port is unattached or has competing attachments, the tutor asks one short question rather than asserting. This replaces the earlier energy-level special case.
+
+Clarifications are conversational in this phase. Persisting user-confirmed connection feedback and board notes is deferred until repeated clarifications show it is needed; the existing recognition feedback store is the model to follow when that happens.
+
 ## Rollback
 
 Point the tutor context back to the legacy `"Active Quickdraw board context"` shape, remove `read_canvas_ink` from the bridge and agent tools, and set the producer back to the previous OCR behavior. The scene graph and stored OCR nodes are additive and can remain.

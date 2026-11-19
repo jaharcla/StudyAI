@@ -141,6 +141,7 @@ function projectCanvasSceneContext(value: unknown, labels: Map<string, string>):
     selectedCount: list(source.selectedIds).length,
     nodes,
     edges,
+    ...(Array.isArray(source.connections) ? { connections: list(source.connections) } : {}),
     ...(scene.truncated === true ? { incomplete: true } : {}),
   };
 }
@@ -230,7 +231,17 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
     if (type === "text" || type === "note") return { kind: "text label", text: text ?? "" };
     const arrow = record(shape.arrow);
     const direction = type === "arrow" || type === "line" ? arrowDirection(arrow.from, arrow.to) : undefined;
-    return { kind: type, ...(direction ? { direction } : {}), ...(Number(arrow.bend) ? { curved: true } : {}), ...(typeof arrow.length === "number" ? { length: Math.round(arrow.length) } : {}), ...(string(arrow.label) ? { label: string(arrow.label) } : {}), ...(string(arrow.fromLevel) ? { fromLevel: string(arrow.fromLevel) } : {}), ...(string(arrow.toLevel) ? { toLevel: string(arrow.toLevel) } : {}) };
+    return {
+      kind: type,
+      ...(direction ? { direction } : {}),
+      ...(Number(arrow.bend) ? { curved: true } : {}),
+      ...(typeof arrow.length === "number" ? { length: Math.round(arrow.length) } : {}),
+      ...(string(arrow.label) ? { label: string(arrow.label) } : {}),
+      ...(Array.isArray(arrow.labels) ? { labels: list(arrow.labels).map((label) => { const item = record(label); return { text: string(item.text) ?? "", confidence: typeof item.confidence === "number" ? item.confidence : null }; }) } : {}),
+      ...(Array.isArray(arrow.startAttached) ? { startAttached: list(arrow.startAttached).map((attachment) => { const item = record(attachment); return { kind: string(item.kind) ?? "unknown", ...(string(item.label) ? { label: string(item.label) } : {}), confidence: typeof item.confidence === "number" ? item.confidence : null }; }) } : {}),
+      ...(Array.isArray(arrow.endAttached) ? { endAttached: list(arrow.endAttached).map((attachment) => { const item = record(attachment); return { kind: string(item.kind) ?? "unknown", ...(string(item.label) ? { label: string(item.label) } : {}), confidence: typeof item.confidence === "number" ? item.confidence : null }; }) } : {}),
+      ...(arrow.unattached === true ? { unattached: true } : {}),
+    };
   };
   const projectedSelected = selected.map((shape) => projectShape(record(shape)));
   const projectedVisible = visible.map((shape) => projectShape(record(shape)));
