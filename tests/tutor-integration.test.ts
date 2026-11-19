@@ -222,6 +222,25 @@ it("retries one transient Ollama failure", async () => {
   expect(mocks.invoke).toHaveBeenCalledTimes(2);
 });
 
+it("prefers the current shape scope over a stale scene scope", async () => {
+  const shape = (id: string, type: string, x: number, y: number, props: Record<string, unknown>) => ({ id, typeName: "shape", type, x, y, rot: 0, z: 1, props });
+  const snapshot = { document: { store: { label: shape("label", "text", 0, 0, { text: "MOLECULE", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }) } } };
+  db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run("board-shapes", "chem-120", "lesson-03", "Shapes", JSON.stringify({ version: 1, snapshot, objects: [] }), 1);
+  mocks.invoke.mockResolvedValue(new AIMessage("ok"));
+  const active = {
+    description: "Active canvas scene",
+    value: {
+      scene: { scope: { boardId: "board-old", courseId: "chem-120", lessonId: "lesson-03" }, nodes: [], edges: [], truncated: false },
+      shapes: { scope: { boardId: "board-shapes", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, visible: [], selected: [], nearbyObjects: [], spatialRelationships: [], truncated: false },
+      selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [],
+    },
+  };
+  await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("What is on the canvas?")] });
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(prompt).toContain("MOLECULE");
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-shapes");
+});
+
 it("forwards a registered canvas tool call through LangGraph for browser review", async () => {  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });

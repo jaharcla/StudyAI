@@ -56,7 +56,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
   const canvasTool = course && lesson && canvasContext.courseId === course.id && canvasContext.lessonId === workspace.lessonId && state.copilotkit.actions?.some((action) => action.name === "propose_canvas_edit")
     ? { name: "propose_canvas_edit", description: "Propose scientific object edits for user review using current boardId and objectId. Use JSON patches for ordinary objects; for a math workspace use mathOperation to request a supported operation on both statement sides. Every math operation is validated and remains pending until the user applies it.", schema: canvasEditSchema } : undefined;
   const quickdrawContext = objectValue(contexts.find((item) => item.description === "Active canvas scene")?.value);
-  const quickdrawScope = objectValue(objectValue(quickdrawContext.scene).scope ?? quickdrawContext.scope ?? objectValue(quickdrawContext.shapes).scope);
+  const quickdrawScope = objectValue(objectValue(quickdrawContext.shapes).scope ?? objectValue(quickdrawContext.scene).scope ?? quickdrawContext.scope);
   const canvasBoardId = typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId ? quickdrawScope.boardId : typeof canvasContext.boardId === "string" ? canvasContext.boardId : "";
   const sameCanvasScope = Boolean(course && lesson && (typeof quickdrawScope.courseId !== "string" || quickdrawScope.courseId === course.id) && (typeof quickdrawScope.lessonId !== "string" || quickdrawScope.lessonId === workspace.lessonId) && canvasBoardId.length > 0);
   let promptCanvasContext = quickdrawContext;
