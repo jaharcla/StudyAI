@@ -67,34 +67,39 @@ async function tutor(state: typeof State.State, config?: unknown) {
         const saved = parseCanvasDocument(JSON.parse(row.document));
         const viewport = { x: 0, y: 0, w: 4000, h: 3000 };
         const selectedIds = Array.isArray(quickdrawContext.selectedIds) ? quickdrawContext.selectedIds.filter((id): id is string => typeof id === "string") : [];
-        const shapes = buildCanvasAIContext({
-          source: saved.snapshot,
-          selectedIds,
-          viewport,
-          objects: saved.objects,
-          maxItems: 100,
-          maxChars: 80_000,
-          scope: { boardId: canvasBoardId, courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
-        });
-        const compact = (shape: (typeof shapes.visible)[number]) => ({
-          type: shape.type,
-          ...(shape.text ? { text: shape.text } : {}),
-          ...(shape.arrow ? { arrow: { label: shape.arrow.label, length: shape.arrow.length, labels: shape.arrow.labels, startAttached: shape.arrow.startAttached, endAttached: shape.arrow.endAttached, unattached: shape.arrow.unattached } } : {}),
-        });
-        promptCanvasContext = {
-          ...quickdrawContext,
-          shapes: {
-            scope: shapes.scope,
-            selected: shapes.selected.map(compact),
-            visible: shapes.visible.map(compact),
-            nearbyObjects: [],
-            spatialRelationships: [],
-            truncated: shapes.truncated,
-          },
-          selectedIds,
-          viewport,
-          warnings: [],
-        };
+        const savedCount = Object.keys(saved.snapshot.document.store).length;
+        if (selectedIds.length === 0 && savedCount > 40) {
+          promptCanvasContext = { ...quickdrawContext, shapes: { ...objectValue(quickdrawContext.shapes), truncated: true }, warnings: [] };
+        } else {
+          const shapes = buildCanvasAIContext({
+            source: saved.snapshot,
+            selectedIds,
+            viewport,
+            objects: saved.objects,
+            maxItems: 100,
+            maxChars: 80_000,
+            scope: { boardId: canvasBoardId, courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
+          });
+          const compact = (shape: (typeof shapes.visible)[number]) => ({
+            type: shape.type,
+            ...(shape.text ? { text: shape.text } : {}),
+            ...(shape.arrow ? { arrow: { label: shape.arrow.label, length: shape.arrow.length, labels: shape.arrow.labels, startAttached: shape.arrow.startAttached, endAttached: shape.arrow.endAttached, unattached: shape.arrow.unattached } } : {}),
+          });
+          promptCanvasContext = {
+            ...quickdrawContext,
+            shapes: {
+              scope: shapes.scope,
+              selected: shapes.selected.map(compact),
+              visible: shapes.visible.map(compact),
+              nearbyObjects: [],
+              spatialRelationships: [],
+              truncated: shapes.truncated,
+            },
+            selectedIds,
+            viewport,
+            warnings: [],
+          };
+        }
       }
     } catch {
       // Keep the client-supplied context; the model will report missing attachments.
