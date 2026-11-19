@@ -89,7 +89,7 @@ describe("Tutor semantic canvas context", () => {
   it("describes an arrow and nearby label without IDs or coordinates", () => {
     const contexts = projectTutorContexts([
       { description: "StudyAI active scientific canvas objects", value: { objects: [] } },
-      { description: "Active Quickdraw board context", value: {
+      { description: "Active canvas scene", value: {
         scope: { boardId: "board-17", courseId: "chem-120", lessonId: "lesson-3" },
         selected: [],
         visible: [
@@ -107,7 +107,7 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).toMatch(/arrow.{0,80}(right|east)|arrow.{0,80}label/i);
     expect(projected).not.toContain("shape-arrow-1");
     expect(projected).not.toContain('"x"');
-    expect(projected).not.toContain("board-17");
+    expect(projected).toContain('"boardId":"board-17"');
   });
 
   it("keeps observations separate from uncertain interpretations", () => {
@@ -164,7 +164,7 @@ describe("Tutor semantic canvas context", () => {
   });
 
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {
-    const raw = [{ description: "Active Quickdraw board context", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
+    const raw = [{ description: "Active canvas scene", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
     const ordinary = JSON.stringify(projectTutorContexts(raw, false));
 
     expect(ordinary).toContain("meaning cannot be determined");

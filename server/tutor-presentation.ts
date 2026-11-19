@@ -104,10 +104,42 @@ export function projectTutorContexts(contexts: TutorContextItem[], includeRawCan
   return contexts.map((item) => {
     if (item.description === "StudyAI current workspace and structured canvas metadata") return { ...item, value: projectWorkspace(item.value) };
     if (item.description === "StudyAI active scientific canvas objects") return { ...item, value: projectScienceContext(item.value, labels) };
-    if (item.description === "Active Quickdraw board context") return { ...item, value: projectQuickdrawContext(item.value, labels) };
+    if (item.description === "Active canvas scene") return { ...item, value: projectCanvasSceneContext(item.value, labels) };
     if (item.description === "StudyAI canvas analysis result") return { ...item, value: projectCanvasAnalysis(item.value) };
     return item;
   });
+}
+
+function projectCanvasSceneContext(value: unknown, labels: Map<string, string>): Record<string, unknown> {
+  const source = record(value);
+  if (!source.scene) return projectQuickdrawContext(value, labels);
+  const scene = record(source.scene);
+  const nodes = list(scene.nodes).map((node) => {
+    const item = record(node);
+    const text = string(item.text);
+    const confidence = typeof item.confidence === "number" ? item.confidence : null;
+    return {
+      kind: string(item.kind) ?? "unknown",
+      ...(text ? { text } : {}),
+      status: string(item.verificationStatus) ?? "unconfirmed",
+      ...(confidence !== null ? { confidence } : {}),
+      ...(list(item.uncertaintyReasons).length ? { uncertain: true } : {}),
+    };
+  });
+  const edges = list(scene.edges).map((edge) => {
+    const item = record(edge);
+    return {
+      relation: string(item.kind) ?? "related",
+      ...(typeof item.distance === "number" ? { distance: Math.round(item.distance) } : {}),
+    };
+  });
+  return {
+    scope: pick(record(scene.scope), ["boardId", "revision"]),
+    selectedCount: list(source.selectedIds).length,
+    nodes,
+    edges,
+    ...(scene.truncated === true ? { incomplete: true } : {}),
+  };
 }
 
 function projectWorkspace(value: unknown): Record<string, unknown> {
@@ -207,6 +239,7 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
   });
   const nearbyObjects = list(source.nearbyObjects).map((item) => projectNearbyObject(item, labels)).filter(Boolean);
   return {
+    scope: pick(record(source.scope), ["boardId", "revision"]),
     selected: projectedSelected,
     visible: projectedVisible,
     nearbyObjects,

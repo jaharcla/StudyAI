@@ -46,7 +46,7 @@ const molecule = makeMolecule(100, 100);
 const context = [
   { description: "StudyAI current workspace and structured canvas metadata", value: { courseId: "chem-120", lessonId: "lesson-03" } },
   { description: "StudyAI active scientific canvas objects", value: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1", objects: [molecule] } },
-  { description: "Active Quickdraw board context", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
+  { description: "Active canvas scene", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
 ];
 function tutorMetadata(result: { messages: unknown[] }) { return (result.messages.at(-1) as AIMessage).response_metadata.studyai as any; }
 beforeEach(() => {
@@ -171,6 +171,14 @@ it("binds structured QuickDraw tools only for the active course and forwards cal
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }, { name: "get_canvas_state" }] }, messages: [new HumanMessage("Add a nitrate label")] });
   expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("propose_canvas_action");
   expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("get_canvas_state");
+  expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
+});
+
+it("binds read_canvas_ink and forwards it for browser execution", async () => {
+  const response = new AIMessage({ content: "", tool_calls: [{ name: "read_canvas_ink", id: "ink-1", args: { boardId: "board-1", groupIds: ["g:abc"], profile: "math" } }] });
+  mocks.invoke.mockResolvedValue(response);
+  const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "read_canvas_ink" }] }, messages: [new HumanMessage("What does the handwritten label say?")] });
+  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("read_canvas_ink");
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
 });
 
