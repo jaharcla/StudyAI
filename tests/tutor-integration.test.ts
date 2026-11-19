@@ -231,7 +231,7 @@ it("prefers the current shape scope over a stale scene scope", async () => {
     description: "Active canvas scene",
     value: {
       scene: { scope: { boardId: "board-old", courseId: "chem-120", lessonId: "lesson-03" }, nodes: [], edges: [], truncated: false },
-      shapes: { scope: { boardId: "board-shapes", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, visible: [], selected: [], nearbyObjects: [], spatialRelationships: [], truncated: false },
+      shapes: { scope: { boardId: "board-shapes", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, visible: [{ type: "text", text: "partial" }], selected: [], nearbyObjects: [], spatialRelationships: [], truncated: true },
       selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [],
     },
   };
