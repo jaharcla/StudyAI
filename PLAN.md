@@ -6,7 +6,7 @@
 - [x] 4. Add p50/p95 latency to the canvas benchmark output in `scripts/benchmark-canvas.ts` instead of only per-board and average latency
 - [x] 5. Create `scripts/benchmark-canvas-scene.ts` building 10,000 synthetic nodes and 1,000 mixed queries, printing build time and p95 query time (ADR target: p95 < 5 ms)
 - [x] 6. Run the scene index benchmark and tune cell size / overflow if p95 misses 5 ms; record the result
-- [ ] 7. Measure end-to-end deep-analysis and cached-scene p95 on the target machine against the targets (deep < 15 s, cached < 3 s) and record them
+- [x] 7. Measure end-to-end deep-analysis and cached-scene p95 on the target machine against the targets (deep < 15 s, cached < 3 s) and record them
 - [ ] 8. Add optional CLIP warmup at server start (the runtime is already a module-level singleton in `recognition/clip.ts`), behind an env flag so tests and short-lived processes skip it
 - [ ] 9. Calibrate the CLIP abstain thresholds using recorded teach/accept/correct/dismiss decisions; sweep `CANVAS_RECOGNITION_MIN_CONFIDENCE` / `CANVAS_RECOGNITION_MIN_MARGIN` and only change the defaults in `recognition/types.ts` with data
 - [ ] 10. Fix the nested-logistic OCR μ/σ ambiguity (0.625 F1) with a targeted crop/preprocess or prompt change, and re-run the benchmark gate

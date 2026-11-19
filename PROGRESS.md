@@ -141,3 +141,55 @@ Verification (unchanged source; re-run to confirm the tree is still clean):
 | --- | --- |
 | `npx tsc -b` | exit 0, "No errors found" |
 | `npx vitest run` | exit 0, 44 files / 301 tests passed |
+
+## Item 7 — Measure deep-analysis and cached-scene p95
+
+Measured on this machine, 2026-11-19, branch `codex/whole-board-scene-experiment`.
+
+### Deep analysis (live, 7 boards)
+
+`npm run benchmark:canvas` (report-only for this item; baseline not touched). Gate passed: 0 hard failures, 4/6 math exact, math F1 0.910, PhysAlign coverage 1.000.
+
+| Board | Latency |
+| --- | --- |
+| MathWriting · bra-ket sum | 17,023 ms |
+| MathWriting · exponential decay | 106,663 ms |
+| MathWriting · gradient vector | 16,129 ms |
+| MathWriting · indexed sum | 11,987 ms |
+| MathWriting · nested logistic expression | 20,280 ms |
+| MathWriting · partial derivative fraction | 40,335 ms |
+| PhysAlign · spring and force-length graph | 95,668 ms |
+
+- p50 **20,280 ms**, p95 **106,663 ms**, average 44,012 ms.
+- Target deep p95 < 15 s: **missed** (p95 is 7.1x over; even p50 is 1.35x over).
+- With 7 samples the nearest-rank p95 is the max board, so one slow board sets the gate. The two slow boards (106.7 s, 95.7 s) finished with `warnings: []` and no errors: the time is provider response time (Groq completions of 3.5k-4.5k tokens plus Gemini OCR), not a local pipeline fault or retry storm. Provider latency is external and variable; item 1 already saw a run where two 60 s OCR timeouts pushed average latency to 23.8 s.
+- Scope: measures OCR crop rendering + `understandCanvas` end to end in the server pipeline. Loopback HTTP transport and client rendering are not included, consistent with how the gate has always been measured.
+
+### Cached scene
+
+Added `scripts/benchmark-canvas-cached-scene.ts`:
+
+- `VACUUM INTO` a throwaway copy of `data/canvas-dataset-benchmark/studyai.sqlite` so the persisted benchmark DB is never mutated.
+- Builds each board's scene once through `buildCanvasScene` (baseline recognition, no network), then runs 1,000 mixed board-scoped `queryCanvasScene` calls and 1,000 course-wide `queryCourseCanvasScene` calls, reusing the persisted revision hash.
+- Reports build time, node/edge counts, and p50/p95/p99/max; timing never changes the exit code.
+
+| Measurement | p50 | p95 | p99 | max |
+| --- | --- | --- | --- | --- |
+| Scene build (7 boards, uncached) | 13.4 ms | 95.5 ms | 95.5 ms | 95.5 ms |
+| Cached scene query (n=1,000) | 0.45 ms | **2.07 ms** | 2.68 ms | 2.93 ms |
+| Cached course scene query (n=1,000) | 0.27 ms | 1.10 ms | 1.36 ms | 2.53 ms |
+
+- Target cached p95 < 3 s: **pass** (2.07 ms, ~1,450x headroom).
+- The 95.5 ms build p95 is the first board only (module/JIT/schema warmup); the six later builds are 12.5-16.5 ms. Even the cold build is under the 3 s target.
+- The client keeps the last built graph in memory keyed by board + revision (`src/canvas/ai/scene-tools.ts`), so a repeat read with unchanged revision is a property hit; the measurement above is the server path that a cache miss or stale revision still has to pay.
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -b` | exit 0, "No errors found" |
+| `npx vitest run` | exit 0, 44 files / 301 tests passed |
+| `npm run benchmark:canvas` | exit 0, benchmark passed against baseline |
+| `npx tsx scripts/benchmark-canvas-cached-scene.ts` | numbers above |
+
+Remaining limit for items 10-14: deep p95 is provider-bound and misses the 15 s target on this connection; the cache path already clears its target, so the remaining performance work belongs to provider routing/model choice, not the scene index.
