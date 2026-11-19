@@ -107,3 +107,37 @@ Verification:
 
 - A first full `vitest` run reported 4 SQLite-backed suites as collection errors (`STACK_TRACE_ERROR`); each passed in isolation and the full re-run was green, so it was parallel-run flake, not a code regression.
 - Observed but not fixed (out of scope for this item): `CanvasGridSpatialIndex.insert` only adds nodes to the grid after `linearThreshold` is exceeded, so on boards larger than 256 nodes the first 256 inserted nodes remain in `nodes` but never enter `cells` and are invisible to `query`. Affects `buildCanvasSceneGraph` only when a board exceeds 256 source nodes. Timing was unaffected; a backfill-on-threshold-crossing fix plus a test is worth its own item.
+
+## Item 6 — Run the scene index benchmark and tune cell size / overflow
+
+Ran `npx tsx scripts/benchmark-canvas-scene.ts` on 2026-11-19 (10,000 nodes, 1,000 mixed queries, 100 warmup). Defaults `cellSize=128`, `maxCellsPerNode=256`, `linearThreshold=256`:
+
+| Run | Build | p50 | p95 | p99 | max | ADR p95 < 5 ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| default | 12.254 ms | 0.883 ms | **2.885 ms** | 3.195 ms | 3.552 ms | pass |
+
+Tuning sweep, all 15 combinations pass (p95 in ms; same node/query seed each row):
+
+| cellSize \ maxCells | 64 | 256 | 1024 |
+| --- | --- | --- | --- |
+| 64 | 2.969 | 2.759 | 2.728 |
+| 96 | 3.073 | 3.195 | 2.997 |
+| 128 | 2.797 | **2.811** | 2.755 |
+| 192 | 2.711 | 2.748 | 2.842 |
+| 256 | 2.771 | 2.740 | 2.749 |
+
+Threshold sweep at the default cell size: `--linear-threshold=0` (every node gridded) build 10.358 ms / p95 2.883; `256` build 11.228 ms / p95 2.845; `20000` (grid never used, pure linear scan) build 2.234 ms / p95 2.976.
+
+Findings:
+
+- No tuning needed: the 2.71–3.20 ms spread across cell size and overflow policy is within run-to-run noise and every configuration clears the 5 ms target by ~40%.
+- The p95 floor is set by `nearest()`, which scans all nodes (O(n) plus a sort) regardless of grid settings — the pure-linear `--linear-threshold=20000` run measures 2.976 ms, i.e. the grid contributes nothing to p95 because half the query mix is nearest. Cell size only moves the rect-query half, which is already sub-millisecond.
+- `cellSize=128` / `maxCellsPerNode=256` / `linearThreshold=256` stay as shipped; the ADR's "swap in an R-tree only if p95 is missed" clause is not triggered, so no dependency and no code change.
+- The 256-node blind spot recorded under item 5 does not inflate this result: the `--linear-threshold=0` row grids from the first insert and still measures p95 2.883 ms. The defect is a recall bug, not a timing artefact.
+
+Verification (unchanged source; re-run to confirm the tree is still clean):
+
+| Command | Result |
+| --- | --- |
+| `npx tsc -b` | exit 0, "No errors found" |
+| `npx vitest run` | exit 0, 44 files / 301 tests passed |
