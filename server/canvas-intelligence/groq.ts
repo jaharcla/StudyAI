@@ -22,7 +22,7 @@ export const groqOCRModel = (env: NodeJS.ProcessEnv = process.env) => env.CANVAS
 export const groqInferenceModel = (env: NodeJS.ProcessEnv = process.env) => env.CANVAS_GROQ_MODEL || env.GROQ_MODEL || "openai/gpt-oss-120b";
 const issued: number[] = [];
 
-type GroqInferenceOptions = { model: string; system: string; prompt: string; baseUrl?: string; signal?: AbortSignal; fetcher?: typeof fetch };
+type GroqInferenceOptions = { model: string; system: string; prompt: string; baseUrl?: string; signal?: AbortSignal; fetcher?: typeof fetch; onFallback?: () => void };
 
 export async function canvasInferenceJson<T>(options: GroqInferenceOptions, schema: z.ZodType<T>, normalize?: (value: unknown, raw: string) => unknown): Promise<T> {
   if (canvasInferenceProvider() !== "groq") return ollamaJson(options, schema, normalize);
@@ -30,7 +30,7 @@ export async function canvasInferenceJson<T>(options: GroqInferenceOptions, sche
     return await groqJson({ ...options, model: groqInferenceModel() }, schema, normalize);
   } catch (groqError) {
     if (options.signal?.aborted) throw groqError;
-    try { return await ollamaJson(options, schema, normalize); }
+    try { const result = await ollamaJson(options, schema, normalize); options.onFallback?.(); return result; }
     catch (ollamaError) {
       const reason = (error: unknown) => error instanceof Error ? error.message : "request failed";
       throw new Error(`Groq inference failed (${reason(groqError)}); Ollama fallback failed (${reason(ollamaError)})`);
