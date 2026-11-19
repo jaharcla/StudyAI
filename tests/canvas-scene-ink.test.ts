@@ -97,6 +97,10 @@ describe("canvas ink evidence", () => {
     const saved = loadCanvasSceneGraph(db, "board-1", built.scene.revisionHash)!;
     expect(saved.nodes.some((node) => node.kind === "ocr-item" && node.text === "x=1")).toBe(true);
 
+    const again = await readCanvasInk(db, "board-1", { courseId: "course-1", lessonId: "lesson-1", expectedRevision: 3, groupIds: [group.id] }, { ocr });
+    expect(calls).toBe(1);
+    expect(again.items).toEqual(result.items);
+
     const typed = await readCanvasInk(db, "board-1", { courseId: "course-1", lessonId: "lesson-1", expectedRevision: 3, groupIds: ["q:t1"] }, { ocr });
     expect(calls).toBe(1);
     expect(typed.warnings.join(" ")).toMatch(/not a freehand group/i);

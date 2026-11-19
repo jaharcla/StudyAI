@@ -88,6 +88,21 @@ export async function readCanvasInk(
       items.push({ groupId: group.id, text: candidate.text, format: "text", confidence: candidate.confidence, source: "recognition", confirmed: false });
       continue;
     }
+    const storedOcr = recognises
+      .map((edge) => graph.nodes.find((node) => node.id === edge.from))
+      .filter((node) => node?.kind === "ocr-item" && node.text && (node.confidence ?? 0) >= minConfidence)
+      .sort((left, right) => (right?.confidence ?? 0) - (left?.confidence ?? 0))[0];
+    if (storedOcr?.text) {
+      items.push({
+        groupId: group.id,
+        text: storedOcr.text,
+        format: storedOcr.recordType === "latex" ? "latex" : "text",
+        confidence: storedOcr.confidence,
+        source: "ocr",
+        confirmed: false,
+      });
+      continue;
+    }
 
     const strokeIds = graph.edges.filter((edge) => edge.kind === "contains" && edge.from === group.id && edge.to.startsWith("q:")).map((edge) => edge.to.slice(2));
     if (!strokeIds.length) {

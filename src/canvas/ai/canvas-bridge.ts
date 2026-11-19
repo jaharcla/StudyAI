@@ -4,7 +4,7 @@ import type { Bounds, Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
 import type { CanvasSceneGraph } from "../spatial/types";
 import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
-import { boundedSceneSlice, canvasEvidenceSearchSchema, canvasSceneReadSchema, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
+import { boundedSceneSlice, canvasEvidenceSearchSchema, canvasSceneReadSchema, invalidateCanvasSceneCache, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
 import { buildTutorCanvasContext } from "./tutor-canvas-context";
 import type { CanvasScope } from "./canvas-context";
 
@@ -74,7 +74,10 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     handler: async ({ boardId, groupIds, profile }) => {
       try {
         if (boardId !== options.scope.boardId) throw new Error("The active board changed.");
-        return await requestCanvasInk(options.scope, { groupIds, profile });
+        const result = await requestCanvasInk(options.scope, { groupIds, profile });
+        invalidateCanvasSceneCache();
+        requestCanvasScene(options.scope).then((graph) => setScene(graph)).catch(() => undefined);
+        return result;
       } catch (error) {
         return { error: error instanceof Error ? error.message : "Canvas ink read unavailable." };
       }

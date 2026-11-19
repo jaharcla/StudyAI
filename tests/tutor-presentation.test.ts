@@ -163,6 +163,25 @@ describe("Tutor semantic canvas context", () => {
     }
   });
 
+  it("projects scene evidence with status and confidence without raw node IDs", () => {
+    const contexts = projectTutorContexts([{ description: "Active canvas scene", value: {
+      scene: {
+        scope: { boardId: "board-17" },
+        nodes: [{ id: "o:1", kind: "ocr-item", text: "F = ma", verificationStatus: "unconfirmed", confidence: 0.62, uncertaintyReasons: ["Ink transcription"] }],
+        edges: [{ id: "e:1", kind: "recognizes", from: "o:1", to: "g:1", distance: null }],
+        truncated: false,
+      },
+      selectedIds: [],
+      viewport: { x: 0, y: 0, w: 100, h: 100 },
+      warnings: [],
+    } }], false);
+    const projected = JSON.stringify(contexts);
+    expect(projected).toContain("F = ma");
+    expect(projected).toContain("unconfirmed");
+    expect(projected).toContain("0.62");
+    expect(projected).not.toContain("o:1");
+  });
+
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {
     const raw = [{ description: "Active canvas scene", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
     const ordinary = JSON.stringify(projectTutorContexts(raw, false));
