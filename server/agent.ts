@@ -60,9 +60,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
   const canvasBoardId = typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId ? quickdrawScope.boardId : typeof canvasContext.boardId === "string" ? canvasContext.boardId : "";
   const sameCanvasScope = Boolean(course && lesson && (typeof quickdrawScope.courseId !== "string" || quickdrawScope.courseId === course.id) && (typeof quickdrawScope.lessonId !== "string" || quickdrawScope.lessonId === workspace.lessonId) && canvasBoardId.length > 0);
   let promptCanvasContext = quickdrawContext;
-  const clientVisible = objectValue(quickdrawContext.shapes).visible;
-  const clientTruncated = objectValue(quickdrawContext.shapes).truncated === true;
-  if (sameCanvasScope && course && (!Array.isArray(clientVisible) || clientVisible.length === 0 || clientTruncated)) {
+  if (sameCanvasScope && course) {
     try {
       const row = db.prepare("SELECT document FROM canvases WHERE id=? AND course_id=? AND lesson_id=?").get(canvasBoardId, course.id, String(workspace.lessonId)) as { document: string } | undefined;
       if (row) {
