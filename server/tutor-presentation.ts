@@ -114,6 +114,7 @@ function projectCanvasSceneContext(value: unknown, labels: Map<string, string>):
   const source = record(value);
   if (!source.scene) return projectQuickdrawContext(value, labels);
   const scene = record(source.scene);
+  const diagram = source.shapes ? projectQuickdrawContext(source.shapes, labels) : {};
   const nodes = list(scene.nodes).map((node) => {
     const item = record(node);
     const text = string(item.text);
@@ -135,6 +136,7 @@ function projectCanvasSceneContext(value: unknown, labels: Map<string, string>):
     };
   });
   return {
+    ...diagram,
     scope: pick(record(scene.scope), ["boardId", "revision"]),
     selectedCount: list(source.selectedIds).length,
     nodes,
@@ -228,7 +230,7 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
     if (type === "text" || type === "note") return { kind: "text label", text: text ?? "" };
     const arrow = record(shape.arrow);
     const direction = type === "arrow" || type === "line" ? arrowDirection(arrow.from, arrow.to) : undefined;
-    return { kind: type, ...(direction ? { direction } : {}), ...(Number(arrow.bend) ? { curved: true } : {}) };
+    return { kind: type, ...(direction ? { direction } : {}), ...(Number(arrow.bend) ? { curved: true } : {}), ...(typeof arrow.length === "number" ? { length: Math.round(arrow.length) } : {}), ...(string(arrow.label) ? { label: string(arrow.label) } : {}), ...(string(arrow.fromLevel) ? { fromLevel: string(arrow.fromLevel) } : {}), ...(string(arrow.toLevel) ? { toLevel: string(arrow.toLevel) } : {}) };
   };
   const projectedSelected = selected.map((shape) => projectShape(record(shape)));
   const projectedVisible = visible.map((shape) => projectShape(record(shape)));

@@ -6,7 +6,7 @@ import type { CanvasSceneGraph } from "../spatial/types";
 import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
 import { boundedSceneSlice, canvasEvidenceSearchSchema, canvasSceneReadSchema, invalidateCanvasSceneCache, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
 import { buildTutorCanvasContext } from "./tutor-canvas-context";
-import type { CanvasScope } from "./canvas-context";
+import { buildCanvasAIContext, type CanvasScope } from "./canvas-context";
 
 export type QuickdrawAIBridgeOptions = {
   store: Store | null;
@@ -27,7 +27,16 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     requestCanvasScene(options.scope).then((graph) => { if (!cancelled) setScene(graph); }).catch(() => { if (!cancelled) setScene(null); });
     return () => { cancelled = true; };
   }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
-  const tutorContext = buildTutorCanvasContext({ scene, selectedIds: options.selectedIds, viewport: options.viewport });
+  const legacy = options.store ? buildCanvasAIContext({
+    source: options.store,
+    selectedIds: options.selectedIds,
+    viewport: options.viewport,
+    objects: options.objects,
+    scope: options.scope,
+    maxChars: options.maxContextChars,
+  }) : null;
+  const shapes = legacy ? { ...legacy, nearbyObjects: [], spatialRelationships: [] } : null;
+  const tutorContext = buildTutorCanvasContext({ scene, shapes, selectedIds: options.selectedIds, viewport: options.viewport });
   useAgentContext({ description: "Active canvas scene", value: tutorContext });
   useFrontendTool({
     name: "propose_canvas_action",

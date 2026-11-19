@@ -26,7 +26,7 @@ describe("Quickdraw AI context", () => {
     const context = buildCanvasAIContext({ source: baseStore(), selectedIds: ["label", "arrow"], viewport: { x: 0, y: 0, w: 200, h: 200 }, objects: [], scope });
     expect(context.selected.map((item) => item.id)).toEqual(["label", "arrow"]);
     expect(context.selected[0].text).toBe("mitochondrion");
-    expect(context.selected[1].arrow).toEqual({ from: { x: 30, y: 40 }, to: { x: 90, y: 30 }, bend: 5 });
+    expect(context.selected[1].arrow).toMatchObject({ from: { x: 30, y: 40 }, to: { x: 90, y: 30 }, bend: 5 });
     expect(context.scope).toEqual(scope);
     expect(context.visible.some((item) => item.id === "offscreen")).toBe(false);
   });
@@ -38,6 +38,30 @@ describe("Quickdraw AI context", () => {
     expect(context.visible.find((item) => item.id === "stroke")?.strokeSummary).toEqual({ pointCount: 3, bounds: { x: 1, y: 3, w: 16, h: 21 }, simplified: [{ x: 4, y: 6 }, { x: 9, y: 16 }, { x: 14, y: 21 }] });
     expect(context.nearbyObjects.map((item) => item.id)).toContain("concept-1");
     expect(context.spatialRelationships.length).toBeGreaterThan(0);
+  });
+
+  it("extracts transition levels and labels from an energy-level diagram", () => {
+    const store = new Store();
+    const line = (id: string, y: number, dx: number) => store.put(shape(id, "line", 307, y, { dx, dy: 0, color: "black", size: "m", dash: "solid" }));
+    line("l4", 68, 300); line("l3", 158, 218); line("l2", 248, 148); line("l1", 388, 117);
+    store.put(shape("t-n", "text", 258, -1, { text: "n", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t4", "text", 262, 60, { text: "4", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t3", "text", 269, 137, { text: "3", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t2", "text", 287, 230, { text: "2", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t1", "text", 299, 374, { text: "1", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("a", "arrow", 330, 66, { dx: 0, dy: 178, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("ta", "text", 308, 93, { text: "a", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("b", "arrow", 363, 252, { dx: 0, dy: 138, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("tb", "text", 341, 308, { text: "b", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("c", "arrow", 419, 69, { dx: 0, dy: 89, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("tc", "text", 400, 91, { text: "c", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 800, h: 500 }, objects: [], scope });
+    const arrows = context.visible.filter((item) => item.type === "arrow").map((item) => item.arrow);
+    expect(arrows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "a", fromLevel: "4", toLevel: "2", length: 178 }),
+      expect.objectContaining({ label: "b", fromLevel: "2", toLevel: "1", length: 138 }),
+      expect.objectContaining({ label: "c", fromLevel: "4", toLevel: "3", length: 89 }),
+    ]));
   });
 
   it("uses Quickdraw rotated bounds and obeys the context character limit", () => {
@@ -204,14 +228,14 @@ describe("Tutor canvas context", () => {
   }
 
   it("sends one scene context and no sampled stroke points", () => {
-    const context = buildTutorCanvasContext({ scene: fixtureScene(), selectedIds: ["label"], viewport: { x: 0, y: 0, w: 200, h: 200 } });
+    const context = buildTutorCanvasContext({ scene: fixtureScene(), shapes: null, selectedIds: ["label"], viewport: { x: 0, y: 0, w: 200, h: 200 } });
     expect(JSON.stringify(context)).not.toMatch(/simplified|strokeSummary/);
     expect(context.scene?.nodes.some((node) => node.text === "mitochondrion")).toBe(true);
     expect(context.selectedIds).toEqual(["label"]);
   });
 
   it("reports an unavailable scene instead of inventing one", () => {
-    const context = buildTutorCanvasContext({ scene: null, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 } });
+    const context = buildTutorCanvasContext({ scene: null, shapes: null, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 } });
     expect(context.scene).toBeNull();
     expect(context.warnings.join(" ")).toMatch(/unavailable/i);
   });

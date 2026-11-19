@@ -185,6 +185,21 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).not.toContain("o:1");
   });
 
+  it("includes transition lengths and levels from the native shape projection", () => {
+    const shapes = {
+      scope: { boardId: "board-17" }, selected: [], nearbyObjects: [], spatialRelationships: [],
+      visible: [
+        { kind: "line", direction: "right" },
+        { kind: "arrow", direction: "down", arrow: { from: { x: 330, y: 66 }, to: { x: 330, y: 245 }, bend: 0, length: 178, label: "a", fromLevel: "4", toLevel: "2" } },
+      ],
+    };
+    const projected = JSON.stringify(projectTutorContexts([{ description: "Active canvas scene", value: { scene: { scope: { boardId: "board-17" }, nodes: [], edges: [], truncated: false }, shapes, selectedIds: [] } }], false));
+    expect(projected).toContain('"label":"a"');
+    expect(projected).toContain('"fromLevel":"4"');
+    expect(projected).toContain('"toLevel":"2"');
+    expect(projected).toContain('"length":178');
+  });
+
   it("states that freehand marks are uninterpreted and retains raw context only on request", () => {
     const raw = [{ description: "Active canvas scene", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
     const ordinary = JSON.stringify(projectTutorContexts(raw, false));

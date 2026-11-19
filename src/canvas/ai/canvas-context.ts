@@ -20,7 +20,7 @@ export type CanvasShapeContext = {
   bounds: Bounds;
   boundsEstimate?: "text-layout-approximation";
   text?: string;
-  arrow?: { from: { x: number; y: number }; to: { x: number; y: number }; bend: number };
+  arrow?: { from: { x: number; y: number }; to: { x: number; y: number }; bend: number; length?: number; label?: string; fromLevel?: string; toLevel?: string };
   strokeSummary?: { pointCount: number; bounds: Bounds; simplified: Array<{ x: number; y: number }> };
 };
 export type CanvasAIContext = {
@@ -104,6 +104,46 @@ function relationship(a: Bounds, b: Bounds): string {
   return dy > 0 ? "above" : "below";
 }
 
+function pointSegmentDistance(point: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return Math.hypot(point.x - a.x, point.y - a.y);
+  const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+  return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
+}
+
+function arrowDiagramInfo(arrow: NonNullable<CanvasShapeContext["arrow"]>, all: readonly ShapeRecord[]) {
+  const length = Math.round(Math.hypot(arrow.to.x - arrow.from.x, arrow.to.y - arrow.from.y));
+  const texts = all
+    .filter((shape) => (shape.type === "text" || shape.type === "note") && String(shape.props.text ?? "").trim())
+    .map((shape) => ({ text: String(shape.props.text).trim(), bounds: shapeBounds(shape) }));
+  const label = texts
+    .filter((item) => item.text.length <= 8 && !/^\d+$/.test(item.text))
+    .map((item) => ({ ...item, distance: pointSegmentDistance(center(item.bounds), arrow.from, arrow.to) }))
+    .sort((left, right) => left.distance - right.distance)
+    .find((item) => item.distance <= 60)?.text;
+  const numerals = texts.filter((item) => /^\d+$/.test(item.text));
+  const levels = all
+    .filter((shape) => shape.type === "line" && Math.abs(Number(shape.props.dy || 0)) < 2 && Math.abs(Number(shape.props.dx || 0)) > 30)
+    .map((shape) => {
+      const nearest = numerals
+        .map((item) => ({ text: item.text, distance: Math.abs(center(item.bounds).y - shape.y) }))
+        .sort((left, right) => left.distance - right.distance)[0];
+      return { y: shape.y, level: nearest && nearest.distance <= 40 ? nearest.text : undefined };
+    });
+  const nearestLevel = (y: number) => levels
+    .map((level) => ({ ...level, distance: Math.abs(level.y - y) }))
+    .sort((left, right) => left.distance - right.distance)[0];
+  const start = nearestLevel(arrow.from.y);
+  const end = nearestLevel(arrow.to.y);
+  return {
+    length,
+    ...(label ? { label } : {}),
+    ...(start && start.distance <= 40 && start.level ? { fromLevel: start.level } : {}),
+    ...(end && end.distance <= 40 && end.level ? { toLevel: end.level } : {}),
+  };
+}
+
 function scientificSummary(object: ScientificObject) {
   const strings = (values: Record<string, unknown>) => Object.fromEntries(Object.entries(values).map(([key, value]) => [key, typeof value === "string" ? value.slice(0, 300) : value]));
   let detail: Record<string, unknown>;
@@ -140,6 +180,9 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
   const visible = all.filter((shape) => !selectedSet.has(shape.id) && intersects(shapeBounds(shape), viewport))
     .slice(0, maxItems).map(summarize);
   const focus = [...selected, ...visible];
+  for (const shape of focus) {
+    if (shape.type === "arrow" && shape.arrow) Object.assign(shape.arrow, arrowDiagramInfo(shape.arrow, all));
+  }
   const nearbyDistance = distance;
   const nearbyObjects = options.objects.filter((object) => [object.x, object.y, object.width, object.height].every(Number.isFinite) && object.width > 0 && object.height > 0 && focus.some((shape) => gap(shape.bounds, { x: object.x, y: object.y, w: object.width, h: object.height }) <= nearbyDistance))
     .slice(0, maxItems).map(scientificSummary);
