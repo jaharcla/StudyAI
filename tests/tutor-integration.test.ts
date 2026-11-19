@@ -194,7 +194,7 @@ it("rebuilds arrow attachments from the saved board when the client omits shapes
   } } };
   db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run("board-fallback", "chem-120", "lesson-03", "Fallback", JSON.stringify({ version: 1, snapshot, objects: [] }), 1);
   mocks.invoke.mockResolvedValue(new AIMessage("b"));
-  const active = { description: "Active canvas scene", value: { scene: null, shapes: null, scope: { boardId: "board-fallback", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [] } };
+  const active = { description: "Active canvas scene", value: { scene: null, shapes: { scope: { boardId: "board-fallback", courseId: "chem-120", lessonId: "lesson-03", revision: 1 } }, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [] } };
   await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Which change in orbit level produces the shortest wavelength?")] });
   const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
   expect(prompt).toContain("startAttached");

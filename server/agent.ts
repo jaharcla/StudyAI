@@ -56,12 +56,13 @@ async function tutor(state: typeof State.State, config?: unknown) {
   const canvasTool = course && lesson && canvasContext.courseId === course.id && canvasContext.lessonId === workspace.lessonId && state.copilotkit.actions?.some((action) => action.name === "propose_canvas_edit")
     ? { name: "propose_canvas_edit", description: "Propose scientific object edits for user review using current boardId and objectId. Use JSON patches for ordinary objects; for a math workspace use mathOperation to request a supported operation on both statement sides. Every math operation is validated and remains pending until the user applies it.", schema: canvasEditSchema } : undefined;
   const quickdrawContext = objectValue(contexts.find((item) => item.description === "Active canvas scene")?.value);
-  const quickdrawScope = objectValue(objectValue(quickdrawContext.scene).scope ?? quickdrawContext.scope);
-  const sameCanvasScope = Boolean(course && lesson && quickdrawScope.courseId === course.id && quickdrawScope.lessonId === workspace.lessonId && typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId.length > 0);
+  const quickdrawScope = objectValue(objectValue(quickdrawContext.scene).scope ?? quickdrawContext.scope ?? objectValue(quickdrawContext.shapes).scope);
+  const canvasBoardId = typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId ? quickdrawScope.boardId : typeof canvasContext.boardId === "string" ? canvasContext.boardId : "";
+  const sameCanvasScope = Boolean(course && lesson && (typeof quickdrawScope.courseId !== "string" || quickdrawScope.courseId === course.id) && (typeof quickdrawScope.lessonId !== "string" || quickdrawScope.lessonId === workspace.lessonId) && canvasBoardId.length > 0);
   let promptCanvasContext = quickdrawContext;
   if (sameCanvasScope && course && !objectValue(quickdrawContext.shapes).visible) {
     try {
-      const row = db.prepare("SELECT document FROM canvases WHERE id=? AND course_id=? AND lesson_id=?").get(String(quickdrawScope.boardId), course.id, String(workspace.lessonId)) as { document: string } | undefined;
+      const row = db.prepare("SELECT document FROM canvases WHERE id=? AND course_id=? AND lesson_id=?").get(canvasBoardId, course.id, String(workspace.lessonId)) as { document: string } | undefined;
       if (row) {
         const saved = parseCanvasDocument(JSON.parse(row.document));
         const viewport = { x: 0, y: 0, w: 4000, h: 3000 };
@@ -71,7 +72,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
           selectedIds,
           viewport,
           objects: saved.objects,
-          scope: { boardId: String(quickdrawScope.boardId), courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
+          scope: { boardId: canvasBoardId, courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
         });
         promptCanvasContext = { ...quickdrawContext, shapes, selectedIds, viewport, warnings: [] };
       }
@@ -88,7 +89,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
   }
   let validatedCanvasAnalysis: unknown;
   if (canvasAnalysisContext) {
-    const boardId = typeof quickdrawScope.boardId === "string" && quickdrawScope.boardId ? quickdrawScope.boardId : typeof canvasContext.boardId === "string" ? canvasContext.boardId : "";
+    const boardId = canvasBoardId;
     try {
       if (!course || !lesson || !boardId || (quickdrawContext.scope && (quickdrawScope.courseId !== course.id || quickdrawScope.lessonId !== workspace.lessonId))) throw new Error("Canvas analysis scope is unavailable.");
       validatedCanvasAnalysis = validateCanvasAnalysisAtReceiver(db, canvasAnalysisContext.value, { boardId, courseId: course.id, lessonId: String(workspace.lessonId) });
