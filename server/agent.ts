@@ -73,11 +73,29 @@ async function tutor(state: typeof State.State, config?: unknown) {
           selectedIds,
           viewport,
           objects: saved.objects,
-          maxItems: 80,
-          maxChars: 24_000,
+          maxItems: 100,
+          maxChars: 80_000,
           scope: { boardId: canvasBoardId, courseId: course.id, lessonId: String(workspace.lessonId), revision: typeof quickdrawScope.revision === "number" ? quickdrawScope.revision : undefined },
         });
-        promptCanvasContext = { ...quickdrawContext, shapes, selectedIds, viewport, warnings: [] };
+        const compact = (shape: (typeof shapes.visible)[number]) => ({
+          type: shape.type,
+          ...(shape.text ? { text: shape.text } : {}),
+          ...(shape.arrow ? { arrow: { label: shape.arrow.label, length: shape.arrow.length, labels: shape.arrow.labels, startAttached: shape.arrow.startAttached, endAttached: shape.arrow.endAttached, unattached: shape.arrow.unattached } } : {}),
+        });
+        promptCanvasContext = {
+          ...quickdrawContext,
+          shapes: {
+            scope: shapes.scope,
+            selected: shapes.selected.map(compact),
+            visible: shapes.visible.map(compact),
+            nearbyObjects: [],
+            spatialRelationships: [],
+            truncated: shapes.truncated,
+          },
+          selectedIds,
+          viewport,
+          warnings: [],
+        };
       }
     } catch {
       // Keep the client-supplied context; the model will report missing attachments.

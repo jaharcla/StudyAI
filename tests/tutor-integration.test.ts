@@ -191,6 +191,9 @@ it("rebuilds arrow attachments from the saved board when the client omits shapes
     t2: shape("t2", "text", -20, 45, { text: "2", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
     a: shape("a", "arrow", 50, 0, { dx: 0, dy: 50, bend: 0, color: "black", size: "m", dash: "solid" }),
     ta: shape("ta", "text", 55, 20, { text: "a", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    ...Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`filler${index}`, shape(`filler${index}`, "text", 100 + index * 10, 200, { text: `filler ${index}`, color: "black", size: "m", font: "sans", autosize: true, scale: 1 })])),
+    tc: shape("tc", "text", 1500, 0, { text: "C", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    th: shape("th", "text", 1540, 0, { text: "H", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
   } } };
   db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run("board-fallback", "chem-120", "lesson-03", "Fallback", JSON.stringify({ version: 1, snapshot, objects: [] }), 1);
   mocks.invoke.mockResolvedValue(new AIMessage("b"));
@@ -200,6 +203,8 @@ it("rebuilds arrow attachments from the saved board when the client omits shapes
   expect(prompt).toContain("startAttached");
   expect(prompt).toContain('"label":"4"');
   expect(prompt).toContain('"label":"2"');
+  expect(prompt).toContain('"text":"C"');
+  expect(prompt).toContain('"text":"H"');
   db.prepare("DELETE FROM canvases WHERE id=?").run("board-fallback");
 });
 
