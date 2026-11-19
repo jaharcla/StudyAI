@@ -17,6 +17,21 @@ export const canvasEvidenceSearchSchema = z.object({
   limit: z.number().int().min(1).max(8).optional(),
 }).strict();
 
+export const readCanvasInkSchema = z.object({
+  boardId: idSchema,
+  groupIds: z.array(idSchema).min(1).max(8),
+  profile: z.enum(["auto", "math", "diagram"]).optional(),
+}).strict();
+
+export type CanvasInkItem = {
+  groupId: string;
+  text: string;
+  format: "latex" | "text";
+  confidence: number | null;
+  source: "user" | "recognition" | "ocr";
+  confirmed: boolean;
+};
+
 export type SceneScope = { boardId: string; courseId: string; lessonId: string; revision?: number };
 export type CourseSceneSearchHit = { boardId: string; revisionHash: string; revision: number; node: CanvasSceneNode; edges: CanvasSceneEdge[] };
 
@@ -53,6 +68,29 @@ export function boundedSceneSlice(graph: CanvasSceneGraph, options: { maxNodes?:
     warnings: graph.warnings,
     truncated: graph.truncated || nodes.length < graph.nodes.length || edges.length < graph.edges.length,
   };
+}
+
+export async function requestCanvasInk(
+  scope: SceneScope,
+  input: { groupIds: string[]; profile?: "auto" | "math" | "diagram" },
+  fetcher: typeof fetch = fetch,
+  signal?: AbortSignal,
+): Promise<{ revisionHash: string; items: CanvasInkItem[]; warnings: string[] }> {
+  const response = await fetcher(`/api/canvases/${encodeURIComponent(scope.boardId)}/ink`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      courseId: scope.courseId,
+      lessonId: scope.lessonId,
+      expectedRevision: scope.revision ?? 0,
+      groupIds: input.groupIds,
+      ...(input.profile ? { profile: input.profile } : {}),
+    }),
+    signal,
+  });
+  const payload = await response.json() as { revisionHash?: string; items?: CanvasInkItem[]; warnings?: string[]; error?: string };
+  if (!response.ok || !payload.revisionHash) throw new Error(payload.error ?? `Canvas ink read failed with HTTP ${response.status}.`);
+  return { revisionHash: payload.revisionHash, items: payload.items ?? [], warnings: payload.warnings ?? [] };
 }
 
 export async function searchCanvasEvidence(scope: SceneScope, query: string, limit = 8, fetcher: typeof fetch = fetch) {

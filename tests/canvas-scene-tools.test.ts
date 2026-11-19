@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedSceneSlice, requestCanvasScene, resetCanvasSceneCacheForTests, searchCanvasEvidence, searchCourseCanvasEvidence } from "../src/canvas/ai/scene-tools.js";
+import { boundedSceneSlice, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, resetCanvasSceneCacheForTests, searchCanvasEvidence, searchCourseCanvasEvidence } from "../src/canvas/ai/scene-tools.js";
 import { CanvasSceneGraphSchema, type CanvasSceneGraph } from "../src/canvas/spatial/types.js";
 
 const graph: CanvasSceneGraph = CanvasSceneGraphSchema.parse({
@@ -64,5 +64,28 @@ describe("canvas scene tools", () => {
 
     await searchCourseCanvasEvidence({ courseId: "course", lessonId: "lesson" }, "force", 5, fetcher);
     expect(requests[1].body).toMatchObject({ courseId: "course", lessonId: "lesson", query: "force" });
+  });
+
+  it("posts only the requested groups and surfaces a stale revision", async () => {
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({ url: String(url), body: JSON.parse(String(init?.body ?? "{}")) });
+      return Response.json({ revisionHash: "rev-2", items: [], warnings: [] });
+    }) as typeof fetch;
+    const result = await requestCanvasInk(
+      { boardId: "board", courseId: "course", lessonId: "lesson", revision: 2 },
+      { groupIds: ["g:abc"], profile: "math" },
+      fetcher,
+    );
+    expect(requests[0].url).toBe("/api/canvases/board/ink");
+    expect(requests[0].body).toMatchObject({ courseId: "course", lessonId: "lesson", expectedRevision: 2, groupIds: ["g:abc"], profile: "math" });
+    expect(result.revisionHash).toBe("rev-2");
+
+    const stale = (async () => Response.json({ error: "stale_revision" }, { status: 409 })) as typeof fetch;
+    await expect(requestCanvasInk(
+      { boardId: "board", courseId: "course", lessonId: "lesson", revision: 2 },
+      { groupIds: ["g:abc"] },
+      stale,
+    )).rejects.toThrow(/stale/i);
   });
 });
