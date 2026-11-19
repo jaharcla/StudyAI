@@ -14,12 +14,14 @@ Date: 2026-11-19
 | OCR policy | `npx vitest run tests/canvas-analysis-producer.test.ts tests/canvas-intelligence.test.ts` | 34 passed |
 | Tutor tool binding | `npx vitest run tests/tutor-integration.test.ts tests/tutor-presentation.test.ts` | 38 passed |
 | Claim scorer | `npx vitest run tests/tutor-claims-score.test.ts` | 3 passed |
+| Full unit suite | `npx vitest run` | 318 passed (47 files) |
 | Fixture dry run | `npx tsx scripts/benchmark-tutor-claims.ts --dry-run` | 20 questions, 7 boards |
+| Context comparison | `npx tsx scripts/compare-canvas-contexts.ts --board <id>` | A/B/C written; energy board A=3144 B=2524 C=2707 bytes |
 
 ## Not verified
 
 - **Live A/B claim run.** The harness is committed, but the two arms were not executed in this change because they require the dev server and 40 tutor calls with provider budget. No claim-score, citation-rate, or latency numbers are claimed.
-- **Full `npm run verify` exit.** Vitest reported 313/314 passing. `tests/learning.test.ts` timed out at 5000 ms under full-suite load and passed 4/4 when re-run alone; this is unrelated to canvas and is treated as a flaky timeout.
+- **Full `npm run verify` exit.** The unit suite passes 318/318; Playwright was cancelled by the user and was not re-run.
 - **Playwright UI path.** Cancelled by the user before completion. Not a failure, and not evidence of passing. `npx playwright test --list` resolves 32 tests across 21 files.
 - **Visual board rendering.** Not part of this change; the tutor remains text-only.
 - **Handwriting accuracy.** The system reports ambiguity rather than guaranteeing transcription.

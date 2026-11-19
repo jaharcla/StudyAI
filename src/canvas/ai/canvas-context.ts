@@ -213,7 +213,7 @@ function arrowConnections(
       .filter((item) => item.distance <= portTolerance)
       .sort((left, right) => left.distance - right.distance);
     const objectCandidates = objects
-      .map((object) => ({ object, distance: boundsBoundaryDistance(point, { x: object.x, y: object.y, w: object.width, h: object.height }) }))
+      .map((object) => ({ object, distance: boundsDistance(point, { x: object.x, y: object.y, w: object.width, h: object.height }) }))
       .filter((item) => item.distance <= portTolerance)
       .sort((left, right) => left.distance - right.distance);
     const candidates: Array<{ kind: string; label?: string; distance: number }> = [
