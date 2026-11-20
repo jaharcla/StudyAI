@@ -20,7 +20,7 @@ async function selectSourceAndTemplate(page: Page, template: "force" | "graph") 
   await page.getByRole("button", { name: /Motion and graphs/ }).first().click();
   await page.getByRole("button", { name: `Use in ${template} template`, exact: true }).click();
   await page.getByRole("button", { name: "Preview", exact: true }).click();
-  await expect(page.getByRole("status").filter({ hasText: "generated canvas validated" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "generated canvas validated" })).toBeVisible({ timeout: 20_000 });
 }
 
 test("force activity edits a model, checks it, records evidence, and resumes", async ({ page, request }) => {

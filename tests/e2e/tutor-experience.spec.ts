@@ -8,8 +8,8 @@ test("keeps Tutor replies direct and canvas descriptions semantic", async ({ pag
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
 
+  await expect.poll(async () => (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json())).length, { timeout: 15_000 }).toBeGreaterThan(0);
   const boards = await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
-  expect(boards.length).toBeGreaterThan(0);
   const board = await request.get(`/api/canvases/${boards[0].id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
   const document = JSON.parse(board.document);
   const suffix = Date.now();

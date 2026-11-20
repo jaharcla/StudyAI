@@ -32,7 +32,8 @@ test("imports a PDF, retrieves its fact in the tutor, and opens its page citatio
     const chat = page.getByTestId("copilot-chat-textarea");
     await chat.fill("According to my imported lecture, what is the assigned alloy code? Separate sourced information from general knowledge and cite the page.");
     await chat.press("Enter");
-    await expect(page.getByText("ZORBIUM-417", { exact: false }).last()).toBeVisible({ timeout: 180_000 });
+    // Models sometimes typeset the code with a non-breaking hyphen; the fact, not the glyph, is under test.
+    await expect(page.getByText(/ZORBIUM[\u2010\u2011-]417/).last()).toBeVisible({ timeout: 180_000 });
     const citation = page.locator('a[href^="#studyai-citation="]').filter({ hasText: "citation-proof.pdf" }).last();
     await expect(citation).toBeVisible({ timeout: 30_000 });
     await expect(citation).toContainText("page 1");
