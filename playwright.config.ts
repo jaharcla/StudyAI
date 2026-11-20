@@ -11,6 +11,8 @@ const outputDir = wholeBoardExperiment ? ".experiment-artifacts/whole-board-scen
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  // The dataset benchmark needs its seeded database and dedicated ports; run it with playwright.dataset.config.ts.
+  testIgnore: "**/canvas-dataset-benchmark.spec.ts",
   outputDir,
   workers: 1,
   use: { baseURL: config.webOrigin, ...devices["Desktop Chrome"], trace: "retain-on-failure", screenshot: "only-on-failure" },

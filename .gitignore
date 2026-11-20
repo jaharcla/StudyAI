@@ -18,3 +18,13 @@ test-results/
 
 # Added by CopilotKit CLI: browser snapshots a coding agent writes.
 .playwright-mcp/
+.copilotkit/
+
+# Local reference downloads and one-off probes; not project sources.
+/*.zip
+/benchmark_models.py
+/check_env.py
+/task.md
+/tmp-board1.cjs
+/scripts/tmp-tutor-probe.ts
+.serena/project.local.yml
