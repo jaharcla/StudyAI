@@ -79,6 +79,18 @@ async function produce(
   });
   const knownIds = new Set([...canvasInput.nativeRecords.map((item) => item.id), ...canvasInput.scientificObjects.map((item) => item.id)]);
   if (input.selectedIds.some((id) => !knownIds.has(id))) throw new CanvasAnalysisValidationError("scope_mismatch", "A selected canvas object is not present in the persisted board.");
+  // Only skip image reading when there is nothing to read. The branch design
+  // reports uncaptured drawings as omitted regions instead of failing the whole
+  // analysis, so drawings without a captured crop are legal.
+  const hasImage = Boolean(input.image.base64) || input.image.regions.length > 0;
+  const fullBoard = normalizeCanvasInput({ boardId: row.boardId, snapshot: document.snapshot, scientificObjects: document.objects });
+  const hasDrawings = fullBoard.nativeRecords.some((record) => {
+    const raw = record.raw as Record<string, unknown> | null;
+    return raw?.typeName === "shape" || (raw?.typeName === undefined && record.type !== "unknown");
+  });
+  if (!hasImage && !hasDrawings && !fullBoard.scientificObjects.length) {
+    throw new CanvasAnalysisValidationError("invalid_result", "A rendered image is required when the board is empty.");
+  }
   const allRecordsInput = normalizeCanvasInput({ boardId: row.boardId, courseId: row.courseId, lessonId: row.lessonId, snapshot: document.snapshot, scientificObjects: document.objects, selectedIds: [] });
   const sourceGroupInput = { ...allRecordsInput, selectedIds: input.selectedIds };
   const sourceRegionGroups = groupQuickdrawStrokes(allRecordsInput);
@@ -94,6 +106,7 @@ async function produce(
     selectedIds: input.selectedIds,
     image: input.image,
     expectedSourceRegionIds: sourceRegionGroups.map((group) => group.id),
+    skipOcr: !hasImage,
     userQuestion: "Analyze this persisted board. Separate observed canvas data from uncertain interpretations. Do not infer meaning from coordinates alone or propose edits.",
     mode: "deep",
     ocrPolicy: "all",

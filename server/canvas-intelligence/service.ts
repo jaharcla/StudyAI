@@ -19,7 +19,7 @@ export type CanvasRecognitionOptions = {
   labels?: readonly string[];
 };
 export type CanvasOCRPolicy = "off" | "unresolved" | "all";
-export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; ocrPolicy?: CanvasOCRPolicy; courseContext?: string; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions; allowImageEgress?: boolean };
+export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; ocrPolicy?: CanvasOCRPolicy; courseContext?: string; skipOcr?: boolean; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions; allowImageEgress?: boolean };
 export type CanvasUnderstanding = { mode: CanvasMode; revision: string; answer?: string; ocr?: OCRResult; associations?: OCRAssociation[]; structure: StructureResult; fusion?: FusionResult; evidence?: CanvasEvidenceBundle; selectedContext?: SelectedCanvasContext; recognition?: CanvasRecognitionStage | null; partial?: boolean; warnings?: string[]; omittedImageRegionIds?: string[]; failedImageRegionIds?: string[]; latencyMs: Record<string, number>; cached: string[] };
 const ocrCache = new RecognitionCache<OCRResult>();
 const structureCache = new RecognitionCache<StructureResult>();
@@ -98,6 +98,9 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   const runOcr = async (confidentGroupIds: ReadonlySet<string> = new Set()) => {
     const before = Date.now();
     let cacheHits = 0;
+    // Scientific-object-only boards have nothing to transcribe. Asking an OCR
+    // model to read an empty render wastes a request and invents text.
+    if (args.skipOcr) return OCRResultSchema.parse({ items: [], uncertain: false, raw: "" });
     const requests = ocrRequestsForPolicy(imageRequests, ocrPolicy, confidentGroupIds);
     if (!requests.length) return OCRResultSchema.parse({ items: [], uncertain: true, raw: "" });
     const results = await Promise.all(requests.map(async (region) => {
@@ -105,9 +108,13 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
         const key = digest({ rev: input.revision, regionId: region.id, sourceIds: "sourceIds" in region ? region.sourceIds : [], image: digest(region.base64), transform: "pixelToWorld" in region ? region.pixelToWorld : undefined, model: models.ocr, provider: ocrProvider, chain: process.env.CANVAS_PROVIDER_CHAIN, profile: ocrProfile, remoteModel: ocrProvider === "groq" ? groqOCRModel() : undefined });
         const hit = ocrCache.get(key);
         if (hit) { cacheHits++; return hit; }
-        const parsed = await canvasOCR({ base64: region.base64, mimeType: region.mimeType, model: models.ocr, profile: ocrProfile, allowImageEgress: args.allowImageEgress, fetcher: args.fetcher, signal: args.signal });
+        let usedFallback = false;
+        const parsed = await canvasOCR({ base64: region.base64, mimeType: region.mimeType, model: models.ocr, profile: ocrProfile, allowImageEgress: args.allowImageEgress, fetcher: args.fetcher, signal: args.signal, onFallback: () => { usedFallback = true; } });
         const localized = "pixelToWorld" in region && "worldBounds" in region && "sourceIds" in region ? localizeOCRByRegion(parsed, [region]) : localizeOCRByRegion(parsed, []);
-        ocrCache.set(key, localized); return localized;
+        // A local fallback must not occupy the cloud provider's cache slot: a
+        // temporary outage would otherwise be cached for the whole session.
+        if (!usedFallback) ocrCache.set(key, localized);
+        return localized;
       } catch (error) {
         if (args.signal?.aborted) throw error;
         failedOCRRegions++;
@@ -129,9 +136,10 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
     const prompt = serializePrompt("structure", ocrPayload ? { quickdrawRecords, selectedIds: input.selectedIds, scientificObjects: input.scientificObjects, ocr: ocrPayload } : { quickdrawRecords, selectedIds: input.selectedIds, scientificObjects: input.scientificObjects });
     const maxChars = Number(process.env.CANVAS_MAX_INPUT_CHARS || 60_000);
     if (prompt.length > maxChars) throw new Error(`Canvas region exceeds CANVAS_MAX_INPUT_CHARS (${maxChars}); select a smaller region or raise the configured limit.`);
-    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.reasoning, system: structureSystemPrompt, prompt }, schemas.structure, (value) => normalizeCanvasStructureOutput(value, canvasIds));
+    let usedFallback = false;
+    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.reasoning, system: structureSystemPrompt, prompt, onFallback: () => { usedFallback = true; } }, schemas.structure, (value) => normalizeCanvasStructureOutput(value, canvasIds));
     const combined = StructureResultSchema.parse(mergeQuickdrawBondRelationships(input, result));
-    latencyMs.structure = Date.now() - before; structureCache.set(key, combined); return combined;
+    latencyMs.structure = Date.now() - before; if (!usedFallback) structureCache.set(key, combined); return combined;
   };
   const runRecognition = async () => {
     const before = Date.now();
@@ -188,9 +196,10 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
     const before = Date.now();
     const prompt = serializePrompt("fusion", { ...fixedFusionContext, canvasEvidence: selectedContext });
     if (prompt.length > maxInputChars) throw new Error(`Fusion evidence exceeds CANVAS_MAX_INPUT_CHARS (${maxInputChars}); select a smaller canvas region or raise the configured limit.`);
-    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.fusion, system: FUSION_SYSTEM_PROMPT, prompt }, schemas.fusion, (value) => normalizeCanvasFusionOutput(value, canvasIds));
+    let usedFallback = false;
+    const result = await canvasInferenceJson({ baseUrl: args.baseUrl, fetcher: args.fetcher, signal: args.signal, model: models.fusion, system: FUSION_SYSTEM_PROMPT, prompt, onFallback: () => { usedFallback = true; } }, schemas.fusion, (value) => normalizeCanvasFusionOutput(value, canvasIds));
     fusion = schemas.fusion.parse(mergeQuickdrawBondRelationships(input, result));
-    latencyMs.fusion = Date.now() - before; fusionCache.set(fusionKey, fusion);
+    latencyMs.fusion = Date.now() - before; if (!usedFallback) fusionCache.set(fusionKey, fusion);
   }
   const unresolved = evidence.conflicts.map((conflict) => `Unresolved evidence conflict for ${conflict.subjectId} / ${conflict.claimKey}: ${conflict.values.join(" vs ")}`);
   const summary = unresolved.length ? `Canvas evidence disagrees: ${unresolved.slice(0, 3).join("; ")}${unresolved.length > 3 ? `; and ${unresolved.length - 3} additional conflicts` : ""}. Verify before editing or grading.` : "";

@@ -65,7 +65,7 @@ export function localizeOCRByRegion(result: OCRResult, regions: OCRImageRegion[]
 
 export function associateOCRLabels(input: CanvasInput, result: OCRResult, maxDistance = 72, ambiguityMargin = 18): OCRAssociation[] {
   const candidates = [
-    ...input.nativeRecords.filter((record) => record.bounds && record.type !== "draw" && record.type !== "highlight").map((record) => ({ scope: "quickdraw" as const, id: record.id, bounds: record.bounds! })),
+    ...input.nativeRecords.filter((record) => record.bounds && record.type !== "draw" && record.type !== "highlight" && record.type !== "text" && record.type !== "note").map((record) => ({ scope: "quickdraw" as const, id: record.id, bounds: record.bounds! })),
     ...input.scientificObjects.map((object) => ({ scope: "science" as const, id: object.id, bounds: scientificObjectBounds(object) })),
   ];
   return result.items.map((item) => {

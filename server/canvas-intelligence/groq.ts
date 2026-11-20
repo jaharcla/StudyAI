@@ -45,7 +45,7 @@ const fallbackEvents: string[] = [];
 export function resetProviderFallbacks() { fallbackEvents.length = 0; }
 export function consumeProviderFallbacks() { return fallbackEvents.splice(0, 8); }
 
-type GroqInferenceOptions = { model: string; system: string; prompt: string; baseUrl?: string; signal?: AbortSignal; fetcher?: typeof fetch };
+type GroqInferenceOptions = { model: string; system: string; prompt: string; baseUrl?: string; signal?: AbortSignal; fetcher?: typeof fetch; onFallback?: () => void };
 
 const OCR_SYSTEM = "Transcribe visible handwritten scientific text only. Return JSON {items:[{text,kind,confidence,alternatives}],uncertain:boolean}. Each kind is word, symbol, number, equation, or unknown. Use null for uncalibrated confidence. Do NOT infer a label's arrow or position. Do NOT fabricate pixel coordinates or object IDs.";
 const OCR_PROMPT = "Extract actual visible characters, one JSON item per label or expression. Return only JSON.";
@@ -90,10 +90,15 @@ export async function canvasInferenceJson<T>(options: GroqInferenceOptions, sche
   const providers = resolveCompletionProviders();
   if (!providers.length) throw new Error("No canvas provider is configured. Set GROQ_API_KEY, OPENCODE_GO_API_KEY, or OPENROUTER_API_KEY.");
   const attempts: string[] = [];
+  let fellBack = false;
+  // A result produced after an earlier provider failed is a fallback result:
+  // callers must not cache it under the healthy provider's key (canvas-recovery).
+  const settle = <V>(value: V): V => { if (fellBack) options.onFallback?.(); return value; };
   for (const provider of providers) {
     if (providers.length > 1 && isProviderCircuitOpen(provider)) {
       attempts.push(`${providerLabel(provider)}: circuit breaker open`);
       logFallback("text", provider, new Error("circuit breaker open"));
+      fellBack = true;
       continue;
     }
     const callStarted = Date.now();
@@ -102,13 +107,14 @@ export async function canvasInferenceJson<T>(options: GroqInferenceOptions, sche
         const result = await groqJson({ ...options, model: groqInferenceModel() }, schema, normalize);
         recordProviderSuccess("groq");
         logProviderCall("text", "groq", groqInferenceModel(), Date.now() - callStarted, "ok");
-        return result;
+        return settle(result);
       } catch (error) {
         recordProviderFailure("groq", message(error));
         logProviderCall("text", "groq", groqInferenceModel(), Date.now() - callStarted, "error", message(error));
         if (providers.length === 1) throw error;
         attempts.push(`Groq: ${message(error)}`);
         logFallback("text", "groq", error);
+        fellBack = true;
         continue;
       }
     }
@@ -117,17 +123,18 @@ export async function canvasInferenceJson<T>(options: GroqInferenceOptions, sche
         const result = await ollamaJson(options, schema, normalize);
         recordProviderSuccess("ollama");
         logProviderCall("text", "ollama", options.model, Date.now() - callStarted, "ok");
-        return result;
+        return settle(result);
       } catch (error) {
         recordProviderFailure("ollama", message(error));
         logProviderCall("text", "ollama", options.model, Date.now() - callStarted, "error", message(error));
         if (providers.length === 1) throw error;
         attempts.push(`Ollama: ${message(error)}`);
         logFallback("text", "ollama", error);
+        fellBack = true;
         continue;
       }
     }
-    if (!allowProviderRequest(provider)) { attempts.push(`${providerLabel(provider)}: daily request budget exhausted`); logFallback("text", provider, new Error("daily request budget exhausted")); continue; }
+    if (!allowProviderRequest(provider)) { attempts.push(`${providerLabel(provider)}: daily request budget exhausted`); logFallback("text", provider, new Error("daily request budget exhausted")); fellBack = true; continue; }
     const model = cloudModel(provider);
     try {
       const result = await openAiCompatibleJson({
@@ -143,13 +150,14 @@ export async function canvasInferenceJson<T>(options: GroqInferenceOptions, sche
       }, schema, normalize);
       recordProviderSuccess(provider);
       logProviderCall("text", provider, model, Date.now() - callStarted, "ok");
-      return result;
+      return settle(result);
     } catch (error) {
       recordProviderFailure(provider, message(error));
       logProviderCall("text", provider, model, Date.now() - callStarted, "error", message(error));
       if (providers.length === 1) throw error;
       attempts.push(`${providerLabel(provider)}: ${message(error)}`);
       logFallback("text", provider, error);
+      fellBack = true;
     }
   }
   throw new Error(`All canvas providers failed: ${attempts.join("; ")}`);
@@ -161,7 +169,7 @@ export function isImageEgressAllowed(allowImageEgress?: boolean, env: NodeJS.Pro
   return raw !== "0" && raw !== "false" && raw !== "off" && raw !== "no";
 }
 
-export async function canvasOCR(input: { base64: string; mimeType?: string; model?: string; profile?: "general" | "math" | "diagram"; allowImageEgress?: boolean; fetcher?: typeof fetch; signal?: AbortSignal }): Promise<OCRResult> {
+export async function canvasOCR(input: { base64: string; mimeType?: string; model?: string; profile?: "general" | "math" | "diagram"; allowImageEgress?: boolean; fetcher?: typeof fetch; signal?: AbortSignal; onFallback?: () => void }): Promise<OCRResult> {
   const profile = input.profile ?? "general";
   const math = profile === "math";
   const diagram = profile === "diagram";
@@ -176,10 +184,15 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
   const prompt = math ? MATH_OCR_PROMPT : OCR_PROMPT;
   const format = math ? "latex" as const : "json" as const;
   const attempts: string[] = [];
+  let fellBack = false;
+  // Same rule as canvasInferenceJson: a fallback result must not be cached as
+  // if it came from the preferred provider.
+  const settle = <V>(value: V): V => { if (fellBack) input.onFallback?.(); return value; };
   for (const provider of providers) {
     if (providers.length > 1 && isProviderCircuitOpen(provider)) {
       attempts.push(`${providerLabel(provider)}: circuit breaker open`);
       logFallback("ocr", provider, new Error("circuit breaker open"));
+      fellBack = true;
       continue;
     }
     const callStarted = Date.now();
@@ -189,13 +202,14 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
         const result = await groqOCR({ base64: input.base64, mimeType: input.mimeType, fetcher: input.fetcher, signal: input.signal, system, prompt, format, ...(model ? { model } : {}) });
         recordProviderSuccess("groq");
         logProviderCall("ocr", "groq", model, Date.now() - callStarted, "ok");
-        return result;
+        return settle(result);
       } catch (error) {
         recordProviderFailure("groq", message(error));
         logProviderCall("ocr", "groq", model, Date.now() - callStarted, "error", message(error));
         if (providers.length === 1) throw error;
         attempts.push(`Groq: ${message(error)}`);
         logFallback("ocr", "groq", error);
+        fellBack = true;
         continue;
       }
     }
@@ -205,17 +219,18 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
         const text = await ollamaText({ model, image: input.base64, system, prompt, fetcher: input.fetcher, signal: input.signal });
         recordProviderSuccess("ollama");
         logProviderCall("ocr", "ollama", model, Date.now() - callStarted, "ok");
-        return math ? latexOCRResult(text) : normalizeOCRText(text);
+        return settle(math ? latexOCRResult(text) : normalizeOCRText(text));
       } catch (error) {
         recordProviderFailure("ollama", message(error));
         logProviderCall("ocr", "ollama", model, Date.now() - callStarted, "error", message(error));
         if (providers.length === 1) throw error;
         attempts.push(`Ollama: ${message(error)}`);
         logFallback("ocr", "ollama", error);
+        fellBack = true;
         continue;
       }
     }
-    if (!allowProviderRequest(provider)) { attempts.push(`${providerLabel(provider)}: daily request budget exhausted`); logFallback("ocr", provider, new Error("daily request budget exhausted")); continue; }
+    if (!allowProviderRequest(provider)) { attempts.push(`${providerLabel(provider)}: daily request budget exhausted`); logFallback("ocr", provider, new Error("daily request budget exhausted")); fellBack = true; continue; }
     const model = math ? mathOCRModelFor(provider) : diagram ? diagramOCRModelFor(provider) : cloudOCRModel(provider);
     try {
       const result = await openAiCompatibleOCR({
@@ -234,13 +249,14 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
       });
       recordProviderSuccess(provider);
       logProviderCall("ocr", provider, model, Date.now() - callStarted, "ok");
-      return result;
+      return settle(result);
     } catch (error) {
       recordProviderFailure(provider, message(error));
       logProviderCall("ocr", provider, model, Date.now() - callStarted, "error", message(error));
       if (providers.length === 1) throw error;
       attempts.push(`${providerLabel(provider)}: ${message(error)}`);
       logFallback("ocr", provider, error);
+      fellBack = true;
     }
   }
   throw new Error(`All canvas OCR providers failed: ${attempts.join("; ")}`);

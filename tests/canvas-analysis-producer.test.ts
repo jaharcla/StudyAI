@@ -222,3 +222,20 @@ describe("canvas OCR policy", () => {
     expect(ocrRequestsForPolicy(requests, "all", new Set(["a"]))).toEqual(requests);
   });
 });
+
+it("accepts a scientific-only board without an image and reports drawings that were not captured", async () => {
+  const analyze = deterministicAnalyze();
+  const scientificOnly = { ...document, snapshot: { document: { store: {} } } };
+  database.prepare("UPDATE canvases SET document=? WHERE id=?").run(JSON.stringify(scientificOnly), board.boardId);
+  const result = await produceCanvasAnalysisForPersistedBoard(database, scope, { expectedRevision: board.revision, document: scientificOnly, selectedIds: ["vector-1"] }, { analyze });
+  expect(result.sourceObjectIds).toContain("vector-1");
+  expect(analyze.mock.calls[0][0].skipOcr).toBe(true);
+  database.prepare("UPDATE canvases SET document=? WHERE id=?").run(board.document, board.boardId);
+  // Drawings without a captured crop are not fatal: the producer reports any
+  // uncaptured freehand groups as omitted regions and still analyzes the board,
+  // so the branch's explicit-omission design wins over the older hard rejection.
+  const withDrawings = await produceCanvasAnalysisForPersistedBoard(database, scope, { expectedRevision: board.revision, document, selectedIds: ["shape-1"] }, { analyze });
+  expect(withDrawings.analysisStatus).toBe("complete");
+  expect(analyze.mock.calls[1][0].skipOcr).toBe(true);
+  expect(analyze).toHaveBeenCalledTimes(2);
+});
