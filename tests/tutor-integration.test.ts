@@ -462,3 +462,93 @@ afterAll(() => {
   if (originalDiagnostics === undefined) delete process.env.AI_DIAGNOSTICS; else process.env.AI_DIAGNOSTICS = originalDiagnostics;
 });
 
+
+function savedBoard(id: string, count: number, revision = 1): string {
+  const shape = (sid: string, sindex: number) => ({ id: sid, typeName: "shape", type: "text", x: 100 + sindex * 10, y: 200, rot: 0, z: 1, props: { text: `filler ${sindex}`, color: "black", size: "m", font: "sans", autosize: true, scale: 1 } });
+  const store = Object.fromEntries(Array.from({ length: count }, (_, index) => [`filler${index}`, shape(`filler${index}`, index)]));
+  db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run(id, "chem-120", "lesson-03", "Reasoning", JSON.stringify({ version: 1, snapshot: { document: { store } }, objects: [] }), revision);
+  return id;
+}
+
+function sceneScope(boardId: string, revision: number) {
+  return { description: "Active canvas scene", value: { scene: null, shapes: { scope: { boardId, courseId: "chem-120", lessonId: "lesson-03", revision }, selected: [], visible: [], nearbyObjects: [], spatialRelationships: [], truncated: false }, selectedIds: [], viewport: { x: 0, y: 0, w: 4000, h: 3000 }, warnings: [] } };
+}
+
+function messagesOf(value: unknown[]): Array<{ content?: unknown }> {
+  // A vi.fn() call entry is [messages, options]; the mock body receives messages directly.
+  return (Array.isArray(value[0]) ? value[0] : value) as Array<{ content?: unknown }>;
+}
+
+function isReasoningCall(value: unknown[]): boolean {
+  return String(messagesOf(value)[0]?.content ?? "").includes("only JSON");
+}
+
+function reasoningDelta(value: unknown[]): string {
+  const prompt = JSON.parse(String(messagesOf(value)[1]?.content ?? "{}")) as { chunk: { id: string; sourceIds: string[] } };
+  return JSON.stringify({
+    coveredChunkId: prompt.chunk.id,
+    entitiesToAdd: [],
+    claimsToAdd: [{ subject: "board", relation: "contains", object: "labels", value: "REASONING-MARKER-7", status: "observed", confidence: 0.9, evidence: [prompt.chunk.sourceIds[0]] }],
+    contradictions: [], unresolved: [], confidence: 0.9,
+  });
+}
+
+it("reasons over a large saved board and injects the state instead of the shape list", async () => {
+  savedBoard("board-large", 60);
+  mocks.invoke.mockImplementation(async (call: unknown[]) => new AIMessage(isReasoningCall(call) ? reasoningDelta(call) : "Answered from the reasoning state."));
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), sceneScope("board-large", 1)] }, messages: [new HumanMessage("What is on the board?")] });
+  const prompt = String(mocks.invoke.mock.calls.at(-1)![0][0].content); console.error("REPAIR_PROMPT", String((mocks.invoke.mock.calls[1][0] as Array<{content?:unknown}>)[1]?.content).slice(-600));
+
+  expect(result.messages.at(-1)?.content).toContain("reasoning state");
+  expect(mocks.invoke.mock.calls.some(isReasoningCall)).toBe(true);
+  expect(prompt).toContain("Canvas reasoning state");
+  expect(prompt).toContain("REASONING-MARKER-7");
+  expect(prompt).not.toContain("filler 59");
+  expect(prompt).not.toContain("filler 0");
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-large");
+});
+
+it("does not reason over a small saved board", async () => {
+  savedBoard("board-small", 10);
+  mocks.invoke.mockImplementation(async (call: unknown[]) => new AIMessage(isReasoningCall(call) ? reasoningDelta(call) : "Small board answer."));
+  await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), sceneScope("board-small", 1)] }, messages: [new HumanMessage("What is on the board?")] });
+  const prompt = String(mocks.invoke.mock.calls.at(-1)![0][0].content);
+
+  expect(mocks.invoke.mock.calls.some(isReasoningCall)).toBe(false);
+  expect(prompt).toContain("filler 9");
+  expect(prompt).not.toContain("Canvas reasoning state");
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-small");
+});
+
+it("falls back to the shape context with a warning when reasoning fails", async () => {
+  savedBoard("board-broken", 60);
+  mocks.invoke.mockImplementation(async (call: unknown[]) => {
+    if (isReasoningCall(call)) throw new Error("provider unavailable");
+    return new AIMessage("Fallback answer.");
+  });
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), sceneScope("board-broken", 1)] }, messages: [new HumanMessage("What is on the board?")] });
+  const prompt = String(mocks.invoke.mock.calls.at(-1)![0][0].content);
+
+  expect(result.messages.at(-1)?.content).toContain("Fallback answer");
+  expect(prompt).toContain("Canvas reasoning was unavailable");
+  expect(prompt).toContain("filler 59");
+  expect(prompt).not.toContain("Canvas reasoning state");
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-broken");
+});
+
+it("refuses to reason over a board whose revision changed", async () => {
+  savedBoard("board-stale", 60, 1);
+  mocks.invoke.mockImplementation(async (call: unknown[]) => new AIMessage(isReasoningCall(call) ? reasoningDelta(call) : "Stale answer."));
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), sceneScope("board-stale", 2)] }, messages: [new HumanMessage("What is on the board?")] });
+  const prompt = String(mocks.invoke.mock.calls.at(-1)![0][0].content);
+
+  expect(result.messages.at(-1)?.content).toContain("Stale answer");
+  expect(mocks.invoke.mock.calls.some(isReasoningCall)).toBe(false);
+  expect(prompt.toLowerCase()).toContain("stale");
+  expect(prompt).not.toContain("Canvas reasoning state");
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-stale");
+});
+
+
+
+

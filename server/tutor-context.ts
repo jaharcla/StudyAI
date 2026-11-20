@@ -21,6 +21,7 @@ const protectedDescriptions = new Set([
   "Active canvas scene",
   "StudyAI canvas analysis result",
   "StudyAI active learning activity",
+  "Canvas reasoning state",
 ]);
 
 export class TutorContextBudgetError extends Error {
@@ -67,6 +68,14 @@ export function budgetTutorContext(input: {
   if (canvasAnalysis && (base > input.budgetTokens || serializedCharacters(canvasAnalysis.value) > canvasBudget)) {
     contexts = contexts.map((item) => item === canvasAnalysis
       ? { ...item, value: compactCanvasAnalysisForTutor(item.value, canvasBudget) }
+      : item);
+  }
+  // The reasoning state has its own allowance: it is the primary board evidence on a
+  // large board, so it is bounded independently of the optional analysis budget.
+  const reasoningState = contexts.find((item) => item.description === "Canvas reasoning state");
+  if (reasoningState && serializedCharacters(reasoningState.value) > REASONING_STATE_MAX_CHARS) {
+    contexts = contexts.map((item) => item === reasoningState
+      ? { ...item, value: String(serializedValue(item.value)).slice(0, REASONING_STATE_MAX_CHARS) }
       : item);
   }
   const compactedBase = measure(input.systemInstructions, contexts, input.evidence, conversation);
@@ -348,6 +357,13 @@ function diagnoseTutorContext(input: {
 
 function serializedCharacters(value: unknown): number {
   try { return JSON.stringify(value)?.length ?? 0; } catch { return 0; }
+}
+
+const REASONING_STATE_MAX_CHARS = 6_000;
+
+function serializedValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  try { return JSON.stringify(value) ?? ""; } catch { return ""; }
 }
 
 function messageContentCharacters(value: unknown): number {
