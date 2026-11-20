@@ -11,7 +11,7 @@ import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { objectTitle } from "./SceneGlyph";
 import { applyCanvasProposal, canvasEditSchema, MathProposalValidationError, proposeCanvasEdit, type CanvasProposal } from "./tutor";
-import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Trash2, Undo2, Upload, X } from "lucide-react";
+import { ArrowRight, Atom, BookOpen, ChartLine, ChevronDown, Download, FileQuestion, FileText, GalleryVerticalEnd, Hand, Link2, MousePointer2, MoveUpRight, Network, Pencil, Plus, Redo2, Ruler, ScanText, Search, Shapes, ShieldCheck, Sigma, Sparkles, StickyNote, Trash2, Type, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
@@ -23,10 +23,10 @@ type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
 type Board = { id: string; name: string; revision: number };
 type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
-type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
+type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean; compactTools?: boolean };
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 
-export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, preferredBoardId, onBoardState, activityMode = false }: Props) {
+export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, preferredBoardId, onBoardState, activityMode = false, compactTools = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
   const editorListeners = useRef<Array<() => void>>([]);
@@ -42,6 +42,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const skipQuickdrawSave = useRef<unknown>(undefined);
   const boardElement = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const toolPaletteRef = useRef<HTMLElement>(null);
   const [boards, setBoards] = useState<Board[]>([]);
   const [activeBoard, setActiveBoard] = useState<Board | null>(null);
   const [document, setDocument] = useState<CanvasDocument>(emptyCanvasDocument());
@@ -63,7 +64,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [proposalBusy, setProposalBusy] = useState(false);
-  useEffect(() => setToolOpen(!activityMode), [activityMode]);
+  useEffect(() => setToolOpen(!activityMode && !compactTools), [activityMode, compactTools]);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
@@ -85,6 +86,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     const query = toolSearch.trim().toLowerCase();
     return canvasTools.filter((tool) => !query || `${tool.label} ${tool.description} ${tool.group}`.toLowerCase().includes(query));
   }, [toolSearch]);
+  useEffect(() => {
+    if (toolOpen) toolPaletteRef.current?.scrollTo({ top: 0 });
+  }, [toolOpen, toolSearch]);
   const selectedObject = document.objects.find((item) => item.id === editingId);
 
   useQuickdrawAIBridge({
@@ -579,11 +583,11 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   return <div className="canvas-studio">
     {canvasAnalysis && <CanvasAnalysisTutorContext analysis={canvasAnalysis} />}
-    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved edit…" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
-    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>AI canvas proposal</strong><p>{shapeProposal.description}</p><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => {
+    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><div className="canvas-proposal-icon"><Sparkles size={17} /></div><div className="canvas-proposal-content"><span className="canvas-proposal-kicker">TUTOR SUGGESTION</span><strong>{proposal.reason}</strong><div className="canvas-proposal-trust"><ShieldCheck size={13} /> Review required before this changes the saved board.</div><details><summary>Review technical changes</summary><pre>{proposal.patchJson}</pre></details><div className="canvas-proposal-actions"><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved edit…" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss</button></div></div></section>}
+    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><div className="canvas-proposal-icon"><Sparkles size={17} /></div><div className="canvas-proposal-content"><span className="canvas-proposal-kicker">CANVAS SUGGESTION</span><strong>{shapeProposal.description}</strong><div className="canvas-proposal-trust"><ShieldCheck size={13} /> {shapeProposal.actions.length} proposed {shapeProposal.actions.length === 1 ? "action" : "actions"} · your approval is required.</div><details><summary>Review action details</summary><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre></details><div className="canvas-proposal-actions"><button className="button-primary" disabled={proposalBusy} onClick={() => {
       if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
       void applyQuickdrawProposal();
-    }}>{proposalBusy ? "Saving approved proposal…" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
+    }}>{proposalBusy ? "Saving approved proposal…" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss</button></div></div></section>}
     <div className="canvas-tools-bar">
       <div className="canvas-board-selector">
         <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label="Choose canvas board"><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
@@ -602,9 +606,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       </div>
     </div>
     <div className="canvas-viewport">
-      {toolOpen && <aside className="canvas-tool-palette"><div className="palette-heading"><span>CANVAS TOOLS</span><button className="icon-button" title="Collapse canvas tools" aria-label="Collapse canvas tools" onClick={() => setToolOpen(false)}><X size={14} /></button></div><label className="palette-search"><Search size={14} /><input aria-label="Search canvas tools" placeholder="Find a tool" value={toolSearch} onChange={(event) => setToolSearch(event.target.value)} /></label>{(["Draw", "Science", "Learning"] as const).map((group) => {
+      {toolOpen && <aside ref={toolPaletteRef} className="canvas-tool-palette"><div className="palette-heading"><span>CANVAS TOOLS</span><button className="icon-button" title="Collapse canvas tools" aria-label="Collapse canvas tools" onClick={() => setToolOpen(false)}><X size={14} /></button></div><label className="palette-search"><Search size={14} /><input aria-label="Search canvas tools" placeholder="Find a tool" value={toolSearch} onChange={(event) => setToolSearch(event.target.value)} /></label>{(["Draw", "Science", "Learning"] as const).map((group) => {
         const tools = filteredTools.filter((tool) => tool.group === group);
-        return tools.length ? <section className="palette-group" key={group}><h4>{group}</h4>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
+        return tools.length ? <section className="palette-group" key={group}><h4>{group}</h4>{tools.map((tool) => <button key={tool.id} className="palette-tool" aria-label={tool.label} title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true"><CanvasToolIcon tool={tool} /></span><span className="palette-tool-copy"><b>{tool.label}</b><small>{tool.description}</small></span></button>)}</section> : null;
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
       <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
@@ -625,6 +629,31 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     </div>
     {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} />}
   </div>;
+}
+
+function CanvasToolIcon({ tool }: { tool: CanvasTool }) {
+  const icons: Record<string, React.ReactNode> = {
+    select: <MousePointer2 size={15} />,
+    hand: <Hand size={15} />,
+    draw: <Pencil size={15} />,
+    geo: <Shapes size={15} />,
+    arrow: <ArrowRight size={15} />,
+    text: <Type size={15} />,
+    molecule: <Atom size={15} />,
+    vector: <MoveUpRight size={15} />,
+    force: <ArrowRight size={15} />,
+    equation: <Sigma size={15} />,
+    measurement: <Ruler size={15} />,
+    graph: <ChartLine size={15} />,
+    anatomy: <ScanText size={15} />,
+    concept: <BookOpen size={15} />,
+    relationship: <Network size={15} />,
+    "linked-note": <StickyNote size={15} />,
+    "linked-document": <Link2 size={15} />,
+    question: <FileQuestion size={15} />,
+    flashcard: <GalleryVerticalEnd size={15} />,
+  };
+  return icons[tool.id] ?? <Plus size={15} />;
 }
 
 function CanvasAnalysisTutorContext({ analysis }: { analysis: CanvasAnalysisResult }) {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { getStudyAIConfig } from "../server/config";
-import { getModelStatus } from "../server/models";
+import { getActiveModelStatus, getModelStatus } from "../server/models";
+import { getTutorProviderSettings } from "../server/tutor-provider";
 
 describe("configuration defaults", () => {
   it("retains the local development defaults", () => {
@@ -26,5 +27,33 @@ describe("Ollama availability", () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ models: [] }), { status: 200 }));
     const status = await getModelStatus("http://ollama", "local-model", fetcher as typeof fetch);
     expect(status).toMatchObject({ status: 200, body: { connected: true, models: [], configuredModel: "local-model" } });
+  });
+});
+
+describe("active model provider", () => {
+  it("reports configured Groq without probing Ollama", async () => {
+    const settings = getTutorProviderSettings({ TUTOR_PROVIDER: "groq", GROQ_API_KEY: "test-key", GROQ_MODEL: "groq-model" } as NodeJS.ProcessEnv);
+    const fetcher = vi.fn();
+    const status = await getActiveModelStatus(settings, "http://ollama", fetcher as typeof fetch);
+
+    expect(status).toEqual({
+      status: 200,
+      body: {
+        provider: "Groq",
+        connected: true,
+        models: [{ name: "groq-model", size: 0 }],
+        configuredModel: "groq-model",
+      },
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Ollama health check when Ollama is selected", async () => {
+    const settings = getTutorProviderSettings({ TUTOR_PROVIDER: "ollama", OLLAMA_MODEL: "local-model" } as NodeJS.ProcessEnv);
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ models: [{ name: "local-model", size: 42 }] }), { status: 200 }));
+    const status = await getActiveModelStatus(settings, "http://ollama", fetcher as typeof fetch);
+
+    expect(status.body).toMatchObject({ provider: "Ollama", connected: true, configuredModel: "local-model" });
+    expect(fetcher).toHaveBeenCalledWith("http://ollama/api/tags");
   });
 });

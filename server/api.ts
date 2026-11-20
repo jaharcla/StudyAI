@@ -9,7 +9,8 @@ import { parseCanvasDocument } from "../src/canvas/model.js";
 import { initializeDocumentIntelligenceSchema } from "./document-intelligence/schema.js";
 import { migrateLegacyDocuments } from "./document-intelligence/legacy.js";
 import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
-import { getModelStatus } from "./models.js";
+import { getActiveModelStatus } from "./models.js";
+import { getTutorProviderSettings } from "./tutor-provider.js";
 import { LearningService } from "./learning/service.js";
 import { createLearningHandler } from "./learning/http.js";
 import { LearningActivityService } from "./learning/activities/service.js";
@@ -44,7 +45,7 @@ const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url ?? "/", `http://${LOOPBACK_HOST}:${port}`);
   if (req.method === "GET" && url.pathname === "/api/models") {
-    const result = await getModelStatus(config.ollamaBaseUrl, config.ollamaModel);
+    const result = await getActiveModelStatus(getTutorProviderSettings(), config.ollamaBaseUrl);
     return json(res, result.status, result.body);
   }
   if (req.method === "GET" && url.pathname === "/api/courses") return json(res, 200, db.prepare("SELECT * FROM courses").all());

@@ -4,6 +4,7 @@ import "@copilotkit/react-core/v2/styles.css";
 import "@quickdrawjs/core/quickdraw.css";
 import "./styles.css";
 import "./overrides.css";
+import "./focus-workspace.css";
 import App from "./App";
 
 createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);

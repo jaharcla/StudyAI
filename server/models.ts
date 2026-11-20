@@ -1,4 +1,34 @@
-export type ModelStatus = { provider: "Ollama"; connected: boolean; models: Array<{ name: string; size: number }>; configuredModel: string; error?: string };
+import type { getTutorProviderSettings } from "./tutor-provider.js";
+
+export type ModelStatus = {
+  provider: "Groq" | "Ollama";
+  connected: boolean;
+  models: Array<{ name: string; size: number }>;
+  configuredModel: string;
+  error?: string;
+};
+
+type TutorProviderSettings = ReturnType<typeof getTutorProviderSettings>;
+
+export async function getActiveModelStatus(
+  settings: TutorProviderSettings,
+  ollamaBaseUrl: string,
+  fetcher: typeof fetch = fetch,
+): Promise<{ status: number; body: ModelStatus }> {
+  if (settings.provider === "groq") {
+    return {
+      status: 200,
+      body: {
+        provider: "Groq",
+        connected: true,
+        models: [{ name: settings.groqModel, size: 0 }],
+        configuredModel: settings.groqModel,
+      },
+    };
+  }
+
+  return getModelStatus(ollamaBaseUrl, settings.ollamaModel, fetcher);
+}
 
 export async function getModelStatus(baseUrl: string, configuredModel: string, fetcher: typeof fetch = fetch): Promise<{ status: number; body: ModelStatus }> {
   try {
