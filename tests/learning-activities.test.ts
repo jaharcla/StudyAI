@@ -89,7 +89,7 @@ async function saveSpec(activities: LearningActivityService, spec: ActivitySpec)
 afterEach(() => {
   database?.close();
   database = undefined;
-  if (temp) for (const path of [temp, `${temp}-wal`, `${temp}-shm`]) try { unlinkSync(path); } catch {}
+  if (temp) for (const path of [temp, `${temp}-wal`, `${temp}-shm`]) try { unlinkSync(path); } catch { /* already gone */ }
   temp = undefined;
 });
 

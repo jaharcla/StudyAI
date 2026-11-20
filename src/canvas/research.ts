@@ -62,7 +62,7 @@ export function replayCanvasEvents(events: Array<{ event_type: string; payload: 
   if (start < 0) return undefined;
   const initial = parseEventPayload(events[start].payload) as { snapshot?: Snapshot; objects?: ScientificObject[] };
   if (!initial.snapshot || !Array.isArray(initial.objects)) return undefined;
-  let snapshot = structuredClone(initial.snapshot);
+  const snapshot = structuredClone(initial.snapshot);
   let objects = structuredClone(initial.objects);
   const tail = events.slice(start + 1, start + 1 + Math.max(0, step));
   for (const event of tail) {
