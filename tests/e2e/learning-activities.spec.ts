@@ -31,7 +31,7 @@ test("force activity edits a model, checks it, records evidence, and resumes", a
   await selectSourceAndTemplate(page, "force");
   await expect(page.getByText(/6 generated canvas objects/)).toBeVisible();
   await page.getByRole("button", { name: "Save and start", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Use the signed horizontal forces and mass to predict acceleration in m\/s²\." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Use the signed horizontal forces and mass to predict acceleration in m/s²." })).toBeVisible();
   await expect(page.locator(".canvas-board-button")).toContainText("Activity · Force and motion");
 
   await page.locator('[data-kind="force"]').first().dblclick();
@@ -43,10 +43,10 @@ test("force activity edits a model, checks it, records evidence, and resumes", a
   await expect(page.getByRole("button", { name: "Check answer", exact: true })).toBeEnabled({ timeout: 15_000 });
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await expect(page.getByText("The numeric relationship matches the supported one-dimensional model.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Using the current model, predict velocity after 2 seconds in m/s\." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Using the current model, predict velocity after 2 seconds in m/s." })).toBeVisible();
   await page.getByRole("textbox", { name: "Activity answer" }).fill("11");
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Update the linked graph so its slope matches the current force model, then enter that slope in m/s²\." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Update the linked graph so its slope matches the current force model, then enter that slope in m/s²." })).toBeVisible();
   await page.locator('[data-kind="equation"]').dblclick();
   const equationEditor = page.locator(".canvas-object-editor");
   await expect(equationEditor).toBeVisible();
@@ -55,7 +55,7 @@ test("force activity edits a model, checks it, records evidence, and resumes", a
   await page.getByRole("textbox", { name: "Activity answer" }).fill("4");
   await expect(page.getByRole("button", { name: "Check answer", exact: true })).toBeEnabled({ timeout: 15_000 });
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Make the graph's y-intercept match the current initial velocity, then enter the intercept in m/s\." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Make the graph's y-intercept match the current initial velocity, then enter the intercept in m/s." })).toBeVisible();
   await page.getByRole("textbox", { name: "Activity answer" }).fill("3");
   await page.getByRole("button", { name: "Check answer", exact: true }).click();
   await expect(page.getByText("All tasks complete")).toBeVisible();
@@ -82,7 +82,7 @@ test("graph activity constructs a linked function, checks its interpretation, an
   await selectSourceAndTemplate(page, "graph");
   await expect(page.getByText(/2 generated canvas objects/)).toBeVisible();
   await page.getByRole("button", { name: "Save and start", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "What is the slope of the current linked graph\?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What is the slope of the current linked graph?" })).toBeVisible();
   await expect(page.locator('[data-kind="equation"]')).toHaveCount(1);
   await expect(page.locator('[data-kind="graph"]')).toHaveCount(1);
 

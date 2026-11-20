@@ -27,6 +27,7 @@ export async function requestJson<T>(url: string, init?: RequestInit): Promise<T
 }
 
 export function uploadOne(file: File, courseId: string, onProgress: (value: number) => void, lessonId?: string): Promise<{ status: "imported" | "duplicate" | "error"; message: string; documentId?: string }> {
+  // eslint-disable-next-line no-async-promise-executor -- every await is inside the try, so nothing can escape as an unhandled rejection
   return new Promise(async (resolve) => {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
