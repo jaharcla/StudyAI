@@ -40,6 +40,7 @@ export async function importDocuments(db: Database.Database, courseId: string, f
   const course = db.prepare("SELECT id FROM courses WHERE id=?").get(courseId);
   if (!course) throw new Error("Course not found.");
   const prepared = await Promise.all(files.map(async (file) => {
+    // eslint-disable-next-line no-control-regex -- stripping control characters is the point
     const filename = basename(file.name).replace(/[\u0000-\u001f]/g, "").slice(0, 240);
     if (!filename || filename === ".") throw new Error("Every file needs a valid filename.");
     if (file.bytes.byteLength > MAX_FILE_BYTES) throw new Error("File exceeds the 20 MB limit.");
@@ -86,7 +87,7 @@ export async function importDocuments(db: Database.Database, courseId: string, f
 
 export function searchDocuments(db: Database.Database, courseId: string, query: string, limit = 8): DocumentSearchResult[] {
   initializeDocumentIntelligenceSchema(db);
-  const terms = query.replace(/["*:^(){}\[\]]/g, " ").trim().split(/\s+/).filter(Boolean).slice(0, 20).map((part) => `"${part.replace(/"/g, '""')}"`).join(" OR ");
+  const terms = query.replace(/["*:^(){}[\]]/g, " ").trim().split(/\s+/).filter(Boolean).slice(0, 20).map((part) => `"${part.replace(/"/g, '""')}"`).join(" OR ");
   if (!terms || !courseId) return [];
   const rows = db.prepare(`SELECT c.document_id AS documentId, d.title, d.filename, c.unit_type AS unitType, c.unit_number AS unitNumber,
     c.chunk_index AS chunkIndex, snippet(di_chunk_search,0,'','','…',28) AS excerpt, bm25(di_chunk_search) AS score
