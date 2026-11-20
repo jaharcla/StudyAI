@@ -246,7 +246,7 @@ function resolveReferences(references: readonly SceneEvidenceRef[], knownStrokeI
     } else if (reference.kind === "candidate") {
       const members = candidateSources.get(reference.id);
       if (!members) invalidCount++;
-      else for (const id of members) knownStrokeIds.has(id) ? strokeIds.add(id) : invalidCount++;
+      else for (const id of members) { if (knownStrokeIds.has(id)) strokeIds.add(id); else invalidCount++; }
     } else nonStrokeCount++;
   }
   return { strokeIds: [...strokeIds].sort(), invalidCount, nonStrokeCount };

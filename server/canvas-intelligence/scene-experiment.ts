@@ -228,7 +228,7 @@ export function createSceneRequestBudget(limit = MAX_SCENE_EXPERIMENT_REQUESTS, 
       temperature = typeof body.temperature === "number" ? body.temperature : undefined;
       maxCompletionTokens = typeof body.max_completion_tokens === "number" ? body.max_completion_tokens : undefined;
       stage = condition !== "A" ? "whole-scene" : images.length ? "ocr" : system === STRUCTURE_SYSTEM_PROMPT ? "structure" : system === FUSION_SYSTEM_PROMPT ? "fusion" : "inference";
-    } catch { }
+    } catch { /* unparseable body: keep the defaults above */ }
     const record: (typeof records)[number] = { condition, stage, model, requestBytes: Buffer.byteLength(requestText), imageCount, imageBytes, temperature, maxCompletionTokens, latencyMs: 0 };
     const started = performance.now();
     try {

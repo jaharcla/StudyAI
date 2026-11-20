@@ -1,0 +1,10 @@
+version: 2
+
+updates:
+  # The workflow pins actions to commit SHAs, so something has to move them.
+  # Scoped to actions only: npm dependency bumps are a separate decision.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

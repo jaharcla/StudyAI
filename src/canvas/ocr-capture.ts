@@ -44,6 +44,7 @@ export async function captureQuickdrawOCRRegions(editor: Editor, selectedIds: st
         pixelToWorld: canvasOCRRegionTransform(plan.cropBounds, pixelWidth, pixelHeight),
       });
     } catch {
+      // a single bad region should not abandon the rest of the capture
     }
   }
   return regions;

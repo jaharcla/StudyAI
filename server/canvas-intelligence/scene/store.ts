@@ -136,5 +136,5 @@ export function searchCurrentCourseCanvasScene(db: Database.Database, scope: { c
 }
 
 function sanitizeQuery(query: string): string[] {
-  return String(query ?? "").replace(/["*:^(){}\[\]]/g, " ").split(/\s+/).map((term) => term.trim()).filter((term) => term.length >= 2).slice(0, 20);
+  return String(query ?? "").replace(/["*:^(){}[\]]/g, " ").split(/\s+/).map((term) => term.trim()).filter((term) => term.length >= 2).slice(0, 20);
 }

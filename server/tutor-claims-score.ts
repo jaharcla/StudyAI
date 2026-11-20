@@ -29,7 +29,7 @@ function normalize(value: string): string {
     .toLowerCase()
     .replace(/[`*_#>]/g, " ")
     .replace(/\s+/g, " ")
-    .replace(/\s*([{}\\^_=+\-])\s*/g, "$1")
+    .replace(/\s*([{}\\^_=+-])\s*/g, "$1")
     .trim();
 }
 
