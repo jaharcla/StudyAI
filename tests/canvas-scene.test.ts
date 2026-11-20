@@ -7,6 +7,7 @@ import { buildCanvasSceneGraph } from "../server/canvas-intelligence/scene/build
 import { recognizeCanvasStrokes } from "../server/canvas-intelligence/recognition/index.js";
 import { initializeCanvasSceneSchema, loadCanvasSceneGraph, saveCanvasSceneGraph, searchCanvasScene } from "../server/canvas-intelligence/scene/store.js";
 import { buildCanvasScene, CanvasSceneError, queryCanvasScene, queryCourseCanvasScene } from "../server/canvas-intelligence/scene/service.js";
+import { readCanvasInk } from "../server/canvas-intelligence/scene/ink-service.js";
 import { createCanvasSpatialIndex } from "../src/canvas/spatial/index.js";
 import { CanvasSceneGraphSchema } from "../src/canvas/spatial/types.js";
 
@@ -111,6 +112,25 @@ describe("canvas scene graph", () => {
     await expect(buildCanvasScene(db, "board-1", { courseId: "course-1", lessonId: "lesson-1", expectedRevision: 2 })).rejects.toThrow(CanvasSceneError);
     const query = queryCanvasScene(db, "board-1", { courseId: "course-1", lessonId: "lesson-1", revisionHash: built.scene.revisionHash, query: "force", limit: 5 });
     expect(query.nodes.length).toBeGreaterThan(0);
+    db.close();
+  });
+
+  it("hashes the persisted revision when a vector geometry omits its scale", async () => {
+    const db = new Database(":memory:");
+    db.exec("CREATE TABLE canvases(id TEXT PRIMARY KEY,course_id TEXT,lesson_id TEXT,revision INTEGER,document TEXT)");
+    const vectorDocument = {
+      version: 1,
+      snapshot,
+      objects: [{ id: "v1", kind: "vector", x: 10, y: 20, width: 120, height: 60, components: [120, 60, 0], units: "", label: "Vector", geometry: { tail: { x: 10, y: 20 }, tip: { x: 130, y: -40 } } }],
+    };
+    db.prepare("INSERT INTO canvases(id,course_id,lesson_id,revision,document) VALUES(?,?,?,?,?)").run("board-1", "course-1", "lesson-1", 2, JSON.stringify(vectorDocument));
+    const built = await buildCanvasScene(db, "board-1", { courseId: "course-1", lessonId: "lesson-1", expectedRevision: 2 });
+    expect(built.scene.revision).toBe(2);
+    const vector = built.scene.nodes.find((node) => node.id === "s:v1");
+    expect(vector?.text).toBe("Vector — components [120, 60, 0]");
+    const ink = await readCanvasInk(db, "board-1", { courseId: "course-1", lessonId: "lesson-1", expectedRevision: 2, groupIds: ["missing"] });
+    expect(ink.items).toEqual([]);
+    expect(ink.warnings).toEqual(["missing is not a freehand group."]);
     db.close();
   });
 

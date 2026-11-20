@@ -53,7 +53,7 @@ export async function readCanvasInk(
   } catch {
     throw new CanvasSceneError("invalid_request", "The persisted canvas document is invalid.", 400);
   }
-  const current = currentCanvasRevision({ ...row, document });
+  const current = currentCanvasRevision(row);
   const canvasInput = normalizeCanvasInput({ boardId: row.boardId, courseId: row.courseId, lessonId: row.lessonId, snapshot: document.snapshot, scientificObjects: document.objects, selectedIds: [] });
   const loaded = loadCanvasSceneGraph(database, boardId, current.revisionHash);
   const graph = loaded ?? (await buildCanvasScene(database, boardId, { courseId: request.courseId, lessonId: request.lessonId, expectedRevision: request.expectedRevision })).scene;

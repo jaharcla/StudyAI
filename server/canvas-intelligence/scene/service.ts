@@ -54,7 +54,7 @@ export async function buildCanvasScene(database: Database.Database, boardId: str
   } catch {
     throw new CanvasSceneError("invalid_request", "The persisted canvas document is invalid.", 400);
   }
-  const current = currentCanvasRevision({ ...row, document });
+  const current = currentCanvasRevision(row);
   const canvasInput = normalizeCanvasInput({ boardId: row.boardId, courseId: row.courseId, lessonId: row.lessonId, snapshot: document.snapshot, scientificObjects: document.objects, selectedIds: [] });
   let analysis = null;
   if (request.analysis !== undefined && request.analysis !== null) {

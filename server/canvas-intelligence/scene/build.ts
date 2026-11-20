@@ -49,12 +49,55 @@ function features(points: readonly CanvasScenePoint[], bounds: CanvasSceneBounds
   return { centroid: { x: cx, y: cy }, orientation: 0, pathLength, pointCount: points.length, aspect };
 }
 
-function labelOf(object: CanvasInput["scientificObjects"][number]): string | null {
+function scientificFacts(object: CanvasInput["scientificObjects"][number]): string[] {
+  const facts: string[] = [];
+  const numbers = (value: unknown): number[] | null => Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "number" && Number.isFinite(item)) ? value as number[] : null;
+  const number = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
+  const text = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
+  if (object.kind === "vector" || object.kind === "force") {
+    const components = numbers(object.components);
+    if (components) facts.push(`components [${components.join(", ")}]`);
+  } else if (object.kind === "measurement") {
+    const value = number(object.value);
+    if (value !== null) facts.push(`value ${value}`);
+  } else if (object.kind === "equation") {
+    const expression = text(object.expression);
+    if (expression) facts.push(`expression ${expression}`);
+    const result = number(object.result);
+    if (result !== null) facts.push(`result ${result}`);
+  } else if (object.kind === "atom") {
+    const element = text(object.element);
+    if (element) facts.push(`element ${element}`);
+    const electrons = number(object.nonbondingElectrons);
+    if (electrons !== null) facts.push(`nonbonding electrons ${electrons}`);
+    const bondOrderSum = number(object.bondOrderSum);
+    if (bondOrderSum !== null) facts.push(`bond order sum ${bondOrderSum}`);
+  } else if (object.kind === "bond") {
+    const order = number(object.order);
+    if (order !== null) facts.push(`bond order ${order}`);
+  } else if (object.kind === "graph") {
+    const expression = text(object.expression);
+    if (expression) facts.push(`expression ${expression}`);
+    const range = numbers(object.xRange);
+    if (range?.length === 2) facts.push(`x range ${range[0]} to ${range[1]}`);
+  } else if (object.kind === "anatomy") {
+    const system = text(object.system);
+    if (system) facts.push(`system ${system}`);
+    const labels = Array.isArray(object.labels) ? object.labels.filter((label): label is string => typeof label === "string" && Boolean(label.trim())) : [];
+    if (labels.length) facts.push(`labels ${labels.join(", ")}`);
+  }
+  const units = text(object.units);
+  if (units) facts.push(`units ${units}`);
+  return facts;
+}
+
+function summaryOf(object: CanvasInput["scientificObjects"][number]): string | null {
   const values: string[] = [];
   for (const key of ["label", "name", "title", "definition", "prompt", "front", "back", "excerpt"]) {
     const value = object[key];
     if (typeof value === "string" && value.trim()) values.push(value.trim());
   }
+  values.push(...scientificFacts(object));
   return values.length ? values.join(" — ").slice(0, 2000) : null;
 }
 
@@ -119,7 +162,7 @@ export function buildCanvasSceneGraph(input: {
       ref: { scope: "science", id: object.id },
       bounds: { x: object.x, y: object.y, width: object.width, height: object.height },
       boundsBasis: "source",
-      text: labelOf(object),
+      text: summaryOf(object),
       recordType: String(object.kind).slice(0, 64),
       origin: "science",
       verificationStatus: "source",
