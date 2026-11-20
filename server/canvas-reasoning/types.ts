@@ -70,6 +70,7 @@ export const CanvasReasoningStateSchema = z.object({
   unresolved: z.array(CanvasReasoningUnresolvedSchema).max(32),
   coveredChunks: z.array(z.string().min(1).max(120)).max(64),
   calls: z.number().int().min(0),
+  needsUser: z.boolean().optional(),
 });
 export type CanvasReasoningState = z.infer<typeof CanvasReasoningStateSchema>;
 
@@ -84,5 +85,7 @@ export const CanvasChunkSchema = z.object({
   sourceIds: z.array(SourceIdSchema).min(1).max(200),
   labels: z.array(z.string().max(200)).max(40),
   detail: z.string().max(8000),
+  /** Set by the deterministic chunk builder; the loop needs it to order and to exit early. */
+  relevance: z.number().min(0).max(1).optional(),
 });
 export type CanvasChunk = z.infer<typeof CanvasChunkSchema>;

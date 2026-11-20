@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { runReasoningPass, type ReasoningCall } from "../server/canvas-reasoning/service.js";
+﻿import { describe, expect, it } from "vitest";
+import { reasonOverCanvas, runReasoningPass, type ReasoningCall } from "../server/canvas-reasoning/service.js";
 import { mergeDelta } from "../server/canvas-reasoning/state.js";
 import type { CanvasChunk, CanvasReasoningState } from "../server/canvas-reasoning/types.js";
 
@@ -140,3 +140,106 @@ describe("runReasoningPass", () => {
     expect(calls).toBe(0);
   });
 });
+
+function chunkOf(id: string, sourceId: string, relevance = 0.9, labels: string[] = []): CanvasChunk {
+  return { id, bounds: { x: 0, y: 0, width: 100, height: 100 }, sourceIds: [sourceId], labels, detail: "[]", relevance };
+}
+
+function deltaFor(chunk: CanvasChunk, over: Record<string, unknown> = {}) {
+  return {
+    coveredChunkId: chunk.id,
+    entitiesToAdd: [],
+    claimsToAdd: [{ subject: "molecule", relation: "is", object: chunk.id, value: `value-${chunk.id}`, status: "observed", confidence: 0.8, evidence: [chunk.sourceIds[0]] }],
+    contradictions: [],
+    unresolved: [],
+    confidence: 0.8,
+    ...over,
+  };
+}
+
+function chunkFromPrompt(prompt: string, chunks: readonly CanvasChunk[]): CanvasChunk {
+  const parsed = JSON.parse(prompt) as { chunk: { id: string } };
+  const match = chunks.find((chunk) => chunk.id === parsed.chunk.id);
+  if (!match) throw new Error(`Unknown chunk ${parsed.chunk.id}`);
+  return match;
+}
+
+describe("reasonOverCanvas", () => {
+  it("runs one pass per relevant chunk and answers from the merged state", async () => {
+    const chunks = [chunkOf("chunk-1", "s1"), chunkOf("chunk-2", "s2")];
+    const call: ReasoningCall = async ({ prompt }) => deltaFor(chunkFromPrompt(prompt, chunks));
+
+    const result = await reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What is drawn?", chunks, call });
+
+    expect(result.calls).toBe(2);
+    expect(result.state.coveredChunks).toEqual(["chunk-1", "chunk-2"]);
+    expect(result.answerContext).toContain("value-chunk-1");
+    expect(result.answerContext).toContain("value-chunk-2");
+    expect(result.exhausted).toBe(false);
+  });
+
+  it("exits early when only low-relevance chunks remain", async () => {
+    const chunks = [chunkOf("chunk-1", "s1", 0.9), chunkOf("chunk-2", "s2", 0.2)];
+    const call: ReasoningCall = async ({ prompt }) => deltaFor(chunkFromPrompt(prompt, chunks));
+
+    const result = await reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What is drawn?", chunks, call });
+
+    expect(result.calls).toBe(1);
+    expect(result.state.coveredChunks).toEqual(["chunk-1"]);
+    expect(result.answerContext).not.toContain("value-chunk-2");
+  });
+
+  it("keeps a contradiction introduced by a later pass", async () => {
+    const chunks = [chunkOf("chunk-1", "s1"), chunkOf("chunk-2", "s2")];
+    const values: Record<string, string> = { "chunk-1": "benzene", "chunk-2": "cyclohexane" };
+    const call: ReasoningCall = async ({ prompt }) => {
+      const chunk = chunkFromPrompt(prompt, chunks);
+      return deltaFor(chunk, { claimsToAdd: [{ subject: "molecule", relation: "is", object: "ring", value: values[chunk.id], status: "observed", confidence: 0.8, evidence: [chunk.sourceIds[0]] }] });
+    };
+
+    const result = await reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What molecule is drawn?", chunks, call });
+
+    expect(result.state.contradictions).toHaveLength(1);
+    expect(result.answerContext).toContain("benzene");
+    expect(result.answerContext).toContain("cyclohexane");
+    expect(result.state.claims.filter((claim) => claim.status === "contradicted")).toHaveLength(2);
+  });
+
+  it("reports exhaustion and a user prompt when critical questions stay open", async () => {
+    const chunks = Array.from({ length: 6 }, (_, index) => chunkOf(`chunk-${index}`, `s-${index}`));
+    const call: ReasoningCall = async ({ prompt }) => {
+      const chunk = chunkFromPrompt(prompt, chunks);
+      return deltaFor(chunk, {
+        claimsToAdd: [],
+        unresolved: [{ question: "What molecule is drawn?", relatedIds: [chunk.sourceIds[0]] }],
+      });
+    };
+
+    const result = await reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What molecule is drawn?", chunks, call, maxPasses: 6 });
+
+    expect(result.calls).toBe(6);
+    expect(result.exhausted).toBe(true);
+    expect(result.state.needsUser).toBe(true);
+    expect(result.state.unresolved).toHaveLength(1);
+  });
+
+  it("stops at the pass budget", async () => {
+    const chunks = Array.from({ length: 4 }, (_, index) => chunkOf(`chunk-${index}`, `s-${index}`));
+    const call: ReasoningCall = async ({ prompt }) => deltaFor(chunkFromPrompt(prompt, chunks));
+
+    const result = await reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What is drawn?", chunks, call, maxPasses: 2 });
+
+    expect(result.calls).toBe(2);
+    expect(result.exhausted).toBe(true);
+    expect(result.state.coveredChunks).toHaveLength(2);
+  });
+
+  it("propagates a call failure so the caller can fall back", async () => {
+    const call: ReasoningCall = async () => {
+      throw new Error("transport down");
+    };
+
+    await expect(reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What is drawn?", chunks: [chunkOf("chunk-1", "s1")], call })).rejects.toThrow("transport down");
+  });
+});
+

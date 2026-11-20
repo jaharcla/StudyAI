@@ -256,6 +256,7 @@ export function buildCanvasChunks(input: CanvasChunkInput): CanvasChunk[] {
         sourceIds,
         labels,
         detail,
+        relevance: Math.min(1, score / 6),
       }),
     };
   });
