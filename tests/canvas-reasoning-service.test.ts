@@ -241,5 +241,15 @@ describe("reasonOverCanvas", () => {
 
     await expect(reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "What is drawn?", chunks: [chunkOf("chunk-1", "s1")], call })).rejects.toThrow("transport down");
   });
+
+  it("reasons about the best chunk when the question matches no labels", async () => {
+    const chunks = [chunkOf("chunk-1", "s1", 0), chunkOf("chunk-2", "s2", 0)];
+    const call: ReasoningCall = async ({ prompt }) => deltaFor(chunkFromPrompt(prompt, chunks));
+
+    const result = await reasonOverCanvas({ boardId: "board-1", revisionHash: "revision-1", question: "Explain this board.", chunks, call });
+
+    expect(result.calls).toBe(1);
+    expect(result.state.coveredChunks).toEqual(["chunk-1"]);
+  });
 });
 

@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import { buildReasoningPrompt, REASONING_SYSTEM_PROMPT, repairPrompt } from "./prompts.js";
 import { mergeDelta } from "./state.js";
 import { CanvasReasoningDeltaSchema, type CanvasChunk, type CanvasReasoningDelta, type CanvasReasoningState } from "./types.js";
@@ -146,6 +146,11 @@ export async function reasonOverCanvas(input: {
 }): Promise<{ state: CanvasReasoningState; answerContext: string; calls: number; exhausted: boolean }> {
   const maxPasses = input.maxPasses ?? DEFAULT_MAX_PASSES;
   const ranked = input.chunks.map((chunk, index) => ({ chunk, index })).sort((left, right) => (right.chunk.relevance ?? 0) - (left.chunk.relevance ?? 0) || left.index - right.index);
+  // A generic question ("explain this board") matches no labels. Rather than doing
+  // nothing on a large board, always reason about at least the best chunk.
+  const targets = ranked.some((entry) => (entry.chunk.relevance ?? 0) >= RELEVANCE_FLOOR)
+    ? ranked.filter((entry) => (entry.chunk.relevance ?? 0) >= RELEVANCE_FLOOR)
+    : ranked.slice(0, 1);
 
   let state: CanvasReasoningState = {
     schemaVersion: 1,
@@ -165,7 +170,7 @@ export async function reasonOverCanvas(input: {
   for (;;) {
     if (input.signal?.aborted) throw new Error("Canvas reasoning aborted.");
     const covered = new Set(state.coveredChunks);
-    const next = ranked.find((entry) => !covered.has(entry.chunk.id) && (entry.chunk.relevance ?? 0) >= RELEVANCE_FLOOR);
+    const next = targets.find((entry) => !covered.has(entry.chunk.id));
     if (!next) break;
     if (calls >= maxPasses) {
       budgetHit = true;
@@ -178,8 +183,9 @@ export async function reasonOverCanvas(input: {
 
   const coveredAfter = new Set(state.coveredChunks);
   const critical = criticalUnresolved(state, input.chunks, coveredAfter);
-  const relevantUncovered = ranked.some((entry) => !coveredAfter.has(entry.chunk.id) && (entry.chunk.relevance ?? 0) >= RELEVANCE_FLOOR);
+  const relevantUncovered = targets.some((entry) => !coveredAfter.has(entry.chunk.id));
 
   state = { ...state, calls, needsUser: critical.length > 0 };
   return { state, answerContext: buildAnswerContext(state), calls, exhausted: budgetHit || relevantUncovered || critical.length > 0 };
 }
+
