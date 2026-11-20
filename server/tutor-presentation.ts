@@ -39,24 +39,24 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
     }
   };
   const content = answer
-    .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\(#studyai-citation=([^\)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, encoded: string) => {
+    .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\(#studyai-citation=([^)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, encoded: string) => {
       let sourceRef: string;
       try { sourceRef = decodeURIComponent(encoded); } catch { rejectedCitationCount++; return ""; }
       const rendered = renderReference(sourceRef);
       if (!rendered) { rejectedCitationCount++; return ""; }
       return rendered;
     })
-    .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\((studyai:\/\/document\/[^\)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, sourceRef: string) => {
+    .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\((studyai:\/\/document\/[^)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, sourceRef: string) => {
       const rendered = renderReference(sourceRef);
       if (!rendered) { rejectedCitationCount++; return ""; }
       return rendered;
     })
-    .replace(/【([^】]*)\((https:\/\/studyai\.org\/document\/[^\)]+)\)】/g, (_match, _label: string, reference: string) => {
+    .replace(/【([^】]*)\((https:\/\/studyai\.org\/document\/[^)]+)\)】/g, (_match, _label: string, reference: string) => {
       const rendered = renderReference(reference);
       if (!rendered) { rejectedCitationCount++; return ""; }
       return rendered;
     })
-    .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\((https:\/\/studyai\.org\/document\/[^\)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, reference: string) => {
+    .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\((https:\/\/studyai\.org\/document\/[^)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, reference: string) => {
       const rendered = renderReference(reference);
       if (!rendered) { rejectedCitationCount++; return ""; }
       return rendered;
@@ -318,5 +318,5 @@ function citationLocation(citation: TutorCitation): string {
 }
 
 function markdownLabel(value: string): string {
-  return value.replace(/[\[\]\\]/g, " ");
+  return value.replace(/[[\]\\]/g, " ");
 }

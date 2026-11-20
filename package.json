@@ -13,7 +13,8 @@
     "dev:agent": "langgraphjs dev --host 127.0.0.1 --port 8133 --no-browser --no-reload",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@ag-ui/client": "1.0.2",
@@ -53,6 +54,8 @@
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "5.0.4",
     "concurrently": "9.2.1",
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0",
     "dotenv": "17.2.3",
     "@langchain/langgraph-cli": "1.7.0",
     "tsx": "4.20.6",

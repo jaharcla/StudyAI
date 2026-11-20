@@ -612,7 +612,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       }} onPointerUpCapture={finishNativeGesture} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
         if (event.code === "Space") setSpaceHeld(true);
-        if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) { event.preventDefault(); event.stopPropagation(); event.shiftKey || event.key.toLowerCase() === "y" ? redo() : undo(); }
+        if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) { event.preventDefault(); event.stopPropagation(); if (event.shiftKey || event.key.toLowerCase() === "y") redo(); else undo(); }
         if (event.key === "Escape") { setScienceMode(null); setSelectedId(undefined); setEditingId(undefined); }
         if ((event.key === "Delete" || event.key === "Backspace") && selectedId) { event.preventDefault(); event.stopPropagation(); replaceObjects(documentRef.current.objects.filter((object) => object.id !== selectedId)); setSelectedId(undefined); }
       }} onKeyUpCapture={(event) => { if (event.code === "Space") setSpaceHeld(false); }} onBlur={() => setSpaceHeld(false)}>
