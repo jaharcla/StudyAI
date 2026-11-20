@@ -1,41 +1,35 @@
 # StudyAI status
 
-The initial scaffold notes below are a historical baseline. The current coordinator status is at the end of this file.
+Workspace snapshot: `codex/whole-board-scene-experiment` at `d40b562` (November 18, 2026), canvas intelligence phases 0-3 landed. This page describes the current source. The verification numbers below were measured on this commit before it was made.
 
-## Implemented in source
+## Implemented
 
-- React/TypeScript workspace with course sidebar, Canvas/Lecture/Split views, resizable tutor panel, and light/dark toggle.
-- Quickdraw canvas integration with SQLite snapshots and revision increments.
-- Loopback-only local API and SQLite schema for courses, notes, document chunks, FTS5 search, attempts, and drawings.
-- Text document ingestion and course-scoped lexical search.
-- CopilotKit documented v2 provider/runtime wiring to a LangGraphJS tutor graph; workspace context includes course, lesson, view, and structured canvas object metadata.
-- Standalone formal-charge and vector calculations with Vitest cases.
-- `.env.example`, `npm run setup`, `npm run dev`, and `start.bat`.
+- Course and lesson workspace with notes, documents, adaptive review, and a lesson-scoped scientific canvas.
+- LangGraphJS Tutor through CopilotKit, with Groq/Ollama provider selection, bounded context and provider requests, course-scoped document retrieval, and optional Google Fact Check searches.
+- PDF, DOCX, PPTX, and UTF-8 TXT ingestion; page/slide-aware text chunks, FTS5 search, source references, and a PDF viewer.
+- Canvas persistence with revision checks, scientific objects, math workspace, direct manipulation, Canvas analysis, and reviewable AI edit proposals.
+- Canvas intelligence: deterministic capture, math and diagram OCR with a provider chain and daily budgets, local recognition plus a teach/accept/correct/dismiss feedback loop, revision-bound spatial scene graph with FTS5 search, and `get_canvas_scene` / `search_canvas_evidence` / `propose_scientific_object` tutor tools.
+- Learning activities with validated specifications and deterministic capability checks.
+
+## Limits
+
+- Document extraction is text-based; scanned PDFs are not OCR'd, and embedded images or charts are not interpreted. Search uses lexical FTS5 rather than embeddings. Canvas OCR is a separate feature.
+- Retrieved excerpts and fact-check ratings are evidence to review, not proof. Canvas model interpretations remain uncertain and are not grading evidence.
+- AI requests leave the machine when Groq or Google Fact Check is configured and used. Local services bind to loopback; multi-user authentication is not implemented.
+- Some learning activity checkers support only the units and models stated in their specifications; unsupported cases return an unknown or unsupported result.
+- Canvas provider budgets are in-memory and reset when the server restarts; per-analysis cost and latency are not shown in the UI, and there is no provider disclosure/opt-out yet (phase 4).
+- Gemini free tier is 15 requests/minute and can return 503; OpenRouter has no credits and is not a reliable primary. Provider failures degrade to partial analyses rather than wrong answers.
 
 ## Verification
 
-- `npm run build` passes; Vite reports large chunks from the bundled editor and diagram libraries.
-- `npm test` passes: 3 unit tests across science and database modules.
-- Full-stack Playwright verification remains incomplete. LangGraph starts and registers the tutor graph, but reports a checkpoint dependency version warning. Download the configured Ollama model before using local AI.
-- Baseline dependency issue: `npm ci` reported a missing transitive optional package before the coordinator lockfile repair; see the clean-install result below.
+Measured on `d40b562` (November 18, 2026), the commit that landed phases 0-3:
 
-## Deferred
+- `npx tsc -b`: pass.
+- `npx vitest run`: 289 passed in 44 files.
+- `npx playwright test tests/e2e/canvas-scene-intelligence.spec.ts tests/e2e/canvas-recognition-review.spec.ts`: 2 passed (19.7 s).
+- `npm run benchmark:canvas`: 0 hard failures, 4/6 math boards exact, math F1 0.91, PhysAlign concept coverage 0.75, 12.9 s average latency, $0 provider cost. Gate compared against the now-tracked `docs/verification/canvas-benchmark-baseline.json`.
+- Known benchmark weaknesses: nested logistic OCR scores 0.625 F1, and PhysAlign reads `F/N` as `A E / N`. Both are recorded in `CANVAS_INTELLIGENCE_HANDOFF_2026-11-18.md`.
 
-- PDF viewer, text/table extraction, page-level citations/highlighting, embeddings, and vector retrieval.
-- Chemistry structure editor, biology/anatomy tools, KIN graphing tools, health concept maps, FSRS scheduling UI, attempt analytics, and optional MCP connections.
-- Baseline provider status: Groq was not routed by the initial scaffold agent. The coordinator branch now retains Groq-first inference, as recorded below. No LMS connector is active.
+CI (`.github/workflows/canvas.yml`) runs build and unit tests on every push. The provider-dependent benchmark and browser tests stay local behind `/canvas-verify`, because they need keys and a gitignored dataset.
 
-## Coordinator branch update — November 9, 2026
-
-- Groq-first inference is retained; Ollama remains the fallback/override.
-- Prior reported gates: isolated clean install, 145/145 tests, production build, and the approved synthetic live Groq Canvas-to-Tutor scenario passed.
-- Latest targeted verification: 148/148 unit tests, production build passed, and all 5 provider-mocked browser flows passed. Vector apply now matches JSON persistence semantics; selected Quickdraw results are bounded to 12,000 characters with explicit truncation metadata.
-- An isolated clean install of the exact snapshot passed `npm ci --include=optional` (1,518 packages), 148/148 tests, and build. The two targeted browser flows also passed there. The additional combined PDF/Lewis flow stalled during note opening in the clean copy, though it passed in the coordinator run; cause remains unconfirmed.
-- Canvas Groq queue/cost accounting and effective-provider/model provenance are follow-ups. `main` remains clean at `d6e39c9`; no merge was performed. See `INTEGRATION_VERIFICATION.md` for details.
-
-## Final gate update — November 9, 2026
-
-- Linked-note stall diagnosed as test timing; waiting for the async placement palette to close fixed the flow. The no-delay browser rerun passed.
-- Affected browser checks passed 5/5; deterministic suite passed 148/148; production build passed.
-- The bounded synthetic Groq Canvas → OCR/analysis → Tutor scenario passed 1/1 with retries disabled, request/token caps, and no available Ollama fallback. Canvas request/cost metering and provider provenance remain follow-ups.
-- `main` was unchanged at `d6e39c9` at verification time; see the final merge status in the coordination registry.
+[INTEGRATION_VERIFICATION.md](INTEGRATION_VERIFICATION.md) records earlier, dated checks; use its results only for the commits named there.

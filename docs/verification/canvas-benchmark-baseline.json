@@ -1,0 +1,418 @@
+{
+  "createdAt": "2026-11-18T22:46:15.699Z",
+  "summary": {
+    "boardCount": 7,
+    "hardFailures": 0,
+    "mathExactCount": 4,
+    "mathAverageF1": 0.91,
+    "physAlignStructureCoverage": 0.75,
+    "averageLatencyMs": 16579,
+    "totalCostUsd": 0,
+    "providerBudget": {
+      "opencode-go": {
+        "used": 0,
+        "limit": 20
+      },
+      "openrouter": {
+        "used": 0,
+        "limit": 50
+      }
+    }
+  },
+  "results": [
+    {
+      "boardId": "mathwriting-02c9daf282f5a1e3",
+      "name": "MathWriting · bra-ket sum",
+      "expected": "\\sum_{x\\in\\{0,1\\}^{T}}|x\\rangle|f(x)\\rangle",
+      "latencyMs": 11597,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "\\sum_{x \\in \\{0,1\\}^T} |x\\rangle |f(x)\\rangle",
+      "answer": "The canvas shows a handwritten quantum‑mechanics style sum \\(\\sum_{x\\in\\{0,1\\}^T}|x\\rangle|f(x)\\rangle\\), but the exact grouping of strokes into individual symbols (sigma, braces, ket brackets) is ambiguous and the claimed spatial association is unconfirmed.",
+      "structureText": "The collection of strokes appears to form a large mathematical expression resembling a summation with a subscript and ket notation, extending across the canvas from left‑most strokes (e.g., shape:inkml-02c9daf282f5a1e3-0) to right‑most strokes (e.g., shape:inkml-02c9daf282f5a1e3-23). The canvas shows a handwritten quantum‑mechanics style sum \\(\\sum_{x\\in\\{0,1\\}^T}|x\\rangle|f(x)\\rangle\\), but the exact grouping of strokes into individual symbols (sigma, braces, ket brackets) is ambiguous and the claimed spatial association is unconfirmed.",
+      "mathScore": {
+        "exact": true,
+        "tokenF1": 1,
+        "precision": 1,
+        "recall": 1,
+        "expectedTokens": 11,
+        "actualTokens": 11,
+        "hits": 8
+      },
+      "structureScore": null,
+      "recognition": [
+        {
+          "groupId": "stroke-group:expression:shape:inkml-02c9daf282f5a1e3-0+shape:inkml-02c9daf282f5a1e3-1+shape:inkml-02c9daf282f5a1e3-10+shape:inkml-02c9daf282f5a1e3-11+shape:inkml-02c9daf282f5a1e3-12+shape:inkml-02c9daf282f5a1e3-13+shape:inkml-02c9daf282f5a1e3-14+shape:inkml-02c9daf282f5a1e3-15+shape:inkml-02c9daf282f5a1e3-16+shape:inkml-02c9daf282f5a1e3-17+shape:inkml-02c9daf282f5a1e3-18+shape:inkml-02c9daf282f5a1e3-19+shape:inkml-02c9daf282f5a1e3-2+shape:inkml-02c9daf282f5a1e3-20+shape:inkml-02c9daf282f5a1e3-21+shape:inkml-02c9daf282f5a1e3-22+shape:inkml-02c9daf282f5a1e3-23+shape:inkml-02c9daf282f5a1e3-3+shape:inkml-02c9daf282f5a1e3-4+shape:inkml-02c9daf282f5a1e3-5+shape:inkml-02c9daf282f5a1e3-6+shape:inkml-02c9daf282f5a1e3-7+shape:inkml-02c9daf282f5a1e3-8+shape:inkml-02c9daf282f5a1e3-9",
+          "candidates": [
+            "circle@0.55",
+            "closed shape@0.45"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 0,
+        "relationships": 0,
+        "observations": 1
+      },
+      "usage": [
+        {
+          "provider": "gemini",
+          "calls": 1,
+          "promptTokens": 1155,
+          "completionTokens": 24,
+          "costUsd": 0
+        },
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 39842,
+          "completionTokens": 3256,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    },
+    {
+      "boardId": "mathwriting-01e6c79f4d27bc54",
+      "name": "MathWriting · exponential decay",
+      "expected": "N(t)=N_{0}2^{-t/t_{1/2}}",
+      "latencyMs": 15227,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "N(t)=N_0 2^{-t/t_{1/2}}",
+      "answer": "The canvas contains geometric shapes that encode the decay expression N(t)=N₀ 2^{-t/t_{1/2}}, but the OCR and spatial mapping are uncertain. Recorded geometry provides bounding boxes and pairwise distances for each shape, without confirmed semantic links. The claimed spatial association of the formula is unmatched and requires manual verification.",
+      "structureText": "A contiguous group of strokes (shapes 0‑20) is arranged left‑to‑right in a typical mathematical expression layout, suggesting an equation of the form N(t)=N_0 2^{-t/t_{1/2}}. The canvas contains geometric shapes that encode the decay expression N(t)=N₀ 2^{-t/t_{1/2}}, but the OCR and spatial mapping are uncertain. Recorded geometry provides bounding boxes and pairwise distances for each shape, without confirmed semantic links. The claimed spatial association of the formula is unmatched and requires manual verification.",
+      "mathScore": {
+        "exact": true,
+        "tokenF1": 1,
+        "precision": 1,
+        "recall": 1,
+        "expectedTokens": 9,
+        "actualTokens": 9,
+        "hits": 5
+      },
+      "structureScore": null,
+      "recognition": [
+        {
+          "groupId": "stroke-group:expression:shape:inkml-01e6c79f4d27bc54-0+shape:inkml-01e6c79f4d27bc54-1+shape:inkml-01e6c79f4d27bc54-10+shape:inkml-01e6c79f4d27bc54-11+shape:inkml-01e6c79f4d27bc54-12+shape:inkml-01e6c79f4d27bc54-13+shape:inkml-01e6c79f4d27bc54-14+shape:inkml-01e6c79f4d27bc54-15+shape:inkml-01e6c79f4d27bc54-16+shape:inkml-01e6c79f4d27bc54-17+shape:inkml-01e6c79f4d27bc54-18+shape:inkml-01e6c79f4d27bc54-19+shape:inkml-01e6c79f4d27bc54-2+shape:inkml-01e6c79f4d27bc54-20+shape:inkml-01e6c79f4d27bc54-3+shape:inkml-01e6c79f4d27bc54-4+shape:inkml-01e6c79f4d27bc54-5+shape:inkml-01e6c79f4d27bc54-6+shape:inkml-01e6c79f4d27bc54-7+shape:inkml-01e6c79f4d27bc54-8+shape:inkml-01e6c79f4d27bc54-9",
+          "candidates": [
+            "cross@0.5",
+            "scribble@0.45"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 0,
+        "relationships": 0,
+        "observations": 1
+      },
+      "usage": [
+        {
+          "provider": "gemini",
+          "calls": 1,
+          "promptTokens": 1155,
+          "completionTokens": 18,
+          "costUsd": 0
+        },
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 35760,
+          "completionTokens": 3277,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    },
+    {
+      "boardId": "mathwriting-001083e26028da36",
+      "name": "MathWriting · gradient vector",
+      "expected": "\\nabla I=(I_{x},I_{y})",
+      "latencyMs": 13582,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "\\nabla I = (I_x, I_y)",
+      "answer": "The canvas contains many stroke groups with recorded bounding boxes and inter‑shape distances (e.g., shape 0 at (79, 309) 174×177, shape 1 at (353, 311) 15×139, shape 10 at (621, 479) 116×5, etc. A model OCR tentatively reads the whole region as the expression “∇ I = (Iₓ, I_y)” (confidence 0.6) and proposes a spatial association with those strokes, but both the text labeling and the association are marked uncertain.",
+      "structureText": "The OCR engine recognized the handwritten expression \"∇ I = (I_x, I_y)\" spanning strokes shape:inkml-001083e26028da36-0 through shape:inkml-001083e26028da36-19. Visually the ink consists of a series of separate stroke groups that could correspond to the nabla symbol, the letter I, an equals sign, parentheses, subscripts x and y, and a comma, but the free‑hand nature of the drawing makes the exact segmentation ambiguous. The canvas contains many stroke groups with recorded bounding boxes and inter‑shape distances (e.g., shape 0 at (79, 309) 174×177, shape 1 at (353, 311) 15×139, shape 10 at (621, 479) 116×5, etc. A model OCR tentatively reads the whole region as the expression “∇ I = (Iₓ, I_y)” (confidence 0.6) and proposes a spatial association with those strokes, but both the text labeling and the association are marked uncertain.",
+      "mathScore": {
+        "exact": true,
+        "tokenF1": 1,
+        "precision": 1,
+        "recall": 1,
+        "expectedTokens": 6,
+        "actualTokens": 6,
+        "hits": 4
+      },
+      "structureScore": null,
+      "recognition": [
+        {
+          "groupId": "stroke-group:expression:shape:inkml-001083e26028da36-0+shape:inkml-001083e26028da36-1+shape:inkml-001083e26028da36-10+shape:inkml-001083e26028da36-11+shape:inkml-001083e26028da36-12+shape:inkml-001083e26028da36-13+shape:inkml-001083e26028da36-14+shape:inkml-001083e26028da36-15+shape:inkml-001083e26028da36-16+shape:inkml-001083e26028da36-17+shape:inkml-001083e26028da36-18+shape:inkml-001083e26028da36-19+shape:inkml-001083e26028da36-2+shape:inkml-001083e26028da36-3+shape:inkml-001083e26028da36-4+shape:inkml-001083e26028da36-5+shape:inkml-001083e26028da36-6+shape:inkml-001083e26028da36-7+shape:inkml-001083e26028da36-8+shape:inkml-001083e26028da36-9",
+          "candidates": [
+            "cross@0.5",
+            "scribble@0.45"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 0,
+        "relationships": 0,
+        "observations": 1
+      },
+      "usage": [
+        {
+          "provider": "gemini",
+          "calls": 1,
+          "promptTokens": 1155,
+          "completionTokens": 13,
+          "costUsd": 0
+        },
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 31443,
+          "completionTokens": 2785,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    },
+    {
+      "boardId": "mathwriting-009d124a50399bba",
+      "name": "MathWriting · indexed sum",
+      "expected": "J_{i}=\\sum_{j}L_{ij}\\frac{\\partial F_{j}}{\\partial x_{j}}",
+      "latencyMs": 15822,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "J_i = \\sum_j L_{ij} \\frac{\\partial F_j}{\\partial x_j}",
+      "answer": "The canvas shows a linear ink expression made of stroke groups shape:inkml-009d124a50399bba‑0…‑26; OCR tentatively reads it as J_i = \\sum_j L_{ij} \\frac{\\partial F_j}{\\partial x_j} but both the label and the segmentation are marked uncertain. Geometry observations give precise bounding boxes and many inter‑stroke distances, confirming the spatial layout but not the exact symbol mapping. Uncertainty remains about the correctness of the OCR transcription and the exact grouping of sub‑ and superscripts.",
+      "structureText": "J_i = \\sum_j L_{ij} \\frac{\\partial F_j}{\\partial x_j} The ink consists of multiple separate stroke groups arranged roughly left‑to‑right, forming a linear expression that resembles an equation. OCR suggests the LaTeX string J_i = \\sum_j L_{ij} \\frac{\\partial F_j}{\\partial x_j}, but the freehand strokes are not clearly segmented into individual characters. The canvas shows a linear ink expression made of stroke groups shape:inkml-009d124a50399bba‑0…‑26; OCR tentatively reads it as J_i = \\sum_j L_{ij} \\frac{\\partial F_j}{\\partial x_j} but both the label and the segmentation are marked uncertain. Geometry observations give precise bounding boxes and many inter‑stroke distances, confirming the spatial layout but not the exact symbol mapping. Uncertainty remains about the correctness of the OCR transcription and the exact grouping of sub‑ and superscripts.",
+      "mathScore": {
+        "exact": true,
+        "tokenF1": 1,
+        "precision": 1,
+        "recall": 1,
+        "expectedTokens": 13,
+        "actualTokens": 13,
+        "hits": 9
+      },
+      "structureScore": null,
+      "recognition": [
+        {
+          "groupId": "stroke-group:expression:shape:inkml-009d124a50399bba-0+shape:inkml-009d124a50399bba-1+shape:inkml-009d124a50399bba-10+shape:inkml-009d124a50399bba-11+shape:inkml-009d124a50399bba-12+shape:inkml-009d124a50399bba-13+shape:inkml-009d124a50399bba-14+shape:inkml-009d124a50399bba-15+shape:inkml-009d124a50399bba-16+shape:inkml-009d124a50399bba-17+shape:inkml-009d124a50399bba-18+shape:inkml-009d124a50399bba-19+shape:inkml-009d124a50399bba-2+shape:inkml-009d124a50399bba-20+shape:inkml-009d124a50399bba-21+shape:inkml-009d124a50399bba-22+shape:inkml-009d124a50399bba-23+shape:inkml-009d124a50399bba-24+shape:inkml-009d124a50399bba-25+shape:inkml-009d124a50399bba-26+shape:inkml-009d124a50399bba-3+shape:inkml-009d124a50399bba-4+shape:inkml-009d124a50399bba-5+shape:inkml-009d124a50399bba-6+shape:inkml-009d124a50399bba-7+shape:inkml-009d124a50399bba-8+shape:inkml-009d124a50399bba-9",
+          "candidates": [
+            "circle@0.55",
+            "closed shape@0.45"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 1,
+        "relationships": 0,
+        "observations": 1
+      },
+      "usage": [
+        {
+          "provider": "gemini",
+          "calls": 1,
+          "promptTokens": 1155,
+          "completionTokens": 25,
+          "costUsd": 0
+        },
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 35801,
+          "completionTokens": 4483,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    },
+    {
+      "boardId": "mathwriting-010d0f9e951a7a44",
+      "name": "MathWriting · nested logistic expression",
+      "expected": "x_{i}^{\\prime}\\equiv\\frac{1}{1+e^{-\\frac{x_{i}-\\mu_{i}}{\\sigma_{i}}}}",
+      "latencyMs": 20667,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "x_i = \\frac{1}{1+e^{-\\frac{x_i-u_i}{\\epsilon}}}",
+      "answer": "The canvas encodes a handwritten formula resembling $x_i = \\frac{1}{1+e^{-\\frac{x_i-u_i}{\\epsilon}}}$, but the grouping of strokes into numerator, denominator, subscripts and superscripts is ambiguous.",
+      "structureText": "x_i = fraction line 1 (numerator) 1+e exponent start (−) x_i −u_i ε fraction line (exponent) parentheses closing parentheses denominator (1+e^{...}) additional denominator terms small term line segment curve final curve left-of left-of above below superscript-of part-of part-of part-of above right-of right-of part-of right-of right-of right-of right-of right-of A variable \"x\" with subscript \"i\" appears at the leftmost side (stroke 0). An equals sign follows (stroke 1). A horizontal fraction line (stroke 2) separates a numerator (stroke 10) from a denominator (stroke 11). The denominator contains \"1+e\" (stroke 11) with an exponent (strokes 12‑18) representing \"- (x_i - u_i)/ε\". Additional strokes (19‑24) appear to extend the denominator with further terms or decorative curves. The canvas encodes a handwritten formula resembling $x_i = \\frac{1}{1+e^{-\\frac{x_i-u_i}{\\epsilon}}}$, but the grouping of strokes into numerator, denominator, subscripts and superscripts is ambiguous.",
+      "mathScore": {
+        "exact": false,
+        "tokenF1": 0.625,
+        "precision": 0.714,
+        "recall": 0.556,
+        "expectedTokens": 15,
+        "actualTokens": 12,
+        "hits": 5
+      },
+      "structureScore": null,
+      "recognition": [
+        {
+          "groupId": "stroke-group:expression:shape:inkml-010d0f9e951a7a44-0+shape:inkml-010d0f9e951a7a44-1+shape:inkml-010d0f9e951a7a44-10+shape:inkml-010d0f9e951a7a44-11+shape:inkml-010d0f9e951a7a44-12+shape:inkml-010d0f9e951a7a44-13+shape:inkml-010d0f9e951a7a44-14+shape:inkml-010d0f9e951a7a44-15+shape:inkml-010d0f9e951a7a44-16+shape:inkml-010d0f9e951a7a44-17+shape:inkml-010d0f9e951a7a44-18+shape:inkml-010d0f9e951a7a44-19+shape:inkml-010d0f9e951a7a44-2+shape:inkml-010d0f9e951a7a44-20+shape:inkml-010d0f9e951a7a44-21+shape:inkml-010d0f9e951a7a44-22+shape:inkml-010d0f9e951a7a44-23+shape:inkml-010d0f9e951a7a44-24+shape:inkml-010d0f9e951a7a44-3+shape:inkml-010d0f9e951a7a44-4+shape:inkml-010d0f9e951a7a44-5+shape:inkml-010d0f9e951a7a44-6+shape:inkml-010d0f9e951a7a44-7+shape:inkml-010d0f9e951a7a44-8+shape:inkml-010d0f9e951a7a44-9",
+          "candidates": [
+            "mark@0.5",
+            "stroke@0.45"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 18,
+        "relationships": 17,
+        "observations": 5
+      },
+      "usage": [
+        {
+          "provider": "gemini",
+          "calls": 1,
+          "promptTokens": 1155,
+          "completionTokens": 25,
+          "costUsd": 0
+        },
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 34701,
+          "completionTokens": 6704,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    },
+    {
+      "boardId": "mathwriting-003ca9082c7047d3",
+      "name": "MathWriting · partial derivative fraction",
+      "expected": "\\partial_{i}f=\\frac{\\partial f}{\\partial\\xi^{i}}:=\\frac{\\partial\\overline{f}}{\\partial\\xi^{i}}",
+      "latencyMs": 16054,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "\\partial_i f = \\frac{\\partial f}{\\partial z^i} = \\frac{\\partial f}{\\partial \\xi^i}",
+      "answer": "The canvas records many drawn shapes with precise bounding‑box geometry; a partial‑derivative expression (∂₁f=∂f/∂zᵢ=∂f/∂ξᵢ) is also present but its spatial association to any shape is unconfirmed.",
+      "structureText": "A horizontal arrangement of strokes forms an expression with two equality signs and two fraction structures. The first fraction appears to have numerator \\partial f and denominator \\partial z^i; the second fraction has numerator \\partial f and denominator \\partial \\xi^i. Subscript i follows the partial symbol in the leading term. The canvas records many drawn shapes with precise bounding‑box geometry; a partial‑derivative expression (∂₁f=∂f/∂zᵢ=∂f/∂ξᵢ) is also present but its spatial association to any shape is unconfirmed.",
+      "mathScore": {
+        "exact": false,
+        "tokenF1": 0.833,
+        "precision": 0.833,
+        "recall": 0.833,
+        "expectedTokens": 16,
+        "actualTokens": 15,
+        "hits": 5
+      },
+      "structureScore": null,
+      "recognition": [
+        {
+          "groupId": "stroke-group:expression:shape:inkml-003ca9082c7047d3-0+shape:inkml-003ca9082c7047d3-1+shape:inkml-003ca9082c7047d3-10+shape:inkml-003ca9082c7047d3-11+shape:inkml-003ca9082c7047d3-12+shape:inkml-003ca9082c7047d3-13+shape:inkml-003ca9082c7047d3-14+shape:inkml-003ca9082c7047d3-15+shape:inkml-003ca9082c7047d3-16+shape:inkml-003ca9082c7047d3-17+shape:inkml-003ca9082c7047d3-18+shape:inkml-003ca9082c7047d3-19+shape:inkml-003ca9082c7047d3-2+shape:inkml-003ca9082c7047d3-20+shape:inkml-003ca9082c7047d3-21+shape:inkml-003ca9082c7047d3-22+shape:inkml-003ca9082c7047d3-23+shape:inkml-003ca9082c7047d3-24+shape:inkml-003ca9082c7047d3-25+shape:inkml-003ca9082c7047d3-26+shape:inkml-003ca9082c7047d3-27+shape:inkml-003ca9082c7047d3-3+shape:inkml-003ca9082c7047d3-4+shape:inkml-003ca9082c7047d3-5+shape:inkml-003ca9082c7047d3-6+shape:inkml-003ca9082c7047d3-7+shape:inkml-003ca9082c7047d3-8+shape:inkml-003ca9082c7047d3-9",
+          "candidates": [
+            "mark@0.5",
+            "stroke@0.45"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 0,
+        "relationships": 0,
+        "observations": 1
+      },
+      "usage": [
+        {
+          "provider": "gemini",
+          "calls": 1,
+          "promptTokens": 1155,
+          "completionTokens": 30,
+          "costUsd": 0
+        },
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 34271,
+          "completionTokens": 4588,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    },
+    {
+      "boardId": "physalign-spring-graph",
+      "name": "PhysAlign · spring and force-length graph",
+      "expected": "F/N",
+      "latencyMs": 23101,
+      "partial": false,
+      "warnings": [],
+      "error": null,
+      "ocrText": "A E / N",
+      "answer": "The canvas shows a multiple‑choice question label, a spring drawn against a vertical wall with hatch marks, and nearby hand‑drawn labels A and O plus a caption “Figure A”. Geometry observations record precise distances between the question label and guide marks (e.g., 418.69 units to guide‑x5‑0) and between the probe and wall elements. OCR‑based spatial associations (e.g., linking A/O/spring/wall to Figure A or linking symbols “/”, “N” to axis marks) are flagged as uncertain due to missing confidence scores and ambiguous proximity.",
+      "structureText": "wall spring spring-end label label 40 0 -40 5 10 15 20 25 l/cm attached-to continuation-of The drawing includes a vertical wall on the left side of the diagram A zigzag spring is drawn extending rightward from the wall Numeric axis labels indicate a horizontal axis ranging from 0 to 25 cm Vertical axis labels show values 40, 0, -40 The canvas shows a multiple‑choice question label, a spring drawn against a vertical wall with hatch marks, and nearby hand‑drawn labels A and O plus a caption “Figure A”. Geometry observations record precise distances between the question label and guide marks (e.g., 418.69 units to guide‑x5‑0) and between the probe and wall elements. OCR‑based spatial associations (e.g., linking A/O/spring/wall to Figure A or linking symbols “/”, “N” to axis marks) are flagged as uncertain due to missing confidence scores and ambiguous proximity.",
+      "mathScore": {
+        "exact": false,
+        "tokenF1": 0.4,
+        "precision": 0.333,
+        "recall": 0.5,
+        "expectedTokens": 2,
+        "actualTokens": 3,
+        "hits": 1
+      },
+      "structureScore": {
+        "matched": [
+          "wall",
+          "spring",
+          "o",
+          "a",
+          "n",
+          "axis"
+        ],
+        "total": 8,
+        "rate": 0.75
+      },
+      "recognition": [
+        {
+          "groupId": "stroke-group:physalign-A-label+physalign-O-label+physalign-spring+physalign-spring-end+physalign-wall+physalign-wall-hatch-386+physalign-wall-hatch-404+physalign-wall-hatch-422+physalign-wall-hatch-440+physalign-wall-hatch-458+physalign-wall-hatch-476+physalign-wall-hatch-494+physalign-wall-hatch-512+physalign-wall-hatch-530+physalign-wall-hatch-548",
+          "candidates": [
+            "resistor@0.3147"
+          ]
+        },
+        {
+          "groupId": "stroke-group:physalign-guide-x5-0+physalign-guide-x5-1+physalign-guide-x5-2+physalign-guide-x5-3+physalign-guide-x5-4+physalign-guide-x5-5+physalign-guide-y40-0+physalign-guide-y40-1+physalign-guide-y40-2+physalign-y-label-F+physalign-y-label-N+physalign-y-label-slash",
+          "candidates": [
+            "text@0.2647"
+          ]
+        },
+        {
+          "groupId": "stroke-group:physalign-guide-x25-0+physalign-guide-x25-1+physalign-guide-x25-2+physalign-guide-x25-3+physalign-guide-x25-4+physalign-guide-x25-5+physalign-guide-yminus40-0+physalign-guide-yminus40-1+physalign-guide-yminus40-10+physalign-guide-yminus40-11+physalign-guide-yminus40-12+physalign-guide-yminus40-13+physalign-guide-yminus40-14+physalign-guide-yminus40-15+physalign-guide-yminus40-16+physalign-guide-yminus40-17+physalign-guide-yminus40-18+physalign-guide-yminus40-2+physalign-guide-yminus40-3+physalign-guide-yminus40-4+physalign-guide-yminus40-5+physalign-guide-yminus40-6+physalign-guide-yminus40-7+physalign-guide-yminus40-8+physalign-guide-yminus40-9",
+          "candidates": [
+            "graph@0.195"
+          ]
+        }
+      ],
+      "structure": {
+        "objects": 14,
+        "relationships": 2,
+        "observations": 4
+      },
+      "usage": [
+        {
+          "provider": "groq",
+          "calls": 2,
+          "promptTokens": 25844,
+          "completionTokens": 4786,
+          "costUsd": 0
+        },
+        {
+          "provider": "gemini",
+          "calls": 3,
+          "promptTokens": 3531,
+          "completionTokens": 193,
+          "costUsd": 0
+        }
+      ],
+      "costUsd": 0
+    }
+  ],
+  "note": "Clean run with Google AI Studio free-tier Gemini 3.1 Flash-Lite math/diagram OCR. 4/6 math exact, 0.91 average F1, PhysAlign coverage 0.75, 0 hard failures,  provider cost."
+}

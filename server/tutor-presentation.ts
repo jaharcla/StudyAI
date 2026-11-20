@@ -11,7 +11,7 @@ export type TutorCitation = Pick<TutorCitationCandidate, "sourceRef" | "filename
 export type TutorStudentResponse = { answer: string; citations: TutorCitation[]; rejectedCitationCount: number };
 export type TutorContextItem = { description: string; value: unknown };
 
-export function presentTutorResponse(answer: string, candidates: readonly TutorCitationCandidate[]): TutorStudentResponse {
+export function presentTutorResponse(answer: string, candidates: readonly TutorCitationCandidate[], options: { linkMentionedSource?: boolean } = {}): TutorStudentResponse {
   const candidateByRef = new Map(candidates.map((candidate) => [candidate.sourceRef, candidate]));
   const citations = new Map<string, TutorCitation>();
   let rejectedCitationCount = 0;
@@ -39,6 +39,11 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
     }
   };
   const content = answer
+    .replace(/\[([^\]]+)\]\[((?:studyai:\/\/document\/|https:\/\/studyai\.org\/document\/)[^\]]+)\]/g, (_match, _label: string, reference: string) => {
+      const rendered = renderReference(reference);
+      if (!rendered) { rejectedCitationCount++; return ""; }
+      return rendered;
+    })
     .replace(/(?:\[([^\]]*)\]|【([^】\]]*)[】\]])\(#studyai-citation=([^)]+)\)/g, (_match, _squareLabel: string | undefined, _fullWidthLabel: string | undefined, encoded: string) => {
       let sourceRef: string;
       try { sourceRef = decodeURIComponent(encoded); } catch { rejectedCitationCount++; return ""; }
@@ -70,11 +75,78 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
   const cleaned = rejectedCitationCount
     ? content.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+([,.;!?])/g, "$1")
     : content;
-  return { answer: cleaned, citations: [...citations.values()], rejectedCitationCount };
+  const renderedCitations = [...citations.values()];
+  if (!options.linkMentionedSource || renderedCitations.length) return { answer: cleaned, citations: renderedCitations, rejectedCitationCount };
+
+  const sourceLine = cleaned.match(/(^|\n)[ \t]*source\s*:[^\n]*/i);
+  if (!sourceLine) return { answer: cleaned, citations: renderedCitations, rejectedCitationCount };
+  const mentionedSource = normalizeCitationText(sourceLine[0]);
+  const matches = candidates.filter((candidate) => mentionedSource.includes(normalizeCitationText(candidate.filename)) && mentionedSource.includes(normalizeCitationText(citationLocation(candidate))));
+  if (matches.length !== 1) return { answer: cleaned, citations: renderedCitations, rejectedCitationCount };
+
+  const candidate = matches[0];
+  const citation = { sourceRef: candidate.sourceRef, filename: candidate.filename, unitType: candidate.unitType, unitNumber: candidate.unitNumber };
+  const link = `[${markdownLabel(citation.filename + " · " + citationLocation(citation))}](#studyai-citation=${encodeURIComponent(citation.sourceRef)})`;
+  const linkedSourceLine = sourceLine[0].replace(/(^|\n)[ \t]*source\s*:[^\n]*/i, (_line, prefix: string) => `${prefix}Source: ${link}`);
+  return { answer: cleaned.replace(sourceLine[0], linkedSourceLine), citations: [citation], rejectedCitationCount };
+}
+
+function sanitizeMathDelimiters(line: string): string {
+  // Normalize math delimiters so KaTeX never sees a '$' inside math mode.
+  // A '$$...$$' block that only wrapped a single inline expression (the model
+  // sometimes nests '$...$' inside '$$...$$') is collapsed back to inline math
+  // so the result reads naturally instead of becoming a displayed equation.
+  return line.replace(/\$\$([\s\S]*?)\$\$/g, (_m, body: string) => {
+    const hadInnerDollar = body.includes("$");
+    const cleaned = body.replace(/\$/g, "").trim();
+    if (!cleaned) return "";
+    if (hadInnerDollar && !cleaned.includes("\n")) return `$${cleaned}$`;
+    if (cleaned.includes("\n")) return `$$\n${cleaned}\n$$`;
+    return `$$${cleaned}$$`;
+  })
+  .replace(/\$([^\n$]*?)\$/g, (_m, body: string) => `$${body.replace(/\$/g, "")}$`);
+}
+
+function hasProse(run: string): boolean {
+  const stripped = run.replace(/\\[a-zA-Z]+\{[^}]*\}/g, "").replace(/\\[a-zA-Z]+/g, "");
+  return /[A-Za-z]{2,}/.test(stripped);
+}
+
+function wrapBareRun(run: string): string {
+  if (run.includes("$")) return run;
+  const match = run.match(/^(.*?)([.!?]+\s*)$/);
+  const body = match ? match[1] : run;
+  const punct = match ? match[2] : "";
+  return `$${body.trim().replace(/\$/g, "")}$${punct}`;
 }
 
 export function renderTutorResponse(response: TutorStudentResponse): string {
-  return response.answer;
+  return response.answer
+    .split(/(```[\s\S]*?```)/)
+    .map((part, index) => {
+      if (index % 2 === 1) return part;
+      const segments = part.split(/(\$\$[\s\S]+?\$\$|\$[^\n$]+?\$)/);
+      return segments.map((seg, j) => {
+        if (j % 2 === 1) return sanitizeMathDelimiters(seg);
+        let out = seg.replace(/\\\[([\s\S]+?)\\\]/g, (_m, body: string) => `$$${body.replace(/\$/g, "")}$$`);
+        out = out.replace(/\\\(([\s\S]+?)\\\)/g, (_m, body: string) => `$${body.replace(/\$/g, "")}$`);
+        out = out.split("\n").map((line) => {
+          if (/^\s*\$\$[\s\S]*\$\$\s*$/.test(line)) return sanitizeMathDelimiters(line);
+          if (/^\s*\$[^\n$]*\$$/.test(line)) return sanitizeMathDelimiters(line);
+          if (line.includes("$")) line = sanitizeMathDelimiters(line);
+          if (line.includes("$")) return line;
+          if (!/\\[a-zA-Z]/.test(line)) return line;
+          if (hasProse(line)) return line;
+          return line.replace(/([^\n]*?\\[a-zA-Z]+[^\n]*?)(?=\n|$)/g, (run) => {
+            if (run.includes("$")) return run;
+            if (!/\\[a-zA-Z]/.test(run)) return run;
+            if (hasProse(run)) return run;
+            return wrapBareRun(run);
+          });
+        }).join("\n");
+        return out;
+      }).join("").replace(/\$\$(?=\$)/g, () => "$$\n").replace(/\$(?=\$\$)/g, () => "$\n").replace(/\n{3,}/g, "\n\n");
+    }).join("");
 }
 
 export function projectTutorContexts(contexts: TutorContextItem[], includeRawCanvasMetadata: boolean): TutorContextItem[] {
@@ -86,10 +158,50 @@ export function projectTutorContexts(contexts: TutorContextItem[], includeRawCan
   return contexts.map((item) => {
     if (item.description === "StudyAI current workspace and structured canvas metadata") return { ...item, value: projectWorkspace(item.value) };
     if (item.description === "StudyAI active scientific canvas objects") return { ...item, value: projectScienceContext(item.value, labels) };
-    if (item.description === "Active Quickdraw board context") return { ...item, value: projectQuickdrawContext(item.value, labels) };
+    if (item.description === "Active canvas scene") return { ...item, value: projectCanvasSceneContext(item.value, labels) };
     if (item.description === "StudyAI canvas analysis result") return { ...item, value: projectCanvasAnalysis(item.value) };
     return item;
   });
+}
+
+const INCOMPLETE_CANVAS_REASON = "Only part of the board is included; ask the user to select or zoom to the relevant area before claiming something is absent.";
+
+function projectCanvasSceneContext(value: unknown, labels: Map<string, string>): Record<string, unknown> {
+  const source = record(value);
+  if (!source.scene) {
+    return source.shapes ? projectQuickdrawContext(source.shapes, labels) : projectQuickdrawContext(value, labels);
+  }
+  const scene = record(source.scene);
+  const diagram = source.shapes ? projectQuickdrawContext(source.shapes, labels) : {};
+  const nodes = list(scene.nodes).map((node) => {
+    const item = record(node);
+    const text = string(item.text);
+    const confidence = typeof item.confidence === "number" ? item.confidence : null;
+    return {
+      ...(item.kind === "stroke-group" ? { id: string(item.id) } : {}),
+      kind: string(item.kind) ?? "unknown",
+      ...(text ? { text } : {}),
+      status: string(item.verificationStatus) ?? "unconfirmed",
+      ...(confidence !== null ? { confidence } : {}),
+      ...(list(item.uncertaintyReasons).length ? { uncertain: true } : {}),
+    };
+  });
+  const edges = list(scene.edges).map((edge) => {
+    const item = record(edge);
+    return {
+      relation: string(item.kind) ?? "related",
+      ...(typeof item.distance === "number" ? { distance: Math.round(item.distance) } : {}),
+    };
+  });
+  return {
+    ...diagram,
+    scope: pick(record(scene.scope), ["boardId", "revision"]),
+    selectedCount: list(source.selectedIds).length,
+    nodes,
+    edges,
+    ...(Array.isArray(source.connections) ? { connections: list(source.connections) } : {}),
+    ...(scene.truncated === true ? { incomplete: true, incompleteReason: INCOMPLETE_CANVAS_REASON } : {}),
+  };
 }
 
 function projectWorkspace(value: unknown): Record<string, unknown> {
@@ -177,7 +289,17 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
     if (type === "text" || type === "note") return { kind: "text label", text: text ?? "" };
     const arrow = record(shape.arrow);
     const direction = type === "arrow" || type === "line" ? arrowDirection(arrow.from, arrow.to) : undefined;
-    return { kind: type, ...(direction ? { direction } : {}), ...(Number(arrow.bend) ? { curved: true } : {}) };
+    return {
+      kind: type,
+      ...(direction ? { direction } : {}),
+      ...(Number(arrow.bend) ? { curved: true } : {}),
+      ...(typeof arrow.length === "number" ? { length: Math.round(arrow.length) } : {}),
+      ...(string(arrow.label) ? { label: string(arrow.label) } : {}),
+      ...(Array.isArray(arrow.labels) ? { labels: list(arrow.labels).map((label) => { const item = record(label); return { text: string(item.text) ?? "", confidence: typeof item.confidence === "number" ? item.confidence : null }; }) } : {}),
+      ...(Array.isArray(arrow.startAttached) ? { startAttached: list(arrow.startAttached).map((attachment) => { const item = record(attachment); return { kind: string(item.kind) ?? "unknown", ...(string(item.label) ? { label: string(item.label) } : {}), confidence: typeof item.confidence === "number" ? item.confidence : null }; }) } : {}),
+      ...(Array.isArray(arrow.endAttached) ? { endAttached: list(arrow.endAttached).map((attachment) => { const item = record(attachment); return { kind: string(item.kind) ?? "unknown", ...(string(item.label) ? { label: string(item.label) } : {}), confidence: typeof item.confidence === "number" ? item.confidence : null }; }) } : {}),
+      ...(arrow.unattached === true ? { unattached: true } : {}),
+    };
   };
   const projectedSelected = selected.map((shape) => projectShape(record(shape)));
   const projectedVisible = visible.map((shape) => projectShape(record(shape)));
@@ -189,11 +311,12 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
   });
   const nearbyObjects = list(source.nearbyObjects).map((item) => projectNearbyObject(item, labels)).filter(Boolean);
   return {
+    scope: pick(record(source.scope), ["boardId", "revision"]),
     selected: projectedSelected,
     visible: projectedVisible,
     nearbyObjects,
     spatialRelationships: relationships,
-    ...(source.truncated === true ? { incomplete: true } : {}),
+    ...(source.truncated === true ? { incomplete: true, incompleteReason: INCOMPLETE_CANVAS_REASON } : {}),
   };
 }
 
@@ -224,10 +347,11 @@ function projectCanvasAnalysis(value: unknown): Record<string, unknown> {
   const analysis = record(source.observedEvidence);
   const inferred = record(source.inferredInterpretations);
   const selectedContext = record(analysis.selectedContext);
+  const aliases = canvasSourceAliases(list(selectedContext.sourceRecords).map(record), list(selectedContext.scientificObjects).map(record));
   return {
     ...(typeof source.analysisStatus === "string" ? { analysisStatus: source.analysisStatus } : {}),
     observedEvidence: {
-      items: list(analysis.items).map((item) => projectEvidence(item, identifiers)),
+      items: list(analysis.items).map((item) => projectEvidence(item, identifiers, aliases)),
       conflicts: list(analysis.conflicts).map((conflict) => ({ values: list(record(conflict).values).map((value) => redactIdentifiers(String(value), identifiers)), resolution: record(conflict).resolution })),
       warnings: list(analysis.warnings).map((warning) => redactIdentifiers(String(warning), identifiers)),
       ...(selectedContext.truncated === true ? { incomplete: true } : {}),
@@ -245,15 +369,42 @@ function projectCanvasAnalysis(value: unknown): Record<string, unknown> {
   };
 }
 
-function projectEvidence(value: unknown, identifiers: Set<string>): Record<string, unknown> {
+function projectEvidence(value: unknown, identifiers: Set<string>, aliases: Map<string, string>): Record<string, unknown> {
   const item = record(value);
+  const association = record(item.association);
+  const candidateRefs = list(association.candidateRefs).map(record);
+  const spatialAssociation = typeof association.status === "string" ? {
+    status: association.status,
+    candidates: candidateRefs.map((ref) => aliases.get(`${string(ref.scope)}:${string(ref.id)}`) ?? "canvas object"),
+    verificationStatus: "unconfirmed",
+  } : undefined;
+  const uncertaintyReasons = list(item.uncertaintyReasons).map((reason) => redactIdentifiers(String(reason), identifiers));
+  if (spatialAssociation && !uncertaintyReasons.some((reason) => /not user-confirmed/i.test(reason))) uncertaintyReasons.push("Spatial association is not user-confirmed.");
   return {
     kind: item.kind,
     text: redactIdentifiers(String(item.text ?? ""), identifiers),
     origin: item.origin,
     uncertain: item.uncertain === true,
-    ...(list(item.uncertaintyReasons).length ? { uncertaintyReasons: list(item.uncertaintyReasons).map((reason) => redactIdentifiers(String(reason), identifiers)) } : {}),
+    ...(uncertaintyReasons.length ? { uncertaintyReasons } : {}),
+    ...(spatialAssociation ? { spatialAssociation } : {}),
   };
+}
+
+function canvasSourceAliases(records: Record<string, unknown>[], scientific: Record<string, unknown>[]): Map<string, string> {
+  const aliases = new Map<string, string>();
+  const counts = new Map<string, number>();
+  const add = (scope: "quickdraw" | "science", object: Record<string, unknown>) => {
+    const id = string(object.id);
+    if (!id) return;
+    const type = string(object.type) ?? string(object.kind) ?? "object";
+    const label = type === "force" ? "force arrow" : type === "vector" ? "vector" : type === "arrow" ? "arrow" : type.replace(/[-_]+/g, " ");
+    const number = (counts.get(`${scope}:${label}`) ?? 0) + 1;
+    counts.set(`${scope}:${label}`, number);
+    aliases.set(`${scope}:${id}`, `${label} ${number}`);
+  };
+  records.forEach((object) => add("quickdraw", object));
+  scientific.forEach((object) => add("science", object));
+  return aliases;
 }
 
 function scientificLabels(objects: unknown[]): Map<string, string> {
@@ -298,7 +449,22 @@ function collectIdentifiers(value: unknown, result = new Set<string>(), key = ""
 }
 
 function redactIdentifiers(value: string, identifiers: Set<string>): string {
-  return [...identifiers].filter(Boolean).sort((a, b) => b.length - a.length).reduce((text, identifier) => text.split(identifier).join("canvas object"), value);
+  const variants = new Set<string>();
+  for (const identifier of identifiers) {
+    if (!identifier) continue;
+    variants.add(identifier);
+    const suffix = identifier.split(/[:/]/).at(-1);
+    if (suffix && suffix.length >= 4) variants.add(suffix);
+  }
+  let redacted = value;
+  for (const identifier of [...variants].sort((a, b) => b.length - a.length)) {
+    const escaped = identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    redacted = redacted.replace(new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "giu"), "canvas object");
+  }
+  return redacted
+    .replace(/\bshape\s*:\s*[a-z0-9][a-z0-9:_-]{7,}\b/gi, "canvas object")
+    .replace(/\bshape\s+(mw[a-z0-9]{8,})\b/gi, "canvas object")
+    .replace(/\bmw[a-z0-9]{8,}\b/gi, "canvas object");
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -319,4 +485,8 @@ function citationLocation(citation: TutorCitation): string {
 
 function markdownLabel(value: string): string {
   return value.replace(/[[\]\\]/g, " ");
+}
+
+function normalizeCitationText(value: string): string {
+  return value.normalize("NFKC").replace(/[‐‑‒–—−]/g, "-").toLocaleLowerCase();
 }

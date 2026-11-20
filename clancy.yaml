@@ -1,0 +1,14 @@
+version: 1
+
+agent:
+  command: 'opencode run --auto -m opencode-go/deepseek-v4.1-flash "Read docs/plans/2026-11-19-canvas-reasoning-state.md. In this repository, execute the first unchecked task, verify it, and check it off in that file. Do not redo checked tasks. When every task is checked and verified, end with <promise>DONE</promise>."'
+
+loop:
+  max_steps: 30
+  timeout: "6h"
+  delay: "10s"
+  stop_phrase: "<promise>DONE</promise>"
+  stop_mode: "suffix"
+
+input:
+  prompt: "file:./docs/plans/2026-11-19-canvas-reasoning-state.md"

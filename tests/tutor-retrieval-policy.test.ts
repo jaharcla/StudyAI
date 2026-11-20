@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requestsCanvasMetadata, shouldRetrieveCourseDocuments } from "../server/tutor-retrieval-policy";
+import { requestsCanvasAction, requestsCanvasMetadata, shouldRetrieveCourseDocuments } from "../server/tutor-retrieval-policy";
 
 describe("Tutor retrieval intent", () => {
   it("skips a greeting", () => {
@@ -23,6 +23,19 @@ describe("Tutor retrieval intent", () => {
 
   it("skips casual nonacademic requests", () => {
     expect(shouldRetrieveCourseDocuments("Tell me a joke.")).toBe(false);
+  });
+});
+
+describe("Tutor canvas action intent", () => {
+  it("does not treat a question about change as an edit", () => {
+    expect(requestsCanvasAction("Which change in orbit level will produce a photon with the shortest wavelength? a, b or c?")).toBe(false);
+    expect(requestsCanvasAction("What happens if I move the shape?")).toBe(false);
+  });
+
+  it("still detects explicit edit requests", () => {
+    expect(requestsCanvasAction("Change the label to F.")).toBe(true);
+    expect(requestsCanvasAction("Can you move the arrow to the right?")).toBe(true);
+    expect(requestsCanvasAction("Please add a text label.")).toBe(true);
   });
 });
 

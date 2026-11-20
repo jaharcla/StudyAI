@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, expect, it, vi } from "vitest";
+﻿import { afterAll, afterEach, beforeEach, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -46,7 +46,7 @@ const molecule = makeMolecule(100, 100);
 const context = [
   { description: "StudyAI current workspace and structured canvas metadata", value: { courseId: "chem-120", lessonId: "lesson-03" } },
   { description: "StudyAI active scientific canvas objects", value: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1", objects: [molecule] } },
-  { description: "Active Quickdraw board context", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
+  { description: "Active canvas scene", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
 ];
 function tutorMetadata(result: { messages: unknown[] }) { return (result.messages.at(-1) as AIMessage).response_metadata.studyai as any; }
 beforeEach(() => {
@@ -138,7 +138,7 @@ it("executes deterministic tutor calculations and returns the result to the mode
 });
 
 it("makes context omitted under the token budget visible in the tutor answer", async () => {
-  process.env.TUTOR_CONTEXT_BUDGET = "2048";
+  process.env.TUTOR_CONTEXT_BUDGET = "2300";
   process.env.TUTOR_MAX_COMPLETION_TOKENS = "256";
   mocks.invoke.mockResolvedValue(new AIMessage("Answer based on current context."));
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
@@ -157,8 +157,97 @@ it("flags canvas context already marked truncated by its producer", async () => 
   expect(tutorMetadata(result).context.incompleteCanvasContextCount).toBe(1);
 });
 
-it("forwards a registered canvas tool call through LangGraph for browser review", async () => {
-  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
+it("serializes arrow attachments into the tutor prompt", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("b"));
+  const active = {
+    description: "Active canvas scene",
+    value: {
+      scene: null,
+      shapes: {
+        selected: [],
+        visible: [{ kind: "arrow", arrow: { from: { x: 0, y: 0 }, to: { x: 0, y: 10 }, bend: 0, length: 138, label: "b", startAttached: [{ kind: "line", label: "2", distance: 1, confidence: 0.8 }], endAttached: [{ kind: "line", label: "1", distance: 1, confidence: 0.8 }] } }],
+        nearbyObjects: [],
+        spatialRelationships: [],
+      },
+      selectedIds: [],
+      viewport: { x: 0, y: 0, w: 100, h: 100 },
+      warnings: [],
+    },
+  };
+  const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Which photon has the shortest wavelength?")] });
+  expect(result.messages.at(-1)?.content).toBe("b");
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(prompt).toContain("startAttached");
+  expect(prompt).toContain('"label":"2"');
+  expect(prompt).toContain('"label":"1"');
+});
+
+it("rebuilds arrow attachments from the saved board when the client omits shapes", async () => {
+  const shape = (id: string, type: string, x: number, y: number, props: Record<string, unknown>) => ({ id, typeName: "shape", type, x, y, rot: 0, z: 1, props });
+  const snapshot = { document: { store: {
+    l1: shape("l1", "line", 0, 0, { dx: 100, dy: 0, color: "black", size: "m", dash: "solid" }),
+    l2: shape("l2", "line", 0, 50, { dx: 100, dy: 0, color: "black", size: "m", dash: "solid" }),
+    t4: shape("t4", "text", -20, -5, { text: "4", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    t2: shape("t2", "text", -20, 45, { text: "2", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    a: shape("a", "arrow", 50, 0, { dx: 0, dy: 50, bend: 0, color: "black", size: "m", dash: "solid" }),
+    ta: shape("ta", "text", 55, 20, { text: "a", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    ...Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`filler${index}`, shape(`filler${index}`, "text", 100 + index * 10, 200, { text: `filler ${index}`, color: "black", size: "m", font: "sans", autosize: true, scale: 1 })])),
+    tc: shape("tc", "text", 1500, 0, { text: "C", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+    th: shape("th", "text", 1540, 0, { text: "H", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }),
+  } } };
+  db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run("board-fallback", "chem-120", "lesson-03", "Fallback", JSON.stringify({ version: 1, snapshot, objects: [] }), 1);
+  mocks.invoke.mockResolvedValue(new AIMessage("b"));
+  const active = { description: "Active canvas scene", value: { scene: null, shapes: { scope: { boardId: "board-fallback", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, viewport: { x: 0, y: 0, w: 195, h: 334 }, selected: [], visible: [], nearbyObjects: [], spatialRelationships: [], truncated: false }, selectedIds: [], viewport: { x: 0, y: 0, w: 195, h: 334 }, warnings: [] } };
+  await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Which change in orbit level produces the shortest wavelength?")] });
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(prompt).toContain("startAttached");
+  expect(prompt).toContain('"label":"4"');
+  expect(prompt).toContain('"label":"2"');
+  expect(prompt).toContain('"text":"C"');
+  expect(prompt).toContain('"text":"H"');
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-fallback");
+});
+
+it("redacts internal canvas node IDs from ordinary answers", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("The label is near q:shape:mw877vh004pyqs."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("What is the label near?")] });
+  expect(result.messages.at(-1)?.content).not.toContain("q:shape:mw877vh004pyqs");
+  expect(result.messages.at(-1)?.content).toContain("the referenced canvas item");
+});
+
+it("retries one transient Ollama failure", async () => {
+  mocks.invoke.mockRejectedValueOnce(new Error("fetch failed")).mockResolvedValueOnce(new AIMessage("Recovered."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });
+  expect(result.messages.at(-1)?.content).toBe("Recovered.");
+  expect(mocks.invoke).toHaveBeenCalledTimes(2);
+});
+
+it("prefers the current shape scope over a stale scene scope", async () => {
+  const shape = (id: string, type: string, x: number, y: number, props: Record<string, unknown>) => ({ id, typeName: "shape", type, x, y, rot: 0, z: 1, props });
+  const snapshot = { document: { store: { label: shape("label", "text", 0, 0, { text: "MOLECULE", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }) } } };
+  db.prepare("INSERT OR REPLACE INTO canvases(id,course_id,lesson_id,name,document,revision) VALUES(?,?,?,?,?,?)").run("board-shapes", "chem-120", "lesson-03", "Shapes", JSON.stringify({ version: 1, snapshot, objects: [] }), 1);
+  mocks.invoke.mockResolvedValue(new AIMessage("ok"));
+  const active = {
+    description: "Active canvas scene",
+    value: {
+      scene: { scope: { boardId: "board-old", courseId: "chem-120", lessonId: "lesson-03" }, nodes: [], edges: [], truncated: false },
+      shapes: { scope: { boardId: "board-shapes", courseId: "chem-120", lessonId: "lesson-03", revision: 1 }, visible: [{ type: "text", text: "partial" }], selected: [], nearbyObjects: [], spatialRelationships: [], truncated: true },
+      selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [],
+    },
+  };
+  await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("What is on the canvas?")] });
+  const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(prompt).toContain("MOLECULE");
+  db.prepare("DELETE FROM canvases WHERE id=?").run("board-shapes");
+});
+
+it("sets the Ollama context window to the tutor budget", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("ok"));
+  await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });
+  expect(mocks.ollamaOptions[0]).toMatchObject({ numCtx: 16384 });
+});
+
+it("forwards a registered canvas tool call through LangGraph for browser review", async () => {  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "edit-1", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Clarify" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
@@ -171,6 +260,14 @@ it("binds structured QuickDraw tools only for the active course and forwards cal
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }, { name: "get_canvas_state" }] }, messages: [new HumanMessage("Add a nitrate label")] });
   expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("propose_canvas_action");
   expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("get_canvas_state");
+  expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
+});
+
+it("binds read_canvas_ink and forwards it for browser execution", async () => {
+  const response = new AIMessage({ content: "", tool_calls: [{ name: "read_canvas_ink", id: "ink-1", args: { boardId: "board-1", groupIds: ["g:abc"], profile: "math" } }] });
+  mocks.invoke.mockResolvedValue(response);
+  const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "read_canvas_ink" }] }, messages: [new HumanMessage("What does the handwritten label say?")] });
+  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("read_canvas_ink");
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
 });
 
@@ -364,3 +461,4 @@ afterAll(() => {
   if (originalGroqOutputRate === undefined) delete process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M; else process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = originalGroqOutputRate;
   if (originalDiagnostics === undefined) delete process.env.AI_DIAGNOSTICS; else process.env.AI_DIAGNOSTICS = originalDiagnostics;
 });
+

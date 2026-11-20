@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { budgetTutorContext, diagnoseTutorMessages, getTutorContextBudget, TutorContextBudgetError } from "../server/tutor-context";
 
 describe("Tutor context budgeting", () => {
@@ -56,7 +56,7 @@ describe("Tutor context budgeting", () => {
     try {
       budgetTutorContext({
         systemInstructions: "Tutor rules",
-        contexts: [{ description: "Active Quickdraw board context", value: { scope: { boardId: "board-1" }, shapes: [{ id: "shape-1" }] } }],
+        contexts: [{ description: "Active canvas scene", value: { scope: { boardId: "board-1" }, shapes: [{ id: "shape-1" }] } }],
         evidence: { status: "no_evidence" },
         conversation: [
           { type: "human", content: "Inspect the board." },
@@ -69,7 +69,7 @@ describe("Tutor context budgeting", () => {
     expect(error).toBeInstanceOf(TutorContextBudgetError);
     const diagnostics = (error as TutorContextBudgetError).diagnostics!;
     expect(diagnostics).toMatchObject({ phase: "protected_context_preflight", budgetTokens: 512 });
-    expect(diagnostics.contextItems).toEqual([{ description: "Active Quickdraw board context", characters: expect.any(Number), included: true }]);
+    expect(diagnostics.contextItems).toEqual([{ description: "Active canvas scene", characters: expect.any(Number), included: true }]);
     expect(diagnostics.messages.at(-1)).toMatchObject({ type: "tool", name: "get_canvas_state", contentCharacters: toolResult.length });
 
     const providerDiagnostics = diagnoseTutorMessages(providerMessages, 512);
@@ -87,3 +87,4 @@ describe("Tutor context budgeting", () => {
     expect(() => getTutorContextBudget({ TUTOR_MODEL_CONTEXT_LIMITS: "not-json" } as NodeJS.ProcessEnv, "local-model")).toThrow(/JSON object/);
   });
 });
+

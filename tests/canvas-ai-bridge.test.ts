@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { Store, type ShapeRecord } from "@quickdrawjs/core";
 import { approveCanvasProposal, MAX_CANVAS_STATE_CHARS, proposeCanvasAction, readCanvasState, validateCanvasAction } from "../src/canvas/ai/canvas-actions";
 import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context";
+import { buildTutorCanvasContext } from "../src/canvas/ai/tutor-canvas-context";
+import { CanvasSceneGraphSchema } from "../src/canvas/spatial/types";
 import type { ScientificObject } from "../src/canvas/model";
 
 function shape(id: string, type: ShapeRecord["type"], x: number, y: number, props: Record<string, unknown>, rot = 0): ShapeRecord {
@@ -24,7 +26,7 @@ describe("Quickdraw AI context", () => {
     const context = buildCanvasAIContext({ source: baseStore(), selectedIds: ["label", "arrow"], viewport: { x: 0, y: 0, w: 200, h: 200 }, objects: [], scope });
     expect(context.selected.map((item) => item.id)).toEqual(["label", "arrow"]);
     expect(context.selected[0].text).toBe("mitochondrion");
-    expect(context.selected[1].arrow).toEqual({ from: { x: 30, y: 40 }, to: { x: 90, y: 30 }, bend: 5 });
+    expect(context.selected[1].arrow).toMatchObject({ from: { x: 30, y: 40 }, to: { x: 90, y: 30 }, bend: 5 });
     expect(context.scope).toEqual(scope);
     expect(context.visible.some((item) => item.id === "offscreen")).toBe(false);
   });
@@ -36,6 +38,64 @@ describe("Quickdraw AI context", () => {
     expect(context.visible.find((item) => item.id === "stroke")?.strokeSummary).toEqual({ pointCount: 3, bounds: { x: 1, y: 3, w: 16, h: 21 }, simplified: [{ x: 4, y: 6 }, { x: 9, y: 16 }, { x: 14, y: 21 }] });
     expect(context.nearbyObjects.map((item) => item.id)).toContain("concept-1");
     expect(context.spatialRelationships.length).toBeGreaterThan(0);
+  });
+
+  it("extracts transition levels and labels from an energy-level diagram", () => {
+    const store = new Store();
+    const line = (id: string, y: number, dx: number) => store.put(shape(id, "line", 307, y, { dx, dy: 0, color: "black", size: "m", dash: "solid" }));
+    line("l4", 68, 300); line("l3", 158, 218); line("l2", 248, 148); line("l1", 388, 117);
+    store.put(shape("t-n", "text", 258, -1, { text: "n", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t4", "text", 262, 60, { text: "4", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t3", "text", 269, 137, { text: "3", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t2", "text", 287, 230, { text: "2", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("t1", "text", 299, 374, { text: "1", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("a", "arrow", 330, 66, { dx: 0, dy: 178, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("ta", "text", 308, 93, { text: "a", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("b", "arrow", 363, 252, { dx: 0, dy: 138, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("tb", "text", 341, 308, { text: "b", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    store.put(shape("c", "arrow", 419, 69, { dx: 0, dy: 89, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("tc", "text", 400, 91, { text: "c", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 800, h: 500 }, objects: [], scope });
+    const arrows = context.visible.filter((item) => item.type === "arrow").map((item) => item.arrow);
+    const byLabel = new Map(arrows.map((arrow) => [arrow?.label, arrow]));
+    expect(byLabel.get("a")).toMatchObject({ length: 178 });
+    expect(byLabel.get("a")?.startAttached?.[0]).toMatchObject({ kind: "line", label: "4" });
+    expect(byLabel.get("a")?.endAttached?.[0]).toMatchObject({ kind: "line", label: "2" });
+    expect(byLabel.get("b")?.startAttached?.[0]).toMatchObject({ kind: "line", label: "2" });
+    expect(byLabel.get("b")?.endAttached?.[0]).toMatchObject({ kind: "line", label: "1" });
+    expect(byLabel.get("c")?.startAttached?.[0]).toMatchObject({ kind: "line", label: "4" });
+    expect(byLabel.get("c")?.endAttached?.[0]).toMatchObject({ kind: "line", label: "3" });
+  });
+
+  it("marks an arrow that touches nothing as unattached", () => {
+    const store = new Store();
+    store.put(shape("box", "geo", 0, 0, { geo: "rectangle", w: 200, h: 120, color: "black", size: "m" }));
+    store.put(shape("inner", "arrow", 60, 40, { dx: 40, dy: 0, bend: 0, color: "black", size: "m", dash: "solid" }));
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 300, h: 200 }, objects: [], scope });
+    const arrow = context.visible.find((item) => item.type === "arrow")?.arrow;
+    expect(arrow?.startAttached).toBeUndefined();
+    expect(arrow?.endAttached).toBeUndefined();
+    expect(arrow?.unattached).toBe(true);
+  });
+
+  it("reports competing labels when a label sits between two arrows", () => {
+    const store = new Store();
+    store.put(shape("x", "arrow", 0, 0, { dx: 100, dy: 0, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("y", "arrow", 0, 40, { dx: 100, dy: 0, bend: 0, color: "black", size: "m", dash: "solid" }));
+    store.put(shape("label", "text", 45, 18, { text: "m", color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 200, h: 100 }, objects: [], scope });
+    const labels = context.visible.filter((item) => item.type === "arrow").map((item) => item.arrow?.labels?.map((label) => label.text));
+    expect(labels).toEqual([["m"], ["m"]]);
+  });
+
+  it("marks the context incomplete when visible shapes are omitted", () => {
+    const store = new Store();
+    for (let index = 0; index < 10; index++) {
+      store.put(shape(`t${index}`, "text", index * 10, 0, { text: `label ${index}`, color: "black", size: "m", font: "sans", autosize: true, scale: 1 }));
+    }
+    const context = buildCanvasAIContext({ source: store, selectedIds: [], viewport: { x: 0, y: 0, w: 300, h: 100 }, objects: [], scope, maxItems: 3 });
+    expect(context.visible.length).toBeLessThanOrEqual(3);
+    expect(context.truncated).toBe(true);
   });
 
   it("uses Quickdraw rotated bounds and obeys the context character limit", () => {
@@ -176,5 +236,41 @@ describe("Quickdraw AI action proposals", () => {
     approveCanvasProposal(store, scope.boardId, proposal, editor, scope.revision);
     expect(editor.setSelection).toHaveBeenCalledWith(["label"]);
     expect(store.undos).toHaveLength(undoCount);
+  });
+});
+
+describe("Tutor canvas context", () => {
+  function fixtureScene() {
+    return CanvasSceneGraphSchema.parse({
+      schemaVersion: 1,
+      scope: { boardId: "board-a", courseId: "bio-130", lessonId: "cell" },
+      revision: 7,
+      revisionHash: "rev-7",
+      snapshotHash: "snap-7",
+      builderVersion: "test",
+      builtAt: "2026-11-19T00:00:00.000Z",
+      nodes: [{
+        id: "q:label", kind: "native-object", ref: { scope: "quickdraw", id: "label" },
+        bounds: { x: 10, y: 20, width: 40, height: 20 }, boundsBasis: "source",
+        text: "mitochondrion", recordType: "text", origin: "quickdraw",
+        verificationStatus: "source", confidence: 1, sourceRefs: [], geometry: null, uncertaintyReasons: [],
+      }],
+      edges: [],
+      warnings: [],
+      truncated: false,
+    });
+  }
+
+  it("sends one scene context and no sampled stroke points", () => {
+    const context = buildTutorCanvasContext({ scene: fixtureScene(), shapes: null, selectedIds: ["label"], viewport: { x: 0, y: 0, w: 200, h: 200 } });
+    expect(JSON.stringify(context)).not.toMatch(/simplified|strokeSummary/);
+    expect(context.scene?.nodes.some((node) => node.text === "mitochondrion")).toBe(true);
+    expect(context.selectedIds).toEqual(["label"]);
+  });
+
+  it("reports an unavailable scene instead of inventing one", () => {
+    const context = buildTutorCanvasContext({ scene: null, shapes: null, selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 } });
+    expect(context.scene).toBeNull();
+    expect(context.warnings.join(" ")).toMatch(/unavailable/i);
   });
 });

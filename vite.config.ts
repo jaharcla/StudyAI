@@ -11,5 +11,5 @@ export default defineConfig({
   plugins: [react()],
   server: { host: LOOPBACK_HOST, port: config.webPort, strictPort: true, proxy, watch: { ignored: ["**/data/**", "**/.worktrees/**"] } },
   preview: { host: LOOPBACK_HOST, port: config.webPort, strictPort: true, proxy },
-  test: { environment: "node", include: ["tests/**/*.test.ts"] },
+  test: { environment: "node", include: ["tests/**/*.test.ts"], env: { CANVAS_RECOGNITION: "baseline", CANVAS_RECOGNITION_ALLOW_DOWNLOAD: "0" } },
 });

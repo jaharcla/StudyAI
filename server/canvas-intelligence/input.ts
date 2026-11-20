@@ -14,7 +14,7 @@ export function normalizeCanvasInput(args: {
   const store = obj(document.store);
   const records: CanvasRecord[] = Object.entries(store).map(([key, raw]) => normalizeRecord(key, raw));
   const objects = (args.scientificObjects ?? []).map((v) => obj(v)).filter((o): o is typeof o & { id: string; x: number; y: number; width: number; height: number; kind: string } => typeof o.id === "string" && typeof o.kind === "string" && [o.x, o.y, o.width, o.height].every(finite));
-  const selected = new Set(args.selectedIds ?? []);
+  const selected = new Set([...(args.selectedIds ?? []), ...(args.image?.regions?.flatMap((region) => region.sourceIds) ?? [])]);
   const selectedBounds = [...records.filter((r) => selected.has(r.id)).map((r) => r.bounds), ...objects.filter((o) => selected.has(o.id)).map((o) => ({ x: o.x, y: o.y, width: o.width, height: o.height }))].filter((b): b is NonNullable<typeof b> => !!b);
   const pad = args.neighborhoodPadding ?? 240;
   const inRegion = (b: NonNullable<CanvasRecord["bounds"]>) => selectedBounds.some((s) => b.x <= s.x + s.width + pad && b.x + b.width >= s.x - pad && b.y <= s.y + s.height + pad && b.y + b.height >= s.y - pad);
@@ -32,6 +32,15 @@ export function normalizeCanvasInput(args: {
   }
   const content = { boardId: args.boardId, courseId: args.courseId, lessonId: args.lessonId, selectedIds: args.selectedIds ?? [], records: scopedRecords, objects: scopedObjects };
   return { boardId: args.boardId, courseId: args.courseId, lessonId: args.lessonId, selectedIds: args.selectedIds ?? [], nativeRecords: scopedRecords, scientificObjects: scopedObjects, relationships, image: args.image, revision: createHash("sha256").update(JSON.stringify(content)).digest("hex") };
+}
+
+export function quickdrawRecordsForStructure(records: readonly CanvasRecord[]) {
+  return records.map((record) => {
+    const raw = record.raw && typeof record.raw === "object" ? record.raw as Record<string, unknown> : { id: record.id, type: record.type };
+    const props = obj(raw.props), geometry = obj(record.geometry);
+    const duplicatedStrokePoints = geometry.kind === "stroke" && Array.isArray(props.pts) && Array.isArray(geometry.points);
+    return { ...raw, normalized: { bounds: record.bounds, geometry: duplicatedStrokePoints ? { kind: "stroke", pointCount: (geometry.points as unknown[]).length } : record.geometry } };
+  });
 }
 
 function normalizeRecord(key: string, raw: unknown): CanvasRecord {
@@ -57,12 +66,22 @@ export function normalizeQuickdrawShape(shape: ShapeRecord): CanvasRecord {
 }
 
 function quickdrawBounds(shape: ShapeRecord): NonNullable<CanvasRecord["bounds"]> {
+  const props = obj(shape.props);
   if (shape.type === "text" || shape.type === "note") {
-    const p = shape.props, scale = finite(p.scale) && p.scale > 0 ? p.scale : 1;
+    const p = props, scale = finite(p.scale) && p.scale > 0 ? p.scale : 1;
     const rows = String(p.text ?? "").split("\n"), fontSize = p.size === "xl" ? 28 : p.size === "l" ? 22 : p.size === "s" ? 12 : 16;
     const width = finite(p.w) && p.autosize === false ? p.w * scale : Math.max(32, ...rows.map((row) => row.length * fontSize * 0.64)) * scale;
     const height = shape.type === "note" ? Math.max(200, rows.length * fontSize * 1.35 + 40) * scale : Math.max(fontSize * 1.32, rows.length * fontSize * 1.32) * scale;
     return rotateBounds(shape, { x: shape.x, y: shape.y, width, height });
+  }
+  if ((shape.type === "draw" || shape.type === "highlight") && Array.isArray(props.pts)) {
+    const points = worldStrokePoints(shape, props.pts);
+    if (points.length) {
+      const strokeWidth = ({ s: 2, m: 6, l: 12, xl: 24 } as Record<string, number>)[String(props.size)] ?? 6;
+      const pad = strokeWidth / 2;
+      const xs = points.map((point) => point.x), ys = points.map((point) => point.y);
+      return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, width: Math.max(...xs) - Math.min(...xs) + pad * 2, height: Math.max(...ys) - Math.min(...ys) + pad * 2 };
+    }
   }
   try {
     const b = pageBounds(shape);
@@ -154,7 +173,7 @@ export function quickdrawBondRelationships(input: CanvasInput) {
   return [...counts.values()].map(({ a, b, lines }) => ({ fromId: a.id, toId: b.id, relation: lines.length === 2 ? "double bond" : lines.length === 3 ? "triple bond" : "single bond", sourceIds: [a.id, b.id, ...lines], confidence: 1, basis: "geometry" as const }));
 }
 
-export function mergeQuickdrawBondRelationships<T extends { relationships: Array<{ fromId: string; toId: string; relation: string; sourceIds: string[]; confidence: number; basis: "geometry" | "model" }> }>(input: CanvasInput, result: T): T {
+export function mergeQuickdrawBondRelationships<T extends { relationships: Array<{ fromId: string; toId: string; relation: string; sourceIds: string[]; confidence: number | null; basis: "geometry" | "model" }> }>(input: CanvasInput, result: T): T {
   const exact = quickdrawBondRelationships(input);
   if (!exact.length) return result;
   const lineIds = new Set(input.nativeRecords.filter((record) => record.type === "line").map((record) => record.id));

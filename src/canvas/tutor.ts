@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emptyCanvasDocument, parseCanvasDocument, type ScientificObject } from "./model";
+import { createObject, emptyCanvasDocument, newId, parseCanvasDocument, type ScientificObject } from "./model";
 import { synchronizeObject } from "./geometry";
 import { assertCanvasRevision, requireCanvasRevision } from "./proposal-revision";
 import { verifyMathOperation } from "./math-workspace";
@@ -22,6 +22,18 @@ export const canvasEditSchema = z.object({
 export type CanvasEdit = z.infer<typeof canvasEditSchema>;
 export type CanvasContext = { boardId: string; courseId: string; lessonId: string; revision?: number; objects: ScientificObject[] };
 export type CanvasProposal = CanvasEdit & { courseId: string; lessonId: string; baseRevision: number; expectedObjects: string; before: ScientificObject; after: ScientificObject };
+
+export const scientificObjectKinds = ["atom", "bond", "molecule", "equation", "vector", "force", "measurement", "graph", "anatomy", "concept", "relationship", "linked-note", "linked-document", "question", "flashcard"] as const;
+export const canvasObjectCreateSchema = z.object({
+  boardId: z.string(),
+  kind: z.enum(scientificObjectKinds),
+  x: z.number().finite().min(-1_000_000).max(1_000_000),
+  y: z.number().finite().min(-1_000_000).max(1_000_000),
+  fieldsJson: z.string().default("{}").describe("JSON object fields such as title, definition, expression, components, or name. Omit id and kind; position may be refined with width and height."),
+  reason: z.string().min(1).max(1000),
+});
+export type CanvasObjectCreateInput = z.infer<typeof canvasObjectCreateSchema>;
+export type CanvasObjectProposal = CanvasObjectCreateInput & { courseId: string; lessonId: string; baseRevision: number; expectedObjects: string; object: ScientificObject };
 export class MathProposalValidationError extends Error {
   constructor(readonly status: "invalid" | "unknown" | "unsupported", message: string) { super(message); this.name = "MathProposalValidationError"; }
 }
@@ -65,4 +77,35 @@ export async function applyCanvasProposal(context: CanvasContext, proposal: Canv
     if (verified.status !== "valid" || JSON.stringify(verified.state) !== JSON.stringify(proposal.after.mathWorkspace)) throw new Error("The mathematical step no longer validates. Ask the tutor to propose it again.");
   }
   return context.objects.map((object) => object.id === proposal.objectId ? proposal.after : object);
+}
+
+export function proposeCanvasObject(context: CanvasContext, value: unknown, baseRevisionOverride?: number): CanvasObjectProposal {
+  const baseRevision = baseRevisionOverride ?? context.revision;
+  requireCanvasRevision(baseRevision);
+  const input = canvasObjectCreateSchema.parse(value);
+  if (context.boardId !== input.boardId) throw new Error("The active board changed. Read its current context again.");
+  const fields = JSON.parse(input.fieldsJson || "{}");
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) throw new Error("Object fields must be a JSON object.");
+  if (Object.keys(fields).some((key) => ["id", "kind", "__proto__", "constructor", "prototype"].includes(key))) throw new Error("Object identity cannot be supplied.");
+  const base = createObject(input.kind, input.x, input.y);
+  let object: ScientificObject;
+  try {
+    const parsed = parseCanvasDocument({
+      version: 1,
+      snapshot: emptyCanvasDocument().snapshot,
+      objects: [synchronizeObject(base, { ...base, ...fields, id: newId(input.kind), kind: input.kind })],
+    });
+    object = parsed.objects[0];
+  } catch (error) {
+    throw new Error(`The proposed ${input.kind} object is invalid: ${error instanceof Error ? error.message : "validation failed"}.`);
+  }
+  return { ...input, fieldsJson: JSON.stringify(fields, null, 2), courseId: context.courseId, lessonId: context.lessonId, baseRevision, expectedObjects: JSON.stringify(context.objects), object };
+}
+
+export function applyCanvasObjectProposal(context: CanvasContext, proposal: CanvasObjectProposal): ScientificObject[] {
+  assertCanvasRevision(proposal.baseRevision, context.revision);
+  if (context.boardId !== proposal.boardId || context.courseId !== proposal.courseId || context.lessonId !== proposal.lessonId || JSON.stringify(context.objects) !== proposal.expectedObjects) throw new Error("This proposal is stale. Ask the tutor to propose it again.");
+  if (context.objects.some((object) => object.id === proposal.object.id)) throw new Error("That object already exists on the board.");
+  parseCanvasDocument({ ...emptyCanvasDocument(), objects: [...context.objects, proposal.object] });
+  return [...context.objects, structuredClone(proposal.object)];
 }
