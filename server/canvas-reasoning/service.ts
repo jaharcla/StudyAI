@@ -19,8 +19,17 @@ class DeltaParseError extends Error {
 
 function extractJson(value: unknown): unknown {
   if (typeof value !== "string") return value;
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(value);
-  return JSON.parse((fenced ? fenced[1] : value).trim()) as unknown;
+  // Local reasoning models wrap JSON in thinking blocks or prose. Strip both before parsing.
+  const withoutThinking = value.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, " ").trim();
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(withoutThinking);
+  const candidate = (fenced ? fenced[1] : withoutThinking).trim();
+  try {
+    return JSON.parse(candidate);
+  } catch (error) {
+    const start = candidate.indexOf("{"), end = candidate.lastIndexOf("}");
+    if (start >= 0 && end > start) return JSON.parse(candidate.slice(start, end + 1)) as unknown;
+    throw error;
+  }
 }
 
 /**

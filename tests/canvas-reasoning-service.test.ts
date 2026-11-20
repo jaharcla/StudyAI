@@ -59,6 +59,22 @@ describe("runReasoningPass", () => {
     expect(result.delta.claimsToAdd).toHaveLength(1);
   });
 
+  it("recovers a delta wrapped in prose", async () => {
+    const call: ReasoningCall = async () => `Thinking about the region. ${JSON.stringify(validDelta)} That is all.`;
+
+    const result = await runReasoningPass({ state, chunk, call });
+
+    expect(result.delta.claimsToAdd).toHaveLength(1);
+  });
+
+  it("strips a reasoning block before parsing", async () => {
+    const call: ReasoningCall = async () => `<think> thinking The user asked about { a molecule }. I will cite shape-1. </think>\n${JSON.stringify(validDelta)}`;
+
+    const result = await runReasoningPass({ state, chunk, call });
+
+    expect(result.delta.claimsToAdd).toHaveLength(1);
+  });
+
   it("retries once on a malformed response, then throws", async () => {
     let calls = 0;
     const call: ReasoningCall = async () => {
