@@ -15,7 +15,7 @@ const CanvasAnalysisRequestSchema = z.object({
   image: z.object({
     base64: z.string().min(1).max(12_000_000),
     mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).default("image/png"),
-  }).strict(),
+  }).strict().optional(),
 }).strict();
 
 export type CanvasAnalysisRequest = z.infer<typeof CanvasAnalysisRequestSchema>;
@@ -68,6 +68,16 @@ async function produce(
   });
   const knownIds = new Set([...canvasInput.nativeRecords.map((item) => item.id), ...canvasInput.scientificObjects.map((item) => item.id)]);
   if (input.selectedIds.some((id) => !knownIds.has(id))) throw new CanvasAnalysisValidationError("scope_mismatch", "A selected canvas object is not present in the persisted board.");
+  // Only skip image reading when the authoritative board contains no native
+  // drawable shapes. Never let a missing image hide existing drawings.
+  const fullCanvas = normalizeCanvasInput({ boardId: row.boardId, snapshot: document.snapshot, scientificObjects: document.objects });
+  const hasDrawings = fullCanvas.nativeRecords.some((record) => {
+    const raw = record.raw as Record<string, unknown> | null;
+    return raw?.typeName === "shape" || (raw?.typeName === undefined && record.type !== "unknown");
+  });
+  if (!input.image && (hasDrawings || !fullCanvas.scientificObjects.length)) {
+    throw new CanvasAnalysisValidationError("invalid_result", "A rendered image is required when the board contains drawings or is empty.");
+  }
   const understanding = await (options.analyze ?? understandCanvas)({
     boardId: row.boardId,
     courseId: row.courseId,
@@ -76,6 +86,7 @@ async function produce(
     scientificObjects: document.objects,
     selectedIds: input.selectedIds,
     image: input.image,
+    skipOcr: !input.image,
     userQuestion: "Analyze this persisted board. Separate observed canvas data from uncertain interpretations. Do not infer meaning from coordinates alone or propose edits.",
     mode: "deep",
   });
