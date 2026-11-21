@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:localhost:studyai-mk3",
+      "displayName": "StudyAI MK3 Tutor",
+      "type": "application/agent-card+json",
+      "url": "http://127.0.0.1:5183/api/copilotkit/info",
+      "description": "Local-first scientific tutor for StudyAI courses, documents and canvas boards.",
+      "capabilities": ["CanvasReasoning", "DocumentRetrieval", "ScientificObjects"],
+      "representativeQueries": [
+        "explain the active canvas",
+        "find course evidence for a concept",
+        "help me study this lesson"
+      ]
+    }
+  ]
+}

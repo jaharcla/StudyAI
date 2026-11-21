@@ -18,6 +18,7 @@ test-results/
 
 # Added by CopilotKit CLI: browser snapshots a coding agent writes.
 .playwright-mcp/
+.playwright-cli/
 .copilotkit/
 
 # Local reference downloads and one-off probes; not project sources.

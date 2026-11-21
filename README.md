@@ -1,6 +1,6 @@
 # StudyAI
 
-Local-first, single-user study workspace with course and lesson management, a scientific canvas, document search, adaptive review, and an AI Tutor.
+Single-user study workspace that keeps your notes on your machine, with course and lesson management, a scientific canvas, document search, adaptive review, and an AI Tutor. AI features can run locally or through a cloud provider.
 
 ## Requirements
 

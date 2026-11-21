@@ -5,6 +5,12 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      // Generated verification bundles, tool artifacts and scratch files are not source.
+      "build-verification*/**",
+      ".gitnexus/**",
+      ".superpowers/**",
+      ".swarm/**",
+      "tmp-*.cjs",
       "coverage/**",
       "playwright-report/**",
       "test-results/**",

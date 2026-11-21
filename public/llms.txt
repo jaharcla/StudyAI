@@ -1,0 +1,13 @@
+# StudyAI MK3
+
+Local-first study workspace with courses, lessons, a scientific canvas, document search, adaptive review, and an AI tutor.
+
+- Scientific canvas: draw, diagram, annotate and reason over scientific objects.
+- Document library: import PDFs and search indexed course material.
+- Tutor: ask grounded questions about the active lesson and canvas.
+
+- [StudyAI home](http://127.0.0.1:5183/)
+- [Agentic resource manifest](http://127.0.0.1:5183/.well-known/ard.json)
+- [CopilotKit runtime info](http://127.0.0.1:5183/api/copilotkit/info)
+
+This is a local development application served on http://127.0.0.1:5183/.
