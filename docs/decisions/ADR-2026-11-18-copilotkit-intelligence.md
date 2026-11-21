@@ -48,6 +48,7 @@ StudyAI already runs a CopilotKit Runtime v2 (`server/runtime.ts`, `@copilotkit/
 - Intelligence records its own copy of interaction history; it does not replace the LangGraph agent's conversation state.
 - Cloud-hosted Intelligence is an external service; offline/local-only operation depends on leaving the key unset.
 - The Inspector thread check is a manual step and is not covered by the existing Vitest/Playwright suites.
+- The runtime exposes the client memory proxy routes with a read-only grant (`memory.access` returns `{ user: "read", project: "read" }`). This avoids 403/404 console errors when the client probes memory, while the local app never writes study data to the Intelligence platform. Deny-all (`"none"`) keeps the routes hidden but produces 403 console errors, so it is not suitable here.
 
 ## Verification
 
