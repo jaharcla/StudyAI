@@ -1,8 +1,8 @@
 # StudyAI
 
-![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![License: MIT + Commons Clause](https://img.shields.io/badge/license-MIT%20%2B%20Commons%20Clause-blue)
 
-A local-first study workspace that keeps your notes on your machine. Bring course documents, handwritten diagrams, and review into one place — with an AI tutor that can run locally or through a provider you configure.
+A study workspace that keeps your notes on your machine. Bring course documents, handwritten diagrams, and review into one place — with an AI tutor that can run locally or through a provider you configure.
 
 ## What's inside
 
@@ -55,4 +55,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Small changes and clear issue reports ar
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT + Commons Clause — see [LICENSE](LICENSE). The Commons Clause removes the right to sell the software.
