@@ -57,3 +57,13 @@ in place for simple captures.
   ffmpeg 1011 already present; no download needed.
 - Prerequisites present: Python 3.10.11, Node 24.13.0, FFmpeg/ffprobe 9.0.2, Playwright 1.56.1
   (skill-local 1.62.1).
+
+## Postscript (same day)
+
+A GenMotion MCP server and its video skills became available after a server restart. The format
+decision in `VIDEO.md` was already recorded, so the cut stayed on the real-capture path; no
+constructed scenes or synthetic motion were added. The capture and finish scripts were exercised
+end to end: 13/5 skill tests passed, a 38.32s raw master was captured with a visible synthetic
+cursor, and the finished 16:9/9:16 MP4s passed `finish_video.py` and `probe_video.py`. See
+`artifacts/product-demo/qa-summary.md` for measured output and the limitations (freehand ink did
+not render with synthetic pointer events; object labels remain app defaults).
