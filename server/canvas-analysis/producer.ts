@@ -9,6 +9,7 @@ import { OCRImageRegionSchema, type OCRImageRegion } from "../canvas-intelligenc
 import { isImageEgressAllowed } from "../canvas-intelligence/groq.js";
 import { providerUsageSnapshot } from "../canvas-intelligence/provider-usage.js";
 import { CanvasAnalysisValidationError, createCanvasAnalysisResult, currentCanvasRevision, type AuthoritativeCanvasRevision, type CanvasAnalysisResult } from "./contract.js";
+import { provenanceForStage } from "../canvas-intelligence/failure-contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./receiver.js";
 import { CANVAS_OCR_DEFAULT_PADDING, CANVAS_OCR_MAX_REGIONS_LIMIT, canvasOCRRegionTransform, clampOCRRegionLimit, planCanvasOCRCrops, sameCanvasRegionBounds } from "../../src/canvas/ocr-regions.js";
 
@@ -130,13 +131,17 @@ async function produce(
   });
 
   const now = (options.now ?? (() => new Date()))().toISOString();
+  const invocations = understanding.stageInvocations ?? [];
+  const ocrProvenance = provenanceForStage("ocr", invocations);
+  const structureProvenance = provenanceForStage("structure", invocations);
+  const fusionProvenance = provenanceForStage("fusion", invocations);
   const provenance = [
     { id: "prov-canvas", stage: "canvas" as const, provider: "quickdraw" as const, method: "Persisted Quickdraw snapshot and scientific objects", model: null, createdAt: now },
     { id: "prov-geometry", stage: "geometry" as const, provider: "system" as const, method: "Deterministic Canvas Intelligence geometry observations", model: null, createdAt: now },
     { id: "prov-recognition", stage: "recognition" as const, provider: understanding.recognition?.mode === "clip" ? "local" as const : "system" as const, method: "Canvas recognition adapter over deterministically rendered stroke groups", model: understanding.recognition?.adapterId ?? null, createdAt: now },
-    { id: "prov-ocr", stage: "ocr" as const, provider: "system" as const, method: "Canvas Intelligence OCR stage; effective provider is not exposed by understandCanvas", model: null, createdAt: now },
-    { id: "prov-structure", stage: "structure" as const, provider: "system" as const, method: "Canvas Intelligence structure stage; effective provider is not exposed by understandCanvas", model: null, createdAt: now },
-    { id: "prov-fusion", stage: "fusion" as const, provider: "system" as const, method: "Canvas Intelligence fusion stage; effective provider is not exposed by understandCanvas", model: null, createdAt: now },
+    { id: "prov-ocr", stage: "ocr" as const, provider: ocrProvenance.provider, method: ocrProvenance.method, model: ocrProvenance.model, createdAt: now },
+    { id: "prov-structure", stage: "structure" as const, provider: structureProvenance.provider, method: structureProvenance.method, model: structureProvenance.model, createdAt: now },
+    { id: "prov-fusion", stage: "fusion" as const, provider: fusionProvenance.provider, method: fusionProvenance.method, model: fusionProvenance.model, createdAt: now },
   ];
   const observedSourceIds = [...new Set(understanding.evidence.evidence.filter((item) => item.origin !== "model").flatMap((item) => item.sourceIds))];
   const supportingEvidenceIds = understanding.evidence.evidence.filter((item) => item.origin !== "model").map((item) => item.id);

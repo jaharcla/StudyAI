@@ -15,7 +15,7 @@ export const AuthoritativeCanvasRevisionSchema = canvasFixtureSchema.shape.sourc
 export const CanvasAnalysisProvenanceSchema = z.object({
   id: identifier,
   stage: z.enum(["canvas", "geometry", "ocr", "recognition", "structure", "fusion", "validation"]),
-  provider: z.enum(["quickdraw", "local", "groq", "system"]),
+  provider: z.enum(["quickdraw", "local", "groq", "system", "opencode-go", "openrouter", "gemini", "openai-compatible"]),
   method: identifier,
   model: z.string().min(1).nullable(),
   createdAt: z.iso.datetime(),

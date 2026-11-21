@@ -10,6 +10,8 @@ import { OCRResultSchema, StructureResultSchema, getCanvasIntelligenceModels, no
 import { recognizeCanvasStrokes } from "./recognition/index.js";
 import type { CanvasRecognitionAdapter, CanvasRecognitionMode, CanvasRecognitionStage } from "./recognition/types.js";
 import { CANVAS_OCR_MAX_REGIONS_PER_ANALYSIS, clampOCRRegionLimit } from "../../src/canvas/ocr-regions.js";
+import { failureForWarning, providerCapabilities, type CanvasFailure, type StageInvocation } from "./failure-contract.js";
+import { resolveCompletionProviders, resolveMathOCRProviders, type CanvasProviderId } from "./providers.js";
 
 export type CanvasMode = "fast" | "recognize" | "deep";
 export type CanvasRecognitionOptions = {
@@ -20,7 +22,7 @@ export type CanvasRecognitionOptions = {
 };
 export type CanvasOCRPolicy = "off" | "unresolved" | "all";
 export type UnderstandCanvasArgs = Parameters<typeof normalizeCanvasInput>[0] & { userQuestion: string; mode?: CanvasMode; ocrPolicy?: CanvasOCRPolicy; courseContext?: string; skipOcr?: boolean; signal?: AbortSignal; baseUrl?: string; fetcher?: typeof fetch; models?: CanvasIntelligenceModels; expectedSourceRegionIds?: string[]; recognition?: CanvasRecognitionOptions; allowImageEgress?: boolean };
-export type CanvasUnderstanding = { mode: CanvasMode; revision: string; answer?: string; ocr?: OCRResult; associations?: OCRAssociation[]; structure: StructureResult; fusion?: FusionResult; evidence?: CanvasEvidenceBundle; selectedContext?: SelectedCanvasContext; recognition?: CanvasRecognitionStage | null; partial?: boolean; warnings?: string[]; omittedImageRegionIds?: string[]; failedImageRegionIds?: string[]; latencyMs: Record<string, number>; cached: string[] };
+export type CanvasUnderstanding = { mode: CanvasMode; revision: string; answer?: string; ocr?: OCRResult; associations?: OCRAssociation[]; structure: StructureResult; fusion?: FusionResult; evidence?: CanvasEvidenceBundle; selectedContext?: SelectedCanvasContext; recognition?: CanvasRecognitionStage | null; partial?: boolean; warnings?: string[]; omittedImageRegionIds?: string[]; failedImageRegionIds?: string[]; stageInvocations?: StageInvocation[]; failures?: CanvasFailure[]; latencyMs: Record<string, number>; cached: string[] };
 const ocrCache = new RecognitionCache<OCRResult>();
 const structureCache = new RecognitionCache<StructureResult>();
 const fusionCache = new RecognitionCache<FusionResult>();
@@ -176,14 +178,23 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   } else {
     [ocr, structure, recognition] = await Promise.all([runOcr(), runStructure(), runRecognition()]);
   }
-  analysisWarnings.push(...consumeProviderFallbacks());
+  const providerFallbacks = consumeProviderFallbacks();
+  analysisWarnings.push(...providerFallbacks);
   if (failedOCRRegions) analysisWarnings.push(`${failedOCRRegions} OCR region(s) could not be processed; provider output was omitted.`);
   const isPartial = analysisWarnings.length > 0;
+  const ocrEffective: CanvasProviderId | "local" = ocrProvider === "auto" ? resolveMathOCRProviders()[0] ?? "groq" : ocrProvider;
+  const inferenceEffective: CanvasProviderId | "local" = inferenceProvider === "auto" ? resolveCompletionProviders()[0] ?? "groq" : inferenceProvider;
+  const failures: CanvasFailure[] = isPartial ? analysisWarnings.map((warning) => failureForWarning(/ocr/i.test(warning) ? "ocr" : /structure/i.test(warning) ? "structure" : "fusion", warning)) : [];
+  const stageInvocations: StageInvocation[] = [
+    { stage: "ocr", provider: ocrEffective, model: models.ocr, tier: "strong", capabilities: providerCapabilities(ocrEffective), fallbacksUsed: providerFallbacks, failure: failures.find((item) => item.stage === "ocr") ?? null },
+    { stage: "structure", provider: inferenceEffective, model: models.reasoning, tier: "strong", capabilities: providerCapabilities(inferenceEffective), fallbacksUsed: providerFallbacks, failure: failures.find((item) => item.stage === "structure") ?? null },
+    { stage: "fusion", provider: inferenceEffective, model: models.fusion, tier: "strong", capabilities: providerCapabilities(inferenceEffective), fallbacksUsed: providerFallbacks, failure: failures.find((item) => item.stage === "fusion") ?? null },
+  ];
   latencyMs.stageOne = Number(latencyMs.structureSerializationMs ?? 0) + Math.max(latencyMs.ocr ?? 0, latencyMs.structure ?? 0);
   const associations = associateOCRLabels(input, ocr);
   const evidence = buildCanvasEvidence(input, ocr, structure, associations, recognition);
   evidence.warnings.push(...analysisWarnings);
-  if (mode === "recognize") return { mode, revision: input.revision, ocr, associations, structure, recognition, evidence, partial: isPartial, warnings: analysisWarnings, omittedImageRegionIds, failedImageRegionIds: [...failedImageRegionIds].sort(), latencyMs: { ...latencyMs, total: performance.now() - started }, cached };
+  if (mode === "recognize") return { mode, revision: input.revision, ocr, associations, structure, recognition, evidence, partial: isPartial, warnings: analysisWarnings, omittedImageRegionIds, failedImageRegionIds: [...failedImageRegionIds].sort(), stageInvocations, failures, latencyMs: { ...latencyMs, total: performance.now() - started }, cached };
 
   const fixedFusionContext = { selectedIds: input.selectedIds, userQuestion: args.userQuestion, courseContext: args.courseContext ?? "" };
   const fusionOverhead = JSON.stringify({ ...fixedFusionContext, canvasEvidence: null }).length;
@@ -204,7 +215,7 @@ export async function understandCanvas(args: UnderstandCanvasArgs): Promise<Canv
   const unresolved = evidence.conflicts.map((conflict) => `Unresolved evidence conflict for ${conflict.subjectId} / ${conflict.claimKey}: ${conflict.values.join(" vs ")}`);
   const summary = unresolved.length ? `Canvas evidence disagrees: ${unresolved.slice(0, 3).join("; ")}${unresolved.length > 3 ? `; and ${unresolved.length - 3} additional conflicts` : ""}. Verify before editing or grading.` : "";
   const safeFusion = unresolved.length ? { ...fusion, answer: `${fusion.answer}\n${summary}`, uncertainties: [...fusion.uncertainties, ...unresolved] } : fusion;
-  return { mode, revision: input.revision, answer: safeFusion.answer, ocr, associations, structure, recognition, fusion: safeFusion, evidence, selectedContext, partial: isPartial, warnings: analysisWarnings, omittedImageRegionIds, failedImageRegionIds: [...failedImageRegionIds].sort(), latencyMs: { ...latencyMs, total: performance.now() - started }, cached };
+  return { mode, revision: input.revision, answer: safeFusion.answer, ocr, associations, structure, recognition, fusion: safeFusion, evidence, selectedContext, partial: isPartial, warnings: analysisWarnings, omittedImageRegionIds, failedImageRegionIds: [...failedImageRegionIds].sort(), stageInvocations, failures, latencyMs: { ...latencyMs, total: performance.now() - started }, cached };
 }
 
 export function clearCanvasRecognitionCache() { ocrCache.clear(); structureCache.clear(); fusionCache.clear(); }

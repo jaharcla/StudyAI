@@ -79,6 +79,31 @@ describe("persisted canvas analysis producer", () => {
     expect(result.diagnostics.timings?.stages).toMatchObject({ total: 8, structure: 3, fusion: 5 });
   });
 
+  it("reports effective providers from stage invocations instead of the system placeholder", async () => {
+    const analyze = vi.fn(async (args: UnderstandCanvasArgs) => {
+      const input = normalizeCanvasInput(args);
+      const ocr = OCRResultSchema.parse({ items: [], uncertain: false, raw: "" });
+      const structure = StructureResultSchema.parse({ objects: [], relationships: [], observations: geometryObservations(input), ambiguities: [] });
+      const associations = associateOCRLabels(input, ocr);
+      const evidence = buildCanvasEvidence(input, ocr, structure, associations);
+      const selectedContext = selectCanvasContext(evidence, { question: args.userQuestion, selectedIds: args.selectedIds, expectedRevisionHash: input.revision, maxChars: 100_000, nativeRecords: input.nativeRecords, scientificObjects: input.scientificObjects });
+      const fusion = FusionResultSchema.parse({ answer: "The board contains a persisted arrow and vector.", objects: [], relationships: [], associations: [], uncertainties: ["The intended relationship is uncertain."] });
+      const capabilities = { completion: true, vision: true, structuredOutput: true, streaming: true };
+      return {
+        mode: "deep" as const, revision: input.revision, structure, fusion, evidence, selectedContext,
+        latencyMs: { total: 8, structure: 3, fusion: 5 }, cached: [],
+        stageInvocations: [
+          { stage: "ocr" as const, provider: "groq" as const, model: "qwen/qwen3.8-27b", tier: "strong" as const, capabilities, fallbacksUsed: [], failure: null },
+          { stage: "fusion" as const, provider: "groq" as const, model: "openai/gpt-oss-120b", tier: "strong" as const, capabilities, fallbacksUsed: ["gemini"], failure: null },
+        ],
+      };
+    });
+    const result = await produceCanvasAnalysisForPersistedBoard(database, scope, { ...request(), allowImageEgress: false }, { analyze, now: () => new Date("2026-11-08T17:00:00.000Z") });
+    expect(result.provenance.find((item) => item.stage === "ocr")).toMatchObject({ provider: "groq", model: "qwen/qwen3.8-27b" });
+    expect(result.provenance.find((item) => item.stage === "fusion")).toMatchObject({ provider: "groq", model: "openai/gpt-oss-120b", method: expect.stringContaining("fallback: gemini") });
+    expect(result.provenance.find((item) => item.stage === "structure")?.provider).toBe("system");
+  });
+
   it("rejects client canvas data that differs from the persisted snapshot before inference", async () => {
     const analyze = deterministicAnalyze();
     const input = request();
