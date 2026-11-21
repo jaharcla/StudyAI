@@ -33,3 +33,7 @@ test-results/
 # Private outreach working files — target lists and message drafts stay local.
 docs/outreach/
 docs/OUTREACH.md
+
+# Generated demo-video captures and working plans; not project sources.
+/artifacts/
+/VIDEO.md

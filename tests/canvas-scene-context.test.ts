@@ -91,4 +91,31 @@ describe("canvas scene AI context", () => {
     expect(JSON.stringify(context).length).toBeLessThanOrEqual(1200);
     expect(context.nodes[0].text).toBe("force F and spring");
   });
+
+  it("summarizes nodes omitted by the node budget", () => {
+    const base = graph();
+    const context = buildCanvasSceneAIContext(base, { maxNodes: 3 });
+    const total = context.ambientClusters.reduce((sum, cluster) => sum + cluster.nodeCount, 0);
+
+    expect(total).toBe(base.nodes.length - 3);
+    expect(context.ambientClusters[0].kinds["native-object"]).toBe(27);
+    expect(context.ambientClusters[0].summary).toContain("27");
+  });
+
+  it("does not present unconfirmed omitted text as a fact", () => {
+    const base = graph();
+    const confirmed = { ...base.nodes[1], id: "q:confirmed", text: "confirmed board label" };
+    const unconfirmed = { ...base.nodes[2], id: "o:9", kind: "ocr-item" as const, origin: "ocr" as const, verificationStatus: "unconfirmed" as const, text: "GHOST-LABEL", confidence: 0.4 };
+    const context = buildCanvasSceneAIContext({ ...base, nodes: [base.nodes[0], confirmed, unconfirmed, ...base.nodes.slice(3)] }, { maxNodes: 2 });
+    const labels = context.ambientClusters.flatMap((cluster) => cluster.sampleLabels);
+
+    expect(labels).toContain("confirmed board label");
+    expect(labels.join(" ")).not.toContain("GHOST-LABEL");
+    expect(context.ambientClusters.some((cluster) => cluster.unconfirmedCount > 0)).toBe(true);
+  });
+
+  it("drops ambient clusters before exceeding a tight character budget", () => {
+    const context = buildCanvasSceneAIContext(graph(), { maxNodes: 1, maxChars: 500 });
+    expect(JSON.stringify(context).length).toBeLessThanOrEqual(500);
+  });
 });

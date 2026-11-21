@@ -4,6 +4,64 @@ import type { CanvasSceneEdge, CanvasSceneGraph, CanvasSceneNode } from "../spat
 const idSchema = z.string().min(1).max(512);
 const nodeKinds = ["stroke", "stroke-group", "native-object", "scientific-object"] as const;
 
+export const CANVAS_DESIGN_GUIDE = [
+  "Scientific canvas design guide — read before proposing a diagram.",
+  "Layout: place process nodes left-to-right and hierarchies top-to-bottom; keep at least 60px gaps.",
+  "Sizing: keep boxes at least 120x60 and labels to at most four words; move detail into note annotations.",
+  "Order: create shapes first, then labeled arrows, then captions; highlight only after shapes exist.",
+  "annotations: treat OCR and recognition text as unconfirmed evidence, never as a confirmed label.",
+  "Reader-check: avoid overlapping text and keep every shape inside the active viewport before user review.",
+].join("\n");
+
+export const canvasDescribeSchema = z.object({ boardId: idSchema }).strict();
+
+export type CanvasViewport = { x: number; y: number; w: number; h: number };
+export type CanvasDescription = {
+  boardId: string;
+  revision: number;
+  objectCount: number;
+  kinds: Record<string, number>;
+  bounds: { x: number; y: number; width: number; height: number } | null;
+  lines: string[];
+  warnings: string[];
+};
+
+/** Cheap plain-text read of the revision-bound scene, with advisory reader-check warnings. */
+export function describeCanvas(graph: CanvasSceneGraph, viewport?: CanvasViewport): CanvasDescription {
+  const kinds: Record<string, number> = {};
+  for (const node of graph.nodes) kinds[node.kind] = (kinds[node.kind] ?? 0) + 1;
+  const minX = graph.nodes.length ? Math.min(...graph.nodes.map((node) => node.bounds.x)) : 0;
+  const minY = graph.nodes.length ? Math.min(...graph.nodes.map((node) => node.bounds.y)) : 0;
+  const maxX = graph.nodes.length ? Math.max(...graph.nodes.map((node) => node.bounds.x + node.bounds.width)) : 0;
+  const maxY = graph.nodes.length ? Math.max(...graph.nodes.map((node) => node.bounds.y + node.bounds.height)) : 0;
+  const warnings = [...graph.warnings];
+  for (const edge of graph.edges) {
+    if (edge.kind === "overlaps") warnings.push(`Overlapping shapes: ${edge.from} and ${edge.to}.`);
+  }
+  if (viewport) {
+    for (const node of graph.nodes) {
+      if (node.bounds.x < viewport.x || node.bounds.y < viewport.y ||
+          node.bounds.x + node.bounds.width > viewport.x + viewport.w ||
+          node.bounds.y + node.bounds.height > viewport.y + viewport.h) {
+        warnings.push(`${node.id} is outside the active viewport.`);
+      }
+    }
+  }
+  const lines = [...graph.nodes]
+    .sort((a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x)
+    .slice(0, 24)
+    .map((node) => `${node.id}: ${node.kind}${node.text ? ` "${node.text}"` : ""} at ${Math.round(node.bounds.x)},${Math.round(node.bounds.y)}`);
+  return {
+    boardId: graph.scope.boardId,
+    revision: graph.revision,
+    objectCount: graph.nodes.length,
+    kinds,
+    bounds: graph.nodes.length ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY } : null,
+    lines,
+    warnings: warnings.slice(0, 32),
+  };
+}
+
 export const canvasSceneReadSchema = z.object({
   boardId: idSchema,
   maxNodes: z.number().int().min(1).max(24).optional(),

@@ -1,11 +1,18 @@
-export type CanvasProviderId = "groq" | "opencode-go" | "openrouter" | "gemini" | "ollama";
+import { DEFAULT_OMNIROUTE_BASE_URL, DEFAULT_OMNIROUTE_MODEL, OMNIROUTE_PLACEHOLDER_API_KEY } from "../config.js";
+
+export type CanvasProviderId = "groq" | "opencode-go" | "openrouter" | "gemini" | "ollama" | "openai-compatible";
 
 export const DEFAULT_PROVIDER_CHAIN: CanvasProviderId[] = ["groq", "opencode-go", "openrouter", "gemini"];
-const KNOWN_PROVIDERS = new Set<CanvasProviderId>(["groq", "opencode-go", "openrouter", "gemini", "ollama"]);
+const KNOWN_PROVIDERS = new Set<CanvasProviderId>(["groq", "opencode-go", "openrouter", "gemini", "ollama", "openai-compatible"]);
+
+// "omniroute" is the project name for the default local OpenAI-compatible gateway.
+function normalizeProvider(id: string): string {
+  return id === "omniroute" ? "openai-compatible" : id;
+}
 
 export function providerChain(env: NodeJS.ProcessEnv = process.env): CanvasProviderId[] {
   const raw = (env.CANVAS_PROVIDER_CHAIN || DEFAULT_PROVIDER_CHAIN.join(",")).trim();
-  const ids = raw.split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+  const ids = raw.split(",").map((value) => normalizeProvider(value.trim().toLowerCase())).filter(Boolean);
   const chain: CanvasProviderId[] = [];
   for (const id of ids) {
     if (!KNOWN_PROVIDERS.has(id as CanvasProviderId)) throw new Error(`Unknown canvas provider in CANVAS_PROVIDER_CHAIN: ${id}`);
@@ -15,16 +22,19 @@ export function providerChain(env: NodeJS.ProcessEnv = process.env): CanvasProvi
   return chain;
 }
 
-export function canvasInferenceMode(env: NodeJS.ProcessEnv = process.env): "groq" | "ollama" | "opencode-go" | "openrouter" | "auto" {
-  const mode = (env.CANVAS_INFERENCE_PROVIDER || "groq").trim().toLowerCase();
-  if (!["groq", "ollama", "opencode-go", "openrouter", "auto"].includes(mode)) throw new Error("CANVAS_INFERENCE_PROVIDER must be groq, ollama, opencode-go, openrouter, or auto");
-  return mode as "groq" | "ollama" | "opencode-go" | "openrouter" | "auto";
+export type CanvasInferenceMode = "groq" | "ollama" | "opencode-go" | "openrouter" | "openai-compatible" | "auto";
+export type CanvasOCRMode = "groq" | "local" | "opencode-go" | "openrouter" | "openai-compatible" | "auto";
+
+export function canvasInferenceMode(env: NodeJS.ProcessEnv = process.env): CanvasInferenceMode {
+  const mode = normalizeProvider((env.CANVAS_INFERENCE_PROVIDER || "groq").trim().toLowerCase());
+  if (!["groq", "ollama", "opencode-go", "openrouter", "openai-compatible", "auto"].includes(mode)) throw new Error("CANVAS_INFERENCE_PROVIDER must be groq, ollama, opencode-go, openrouter, openai-compatible, or auto");
+  return mode as CanvasInferenceMode;
 }
 
-export function canvasOCRMode(env: NodeJS.ProcessEnv = process.env): "groq" | "local" | "opencode-go" | "openrouter" | "auto" {
-  const mode = (env.CANVAS_OCR_PROVIDER || "groq").trim().toLowerCase();
-  if (!["groq", "local", "opencode-go", "openrouter", "auto"].includes(mode)) throw new Error("CANVAS_OCR_PROVIDER must be groq, local, opencode-go, openrouter, or auto");
-  return mode as "groq" | "local" | "opencode-go" | "openrouter" | "auto";
+export function canvasOCRMode(env: NodeJS.ProcessEnv = process.env): CanvasOCRMode {
+  const mode = normalizeProvider((env.CANVAS_OCR_PROVIDER || "groq").trim().toLowerCase());
+  if (!["groq", "local", "opencode-go", "openrouter", "openai-compatible", "auto"].includes(mode)) throw new Error("CANVAS_OCR_PROVIDER must be groq, local, opencode-go, openrouter, openai-compatible, or auto");
+  return mode as CanvasOCRMode;
 }
 
 export function providerConfigured(provider: CanvasProviderId, env: NodeJS.ProcessEnv = process.env): boolean {
@@ -50,7 +60,7 @@ export function resolveVisionProviders(env: NodeJS.ProcessEnv = process.env): Ca
 }
 
 export function resolveMathOCRProviders(env: NodeJS.ProcessEnv = process.env): CanvasProviderId[] {
-  const configured = (env.CANVAS_MATH_OCR_PROVIDER || "").trim().toLowerCase();
+  const configured = normalizeProvider((env.CANVAS_MATH_OCR_PROVIDER || "").trim().toLowerCase());
   if (configured) {
     if (!KNOWN_PROVIDERS.has(configured as CanvasProviderId)) throw new Error(`Unknown CANVAS_MATH_OCR_PROVIDER: ${configured}`);
     return [configured as CanvasProviderId];
@@ -63,7 +73,7 @@ export function resolveMathOCRProviders(env: NodeJS.ProcessEnv = process.env): C
 }
 
 export function resolveDiagramOCRProviders(env: NodeJS.ProcessEnv = process.env): CanvasProviderId[] {
-  const configured = (env.CANVAS_DIAGRAM_OCR_PROVIDER || "").trim().toLowerCase();
+  const configured = normalizeProvider((env.CANVAS_DIAGRAM_OCR_PROVIDER || "").trim().toLowerCase());
   if (configured) {
     if (!KNOWN_PROVIDERS.has(configured as CanvasProviderId)) throw new Error(`Unknown CANVAS_DIAGRAM_OCR_PROVIDER: ${configured}`);
     return [configured as CanvasProviderId];
@@ -88,6 +98,7 @@ export function mathOCRModelFor(provider: CanvasProviderId, env: NodeJS.ProcessE
   if (provider === "groq") return env.CANVAS_GROQ_MATH_OCR_MODEL || env.CANVAS_GROQ_OCR_MODEL || "qwen/qwen3.8-27b";
   if (provider === "gemini") return env.CANVAS_GEMINI_MATH_OCR_MODEL || geminiModel(env);
   if (provider === "ollama") return env.CANVAS_OCR_MODEL || "glm-ocr:q8_0";
+  if (provider === "openai-compatible") return canvasOmnirouteModel(env);
   return mathOCRModel(env);
 }
 
@@ -96,7 +107,24 @@ export function diagramOCRModelFor(provider: CanvasProviderId, env: NodeJS.Proce
   if (provider === "groq") return env.CANVAS_GROQ_OCR_MODEL || "qwen/qwen3.8-27b";
   if (provider === "gemini") return env.CANVAS_GEMINI_OCR_MODEL || geminiModel(env);
   if (provider === "ollama") return env.CANVAS_OCR_MODEL || "glm-ocr:q8_0";
+  if (provider === "openai-compatible") return canvasOmnirouteModel(env);
   return diagramOCRModel(env);
+}
+
+export function omnirouteBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.OMNIROUTE_BASE_URL || DEFAULT_OMNIROUTE_BASE_URL).replace(/\/$/, "");
+}
+
+export function omnirouteApiKey(env: NodeJS.ProcessEnv = process.env): string {
+  return env.OMNIROUTE_API_KEY?.trim() || OMNIROUTE_PLACEHOLDER_API_KEY;
+}
+
+export function omnirouteModel(env: NodeJS.ProcessEnv = process.env): string {
+  return env.OMNIROUTE_MODEL?.trim() || DEFAULT_OMNIROUTE_MODEL;
+}
+
+export function canvasOmnirouteModel(env: NodeJS.ProcessEnv = process.env): string {
+  return env.CANVAS_OMNIROUTE_MODEL?.trim() || omnirouteModel(env);
 }
 
 export function opencodeGoBaseUrl(env: NodeJS.ProcessEnv = process.env): string {

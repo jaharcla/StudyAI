@@ -1,10 +1,16 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import type Database from "better-sqlite3";
 import { getStudyAIConfig, LOOPBACK_HOST } from "../config.js";
-import { deleteDocument, getDocument, getDocumentFile, getDocumentLocation, importDocumentsIndividually, listDocuments, MAX_BATCH_BYTES, MAX_BATCH_FILES, retrieveCourseDocuments, searchDocuments } from "./service.js";
+import { deleteDocument, getDocument, getDocumentFile, getDocumentLocation, importDocumentsIndividually, listDocuments, MAX_BATCH_BYTES, MAX_BATCH_FILES, MAX_FILE_BYTES, retrieveCourseDocuments, searchDocuments } from "./service.js";
 import type { ImportFile } from "./types.js";
 
 const MAX_REQUEST_BYTES = 70 * 1024 * 1024;
+const MAX_CHUNK_BYTES = 3 * 1024 * 1024;
+const MAX_UPLOAD_CHUNKS = 64;
+const UPLOAD_ID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 type Handler = (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
 
 export function createDocumentIntelligenceHandler(db: Database.Database, storageRoot?: string): Handler {
@@ -23,8 +29,8 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
         if (input.lessonId !== undefined && (typeof input.lessonId !== "string" || !db.prepare("SELECT id FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId))) return send(response, 400, { error: "Lesson not found in this course." });
         if (input.files.length > MAX_BATCH_FILES) return send(response, 413, { error: `A batch can contain at most ${MAX_BATCH_FILES} files.` });
         const files: ImportFile[] = input.files.map((file: { name?: unknown; contentBase64?: unknown }) => {
-          if (typeof file?.name !== "string" || typeof file.contentBase64 !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.contentBase64)) throw new Error("Each file needs a name and valid base64 content.");
-          return { name: file.name, bytes: Buffer.from(file.contentBase64, "base64") };
+          if (typeof file?.name !== "string") throw new Error("Each file needs a name and valid base64 content.");
+          return { name: file.name, bytes: decodeBase64Field(file.contentBase64, "base64 content") };
         });
         if (files.reduce((sum, file) => sum + file.bytes.byteLength, 0) > MAX_BATCH_BYTES) return send(response, 413, { error: "Batch exceeds the 50 MB total limit." });
         const results = await importDocumentsIndividually(db, input.courseId, files, storageRoot);
@@ -33,6 +39,49 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
         }
         return send(response, 200, { results, documents: results.filter((result) => result.status === "imported").map((result) => result.document) });
       } catch (error) { return sendError(response, error); }
+    }
+    if (url.pathname === "/api/document-intelligence/upload/chunk" && request.method === "POST") {
+      try {
+        const input = await readJson(request);
+        const uploadId = validateUploadId(input.uploadId);
+        const chunkIndex = Number(input.chunkIndex);
+        if (!Number.isInteger(chunkIndex) || chunkIndex < 0 || chunkIndex >= MAX_UPLOAD_CHUNKS) throw new Error("Invalid upload chunk index.");
+        const bytes = decodeBase64Field(input.contentBase64, "base64 content");
+        if (bytes.length > MAX_CHUNK_BYTES) throw new Error("Upload chunk exceeds the 3 MB limit.");
+        validateUploadScope(db, input);
+        const dir = uploadDirectory(storageRoot, uploadId);
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, `${chunkIndex}.part`), bytes);
+        return send(response, 200, { received: chunkIndex });
+      } catch (error) { return sendError(response, error); }
+    }
+    if (url.pathname === "/api/document-intelligence/upload/complete" && request.method === "POST") {
+      let dir: string | undefined;
+      try {
+        const input = await readJson(request);
+        const uploadId = validateUploadId(input.uploadId);
+        validateUploadScope(db, input);
+        const totalChunks = Number(input.totalChunks);
+        if (!Number.isInteger(totalChunks) || totalChunks < 1 || totalChunks > MAX_UPLOAD_CHUNKS) throw new Error("Invalid upload batch size.");
+        const name = input.name;
+        // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+        if (typeof name !== "string" || !basename(name).replace(/[\u0000-\u001f]/g, "")) throw new Error("A valid file name is required.");
+        dir = uploadDirectory(storageRoot, uploadId);
+        const chunks: Buffer[] = [];
+        for (let index = 0; index < totalChunks; index++) {
+          const part = join(dir, `${index}.part`);
+          if (!existsSync(part)) throw new Error("Upload batch is incomplete; a chunk is missing.");
+          chunks.push(await readFile(part));
+        }
+        const bytes = Buffer.concat(chunks);
+        if (bytes.length > MAX_FILE_BYTES) throw new Error("File exceeds the 20 MB limit.");
+        const results = await importDocumentsIndividually(db, input.courseId as string, [{ name, bytes }], storageRoot);
+        if (typeof input.lessonId === "string") for (const result of results) {
+          if (result.status === "imported") db.prepare("UPDATE di_documents SET lesson_id=? WHERE id=? AND course_id=?").run(input.lessonId, result.document.id, input.courseId);
+        }
+        return send(response, 200, { results, documents: results.filter((result) => result.status === "imported").map((result) => result.document) });
+      } catch (error) { return sendError(response, error); }
+      finally { if (dir) await rm(dir, { recursive: true, force: true }).catch(() => undefined); }
     }
     if (url.pathname === "/api/document-intelligence/search" && request.method === "GET") {
       const course = url.searchParams.get("course") ?? "";
@@ -87,6 +136,28 @@ export function createDocumentIntelligenceHandler(db: Database.Database, storage
     }
     return false;
   };
+}
+
+function decodeBase64Field(value: unknown, label: string): Buffer {
+  if (typeof value !== "string") throw new Error(`${label} must be a base64 string.`);
+  const bytes = Buffer.from(value, "base64");
+  // Linear round-trip check; a nested-quantifier regex overflows the stack on large payloads.
+  if (bytes.toString("base64") !== value) throw new Error(`${label} must be a base64 string.`);
+  return bytes;
+}
+
+function validateUploadId(value: unknown): string {
+  if (typeof value !== "string" || !UPLOAD_ID.test(value)) throw new Error("Invalid upload session.");
+  return value;
+}
+
+function validateUploadScope(db: Database.Database, input: Record<string, unknown>): void {
+  if (typeof input.courseId !== "string" || !db.prepare("SELECT id FROM courses WHERE id=?").get(input.courseId)) throw new Error("Course not found.");
+  if (input.lessonId !== undefined && (typeof input.lessonId !== "string" || !db.prepare("SELECT id FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId))) throw new Error("Lesson not found in this course.");
+}
+
+function uploadDirectory(storageRoot: string | undefined, uploadId: string): string {
+  return join(storageRoot ?? "data/documents", ".uploads", uploadId);
 }
 
 async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {

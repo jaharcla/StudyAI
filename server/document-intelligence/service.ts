@@ -68,7 +68,9 @@ export async function importDocuments(db: Database.Database, courseId: string, f
   const insert = db.transaction(() => {
     for (const [index, item] of prepared.entries()) {
       const path = stored[index];
-      const title = item.extracted.title?.trim().slice(0, 240) || item.filename;
+      // The uploaded filename is the reliable label: embedded PDF/Office title
+      // metadata is often stale template text shared by many course decks.
+      const title = item.filename;
       db.prepare("INSERT INTO di_documents(id,course_id,title,filename,mime_type,storage_path,content_hash) VALUES(?,?,?,?,?,?,?)").run(item.id, courseId, title, item.filename, mimeType(item.filename), path, item.contentHash);
       const insertUnit = db.prepare("INSERT INTO di_units(document_id,unit_type,unit_number,title,content) VALUES(?,?,?,?,?)");
       for (const unit of item.extracted.units) insertUnit.run(item.id, unit.type, unit.number, unit.title ?? null, unit.text);
@@ -82,7 +84,7 @@ export async function importDocuments(db: Database.Database, courseId: string, f
     if (conflict) throw Object.assign(new Error("Duplicate of " + conflict.title + "."), { code: "DUPLICATE_DOCUMENT", existing: conflict });
     throw error;
   }
-  return prepared.map((item) => ({ id: item.id, title: item.extracted.title?.trim().slice(0, 240) || item.filename, unitCount: item.extracted.units.length, chunkCount: item.chunks.length }));
+  return prepared.map((item) => ({ id: item.id, title: item.filename, unitCount: item.extracted.units.length, chunkCount: item.chunks.length }));
 }
 
 export function searchDocuments(db: Database.Database, courseId: string, query: string, limit = 8): DocumentSearchResult[] {

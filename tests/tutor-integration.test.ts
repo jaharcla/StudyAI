@@ -29,6 +29,10 @@ const originalCompletionTokens = process.env.TUTOR_MAX_COMPLETION_TOKENS;
 const originalGroqInputRate = process.env.TUTOR_GROQ_INPUT_USD_PER_1M;
 const originalGroqOutputRate = process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M;
 const originalDiagnostics = process.env.AI_DIAGNOSTICS;
+const originalOmnirouteBaseUrl = process.env.OMNIROUTE_BASE_URL;
+const originalOmnirouteApiKey = process.env.OMNIROUTE_API_KEY;
+const originalOmnirouteModel = process.env.OMNIROUTE_MODEL;
+const originalCanvasOmnirouteModel = process.env.CANVAS_OMNIROUTE_MODEL;
 process.env.STUDYAI_DB = join(folder, "test.sqlite");
 process.env.TUTOR_PROVIDER = "ollama";
 process.env.GROQ_API_KEY = "";
@@ -42,6 +46,12 @@ for (const [id, title] of [["chem-120", "Chemistry test course"], ["biol-130", "
 }
 const { importDocuments, searchDocuments } = await import("../server/document-intelligence/service");
 const { graph } = await import("../server/agent");
+// dotenv loads inside this worker during the imports above; clear the real .env
+// gateway afterwards so the Groq -> Ollama fallback fixtures stay isolated.
+delete process.env.OMNIROUTE_BASE_URL;
+delete process.env.OMNIROUTE_API_KEY;
+delete process.env.OMNIROUTE_MODEL;
+delete process.env.CANVAS_OMNIROUTE_MODEL;
 const molecule = makeMolecule(100, 100);
 const context = [
   { description: "StudyAI current workspace and structured canvas metadata", value: { courseId: "chem-120", lessonId: "lesson-03" } },
@@ -49,6 +59,9 @@ const context = [
   { description: "Active canvas scene", value: { scope: { courseId: "chem-120", lessonId: "lesson-03", boardId: "board-1" }, selected: [], visible: [], nearbyObjects: [] } },
 ];
 function tutorMetadata(result: { messages: unknown[] }) { return (result.messages.at(-1) as AIMessage).response_metadata.studyai as any; }
+type BoundTool = { name?: string; function?: { name?: string; strict?: boolean } };
+function boundToolNames(calls: unknown[][]): string[] { return ((calls[0]?.[0] ?? []) as BoundTool[]).map((tool) => tool.function?.name ?? tool.name ?? ""); }
+function boundToolStrict(calls: unknown[][]): boolean[] { return ((calls[0]?.[0] ?? []) as BoundTool[]).map((tool) => tool.function?.strict === false); }
 beforeEach(() => {
   process.env.TUTOR_PROVIDER = "ollama";
   process.env.GROQ_API_KEY = "";
@@ -86,7 +99,7 @@ it("returns an exact requested string without retrieval or citation additions", 
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Reply with exactly: STUDYAI-GROQ-CONNECTED")] });
 
   expect(result.messages.at(-1)?.content).toBe("STUDYAI-GROQ-CONNECTED");
-  expect(mocks.bindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name)).not.toContain("search_course_documents");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("search_course_documents");
 });
 
 it("skips course retrieval for greetings even when matching documents exist", async () => {
@@ -95,7 +108,7 @@ it("skips course retrieval for greetings even when matching documents exist", as
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });
 
   expect(result.messages.at(-1)?.content).toBe("Hello!");
-  expect(mocks.bindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name)).not.toContain("search_course_documents");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("search_course_documents");
 });
 
 it("includes raw canvas metadata for an explicit identifier and coordinate request", async () => {
@@ -122,7 +135,7 @@ it("projects ordinary canvas descriptions into observations without retrieval me
   expect(prompt).toContain('"direction":"right"');
   expect(prompt).not.toContain("shape-arrow-9");
   expect(prompt).not.toContain('"x":10');
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).not.toContain("search_course_documents");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("search_course_documents");
   expect(tutorMetadata(result).canvas.rawMetadataIncluded).toBe(false);
 });
 
@@ -130,7 +143,7 @@ it("executes deterministic tutor calculations and returns the result to the mode
   mocks.invoke.mockResolvedValueOnce(new AIMessage({ content: "", tool_calls: [{ name: "calculate_vector", id: "vector-1", args: { operation: "magnitude", vectorA: [3, 4, 0] } }] }))
     .mockResolvedValueOnce(new AIMessage("The vector magnitude is 5 units."));
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Calculate the vector magnitude for (3,4,0)." )] });
-  const boundNames = mocks.bindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name);
+  const boundNames = boundToolNames(mocks.bindTools.mock.calls);
   expect(boundNames).toContain("calculate_vector");
   expect(mocks.invoke).toHaveBeenCalledTimes(2);
   expect(mocks.invoke.mock.calls[1][0].some((message: { content?: unknown }) => String(message.content).includes('"result":5'))).toBe(true);
@@ -138,7 +151,8 @@ it("executes deterministic tutor calculations and returns the result to the mode
 });
 
 it("makes context omitted under the token budget visible in the tutor answer", async () => {
-  process.env.TUTOR_CONTEXT_BUDGET = "2300";
+  // Keep enough room for the richer geometry context; the long conversation still forces omission.
+  process.env.TUTOR_CONTEXT_BUDGET = "2800";
   process.env.TUTOR_MAX_COMPLETION_TOKENS = "256";
   mocks.invoke.mockResolvedValue(new AIMessage("Answer based on current context."));
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
@@ -251,15 +265,16 @@ it("forwards a registered canvas tool call through LangGraph for browser review"
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Rename my molecule")] });
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("propose_canvas_edit");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).toContain("propose_canvas_edit");
 });
 
 it("binds structured QuickDraw tools only for the active course and forwards calls", async () => {
   const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_action", id: "shape-1", args: { boardId: "board-1", actions: [{ kind: "createText", id: "label-1", x: 40, y: 50, text: "Nitrate" }] } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }, { name: "get_canvas_state" }] }, messages: [new HumanMessage("Add a nitrate label")] });
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("propose_canvas_action");
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("get_canvas_state");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).toContain("propose_canvas_action");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).toContain("get_canvas_state");
+  expect(boundToolStrict(mocks.bindTools.mock.calls).every(Boolean)).toBe(true);
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
 });
 
@@ -267,7 +282,7 @@ it("binds read_canvas_ink and forwards it for browser execution", async () => {
   const response = new AIMessage({ content: "", tool_calls: [{ name: "read_canvas_ink", id: "ink-1", args: { boardId: "board-1", groupIds: ["g:abc"], profile: "math" } }] });
   mocks.invoke.mockResolvedValue(response);
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "read_canvas_ink" }] }, messages: [new HumanMessage("What does the handwritten label say?")] });
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("read_canvas_ink");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).toContain("read_canvas_ink");
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
 });
 
@@ -276,6 +291,15 @@ it("reports tool-calling incompatibility without returning JSON as ordinary chat
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }] }, messages: [new HumanMessage("Draw an arrow")] });
   expect(result.messages.at(-1)?.content).toContain("did not receive a structured canvas tool call");
   expect(result.messages.at(-1)?.content).not.toContain("{\"kind\"");
+});
+
+it("recovers from a provider tool-call validation error with one corrective retry", async () => {
+  const validationError = new Error('400 {"error":{"message":"Tool call validation failed: parameters for tool propose_canvas_action did not match schema"}}');
+  const proposal = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_action", id: "retry-1", args: { boardId: "board-1", actions: [{ kind: "createText", x: 10, y: 20, text: "Moment arm question", style: {} }] } }] });
+  mocks.invoke.mockRejectedValueOnce(validationError).mockResolvedValueOnce(proposal);
+  const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }] }, messages: [new HumanMessage("Add a moment arm question")] });
+  expect(mocks.invoke).toHaveBeenCalledTimes(2);
+  expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(proposal.tool_calls![0]);
 });
 
 it("allows a text answer when the user explicitly says not to edit the canvas", async () => {
@@ -306,7 +330,7 @@ it("rejects an invalid canvas analysis before it reaches the inference provider"
 it("does not bind canvas tools from another course or retrieve another course's excerpts", async () => {
   mocks.invoke.mockResolvedValue(new AIMessage("No course excerpts found."));
   await graph.invoke({ copilotkit: { context: [{ ...context[0], value: { courseId: "biol-130", lessonId: "lesson-03" } }, context[1]], actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("According to my lecture, what is TUTOR-771?")] });
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).not.toContain("propose_canvas_edit");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("propose_canvas_edit");
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0][0].content)).toContain('no_evidence');
 });
 
@@ -369,7 +393,7 @@ it("runs search_fact_checks through Groq and returns publisher evidence to the m
 
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Please fact-check this claim: A published factual claim.")] });
 
-  const boundNames = mocks.groqBindTools.mock.calls[0][0].map((registered: { name: string }) => registered.name);
+  const boundNames = boundToolNames(mocks.groqBindTools.mock.calls);
   expect(boundNames).toContain("search_fact_checks");
   expect(mocks.groqInvoke).toHaveBeenCalledTimes(2);
   const toolMessage = mocks.groqInvoke.mock.calls[1][0].find((message: { _getType: () => string }) => message._getType() === "tool");
@@ -393,8 +417,8 @@ it("falls back once to the selected Ollama model after a Groq provider failure",
   expect(mocks.groqInvoke).toHaveBeenCalledTimes(1);
   expect(mocks.invoke).toHaveBeenCalledTimes(1);
   expect(mocks.ollamaOptions[0]).toMatchObject({ model: "qwen3:8b", numPredict: 2048 });
-  expect(mocks.groqBindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).toContain("search_fact_checks");
-  expect(mocks.bindTools.mock.calls[0][0].map((tool: { name: string }) => tool.name)).not.toContain("search_fact_checks");
+  expect(boundToolNames(mocks.groqBindTools.mock.calls)).toContain("search_fact_checks");
+  expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("search_fact_checks");
 });
 
 it("does not call Ollama after a Groq failure in Groq-only mode", async () => {
@@ -460,6 +484,10 @@ afterAll(() => {
   if (originalGroqInputRate === undefined) delete process.env.TUTOR_GROQ_INPUT_USD_PER_1M; else process.env.TUTOR_GROQ_INPUT_USD_PER_1M = originalGroqInputRate;
   if (originalGroqOutputRate === undefined) delete process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M; else process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = originalGroqOutputRate;
   if (originalDiagnostics === undefined) delete process.env.AI_DIAGNOSTICS; else process.env.AI_DIAGNOSTICS = originalDiagnostics;
+  if (originalOmnirouteBaseUrl === undefined) delete process.env.OMNIROUTE_BASE_URL; else process.env.OMNIROUTE_BASE_URL = originalOmnirouteBaseUrl;
+  if (originalOmnirouteApiKey === undefined) delete process.env.OMNIROUTE_API_KEY; else process.env.OMNIROUTE_API_KEY = originalOmnirouteApiKey;
+  if (originalOmnirouteModel === undefined) delete process.env.OMNIROUTE_MODEL; else process.env.OMNIROUTE_MODEL = originalOmnirouteModel;
+  if (originalCanvasOmnirouteModel === undefined) delete process.env.CANVAS_OMNIROUTE_MODEL; else process.env.CANVAS_OMNIROUTE_MODEL = originalCanvasOmnirouteModel;
 });
 
 

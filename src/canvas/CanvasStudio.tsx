@@ -30,6 +30,9 @@ type PersistedBoard = { id: string; course_id: string; lesson_id: string; revisi
 type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
 type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
+// Quickdraw's own tool shortcuts (editor.js toolKeys) switch tools without
+// ending an active pointer session; match the set so we can close it first.
+const TOOL_KEYS = new Set(["v", "1", "h", "d", "p", "b", "i", "e", "k", "a", "l", "t", "n", "g", "r", "o"]);
 
 export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, preferredBoardId, onBoardState, activityMode = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
@@ -80,7 +83,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
   useFrontendTool({
     name: "propose_canvas_edit",
-    description: "Propose an edit to an existing scientific object on the active board. The user must apply it before it changes the canvas. Use current IDs from canvas context.",
+    description: "Consequential: requires user approval. Propose an edit to an existing scientific object on the active board. The user must apply it before it changes the canvas. Use current IDs from canvas context.",
     parameters: canvasEditSchema,
     handler: async (edit) => {
       try {
@@ -95,7 +98,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   }, [courseId, lessonId]);
   useFrontendTool({
     name: "propose_scientific_object",
-    description: "Propose adding one validated scientific object to the active board for user review. Provide kind, position, and a JSON field object; id and kind are assigned by the app. The object is not added until the user applies the proposal.",
+    description: "Consequential: requires user approval. Propose adding one validated scientific object to the active board for user review. Provide kind, position, and a JSON field object; id and kind are assigned by the app. The object is not added until the user applies the proposal.",
     parameters: canvasObjectCreateSchema,
     handler: async (input) => {
       try {
@@ -610,14 +613,25 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     }, 0);
   };
 
-  const activatePlacement = useCallback((kind: ScientificObject["kind"], patch: Partial<ScientificObject> = {}) => {
-    editorRef.current?.setTool("select"); setScienceMode(kind); setPlacementPatch(patch); setToolOpen(false); setEditingId(undefined); setSelectedId(undefined);
+  // Quickdraw's setTool() leaves its live pointer session running, so a pan or
+  // stroke started before a tool switch keeps consuming moves under the old
+  // tool. End it through Quickdraw's public pointercancel input path first.
+  const cancelNativeGesture = useCallback(() => {
+    if (!nativeGesture.current) return;
+    quickdrawRef.current?.editor?.container.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1, pointerType: "mouse", bubbles: true }));
+    nativeGesture.current = null;
   }, []);
+
+  const activatePlacement = useCallback((kind: ScientificObject["kind"], patch: Partial<ScientificObject> = {}) => {
+    cancelNativeGesture();
+    editorRef.current?.setTool("select"); setScienceMode(kind); setPlacementPatch(patch); setToolOpen(false); setEditingId(undefined); setSelectedId(undefined);
+  }, [cancelNativeGesture]);
 
   const useTool = useCallback(async (tool: CanvasTool) => {
     const sequence = loadSequence.current;
     if (tool.action === "quickdraw") {
       setScienceMode(null);
+      cancelNativeGesture();
       quickdrawRef.current?.editor?.setTool(tool.tool);
       setToolOpen(false);
       return;
@@ -644,7 +658,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       return;
     }
     activatePlacement(tool.id);
-  }, [activatePlacement, courseId, lessonId, onStatus]);
+  }, [activatePlacement, cancelNativeGesture, courseId, lessonId, onStatus]);
 
   const createBoard = useCallback(async () => {
     const nextName = `Board ${boards.length + 1}`;
@@ -732,7 +746,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     </section>}
     <div className="canvas-tools-bar">
       <div className="canvas-board-selector">
-        <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label="Choose canvas board"><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
+        <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label={`Choose canvas board: ${activeBoard?.name ?? "Loading board"}`}><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
         {boardMenu && <div className="canvas-board-menu">{boards.map((board) => <button key={board.id} className={board.id === activeBoard?.id ? "current" : ""} onClick={() => void changeBoard(board.id)}>{board.name}</button>)}<button onClick={() => void createBoard()}><Plus size={13} /> New board</button>{boards.length > 1 && <button className="delete-board" onClick={() => void deleteBoard()}><Trash2 size={13} /> Delete current board</button>}</div>}
       </div>
       {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} · Esc cancels</span>}
@@ -757,13 +771,14 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     <div className="canvas-viewport">
       {toolOpen && <aside className="canvas-tool-palette"><div className="palette-heading"><span>CANVAS TOOLS</span><button className="icon-button" title="Collapse canvas tools" aria-label="Collapse canvas tools" onClick={() => setToolOpen(false)}><X size={14} /></button></div><label className="palette-search"><Search size={14} /><input aria-label="Search canvas tools" placeholder="Find a tool" value={toolSearch} onChange={(event) => setToolSearch(event.target.value)} /></label>{(["Draw", "Science", "Learning"] as const).map((group) => {
         const tools = filteredTools.filter((tool) => tool.group === group);
-        return tools.length ? <section className="palette-group" key={group}><h4>{group}</h4>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
+        return tools.length ? <section className="palette-group" key={group}><h2>{group}</h2>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
       <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
         if ((event.target as HTMLElement).closest(".quickdraw-native") && !(event.target as HTMLElement).closest("button,input,textarea,select") && event.button === 0) { nativeGesture.current = structuredClone(currentDocument()); setSelectedId(undefined); }
       }} onPointerUpCapture={finishNativeGesture} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
+        if (nativeGesture.current && TOOL_KEYS.has(event.key.toLowerCase())) cancelNativeGesture();
         if (event.code === "Space") setSpaceHeld(true);
         if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) { event.preventDefault(); event.stopPropagation(); if (event.shiftKey || event.key.toLowerCase() === "y") redo(); else undo(); }
         if (event.key === "Escape") { setScienceMode(null); setSelectedId(undefined); setEditingId(undefined); }
@@ -771,7 +786,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       }} onKeyUpCapture={(event) => { if (event.code === "Space") setSpaceHeld(false); }} onBlur={() => setSpaceHeld(false)}>
         {loading ? <div className="canvas-loading">Loading saved canvas…</div> : <>
           <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} onSelectionChange={(ids) => setSelectedShapeIds(ids)} />
-          {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
+          {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { cancelNativeGesture(); editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
         </>}
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>

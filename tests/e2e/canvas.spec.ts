@@ -1,6 +1,41 @@
 import { expect, test } from "@playwright/test";
 import { createCourse, createCourseWithLesson, createLesson, drawCarbonDioxide, selectCourseOnPage } from "./helpers";
 
+test("switching canvas tools mid-drag ends the active gesture", async ({ page }) => {
+  test.setTimeout(120_000);
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/");
+  await selectCourseOnPage(page, course.title);
+  await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
+  await drawCarbonDioxide(page, false);
+
+  const object = page.locator("[data-scientific-id]").first();
+  const board = (await page.locator(".canvas-board").boundingBox())!;
+  const native = page.locator(".quickdraw-native").first();
+  const position = async () => {
+    const box = (await object.boundingBox())!;
+    return { x: Math.round(box.x), y: Math.round(box.y) };
+  };
+  const startX = board.x + Math.min(board.width - 80, 700);
+  const startY = board.y + 80;
+
+  await page.getByRole("button", { name: "Hand — H", exact: true }).click();
+  await native.focus();
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 100, startY + 100, { steps: 8 });
+  const afterPan = await position();
+
+  // Quickdraw's setTool() leaves its pointer session alive; the app must end it.
+  await native.focus();
+  await page.keyboard.press("d");
+  await page.mouse.move(startX + 250, startY + 250, { steps: 12 });
+  await page.mouse.up();
+
+  await expect(page.getByRole("button", { name: "Draw — D", exact: true })).toHaveClass(/on/);
+  expect(await position()).toEqual(afterPan);
+});
+
 test("canvas creates, calculates, saves, reloads, and separates boards by course", async ({ page }) => {
   test.setTimeout(120_000);
   const { course, lesson } = await createCourseWithLesson(page.request);

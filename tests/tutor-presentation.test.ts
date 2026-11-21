@@ -221,11 +221,32 @@ describe("Tutor semantic canvas context", () => {
     expect(projected).toContain("select or zoom");
   });
 
-  it("states that freehand marks are uninterpreted and retains raw context only on request", () => {
+  it("projects ambient clusters without omitted node IDs or coordinates", () => {
+    const projected = JSON.stringify(projectTutorContexts([{ description: "Active canvas scene", value: {
+      scene: {
+        scope: { boardId: "board-17" }, nodes: [], edges: [], truncated: true,
+        ambientClusters: [{
+          id: "ambient-1", nodeCount: 14, kinds: { "native-object": 14 },
+          summary: "14 nodes outside the focused view: 14 native-object",
+          sampleLabels: ["force F and spring"], unconfirmedCount: 0,
+        }],
+      },
+      selectedIds: [], viewport: { x: 0, y: 0, w: 100, h: 100 }, warnings: [],
+    } }], false));
+
+    expect(projected).toContain("14 nodes outside the focused view");
+    expect(projected).toContain("force F and spring");
+    expect(projected).not.toContain("q:14");
+    expect(projected).not.toContain('"x":');
+  });
+
+  it("describes freehand strokes geometrically and retains raw context only on request", () => {
     const raw = [{ description: "Active canvas scene", value: { selected: [{ id: "draw-1", type: "draw", strokeSummary: { pointCount: 12, bounds: { x: 1, y: 2, w: 3, h: 4 }, simplified: [{ x: 1, y: 2 }] } }] } }];
     const ordinary = JSON.stringify(projectTutorContexts(raw, false));
 
-    expect(ordinary).toContain("meaning cannot be determined");
+    expect(ordinary).toContain("freehand stroke");
+    expect(ordinary).toContain("pointCount");
+    expect(ordinary).not.toContain("meaning cannot be determined");
     expect(ordinary).not.toContain("draw-1");
     expect(ordinary).not.toContain('"x"');
     expect(projectTutorContexts(raw, true)).toBe(raw);

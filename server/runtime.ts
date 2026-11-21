@@ -17,6 +17,10 @@ const intelligence = new CopilotKitIntelligence({
 const runtime = new CopilotRuntime({
   intelligence,
   identifyUser: () => ({ id: "local-single-user", name: "Local user" }),
+  // Expose the read-only memory proxy so the client gets a clean response
+  // instead of a 403/404, while the local app never writes study data to the
+  // Intelligence platform.
+  memory: { access: () => ({ user: "read", project: "read" }) },
   agents: {
     studyai: new LangGraphAgent({
       deploymentUrl: config.langgraphDeploymentUrl,

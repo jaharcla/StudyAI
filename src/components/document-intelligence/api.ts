@@ -26,28 +26,73 @@ export async function requestJson<T>(url: string, init?: RequestInit): Promise<T
   return value;
 }
 
-export function uploadOne(file: File, courseId: string, onProgress: (value: number) => void, lessonId?: string): Promise<{ status: "imported" | "duplicate" | "error"; message: string; documentId?: string }> {
-  // eslint-disable-next-line no-async-promise-executor -- every await is inside the try, so nothing can escape as an unhandled rejection
-  return new Promise(async (resolve) => {
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      let binary = "";
-      for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-      const body = JSON.stringify({ courseId, lessonId, files: [{ name: file.name, contentBase64: btoa(binary) }] });
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", DOCUMENT_API + "/import");
-      xhr.setRequestHeader("content-type", "application/json");
-      xhr.upload.onprogress = (event) => onProgress(event.lengthComputable ? Math.round(event.loaded / event.total * 100) : 0);
-      xhr.onerror = () => resolve({ status: "error", message: "Network error while uploading." });
-      xhr.onload = () => {
-        try {
-          const response = JSON.parse(xhr.responseText) as { results?: Array<{ status: "imported" | "duplicate" | "error"; fileName: string; error?: string; document?: { id: string; title: string } }>; error?: string };
-          const result = response.results?.[0];
-          if (xhr.status < 200 || xhr.status >= 300 || !result) return resolve({ status: "error", message: response.error || "Import failed." });
-          resolve({ status: result.status, message: result.status === "error" ? (result.error || "Import failed.") : result.status === "duplicate" ? "Already imported as " + result.document?.title + "." : "Indexed", documentId: result.document?.id });
-        } catch { resolve({ status: "error", message: "Invalid response from document service." }); }
-      };
-      xhr.send(body);
-    } catch (error) { resolve({ status: "error", message: error instanceof Error ? error.message : "Could not read file." }); }
+export const BATCH_UPLOAD_THRESHOLD_BYTES = 4 * 1024 * 1024;
+export const BATCH_CHUNK_BYTES = 2 * 1024 * 1024;
+
+type UploadResult = { status: "imported" | "duplicate" | "error"; message: string; documentId?: string };
+type ImportResponse = { results?: Array<{ status: UploadResult["status"]; fileName: string; error?: string; document?: { id: string; title: string } }>; error?: string };
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  return btoa(binary);
+}
+
+function describe(result: NonNullable<ImportResponse["results"]>[number]): UploadResult {
+  return {
+    status: result.status,
+    message: result.status === "error" ? (result.error || "Import failed.") : result.status === "duplicate" ? "Already imported as " + result.document?.title + "." : "Indexed",
+    documentId: result.document?.id,
+  };
+}
+
+function uploadSingle(file: File, courseId: string, onProgress: (value: number) => void, lessonId?: string): Promise<UploadResult> {
+  return new Promise((resolve) => {
+    void (async () => {
+      try {
+        const body = JSON.stringify({ courseId, lessonId, files: [{ name: file.name, contentBase64: toBase64(new Uint8Array(await file.arrayBuffer())) }] });
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", DOCUMENT_API + "/import");
+        xhr.setRequestHeader("content-type", "application/json");
+        xhr.upload.onprogress = (event) => onProgress(event.lengthComputable ? Math.round(event.loaded / event.total * 100) : 0);
+        xhr.onerror = () => resolve({ status: "error", message: "Network error while uploading." });
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(xhr.responseText) as ImportResponse;
+            const result = response.results?.[0];
+            if (xhr.status < 200 || xhr.status >= 300 || !result) return resolve({ status: "error", message: response.error || "Import failed." });
+            resolve(describe(result));
+          } catch { resolve({ status: "error", message: "Invalid response from document service." }); }
+        };
+        xhr.send(body);
+      } catch (error) { resolve({ status: "error", message: error instanceof Error ? error.message : "Could not read file." }); }
+    })();
   });
+}
+
+async function uploadBatched(file: File, courseId: string, onProgress: (value: number) => void, lessonId?: string): Promise<UploadResult> {
+  const uploadId = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / BATCH_CHUNK_BYTES);
+  const common = { uploadId, courseId, ...(lessonId ? { lessonId } : {}), name: file.name };
+  const headers = { "content-type": "application/json" };
+  for (let index = 0; index < totalChunks; index++) {
+    const start = index * BATCH_CHUNK_BYTES;
+    const slice = new Uint8Array(await file.slice(start, start + BATCH_CHUNK_BYTES).arrayBuffer());
+    await requestJson(DOCUMENT_API + "/upload/chunk", { method: "POST", headers, body: JSON.stringify({ ...common, chunkIndex: index, contentBase64: toBase64(slice) }) });
+    onProgress(Math.round(((index + 1) / totalChunks) * 100));
+  }
+  const response = await requestJson<ImportResponse>(DOCUMENT_API + "/upload/complete", { method: "POST", headers, body: JSON.stringify({ ...common, totalChunks }) });
+  const result = response.results?.[0];
+  if (!result) return { status: "error", message: response.error || "Import failed." };
+  return describe(result);
+}
+
+export async function uploadOne(file: File, courseId: string, onProgress: (value: number) => void, lessonId?: string): Promise<UploadResult> {
+  try {
+    return file.size > BATCH_UPLOAD_THRESHOLD_BYTES
+      ? await uploadBatched(file, courseId, onProgress, lessonId)
+      : await uploadSingle(file, courseId, onProgress, lessonId);
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : "Could not read file." };
+  }
 }

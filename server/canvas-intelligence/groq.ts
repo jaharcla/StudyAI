@@ -10,6 +10,9 @@ import {
   geminiBaseUrl,
   geminiModel,
   mathOCRModelFor,
+  canvasOmnirouteModel,
+  omnirouteApiKey,
+  omnirouteBaseUrl,
   opencodeGoBaseUrl,
   opencodeGoModel,
   opencodeGoOCRModel,
@@ -53,7 +56,7 @@ const MATH_OCR_SYSTEM = "Transcribe the handwritten mathematical expression in t
 const MATH_OCR_PROMPT = "Write the visible handwritten mathematical expression as one LaTeX string. Do not describe the image.";
 
 function providerLabel(provider: CanvasProviderId) {
-  return provider === "opencode-go" ? "OpenCode Go" : provider === "openrouter" ? "OpenRouter" : provider === "gemini" ? "Google AI Studio" : provider === "groq" ? "Groq" : "Ollama";
+  return provider === "opencode-go" ? "OpenCode Go" : provider === "openrouter" ? "OpenRouter" : provider === "gemini" ? "Google AI Studio" : provider === "groq" ? "Groq" : provider === "openai-compatible" ? "OpenAI-compatible" : "Ollama";
 }
 
 function cloudHeaders(provider: CanvasProviderId): Record<string, string> {
@@ -65,24 +68,28 @@ function cloudHeaders(provider: CanvasProviderId): Record<string, string> {
 function cloudBaseUrl(provider: CanvasProviderId): string {
   if (provider === "opencode-go") return opencodeGoBaseUrl();
   if (provider === "gemini") return geminiBaseUrl();
+  if (provider === "openai-compatible") return omnirouteBaseUrl();
   return openRouterBaseUrl();
 }
 
 function cloudApiKey(provider: CanvasProviderId): string {
   if (provider === "opencode-go") return process.env.OPENCODE_GO_API_KEY ?? "";
   if (provider === "gemini") return process.env.GOOGLE_AI_API_KEY ?? "";
+  if (provider === "openai-compatible") return omnirouteApiKey();
   return process.env.OPENROUTER_API_KEY ?? "";
 }
 
 function cloudModel(provider: CanvasProviderId): string {
   if (provider === "opencode-go") return opencodeGoModel();
   if (provider === "gemini") return geminiModel();
+  if (provider === "openai-compatible") return canvasOmnirouteModel();
   return openRouterModel();
 }
 
 function cloudOCRModel(provider: CanvasProviderId): string {
   if (provider === "opencode-go") return opencodeGoOCRModel();
   if (provider === "gemini") return geminiModel();
+  if (provider === "openai-compatible") return canvasOmnirouteModel();
   return openRouterOCRModel();
 }
 
@@ -178,7 +185,7 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
   const providers = allowEgress ? rawProviders : rawProviders.filter((provider) => provider === "ollama");
   if (!providers.length) {
     if (!allowEgress) throw new Error("Cloud canvas image egress is disabled (CANVAS_ALLOW_IMAGE_EGRESS=0 or user opt-out) and no local OCR provider is configured.");
-    throw new Error("No canvas OCR provider is configured. Set GROQ_API_KEY, OPENCODE_GO_API_KEY, or OPENROUTER_API_KEY.");
+    throw new Error("No canvas OCR provider is configured. Set GROQ_API_KEY, OPENCODE_GO_API_KEY, OPENROUTER_API_KEY, or configure OMNIROUTE_BASE_URL.");
   }
   const system = math ? MATH_OCR_SYSTEM : OCR_SYSTEM;
   const prompt = math ? MATH_OCR_PROMPT : OCR_PROMPT;
@@ -348,7 +355,7 @@ function message(error: unknown): string {
 
 function redactSecrets(text: string): string {
   let sanitized = text.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/gi, "[REDACTED_IMAGE]");
-  for (const key of [process.env.GROQ_API_KEY, process.env.OPENCODE_GO_API_KEY, process.env.OPENROUTER_API_KEY, process.env.GOOGLE_AI_API_KEY]) {
+  for (const key of [process.env.GROQ_API_KEY, process.env.OPENCODE_GO_API_KEY, process.env.OPENROUTER_API_KEY, process.env.GOOGLE_AI_API_KEY, process.env.OMNIROUTE_API_KEY]) {
     if (key && key.length >= 4) sanitized = sanitized.split(key).join("[REDACTED_KEY]");
   }
   return sanitized.slice(0, 300);

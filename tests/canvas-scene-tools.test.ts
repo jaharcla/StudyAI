@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boundedSceneSlice, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, resetCanvasSceneCacheForTests, searchCanvasEvidence, searchCourseCanvasEvidence } from "../src/canvas/ai/scene-tools.js";
+import { boundedSceneSlice, describeCanvas, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, resetCanvasSceneCacheForTests, searchCanvasEvidence, searchCourseCanvasEvidence } from "../src/canvas/ai/scene-tools.js";
 import { CanvasSceneGraphSchema, type CanvasSceneGraph } from "../src/canvas/spatial/types.js";
 
 const graph: CanvasSceneGraph = CanvasSceneGraphSchema.parse({
@@ -20,6 +20,21 @@ const graph: CanvasSceneGraph = CanvasSceneGraphSchema.parse({
 });
 
 describe("canvas scene tools", () => {
+  it("describes a scene in plain text and reports reader-check warnings", () => {
+    const described = describeCanvas(graph);
+    expect(described.boardId).toBe("board");
+    expect(described.objectCount).toBe(2);
+    expect(described.lines.join("\n")).toContain("force");
+    expect(described.warnings).toEqual([]);
+    const overlapping = {
+      ...graph,
+      edges: [...graph.edges, { ...graph.edges[0], id: "e:overlap", kind: "overlaps" as const }],
+    };
+    const warnings = describeCanvas(overlapping, { x: 0, y: 0, w: 15, h: 15 }).warnings;
+    expect(warnings.some((warning) => /overlap/i.test(warning))).toBe(true);
+    expect(warnings.some((warning) => /outside/i.test(warning))).toBe(true);
+  });
+
   it("builds, caches, and slices the scene", async () => {
     resetCanvasSceneCacheForTests();
     const calls: string[] = [];

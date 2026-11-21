@@ -4,6 +4,25 @@ import type { ObjectAnchor } from "./scene";
 export type ArrowGeometry = { tail: Point; tip: Point; unitsPerCanvasUnit?: number; tailRef?: ObjectAnchor; tipRef?: ObjectAnchor };
 export type ScientificArrow = Extract<ScientificObject, { kind: "vector" | "force" }>;
 
+// Canvas screen/world Y increases downward, while scientific components and
+// angles use Cartesian Y-up. One conversion authority keeps those conventions
+// from being mixed when geometry is described to the tutor.
+export function cartesianDelta(from: Point, to: Point): Point {
+  return { x: to.x - from.x, y: from.y - to.y };
+}
+
+/** Signed direction from the +x axis in degrees (positive = above horizontal, negative = below). */
+export function directionAngleDegrees(from: Point, to: Point): number {
+  const delta = cartesianDelta(from, to);
+  return Math.atan2(delta.y, delta.x) * 180 / Math.PI;
+}
+
+/** Smallest unsigned angle between two signed directions, in degrees (0..180). */
+export function includedAngleDegrees(a: number, b: number): number {
+  const difference = Math.abs(a - b) % 360;
+  return Math.min(difference, 360 - difference);
+}
+
 export function arrowGeometry(object: ScientificArrow): ArrowGeometry {
   const tail = object.geometry?.tail ?? (object.kind === "force" ? object.pointOfApplication : undefined) ?? { x: object.x, y: object.y };
   const scale = object.geometry ? object.geometry.unitsPerCanvasUnit ?? 1 : 1 / 24;

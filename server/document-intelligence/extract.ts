@@ -34,7 +34,7 @@ async function extractPdf(bytes: Uint8Array): Promise<ExtractedDocument> {
       if (extractedBytes > MAX_UNCOMPRESSED_BYTES) throw new Error("Extracted PDF text exceeds the 80 MB limit.");
       if (text) units.push({ type: "page", number: pageNumber, text });
     }
-    if (!units.length) throw new Error("No extractable text was found in the PDF.");
+    if (!units.length) throw new Error("No extractable text was found in the PDF; it may be a scanned or image-only document, which cannot be indexed.");
     const metadata = await pdf.getMetadata();
     return { title: (metadata.info as { Title?: string } | undefined)?.Title || undefined, units };
   } finally {

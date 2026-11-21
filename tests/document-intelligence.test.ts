@@ -37,6 +37,14 @@ describe("document intelligence", () => {
     expect(docx.units[0].text).toBe("Water & ions\nCharge stays conserved.");
   });
 
+  it("titles imported documents by filename, not stale embedded metadata", async () => {
+    // docxFixture() carries dc:title "Ion notes"; course decks often reuse a
+    // stale slide-master title, so the uploaded filename must win in the library.
+    const imported = await importDocuments(db, "chem-120", [{ name: "3.2 Dot Products.docx", bytes: docxFixture() }], storage);
+    expect(imported[0].title).toBe("3.2 Dot Products.docx");
+    expect(getDocument(db, "chem-120", imported[0].id)?.title).toBe("3.2 Dot Products.docx");
+  });
+
   it("extracts PDF page text with one-based page metadata", async () => {
     const pdf = await extractDocument("sample.pdf", pdfFixture());
     expect(pdf.units).toEqual([{ type: "page", number: 1, text: "PDF sample page" }]);
@@ -137,6 +145,68 @@ describe("document intelligence", () => {
     expect(findDocumentMatches(document, "atp").map((match) => match.unitNumber)).toEqual([1, 4]);
     expect(nextMatchIndex(1, 1, 2)).toBe(0);
     expect(clampUnitNumber(9, "slide", document)).toBe(4);
+  });
+
+  it("imports large base64 payloads without a regex stack overflow", async () => {
+    const handler = createDocumentIntelligenceHandler(db, storage);
+    const bytes = Buffer.alloc(6 * 1024 * 1024, 65);
+    const body = JSON.stringify({ courseId: "chem-120", files: [{ name: "large.txt", contentBase64: bytes.toString("base64") }] });
+    const request = Readable.from([Buffer.from(body)]) as IncomingMessage;
+    Object.assign(request, { method: "POST", url: "/api/document-intelligence/import", headers: { "content-length": String(Buffer.byteLength(body)) } });
+    let status = 0;
+    let value = "";
+    const response = {
+      writeHead(code: number) { status = code; return this; },
+      end(content = "") { value = String(content); },
+    } as unknown as ServerResponse;
+    expect(await handler(request, response)).toBe(true);
+    expect(status).toBe(200);
+    expect(JSON.parse(value).documents[0].title).toBe("large.txt");
+  }, 30_000);
+
+  it("assembles a batched upload and indexes the file", async () => {
+    const handler = createDocumentIntelligenceHandler(db, storage);
+    const call = async (path: string, body: object) => {
+      const payload = JSON.stringify(body);
+      const request = Readable.from([Buffer.from(payload)]) as IncomingMessage;
+      Object.assign(request, { method: "POST", url: "/api/document-intelligence" + path, headers: { "content-length": String(Buffer.byteLength(payload)) } });
+      let status = 0;
+      let value = "";
+      const response = {
+        writeHead(code: number) { status = code; return this; },
+        end(content = "") { value = String(content); },
+      } as unknown as ServerResponse;
+      expect(await handler(request, response)).toBe(true);
+      return { status, value: JSON.parse(value) as { documents?: Array<{ title: string }>; results?: Array<{ status: string }>; error?: string } };
+    };
+    const bytes = Buffer.alloc(5 * 1024 * 1024, 65);
+    const uploadId = "11111111-2222-4333-8444-555555555555";
+    const chunkSize = 2 * 1024 * 1024;
+    for (let index = 0, offset = 0; offset < bytes.length; index++, offset += chunkSize) {
+      const chunk = bytes.subarray(offset, Math.min(bytes.length, offset + chunkSize));
+      const result = await call("/upload/chunk", { uploadId, courseId: "chem-120", name: "batched.txt", chunkIndex: index, contentBase64: chunk.toString("base64") });
+      expect(result.status, JSON.stringify(result.value)).toBe(200);
+    }
+    const complete = await call("/upload/complete", { uploadId, courseId: "chem-120", name: "batched.txt", totalChunks: Math.ceil(bytes.length / chunkSize) });
+    expect(complete.status).toBe(200);
+    expect(complete.value.documents?.[0]?.title).toBe("batched.txt");
+    expect(complete.value.results?.[0]?.status).toBe("imported");
+  }, 30_000);
+
+  it("rejects completing a batch with missing chunks", async () => {
+    const handler = createDocumentIntelligenceHandler(db, storage);
+    const payload = JSON.stringify({ uploadId: "99999999-2222-4333-8444-555555555555", courseId: "chem-120", name: "partial.txt", totalChunks: 2 });
+    const request = Readable.from([Buffer.from(payload)]) as IncomingMessage;
+    Object.assign(request, { method: "POST", url: "/api/document-intelligence/upload/complete", headers: { "content-length": String(Buffer.byteLength(payload)) } });
+    let status = 0;
+    let value = "";
+    const response = {
+      writeHead(code: number) { status = code; return this; },
+      end(content = "") { value = String(content); },
+    } as unknown as ServerResponse;
+    expect(await handler(request, response)).toBe(true);
+    expect(status).toBe(400);
+    expect(JSON.parse(value).error).toMatch(/upload|chunk/i);
   });
 
   it("serves explicit bulk import and course search through the HTTP adapter", async () => {

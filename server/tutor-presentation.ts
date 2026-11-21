@@ -1,3 +1,5 @@
+import { directionAngleDegrees } from "../src/canvas/geometry.js";
+
 export type TutorCitationCandidate = {
   sourceRef: string;
   filename: string;
@@ -193,12 +195,23 @@ function projectCanvasSceneContext(value: unknown, labels: Map<string, string>):
       ...(typeof item.distance === "number" ? { distance: Math.round(item.distance) } : {}),
     };
   });
+  const ambientClusters = list(scene.ambientClusters).map((value) => {
+    const cluster = record(value);
+    const labels = list(cluster.sampleLabels).filter((label): label is string => typeof label === "string");
+    const unconfirmedCount = typeof cluster.unconfirmedCount === "number" ? cluster.unconfirmedCount : 0;
+    return {
+      summary: string(cluster.summary) ?? "Additional board content",
+      ...(labels.length ? { sampleLabels: labels } : {}),
+      ...(unconfirmedCount > 0 ? { unconfirmedCount } : {}),
+    };
+  });
   return {
     ...diagram,
     scope: pick(record(scene.scope), ["boardId", "revision"]),
     selectedCount: list(source.selectedIds).length,
     nodes,
     edges,
+    ...(ambientClusters.length ? { ambientClusters } : {}),
     ...(Array.isArray(source.connections) ? { connections: list(source.connections) } : {}),
     ...(scene.truncated === true ? { incomplete: true, incompleteReason: INCOMPLETE_CANVAS_REASON } : {}),
   };
@@ -285,13 +298,28 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
     const text = string(shape.text)?.slice(0, 500);
     const alias = type === "text" || type === "note" ? `text label “${text ?? ""}”` : `${type} ${count}`;
     if (typeof shape.id === "string") aliases.set(shape.id, alias);
-    if (type === "draw" || type === "highlight") return { kind: "freehand mark", observation: "The meaning cannot be determined from this freehand mark alone." };
+    if (type === "draw" || type === "highlight") {
+      const stroke = record(shape.strokeSummary);
+      const bounds = record(stroke.bounds);
+      return {
+        kind: "freehand stroke",
+        ...(typeof stroke.pointCount === "number" ? { pointCount: stroke.pointCount } : {}),
+        ...([bounds.x, bounds.y, bounds.w, bounds.h].every((value) => typeof value === "number")
+          ? { bounds: [bounds.x, bounds.y, bounds.w, bounds.h] } : {}),
+        observation: "A drawn mark: use its position and the nearest labels to interpret it; do not treat it as meaningless.",
+      };
+    }
     if (type === "text" || type === "note") return { kind: "text label", text: text ?? "" };
+    if (type === "geo") return { kind: "shape", geometry: string(shape.geometry) ?? "shape" };
     const arrow = record(shape.arrow);
-    const direction = type === "arrow" || type === "line" ? arrowDirection(arrow.from, arrow.to) : undefined;
+    const directional = type === "arrow" || type === "line";
+    const from = finitePoint(arrow.from), to = finitePoint(arrow.to);
+    const direction = directional ? arrowDirection(arrow.from, arrow.to) : undefined;
+    const angle = directional && from && to ? Math.round(directionAngleDegrees(from, to) * 10) / 10 : undefined;
     return {
       kind: type,
       ...(direction ? { direction } : {}),
+      ...(angle !== undefined ? { angleFromHorizontalDegrees: angle, verticalOrientation: verticalOrientation(angle) } : {}),
       ...(Number(arrow.bend) ? { curved: true } : {}),
       ...(typeof arrow.length === "number" ? { length: Math.round(arrow.length) } : {}),
       ...(string(arrow.label) ? { label: string(arrow.label) } : {}),
@@ -320,7 +348,19 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
   };
 }
 
+function roundNumbers(value: unknown): unknown {
+  if (typeof value === "number") return Number.isFinite(value) ? Math.round(value * 10) / 10 : value;
+  if (Array.isArray(value)) return value.slice(0, 6).map(roundNumbers);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, roundNumbers(item)]));
+  return value;
+}
+
 function projectNearbyObject(value: unknown, labels: Map<string, string>): Record<string, unknown> | null {
+  const projected = projectNearbyObjectRaw(value, labels);
+  return projected ? roundNumbers(projected) as Record<string, unknown> : null;
+}
+
+function projectNearbyObjectRaw(value: unknown, labels: Map<string, string>): Record<string, unknown> | null {
   const item = record(value);
   const kind = string(item.kind);
   const detail = record(item.detail);
@@ -329,7 +369,19 @@ function projectNearbyObject(value: unknown, labels: Map<string, string>): Recor
   if (kind === "bond") return { kind, label: detail.label, from: labels.get(string(detail.from) ?? "") ?? "an atom", to: labels.get(string(detail.to) ?? "") ?? "an atom", order: detail.order };
   if (kind === "equation") return { kind, expression: detail.expression, variables: detail.variables, ...(detail.units ? { units: detail.units } : {}) };
   if (kind === "graph") return pick({ kind, ...detail }, ["kind", "expression", "xRange", "xLabel", "yLabel", "pointCount"]);
-  if (kind === "vector" || kind === "force") return pick({ kind, ...detail }, ["kind", "components", "units", "label"]);
+  if (kind === "vector" || kind === "force") {
+    const components = Array.isArray(detail.components) ? detail.components.filter((value): value is number => typeof value === "number") : [];
+    const magnitude = Math.round(Math.hypot(...components) * 10) / 10;
+    // Components are already Cartesian (Y-up), so atan2(y, x) is the signed
+    // direction from horizontal. Keep a decimal so small inclinations survive.
+    const angleDegrees = components.length >= 2 ? Math.round(Math.atan2(components[1], components[0]) * 1800 / Math.PI) / 10 : undefined;
+    return {
+      kind,
+      ...(string(detail.label) ? { label: string(detail.label) } : {}),
+      ...(string(detail.units) ? { units: string(detail.units) } : {}),
+      ...(components.length ? { magnitude, ...(angleDegrees !== undefined ? { angleDegrees, verticalOrientation: verticalOrientation(angleDegrees) } : {}) } : {}),
+    };
+  }
   if (kind === "measurement") return pick({ kind, ...detail }, ["kind", "value", "units", "label"]);
   if (kind === "anatomy") return pick({ kind, ...detail }, ["kind", "system", "labels"]);
   if (kind === "concept") return pick({ kind, ...detail }, ["kind", "title", "definition"]);
@@ -427,6 +479,17 @@ function scientificLabels(objects: unknown[]): Map<string, string> {
     }
   }
   return labels;
+}
+
+function finitePoint(value: unknown): { x: number; y: number } | undefined {
+  const point = record(value);
+  return [point.x, point.y].every((item) => typeof item === "number" && Number.isFinite(item))
+    ? { x: Number(point.x), y: Number(point.y) }
+    : undefined;
+}
+
+function verticalOrientation(degrees: number): string {
+  return degrees > 0 ? "above horizontal" : degrees < 0 ? "below horizontal" : "horizontal";
 }
 
 function arrowDirection(from: unknown, to: unknown): string | undefined {

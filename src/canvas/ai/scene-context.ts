@@ -1,11 +1,29 @@
 import type { CanvasSceneGraph } from "../spatial/types.js";
 
+type SceneNode = CanvasSceneGraph["nodes"][number];
+type SceneBounds = SceneNode["bounds"];
+
+const AMBIENT_MAX_CLUSTERS = 6;
+const AMBIENT_MAX_LABELS = 3;
+const AMBIENT_LABEL_CHARS = 80;
+const AMBIENT_PROXIMITY = 250;
+
+export type CanvasSceneAmbientCluster = {
+  id: string;
+  nodeCount: number;
+  kinds: Record<string, number>;
+  summary: string;
+  sampleLabels: string[];
+  unconfirmedCount: number;
+};
+
 export type CanvasSceneAIContext = {
   scope: CanvasSceneGraph["scope"];
   revision: number;
   revisionHash: string;
   builderVersion: string;
   nodeCounts: Record<string, number>;
+  ambientClusters: CanvasSceneAmbientCluster[];
   nodes: Array<{
     id: string;
     kind: string;
@@ -40,6 +58,68 @@ function nodeRank(node: CanvasSceneGraph["nodes"][number]): number {
   return 0;
 }
 
+function near(a: SceneBounds, b: SceneBounds): boolean {
+  return !(
+    a.x + a.width + AMBIENT_PROXIMITY < b.x ||
+    b.x + b.width + AMBIENT_PROXIMITY < a.x ||
+    a.y + a.height + AMBIENT_PROXIMITY < b.y ||
+    b.y + b.height + AMBIENT_PROXIMITY < a.y
+  );
+}
+
+function union(a: SceneBounds, b: SceneBounds): SceneBounds {
+  const minX = Math.min(a.x, b.x);
+  const minY = Math.min(a.y, b.y);
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(a.x + a.width, b.x + b.width) - minX,
+    height: Math.max(a.y + a.height, b.y + b.height) - minY,
+  };
+}
+
+function buildAmbientClusters(omitted: SceneNode[]): CanvasSceneAmbientCluster[] {
+  if (!omitted.length) return [];
+
+  const groups: Array<{ nodes: SceneNode[]; bounds: SceneBounds }> = [];
+  for (const node of omitted) {
+    const group = groups.find((candidate) => near(candidate.bounds, node.bounds));
+    if (group) {
+      group.nodes.push(node);
+      group.bounds = union(group.bounds, node.bounds);
+    } else if (groups.length < AMBIENT_MAX_CLUSTERS) {
+      groups.push({ nodes: [node], bounds: { ...node.bounds } });
+    } else {
+      const last = groups[groups.length - 1];
+      last.nodes.push(node);
+      last.bounds = union(last.bounds, node.bounds);
+    }
+  }
+
+  return groups.map((group, index) => {
+    const kinds: Record<string, number> = {};
+    const sampleLabels: string[] = [];
+    let unconfirmedCount = 0;
+    for (const node of group.nodes) {
+      kinds[node.kind] = (kinds[node.kind] ?? 0) + 1;
+      if (node.verificationStatus === "source" || node.verificationStatus === "confirmed") {
+        if (node.text && sampleLabels.length < AMBIENT_MAX_LABELS) sampleLabels.push(node.text.slice(0, AMBIENT_LABEL_CHARS));
+      } else {
+        unconfirmedCount++;
+      }
+    }
+    const kindsSummary = Object.entries(kinds).map(([kind, count]) => `${count} ${kind}`).join(", ");
+    return {
+      id: `ambient-${index + 1}`,
+      nodeCount: group.nodes.length,
+      kinds,
+      summary: `${group.nodes.length} other board nodes: ${kindsSummary}${unconfirmedCount ? `, ${unconfirmedCount} unconfirmed` : ""}`,
+      sampleLabels,
+      unconfirmedCount,
+    };
+  });
+}
+
 export function buildCanvasSceneAIContext(
   graph: CanvasSceneGraph,
   options: { maxChars?: number; maxNodes?: number; maxEdges?: number } = {},
@@ -54,6 +134,7 @@ export function buildCanvasSceneAIContext(
     .sort((left, right) => nodeRank(left) - nodeRank(right) || left.id.localeCompare(right.id))
     .slice(0, maxNodes);
   const keptIds = new Set(ordered.map((node) => node.id));
+  const ambientClusters = buildAmbientClusters(graph.nodes.filter((node) => !keptIds.has(node.id)));
   const groupOf = new Map<string, string>();
   for (const edge of graph.edges) {
     if (edge.kind !== "contains" || !edge.from.startsWith("g:") || !keptIds.has(edge.to)) continue;
@@ -66,6 +147,7 @@ export function buildCanvasSceneAIContext(
     revisionHash: graph.revisionHash,
     builderVersion: graph.builderVersion,
     nodeCounts,
+    ambientClusters,
     nodes: ordered.map((node) => ({
       id: node.id,
       kind: node.kind,
@@ -95,10 +177,11 @@ export function buildCanvasSceneAIContext(
     truncated: graph.truncated || graph.nodes.length > maxNodes || graph.edges.length > maxEdges,
   };
 
-  while (JSON.stringify(context).length > maxChars && (context.edges.length || context.nodes.length)) {
+  while (JSON.stringify(context).length > maxChars && (context.edges.length || context.nodes.length || context.ambientClusters.length)) {
     context.truncated = true;
     if (context.edges.length) context.edges.pop();
-    else context.nodes.pop();
+    else if (context.nodes.length) context.nodes.pop();
+    else context.ambientClusters.pop();
   }
   if (context.nodes.length) {
     const remaining = new Set(context.nodes.map((node) => node.id));

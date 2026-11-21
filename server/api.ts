@@ -28,6 +28,14 @@ import { isImageEgressAllowed } from "./canvas-intelligence/groq.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
+const allowedHosts = new Set([`${LOOPBACK_HOST}:${port}`, `localhost:${port}`]);
+const readOnlyMethods = new Set(["GET", "HEAD", "OPTIONS"]);
+function rejectUntrustedRequest(req: import("node:http").IncomingMessage): string | null {
+  if (!allowedHosts.has(req.headers.host ?? "")) return "Request host is not allowed.";
+  const origin = req.headers.origin;
+  if (!readOnlyMethods.has(req.method ?? "GET") && origin !== undefined && origin !== config.webOrigin) return "Request origin is not allowed.";
+  return null;
+}
 configureProviderBudgetDatabase(db);
 configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
@@ -47,6 +55,8 @@ const canvasRecognitionHandler = createCanvasRecognitionHandler(db, config.webOr
 
 const server = createServer(async (req, res) => {
   try {
+  const untrusted = rejectUntrustedRequest(req);
+  if (untrusted) return json(res, 403, { error: untrusted });
   if (await activityHandler(req, res)) return;
   if (await learningHandler(req, res)) return;
   if (await documentHandler(req, res)) return;

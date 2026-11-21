@@ -18,6 +18,7 @@ export type CanvasAttachment = { kind: string; label?: string; distance: number;
 export type CanvasShapeContext = {
   id: string;
   type: ShapeRecord["type"];
+  geometry?: string;
   position: { x: number; y: number; rotation: number; z: number };
   bounds: Bounds;
   boundsEstimate?: "text-layout-approximation";
@@ -81,6 +82,7 @@ function summarize(shape: ShapeRecord): CanvasShapeContext {
     position: { x: round(shape.x), y: round(shape.y), rotation: round(shape.rot), z: shape.z },
     bounds: { x: round(bounds.x), y: round(bounds.y), w: round(bounds.w), h: round(bounds.h) },
   };
+  if (shape.type === "geo") result.geometry = String(shape.props.geo ?? "shape");
   if (shape.type === "text" || shape.type === "note") result.boundsEstimate = "text-layout-approximation";
   if (shape.type === "text" || shape.type === "note") result.text = String(shape.props.text ?? "").slice(0, 500);
   if (shape.type === "arrow" || shape.type === "line") {
