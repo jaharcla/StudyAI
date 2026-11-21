@@ -28,3 +28,7 @@ test-results/
 /tmp-board1.cjs
 /scripts/tmp-tutor-probe.ts
 .serena/project.local.yml
+
+# Private outreach working files — target lists and message drafts stay local.
+docs/outreach/
+docs/OUTREACH.md
