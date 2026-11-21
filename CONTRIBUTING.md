@@ -6,6 +6,8 @@ Thanks for being here. Small, well-described changes are very welcome — you do
 
 The README has the local setup commands. If anything is unclear, open an issue and ask; that's a useful contribution too.
 
+A normal clone is about 50 MB. StudyAI downloads no models or data as part of a clone; those are created locally under the gitignored `data/` directory. Upstream source archives used for reference are also gitignored and stay on your machine — please don't commit them.
+
 ## Pick something to work on
 
 Look for issues labelled `good first issue` and comment on one before you start, so two people don't do the same thing. If you have an idea that isn't an issue yet, open one and we'll talk it through.

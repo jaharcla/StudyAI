@@ -1,37 +1,36 @@
 # StudyAI
 
-Single-user study workspace that keeps your notes on your machine, with course and lesson management, a scientific canvas, document search, adaptive review, and an AI Tutor. AI features can run locally or through a cloud provider.
+![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen) ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 
-## Requirements
+A local-first study workspace that keeps your notes on your machine. Bring course documents, handwritten diagrams, and review into one place — with an AI tutor that can run locally or through a provider you configure.
 
-- Node.js 22 or newer and npm.
-- The current `.env.example` configures Groq; provide a `GROQ_API_KEY` to use that default. Groq receives Tutor prompt context and, when Canvas analysis is requested, canvas input including OCR image crops.
-- For local AI, install Ollama and pull the configured model, then select Ollama in `.env`.
+## What's inside
 
-Python is not required to run the app.
+- **Course workspace** — organize courses and lessons, with notes and imported documents.
+- **Scientific canvas** — sketch diagrams and math on a revision-tracked canvas, with reviewable AI edit proposals.
+- **Document search** — import PDF, DOCX, PPTX, and UTF-8 TXT, then search across your material.
+- **Adaptive review** — keep your review queue tied to what you're studying.
+- **AI tutor** — asks about your course material and canvas, with bounded context and provider calls.
 
-## Run locally
+## Quick start
 
-In PowerShell:
+Requires Node.js 22 or newer and npm. Python is not required.
 
 ```powershell
+git clone https://github.com/jaharcla/StudyAI.git
+cd StudyAI
 npm ci
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
 npm run dev
 ```
 
-Open `http://127.0.0.1:5183`. Keep API keys in `.env`; do not edit `.env.example` with local secrets.
+Open <http://127.0.0.1:5183>. Keep API keys in `.env`; never put secrets in `.env.example`.
 
-The current `.env.example` sets `TUTOR_PROVIDER=groq`, `CANVAS_INFERENCE_PROVIDER=groq`, and `CANVAS_OCR_PROVIDER=groq`. Groq mode requires `GROQ_API_KEY` and does not fall back to Ollama. To use local inference, set `TUTOR_PROVIDER=ollama`, `CANVAS_INFERENCE_PROVIDER=ollama`, and `CANVAS_OCR_PROVIDER=local`; the default Ollama model is `qwen3:latest`. The Tutor also supports `TUTOR_PROVIDER=auto`, which selects Groq when a key is present and can fall back to Ollama after a Groq failure.
+The default `.env.example` is configured for a cloud provider and needs a `GROQ_API_KEY`. To keep everything on your machine, install Ollama, pull the configured model, and switch the provider settings. See [Configuration](docs/CONFIGURATION.md) for the options.
 
-`GOOGLE_FACT_CHECK_API_KEY` is optional; it enables published-claim searches through Google's Fact Check Tools API when the Tutor uses Groq. Those requests send the search query to Google and do not establish a claim as true or false.
+## Privacy
 
-## Data and services
-
-- SQLite database: `data/studyai.sqlite`.
-- Imported files: `data/documents/`.
-- The web app, CopilotKit runtime, data API, and LangGraph agent bind to loopback. Default ports are 5183, 8210, 8211, and 8133.
-- Supported document imports: PDF, DOCX, PPTX, and UTF-8 TXT. Search is lexical; scanned-PDF OCR is not included.
+StudyAI is single-user and stores its data locally. With the default configuration, tutor prompts — and canvas image crops when analysis is requested — are sent to the configured provider. Choosing local inference keeps those requests on your machine. See [Configuration](docs/CONFIGURATION.md#privacy-and-data-flow) and [Status and limitations](docs/STATUS.md) for the details.
 
 ## Checks
 
@@ -44,8 +43,16 @@ npm run test:e2e
 
 ## Documentation
 
+- [Configuration](docs/CONFIGURATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Current status and limitations](docs/STATUS.md)
 - [Document intelligence](docs/DOCUMENT_INTELLIGENCE.md)
 - [Adaptive learning](docs/ADAPTIVE_LEARNING.md)
-- [Historical integration verification](docs/INTEGRATION_VERIFICATION.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Small changes and clear issue reports are welcome.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
