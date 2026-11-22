@@ -111,6 +111,9 @@ describe("Tutor OpenAI-compatible model routing", () => {
   });
 
   it("does not alter Groq or Ollama model construction", () => {
+    // ChatGroq reads the key from process.env (production behaviour); stub it so this
+    // construction test is hermetic in CI, where no .env/GROQ_API_KEY is present.
+    vi.stubEnv("GROQ_API_KEY", "mock-groq");
     const settings = getTutorProviderSettings({ GROQ_API_KEY: "mock-groq", GROQ_MODEL: "custom-groq-model" } as NodeJS.ProcessEnv);
     const groq = createTutorChatModel("groq", "unused", settings);
     expect(groq).not.toBeInstanceOf(ChatOpenAI);
