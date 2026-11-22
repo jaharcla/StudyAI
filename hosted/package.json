@@ -9,6 +9,9 @@
     "deploy": "wrangler deploy",
     "db:apply": "wrangler d1 migrations apply CREDITS_DB --remote"
   },
+  "dependencies": {
+    "stripe": "23.2.0"
+  },
   "devDependencies": {
     "vitest": "3.2.4",
     "wrangler": "4.166.0"
