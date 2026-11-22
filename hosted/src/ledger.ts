@@ -10,6 +10,7 @@ export type WalletRow = {
   daily_cap_micros: number;
   spent_today_micros: number;
   day: string; // YYYY-MM-DD UTC
+  demo_day: string; // last UTC day a free demo grant was applied
 };
 
 export type CodeRow = {
@@ -90,6 +91,7 @@ export async function createWallet(id: string, store: LedgerStore): Promise<Wall
     daily_cap_micros: DAILY_CAP,
     spent_today_micros: 0,
     day: utcDay(),
+    demo_day: "",
   };
   await store.insertWallet(wallet);
   return wallet;
@@ -126,6 +128,32 @@ export async function creditWallet(
     created_at: new Date().toISOString(),
   });
   return { balanceMicros: updated.balance_micros };
+}
+
+/** Grant the small free demo allowance once per wallet per UTC day. */
+export async function grantDailyDemo(
+  walletId: string,
+  day: string,
+  amountMicros: number,
+  store: LedgerStore,
+): Promise<boolean> {
+  if (!Number.isInteger(amountMicros) || amountMicros <= 0) throw new Error('Demo grant must be a positive integer');
+  const wallet = await getWallet(walletId, store);
+  if (wallet.demo_day === day) return false;
+  const updated: WalletRow = {
+    ...wallet,
+    demo_day: day,
+    balance_micros: wallet.balance_micros + amountMicros,
+    version: wallet.version + 1,
+  };
+  await store.updateWallet(updated);
+  await store.insertEntry({
+    wallet_id: walletId,
+    delta_micros: amountMicros,
+    reason: `demo_grant:${walletId}:${day}`,
+    created_at: new Date().toISOString(),
+  });
+  return true;
 }
 
 /** Redeem a credit code, adding its value to the wallet */

@@ -1,0 +1,1 @@
+ALTER TABLE wallets ADD COLUMN demo_day TEXT NOT NULL DEFAULT '';

@@ -57,6 +57,7 @@ function walletRow(row: Record<string, unknown>): WalletRow {
     daily_cap_micros: Number(row.daily_cap_micros),
     spent_today_micros: Number(row.spent_today_micros),
     day: String(row.day),
+    demo_day: String(row.demo_day ?? ""),
   };
 }
 
@@ -73,13 +74,13 @@ export function createD1Store(db: D1DatabaseLike): LedgerStore {
     },
     async insertWallet(wallet) {
       await db.prepare(
-        "INSERT INTO wallets (id, balance_micros, version, daily_cap_micros, spent_today_micros, day) VALUES (?, ?, ?, ?, ?, ?)",
-      ).bind(wallet.id, wallet.balance_micros, wallet.version, wallet.daily_cap_micros, wallet.spent_today_micros, wallet.day).run();
+        "INSERT INTO wallets (id, balance_micros, version, daily_cap_micros, spent_today_micros, day, demo_day) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ).bind(wallet.id, wallet.balance_micros, wallet.version, wallet.daily_cap_micros, wallet.spent_today_micros, wallet.day, wallet.demo_day).run();
     },
     async updateWallet(wallet) {
       const result = await db.prepare(
-        "UPDATE wallets SET balance_micros = ?, version = ?, daily_cap_micros = ?, spent_today_micros = ?, day = ? WHERE id = ? AND version = ?",
-      ).bind(wallet.balance_micros, wallet.version, wallet.daily_cap_micros, wallet.spent_today_micros, wallet.day, wallet.id, wallet.version - 1).run();
+        "UPDATE wallets SET balance_micros = ?, version = ?, daily_cap_micros = ?, spent_today_micros = ?, day = ?, demo_day = ? WHERE id = ? AND version = ?",
+      ).bind(wallet.balance_micros, wallet.version, wallet.daily_cap_micros, wallet.spent_today_micros, wallet.day, wallet.demo_day, wallet.id, wallet.version - 1).run();
       if (result.meta?.changes === 0) throw new Error("Version conflict");
     },
     async getCode(code) {
