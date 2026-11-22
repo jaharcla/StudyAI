@@ -36,7 +36,7 @@ The blocker is not a lack of places to post. It is that a stranger currently has
 - Hands-off is a preference, not just a convenience: the author will not assign tickets or review deep code.
 - The codebase is deep and specialized (canvas intelligence, provider chains, benchmark gates, 300+ tests). Starter tasks must be small and well described.
 - Local-first, single-user; no multi-user auth. Anything implying hosted/multi-user service is false.
-- MIT + Commons Clause license (no right to sell the software), chosen by the author on 2026-11-21 as a revision to the earlier plain-MIT decision.
+- MIT license (fully open source), restored by the author on 2026-11-22. A Commons Clause version was briefly chosen on 2026-11-21 and then reverted; the intended model is open-core, with paid features in a separate edition.
 - Project rules: GitNexus `detect_changes` before commits; no suppression to make code compile; verification evidence before claiming done; no secrets in docs or tool arguments.
 - Money rule: `treg` bills per catalog call; state the price from `catalog_get` and get consent above one cent. `exa`/`firecrawl` consume credits. Built-in web search is free and preferred first.
 
@@ -50,7 +50,7 @@ Approach 2 is chosen, with approach 1's packaging done first. A community is the
 
 ## Decisions made here (the author's calls are listed separately)
 
-- MIT + Commons Clause at the repo root. Holder `jaharcla` (confirmed by the author).
+- MIT at the repo root. Holder `jaharcla` (confirmed by the author).
 - Short `CONTRIBUTING.md`; the existing README already covers local setup.
 - Vision recorded in `docs/VISION.md`; a persistent `docs/OUTREACH.md` holds the brief, lanes, and boundaries.
 - Starter issues, public post drafts, and personal note drafts live as **local files under `docs/outreach/`** until the author approves each one.
