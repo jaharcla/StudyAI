@@ -11,7 +11,7 @@ import { lessonPreferenceKey, selectCourse, selectLesson } from "./workspace-sta
 const DocumentLibrary = lazy(() => import("./components/document-intelligence").then((module) => ({ default: module.DocumentLibrary })));
 
 
-import { API } from "./api";
+import { API, CREDITS_API } from "./api";
 import { Streamdown, defaultRemarkPlugins, defaultRehypePlugins } from "streamdown";
 import "katex/dist/katex.min.css";
 
@@ -54,6 +54,23 @@ function Workspace() {
   const [models, setModels] = useState<Array<{ name: string; size: number }>>([]);
   const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem("studyai.model") ?? "");
   const [aiStatus, setAiStatus] = useState("Checking Ollama…");
+  const [creditProvider, setCreditProvider] = useState(() => localStorage.getItem("studyai.credit.provider") ?? "local");
+  const [creditToken] = useState(() => {
+    const saved = localStorage.getItem("studyai.credits.token");
+    if (saved) return saved;
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    localStorage.setItem("studyai.credits.token", token);
+    return token;
+  });
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [creditCode, setCreditCode] = useState("");
+  const [creditQuestion, setCreditQuestion] = useState("");
+  const [creditAnswer, setCreditAnswer] = useState("");
+  const [creditStatus, setCreditStatus] = useState("");
+  const creditClientToken = String(import.meta.env.VITE_STUDYAI_CLIENT_TOKEN ?? "");
+  const creditRecovery = `RC-${creditToken.match(/.{1,4}/g)?.join("-") ?? creditToken}`;
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
   const [noteTitle, setNoteTitle] = useState("");
@@ -118,6 +135,60 @@ function Workspace() {
     }).catch((error) => { if (live) { setModels([]); setSelectedModel(""); localStorage.removeItem("studyai.model"); setAiStatus(error instanceof Error ? error.message : "Ollama is unavailable"); } });
     return () => { live = false; };
   }, []);
+
+  const creditHeaders = useCallback(() => ({
+    "content-type": "application/json",
+    authorization: `Bearer ${creditToken}`,
+    "x-studyai-client": creditClientToken,
+  }), [creditToken, creditClientToken]);
+
+  const refreshCreditBalance = useCallback(async () => {
+    try {
+      const response = await fetch(`${CREDITS_API}/v1/wallet`, { headers: creditHeaders() });
+      if (!response.ok) throw new Error("Wallet unavailable");
+      const data = await response.json() as { balanceMicros: number };
+      setCreditBalance(data.balanceMicros);
+    } catch (error) {
+      setCreditStatus(error instanceof Error ? error.message : "Wallet unavailable");
+    }
+  }, [creditHeaders]);
+
+  useEffect(() => {
+    if (creditProvider === "credits") void refreshCreditBalance();
+  }, [creditProvider, refreshCreditBalance]);
+
+  const redeemCredit = useCallback(async () => {
+    try {
+      const response = await fetch(`${CREDITS_API}/v1/redeem`, {
+        method: "POST", headers: creditHeaders(), body: JSON.stringify({ code: creditCode }),
+      });
+      if (!response.ok) throw new Error("Code could not be redeemed");
+      setCreditCode("");
+      setCreditStatus("Credits added.");
+      await refreshCreditBalance();
+    } catch (error) {
+      setCreditStatus(error instanceof Error ? error.message : "Code could not be redeemed");
+    }
+  }, [creditCode, creditHeaders, refreshCreditBalance]);
+
+  const sendCreditChat = useCallback(async () => {
+    const question = creditQuestion.trim();
+    if (!question) return;
+    setCreditStatus("");
+    try {
+      const response = await fetch(`${CREDITS_API}/v1/chat/completions`, {
+        method: "POST",
+        headers: creditHeaders(),
+        body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "user", content: question }] }),
+      });
+      if (!response.ok) throw new Error("Credits chat unavailable");
+      const data = await response.json() as { text: string; balanceMicros: number };
+      setCreditAnswer(data.text);
+      setCreditBalance(data.balanceMicros);
+    } catch (error) {
+      setCreditStatus(error instanceof Error ? error.message : "Credits chat unavailable");
+    }
+  }, [creditQuestion, creditHeaders]);
 
   useEffect(() => {
     const scope = course.id && lessonId ? `${course.id}:${lessonId}` : "";
@@ -260,7 +331,7 @@ function Workspace() {
       else if (event.key === "End") { event.preventDefault(); setTutorWidth(520); }
     }} onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small><i />{aiStatus}</small></span></div><div><button className="icon-button" title="Tutor options are not available yet" disabled><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div>{tutorContextOpen && course.id && lessonId && <div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button" onClick={() => setTutorContextOpen(false)} aria-label="Hide lesson context"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>{lessonTitle}</b><small>{course.title}</small></span></div><p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div>}{course.id && lessonId ? <div className="copilot-slot" onClick={openCitation}><CopilotChat className="study-chat" messageView={{ assistantMessage: { markdownRenderer: CustomMarkdownRenderer }, toolCallDisplay: "turn" }} inspectorTools={import.meta.env.DEV} labels={{ welcomeMessageText: `Ask about ${lessonTitle}, request a worked example, or ask about the canvas.` }} /></div> : <div className="copilot-slot"><div className="canvas-loading">Select or create a lesson to start tutoring.</div></div>}<div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
     {!tutor && <button className="reopen-tutor" onClick={() => setTutor(true)}><Sparkles size={16} /> Open tutor</button>}
-    {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>Local model service<input value={aiStatus} readOnly /></label><label>Model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p>{models.length ? "Your selection is used for the next tutor message." : aiStatus}</p><button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
+    {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>Local model service<input value={aiStatus} readOnly /></label><label>Model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p>{models.length ? "Your selection is used for the next tutor message." : aiStatus}</p><label>AI provider<select data-testid="credit-provider-option" value={creditProvider} onChange={(e) => { setCreditProvider(e.target.value); localStorage.setItem("studyai.credit.provider", e.target.value); }}><option value="local">Local / BYOK</option><option value="credits">StudyAI Credits</option></select></label>{creditProvider === "credits" && <div className="credits-panel"><p data-testid="credit-balance">Balance: ${(creditBalance / 1_000_000).toFixed(2)}</p><p data-testid="credit-recovery-code">{creditRecovery}</p><p data-testid="credit-disclosure">Your wallet lives in this browser only. Save the recovery code: without it a balance cannot be recovered.</p><label>Redeem code<input data-testid="credit-redeem-input" value={creditCode} onChange={(e) => setCreditCode(e.target.value)} /></label><button data-testid="credit-redeem-button" onClick={redeemCredit}>Redeem</button><label>Ask with credits<input data-testid="credit-chat-input" value={creditQuestion} onChange={(e) => setCreditQuestion(e.target.value)} /></label><button data-testid="credit-chat-send" onClick={sendCreditChat}>Send</button>{creditAnswer && <div data-testid="credit-chat-answer"><CustomMarkdownRenderer content={creditAnswer} /></div>}{creditStatus && <p>{creditStatus}</p>}</div>}<button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
     {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div className="settings-modal notes-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · {lessonTitle}</span><input aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lesson…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
