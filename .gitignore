@@ -37,3 +37,8 @@ docs/OUTREACH.md
 # Generated demo-video captures and working plans; not project sources.
 /artifacts/
 /VIDEO.md
+
+# Per-user agent workflows, skills and tooling. Each developer brings their own.
+.claude/skills/
+.opencode/
+.serena/
