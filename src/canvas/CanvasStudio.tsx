@@ -10,7 +10,7 @@ import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
 import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { objectTitle } from "./SceneGlyph";
-import { applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, proposeCanvasEdit, proposeCanvasObject, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
+import { applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema, proposeCanvasEdit, proposeCanvasObject, proposeMolecule, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
 import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
@@ -109,6 +109,22 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         return { status: "pending_user_review", kind: next.object.kind, reason: next.reason, requiresConfirmation: true };
       } catch (error) {
         return { status: "rejected", error: error instanceof Error ? error.message : "Invalid scientific object proposal." };
+      }
+    },
+  }, [courseId, lessonId]);
+  useFrontendTool({
+    name: "propose_molecule",
+    description: "Consequential: requires user approval. Propose a validated Lewis molecule. Provide atoms as {element, nonbondingElectrons} and bonds as zero-based atom indices with an order (1, 1.5, 2, or 3). IDs are assigned by the app; nothing is added until the user applies the proposal.",
+    parameters: moleculeProposalSchema,
+    handler: async (input) => {
+      try {
+        const currentBoard = boardRef.current;
+        if (!currentBoard) throw new Error("The active board is not ready.");
+        const next = proposeMolecule({ boardId: currentBoard.id, courseId, lessonId, revision: currentBoard.revision, objects: documentRef.current.objects }, input);
+        setObjectProposal(next);
+        return { status: "pending_user_review", kind: next.object.kind, reason: next.reason, requiresConfirmation: true };
+      } catch (error) {
+        return { status: "rejected", error: error instanceof Error ? error.message : "Invalid molecule proposal." };
       }
     },
   }, [courseId, lessonId]);

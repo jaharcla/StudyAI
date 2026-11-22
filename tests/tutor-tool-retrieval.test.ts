@@ -27,6 +27,12 @@ describe("recommendedToolsForQuery", () => {
     expect(recommendedToolsForQuery("Read the handwriting on my canvas.", available)).toContain("read_canvas_ink");
   });
 
+  it("honors a tool the user names explicitly in the request", () => {
+    const result = recommendedToolsForQuery("Use propose_canvas_edit to propose changing my vector components. Call the tool for review.", available);
+    expect(result).toContain("propose_canvas_edit");
+    expect(result[0]).toBe("propose_canvas_edit");
+  });
+
   it("only returns tools that are actually bound", () => {
     const result = recommendedToolsForQuery("Add a concept object.", ["search_fact_checks"]);
     expect(result).toEqual([]);

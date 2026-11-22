@@ -8,8 +8,8 @@ import { createDocumentRetrievalTool } from "./document-intelligence/retrieval-t
 import { createScienceTools } from "./science-tools.js";
 import { createFactCheckTool } from "./fact-checks.js";
 import { retrieveCourseDocuments, type RetrievalResult } from "./document-intelligence/service.js";
-import { canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError } from "../src/canvas/tutor.js";
-import { canvasActionSchema, canvasReadSchema } from "../src/canvas/ai/canvas-actions.js";
+import { canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema } from "../src/canvas/tutor.js";
+import { CANVAS_ACTION_TOOL_DESCRIPTION, canvasActionSchema, canvasReadSchema } from "../src/canvas/ai/canvas-actions.js";
 import { canvasDescribeSchema, canvasEvidenceSearchSchema, canvasSceneReadSchema, readCanvasInkSchema } from "../src/canvas/ai/scene-tools.js";
 import { teachingSceneSchema } from "../src/canvas/ai/teaching-scene.js";
 import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context.js";
@@ -139,7 +139,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     }
   }
   const quickdrawActions = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "propose_canvas_action")
-    ? { name: "propose_canvas_action", description: "Propose a validated QuickDraw shape action batch for review. Use the exact active boardId. Supported actions are createShape, createText, createArrow, updateShape, moveShape, deleteShape, highlightShape and selectShapes. groupShapes is unsupported.", schema: canvasActionSchema } : undefined;
+    ? { name: "propose_canvas_action", description: CANVAS_ACTION_TOOL_DESCRIPTION, schema: canvasActionSchema } : undefined;
   const quickdrawRead = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "get_canvas_state")
     ? { name: "get_canvas_state", description: "Read native QuickDraw shape IDs, coordinates and properties from the active board. Use shapeIds from current context for targeted follow-up details and the exact current boardId.", schema: canvasReadSchema } : undefined;
   const canvasSceneRead = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "get_canvas_scene")
@@ -150,6 +150,8 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ? { name: "search_canvas_evidence", description: "Search canvas scene evidence by text on the active board, or across every current board in the course when boardId is omitted. Returns source-linked nodes, incident edges, and board attribution. Cite at most three returned source refs for canvas claims.", schema: canvasEvidenceSearchSchema } : undefined;
   const canvasObjectCreate = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "propose_scientific_object")
     ? { name: "propose_scientific_object", description: "Propose adding one scientific object to the active board for user review. Provide kind, position, and a JSON field object; the object is validated and stays pending until the user applies it. Do not create objects the user did not ask for.", schema: canvasObjectCreateSchema } : undefined;
+  const moleculeTool = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "propose_molecule")
+    ? { name: "propose_molecule", description: "Propose a validated Lewis molecule for user review. Provide name, atoms [{element, nonbondingElectrons}], and bonds [{from, to, order}] using zero-based atom indices. Use this instead of propose_scientific_object for molecules so the structure is explicit. The object stays pending until the user applies it.", schema: moleculeProposalSchema } : undefined;
   const canvasDescribe = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "describe_canvas")
     ? { name: "describe_canvas", description: "Read-only. Plain-text summary of the active board's scene with object counts, bounds, ordered node lines, and advisory overlap or off-viewport warnings. Use for a cheap overview before get_canvas_scene.", schema: canvasDescribeSchema } : undefined;
   const canvasDesignGuide = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "read_design_guide")
@@ -224,6 +226,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ...(canvasInkRead ? ["read_canvas_ink"] : []),
     ...(canvasEvidenceSearch ? ["search_canvas_evidence"] : []),
     ...(canvasObjectCreate ? ["propose_scientific_object"] : []),
+    ...(moleculeTool ? ["propose_molecule"] : []),
     ...(canvasDescribe ? ["describe_canvas"] : []),
     ...(canvasDesignGuide ? ["read_design_guide"] : []),
     ...(teachingScene ? ["propose_teaching_scene"] : []),
@@ -258,12 +261,27 @@ async function tutor(state: typeof State.State, config?: unknown) {
     instructions + " Workspace and canvas context: " + budgeted.canvasJson + ". Course evidence from the server: " + budgeted.evidenceJson,
   );
   const executableBaseTools = [...(retrieval ? [retrieval] : []), ...scienceTools];
-  const baseTools = [...executableBaseTools, ...(canvasTool ? [canvasTool] : []), ...(quickdrawActions ? [quickdrawActions] : []), ...(quickdrawRead ? [quickdrawRead] : []), ...(canvasSceneRead ? [canvasSceneRead] : []), ...(canvasInkRead ? [canvasInkRead] : []), ...(canvasEvidenceSearch ? [canvasEvidenceSearch] : []), ...(canvasObjectCreate ? [canvasObjectCreate] : []), ...(canvasDescribe ? [canvasDescribe] : []), ...(canvasDesignGuide ? [canvasDesignGuide] : []), ...(teachingScene ? [teachingScene] : [])];
+  const baseTools = [...executableBaseTools, ...(canvasTool ? [canvasTool] : []), ...(quickdrawActions ? [quickdrawActions] : []), ...(quickdrawRead ? [quickdrawRead] : []), ...(canvasSceneRead ? [canvasSceneRead] : []), ...(canvasInkRead ? [canvasInkRead] : []), ...(canvasEvidenceSearch ? [canvasEvidenceSearch] : []), ...(canvasObjectCreate ? [canvasObjectCreate] : []), ...(moleculeTool ? [moleculeTool] : []), ...(canvasDescribe ? [canvasDescribe] : []), ...(canvasDesignGuide ? [canvasDesignGuide] : []), ...(teachingScene ? [teachingScene] : [])];
   const factCheckTool = createFactCheckTool();
   const requestSignal = signalFromConfig(config);
   const run: TutorModelRun = { provider: providerSettings.provider, model: activeModel, providersTried: [providerSettings.provider], invocationCount: 0, retries: 0, groqReservedCostUsd: 0, groqAccountedCostUsd: 0, maxGroqCostUsd: providerSettings.maxGroqCostUsd, maxProviderCalls: providerSettings.maxProviderCalls, groqInputUsdPerMillion: providerSettings.groqInputUsdPerMillion, groqOutputUsdPerMillion: providerSettings.groqOutputUsdPerMillion, startedAt: Date.now() };
   const toolsForProvider = (provider: TutorProvider) => [...baseTools, ...(provider !== "ollama" ? [factCheckTool] : [])];
-  let tools = toolsForProvider(run.provider);
+  // Tool retrieval: bind only the tools relevant to this request so the model
+  // is not choosing among a dozen schemas. Fall back to the full set when no
+  // route matched, so capability is never silently lost.
+  const selectTools = (provider: TutorProvider) => {
+    const candidates = toolsForProvider(provider);
+    if (!recommendedTools.length) return candidates;
+    const selected = candidates.filter((tool) => recommendedTools.includes(tool.name));
+    if (selected.some((tool) => ["propose_canvas_action", "propose_canvas_edit", "propose_scientific_object"].includes(tool.name))) {
+      for (const name of ["get_canvas_state", "describe_canvas"]) {
+        const companion = candidates.find((tool) => tool.name === name);
+        if (companion && !selected.includes(companion)) selected.push(companion);
+      }
+    }
+    return selected.length ? selected : candidates;
+  };
+  let tools = selectTools(run.provider);
   let baseModel: TutorChatModel = createTutorChatModel(run.provider, run.model, providerSettings);
   let model = bindTutorTools(baseModel, tools);
   const history = [system, ...budgeted.conversation];
@@ -312,7 +330,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
         run.model = tutorModelForProvider(next, providerSettings, selectedModel);
         if (!run.providersTried.includes(next)) run.providersTried.push(next);
         baseModel = createTutorChatModel(next, run.model, providerSettings);
-        tools = toolsForProvider(next);
+        tools = selectTools(next);
         model = bindTutorTools(baseModel, tools);
       }
     }
@@ -324,10 +342,14 @@ async function tutor(state: typeof State.State, config?: unknown) {
     logTutorContextOverflow(error);
     const failure = classifyModelFailure(error);
     if (failure === "tool_call_invalid") {
-      const correction = new SystemMessage("Your previous tool call was rejected because its arguments did not match the tool schema. Retry with only the documented fields and valid enum values, and no extra properties.");
+      const detail = error instanceof Error ? error.message : String(error);
+      const hallucinated = /attempted to call tool ['"]([^'"]+)['"]/.exec(detail)?.[1];
+      const correction = new SystemMessage(hallucinated
+        ? `Your previous response tried to call a tool named "${hallucinated}", which is not a bound tool. JSON is data, not a tool: call one of the exact bound tool names and put any JSON inside that tool's arguments. Retry with a valid tool call.`
+        : "Your previous tool call was rejected because its arguments did not match the tool schema. Retry with only the documented fields and valid enum values, and no extra properties.");
       try { response = await invoke([...history, correction]); }
       catch (retryError) { logTutorContextOverflow(retryError); return failureResult(activeScope, scopeStart, classifyModelFailure(retryError), run); }
-    } else if (failure === "tool_call_unsupported" && (quickdrawActions || quickdrawRead || canvasTool || canvasSceneRead || canvasInkRead || canvasEvidenceSearch || canvasObjectCreate || canvasDescribe || canvasDesignGuide || teachingScene)) {
+    } else if (failure === "tool_call_unsupported" && (quickdrawActions || quickdrawRead || canvasTool || canvasSceneRead || canvasInkRead || canvasEvidenceSearch || canvasObjectCreate || moleculeTool || canvasDescribe || canvasDesignGuide || teachingScene)) {
       const fallback = new SystemMessage("The selected model cannot call canvas tools. Answer ordinary explanatory questions normally. If the request requires inspecting or changing the canvas, explain that the canvas tool is unavailable. Do not describe freehand ink or claim to have transcribed it. Do not claim to inspect, propose, or apply a canvas change.");
       try { response = await invoke([system, fallback, ...budgeted.conversation], true); }
       catch (fallbackError) { logTutorContextOverflow(fallbackError); return failureResult(activeScope, scopeStart, classifyModelFailure(fallbackError), run); }
@@ -337,7 +359,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
 
   const executableTools = new Map<string, { name: string; invoke(input: any): Promise<any> }>([...executableBaseTools, ...(run.provider !== "ollama" ? [factCheckTool] : [])].map((item) => [item.name, item] as [string, { name: string; invoke(input: any): Promise<any> }]));
   for (let iteration = 0; iteration < 2 && response.tool_calls?.length; iteration++) {
-    if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, canvasDescribe, canvasDesignGuide, teachingScene].some((tool) => tool && (response.tool_calls ?? []).some((call) => call.name === tool.name))) {
+    if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene].some((tool) => tool && (response.tool_calls ?? []).some((call) => call.name === tool.name))) {
       canvasToolProposed = true;
       recordTutorOutcome(run, response.tool_calls?.map((call) => call.name) ?? [], "tool_proposed", budgeted);
       return { activeScope, scopeStart, messages: [response] };
@@ -368,7 +390,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     try { response = await invoke(history); }
     catch (error) { logTutorContextOverflow(error); return failureResult(activeScope, scopeStart, classifyModelFailure(error), run); }
   }
-  if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate].some((tool) => tool && response.tool_calls?.some((call) => call.name === tool.name))) {
+  if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool].some((tool) => tool && response.tool_calls?.some((call) => call.name === tool.name))) {
     recordTutorOutcome(run, response.tool_calls?.map((call) => call.name) ?? [], "tool_proposed", budgeted);
     return { activeScope, scopeStart, messages: [response] };
   }
@@ -378,14 +400,14 @@ async function tutor(state: typeof State.State, config?: unknown) {
     recordTutorOutcome(run, [], "empty_answer", budgeted);
     return { activeScope, scopeStart, messages: [new AIMessage("The model returned an empty answer. Retry with a larger response limit.")] };
   }
-  const canvasActionToolNames = [canvasTool, quickdrawActions, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, canvasDescribe, canvasDesignGuide, teachingScene]
+  const canvasActionToolNames = [canvasTool, quickdrawActions, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene]
     .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
     .map((tool) => tool.name);
   const priorCanvasProposal = state.messages.some((message) => {
     const calls = (message as AIMessage).tool_calls;
     return Array.isArray(calls) && calls.some((call) => canvasActionToolNames.includes(call.name));
   });
-  if (!canvasToolProposed && !priorCanvasProposal && (quickdrawActions || quickdrawRead || canvasTool || canvasObjectCreate) && requestsCanvasAction(query)) return { activeScope, scopeStart, messages: [new AIMessage("I did not receive a structured canvas tool call, so the canvas was not changed. This model may not support tool calling; try a model with tool-calling support.")] };
+  if (!canvasToolProposed && !priorCanvasProposal && (quickdrawActions || quickdrawRead || canvasTool || canvasObjectCreate || moleculeTool) && requestsCanvasAction(query)) return { activeScope, scopeStart, messages: [new AIMessage("I did not receive a structured canvas tool call, so the canvas was not changed. This model may not support tool calling; try a model with tool-calling support.")] };
   const redactedBody = rawCanvasMetadataRequested || isExactOutputRequest(query)
     ? body
     : body.replace(/\b(?:q|s|g|o|c):[A-Za-z0-9:_-]{3,}/g, "the referenced canvas item");

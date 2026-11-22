@@ -34,6 +34,50 @@ export const canvasObjectCreateSchema = z.object({
 });
 export type CanvasObjectCreateInput = z.infer<typeof canvasObjectCreateSchema>;
 export type CanvasObjectProposal = CanvasObjectCreateInput & { courseId: string; lessonId: string; baseRevision: number; expectedObjects: string; object: ScientificObject };
+
+/** Flat molecule schema: atom/bond indices instead of generated nested IDs. */
+export const moleculeProposalSchema = z.object({
+  boardId: z.string(),
+  name: z.string().trim().min(1).max(120),
+  x: z.number().finite(),
+  y: z.number().finite(),
+  atoms: z.array(z.object({
+    element: z.enum(["H", "C", "N", "O", "F", "P", "S", "Cl", "Br", "I"]),
+    nonbondingElectrons: z.number().int().min(0),
+  })).min(2).max(30),
+  bonds: z.array(z.object({
+    from: z.number().int().nonnegative().describe("Zero-based index into atoms."),
+    to: z.number().int().nonnegative().describe("Zero-based index into atoms."),
+    order: z.union([z.literal(1), z.literal(1.5), z.literal(2), z.literal(3)]),
+  })).min(1).max(60),
+  reason: z.string().min(1).max(1000),
+});
+export type MoleculeProposalInput = z.infer<typeof moleculeProposalSchema>;
+
+export function proposeMolecule(context: CanvasContext, value: unknown): CanvasObjectProposal {
+  const input = moleculeProposalSchema.parse(value);
+  const baseRevision = context.revision;
+  requireCanvasRevision(baseRevision);
+  if (input.bonds.some((bond) => bond.from >= input.atoms.length || bond.to >= input.atoms.length || bond.from === bond.to)) {
+    throw new Error("Molecule bond endpoints must be distinct, valid atom indices.");
+  }
+  const atomIds = input.atoms.map(() => newId("atom"));
+  const atoms = input.atoms.map((atom, index) => ({ ...atom, id: atomIds[index] }));
+  const formId = newId("form");
+  const bonds = input.bonds.map((bond) => ({ id: newId("bond"), from: atomIds[bond.from], to: atomIds[bond.to], order: bond.order }));
+  const object: ScientificObject = {
+    id: newId("molecule"), kind: "molecule", x: input.x, y: input.y, width: 260, height: 154,
+    name: input.name, atoms, resonanceForms: [{ id: formId, name: "Resonance form 1", bonds }], activeResonanceId: formId,
+  };
+  parseCanvasDocument({ ...emptyCanvasDocument(), objects: [object] });
+  return {
+    boardId: input.boardId, courseId: context.courseId, lessonId: context.lessonId,
+    kind: "molecule", x: input.x, y: input.y,
+    fieldsJson: JSON.stringify({ name: input.name, atoms, resonanceForms: object.resonanceForms, activeResonanceId: formId }, null, 2),
+    reason: input.reason, baseRevision, expectedObjects: JSON.stringify(context.objects), object,
+  };
+}
+
 export class MathProposalValidationError extends Error {
   constructor(readonly status: "invalid" | "unknown" | "unsupported", message: string) { super(message); this.name = "MathProposalValidationError"; }
 }

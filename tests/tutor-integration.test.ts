@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { makeMolecule } from "../src/canvas/model";
 
-const mocks = vi.hoisted(() => ({ invoke: vi.fn(), bindTools: vi.fn(), ollamaOptions: [] as unknown[], groqInvoke: vi.fn(), groqBindTools: vi.fn(), groqOptions: [] as unknown[] }));
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), bindTools: vi.fn(), ollamaOptions: [] as unknown[], groqInvoke: vi.fn(), groqBindTools: vi.fn(), groqBindToolOptions: [] as unknown[], groqOptions: [] as unknown[] }));
 vi.mock("@langchain/ollama", () => ({ ChatOllama: class {
   invoke = mocks.invoke;
   constructor(options: unknown) { mocks.ollamaOptions.push(options); }
@@ -14,7 +14,7 @@ vi.mock("@langchain/ollama", () => ({ ChatOllama: class {
 vi.mock("@langchain/groq", () => ({ ChatGroq: class {
   invoke = mocks.groqInvoke;
   constructor(options: unknown) { mocks.groqOptions.push(options); }
-  bindTools(tools: unknown[]) { mocks.groqBindTools(tools); return this; }
+  bindTools(tools: unknown[], options?: unknown) { mocks.groqBindTools(tools); mocks.groqBindToolOptions.push(options); return this; }
 } }));
 const folder = mkdtempSync(join(tmpdir(), "studyai-tutor-"));
 const originalStudyAiDb = process.env.STUDYAI_DB;
@@ -74,7 +74,7 @@ beforeEach(() => {
   process.env.TUTOR_GROQ_INPUT_USD_PER_1M = "0.15";
   process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = "0.6";
   delete process.env.AI_DIAGNOSTICS;
-  mocks.invoke.mockReset(); mocks.bindTools.mockClear(); mocks.ollamaOptions.length = 0; mocks.groqInvoke.mockReset(); mocks.groqBindTools.mockClear(); mocks.groqOptions.length = 0;
+  mocks.invoke.mockReset(); mocks.bindTools.mockClear(); mocks.ollamaOptions.length = 0; mocks.groqInvoke.mockReset(); mocks.groqBindTools.mockClear(); mocks.groqBindToolOptions.length = 0; mocks.groqOptions.length = 0;
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -286,6 +286,17 @@ it("binds read_canvas_ink and forwards it for browser execution", async () => {
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(response.tool_calls![0]);
 });
 
+it("does not force tool_choice for a natural drawing request", async () => {
+  process.env.TUTOR_PROVIDER = "auto";
+  process.env.GROQ_API_KEY = "mock-key";
+  const response = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_action", id: "draw-1", args: { boardId: "board-1", actions: [{ kind: "createShape", shape: { type: "line", x: 0, y: 0, props: { color: "black", size: "m" } } }] } }] });
+  mocks.groqInvoke.mockResolvedValue(response);
+  await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }, { name: "get_canvas_state" }] }, messages: [new HumanMessage("Draw a straight line and an arrow on the canvas")] });
+  const options = mocks.groqBindToolOptions[0] as { tool_choice?: string } | undefined;
+  expect(options?.tool_choice).not.toBe("any");
+  expect(boundToolNames(mocks.groqBindTools.mock.calls)).toContain("propose_canvas_action");
+});
+
 it("reports tool-calling incompatibility without returning JSON as ordinary chat", async () => {
   mocks.invoke.mockRejectedValueOnce(new Error("model does not support tools")).mockResolvedValueOnce(new AIMessage("This model cannot draw an arrow."));
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }] }, messages: [new HumanMessage("Draw an arrow")] });
@@ -311,6 +322,16 @@ it("recovers from a provider tool-call validation error with one corrective retr
   const result = await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_action" }] }, messages: [new HumanMessage("Add a moment arm question")] });
   expect(mocks.invoke).toHaveBeenCalledTimes(2);
   expect((result.messages.at(-1) as AIMessage).tool_calls?.[0]).toEqual(proposal.tool_calls![0]);
+});
+
+it("names a hallucinated tool name in the corrective retry message", async () => {
+  const validationError = new Error("Tool call validation failed: attempted to call tool 'json' which was not in request.tools");
+  const proposal = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_edit", id: "retry-j", args: { boardId: "board-1", objectId: molecule.id, patchJson: '{"name":"Reviewed"}', reason: "Requested" } }] });
+  mocks.invoke.mockRejectedValueOnce(validationError).mockResolvedValueOnce(proposal);
+  await graph.invoke({ copilotkit: { context, actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("Correct the force vector on my board.")] });
+  const retryMessages = mocks.invoke.mock.calls[1][0] as Array<{ content?: unknown }>;
+  const correction = retryMessages.find((message) => typeof message.content === "string" && /json/i.test(message.content) && /not a bound tool/i.test(message.content));
+  expect(correction).toBeDefined();
 });
 
 it("allows a text answer when the user explicitly says not to edit the canvas", async () => {
