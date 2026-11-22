@@ -10,6 +10,18 @@ import {
 } from "./ledger.js";
 import { handleChat } from "./gateway.js";
 import { hashToken } from "./token.js";
+import {
+  createCheckoutSession,
+  createStripeCheckoutClient,
+  type StripeCheckoutClient,
+  type CheckoutParams,
+} from "./stripe.js";
+import {
+  handleStripeWebhook,
+  verifyStripeSignature,
+  type StripeEvent,
+  type StripeEventStore,
+} from "./stripe-webhook.js";
 
 /** Minimal structural D1 types: avoids adding a Workers type dependency to this repo. */
 export interface D1StatementLike {
@@ -26,6 +38,8 @@ export interface WorkerEnv {
   GROQ_API_KEY: string;
   STUDYAI_CLIENT_TOKEN: string;
   STUDYAI_ORIGIN?: string;
+  STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
 }
 
 function json(status: number, body: unknown): Response {
@@ -100,6 +114,19 @@ export function createD1Store(db: D1DatabaseLike): LedgerStore {
   };
 }
 
+/** D1-backed Stripe event store for webhook replay protection. */
+function createD1EventStore(db: D1DatabaseLike): StripeEventStore {
+  return {
+    async hasEvent(id) {
+      const row = await db.prepare("SELECT event_id FROM stripe_events WHERE event_id = ?").bind(id).all();
+      return row.results.length > 0;
+    },
+    async recordEvent(id, kind, createdAt) {
+      await db.prepare("INSERT OR IGNORE INTO stripe_events (event_id, kind, created_at) VALUES (?, ?, ?)").bind(id, kind, createdAt).run();
+    },
+  };
+}
+
 function walletToken(request: Request): string | null {
   const match = /^Bearer ([0-9a-f]{32,})$/i.exec(request.headers.get("authorization") ?? "");
   return match ? match[1].toLowerCase() : null;
@@ -116,9 +143,42 @@ function withCors(response: Response, request: Request, env: WorkerEnv): Respons
   return new Response(response.body, { status: response.status, headers });
 }
 
-/** Route handler with an injected store, so it can be tested without D1. */
-export function makeFetch(store: LedgerStore, env: WorkerEnv): (request: Request) => Promise<Response> {
+export interface RouteDeps {
+  stripe?: StripeCheckoutClient;
+  constructEvent?: (body: string, signature: string, secret: string) => StripeEvent | Promise<StripeEvent>;
+  events?: StripeEventStore;
+}
+
+function memoryEventStore(): StripeEventStore {
+  const seen = new Set<string>();
+  return {
+    async hasEvent(id) { return seen.has(id); },
+    async recordEvent(id) { seen.add(id); },
+  };
+}
+
+function integrationIdentifier(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return `studyai-${Array.from(bytes, (b) => String.fromCharCode(97 + (b % 26))).join("")}`;
+}
+
+/** Route handler with injectable dependencies, so it can be tested without D1 or Stripe. */
+export function makeFetch(store: LedgerStore, env: WorkerEnv, deps: RouteDeps = {}): (request: Request) => Promise<Response> {
   return async (request) => {
+    const path = new URL(request.url).pathname;
+    if (path === "/v1/stripe/webhook" && request.method === "POST") {
+      return handleStripeWebhook(
+        request,
+        {
+          STRIPE_WEBHOOK_SECRET: env.STRIPE_WEBHOOK_SECRET,
+          store,
+          events: deps.events ?? memoryEventStore(),
+        },
+        deps.constructEvent ?? verifyStripeSignature,
+      );
+    }
+
     if (request.headers.get("x-studyai-client") !== env.STUDYAI_CLIENT_TOKEN) {
       return json(403, { error: "invalid_client" });
     }
@@ -126,10 +186,45 @@ export function makeFetch(store: LedgerStore, env: WorkerEnv): (request: Request
       return withCors(new Response(null, { status: 204 }), request, env);
     }
 
-    const path = new URL(request.url).pathname;
     let response: Response;
     if (path === "/v1/chat/completions" && request.method === "POST") {
       response = await handleChat(request, { GROQ_API_KEY: env.GROQ_API_KEY, store });
+    } else if (path === "/v1/checkout" && request.method === "POST") {
+      const token = walletToken(request);
+      if (!token) {
+        response = json(401, { error: "invalid_wallet_token" });
+      } else {
+        let kind = "";
+        let choice = "";
+        try {
+          const body = (await request.json()) as { kind?: string; choice?: string };
+          kind = body.kind ?? "";
+          choice = body.choice ?? "";
+        } catch {
+          response = json(400, { error: "invalid_request" });
+          return withCors(response, request, env);
+        }
+        if ((kind !== "donation" && kind !== "credits") || !choice) {
+          response = json(400, { error: "invalid_request" });
+        } else {
+          try {
+            const stripe = deps.stripe ?? createStripeCheckoutClient(env.STRIPE_SECRET_KEY);
+            const session = await createCheckoutSession(
+              {
+                kind,
+                choice,
+                walletId: await hashToken(token),
+                origin: env.STUDYAI_ORIGIN ?? "",
+                integrationIdentifier: integrationIdentifier(),
+              },
+              stripe,
+            );
+            response = json(200, session);
+          } catch {
+            response = json(400, { error: "invalid_checkout" });
+          }
+        }
+      }
     } else if (path === "/v1/wallet" && request.method === "GET") {
       const token = walletToken(request);
       if (!token) {
@@ -174,6 +269,6 @@ export function makeFetch(store: LedgerStore, env: WorkerEnv): (request: Request
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     if (!env.CREDITS_DB) return json(500, { error: "credits_db_unavailable" });
-    return makeFetch(createD1Store(env.CREDITS_DB), env)(request);
+    return makeFetch(createD1Store(env.CREDITS_DB), env, { events: createD1EventStore(env.CREDITS_DB) })(request);
   },
 };

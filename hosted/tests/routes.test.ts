@@ -10,6 +10,8 @@ import {
 } from "../src/ledger.js";
 import { hashToken } from "../src/token.js";
 import { makeFetch, type WorkerEnv } from "../src/index.js";
+import type { StripeCheckoutClient, CheckoutParams } from "../src/stripe.js";
+import type { StripeEvent } from "../src/stripe-webhook.js";
 
 const TOKEN = "abcdef0123456789abcdef0123456789";
 const CLIENT = "client-token";
@@ -53,6 +55,8 @@ function env(): WorkerEnv {
     GROQ_API_KEY: "key",
     STUDYAI_CLIENT_TOKEN: CLIENT,
     STUDYAI_ORIGIN: "https://studyai.example",
+    STRIPE_SECRET_KEY: "rk_test_placeholder",
+    STRIPE_WEBHOOK_SECRET: "whsec_placeholder",
   };
 }
 
@@ -118,5 +122,77 @@ describe("worker routes", () => {
   it("returns 404 for an unknown path", async () => {
     const res = await makeFetch(new FakeStore(), env())(request("/nope"));
     expect(res.status).toBe(404);
+  });
+
+  it("creates a checkout session for a valid choice and rejects an invalid one", async () => {
+    const calls: CheckoutParams[] = [];
+    const stripe: StripeCheckoutClient = {
+      async createSession(params) {
+        calls.push(params);
+        return { url: "https://checkout.stripe.com/c/pay/mock" };
+      },
+    };
+    const handler = makeFetch(new FakeStore(), env(), { stripe });
+    const ok = await handler(request("/v1/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "credits", choice: "medium" }),
+    }));
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ url: "https://checkout.stripe.com/c/pay/mock" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].clientReferenceId).toBeTruthy();
+    expect(calls[0].integrationIdentifier).toMatch(/^studyai-[a-z]{8}$/);
+    const bad = await handler(request("/v1/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "credits", choice: "huge" }),
+    }));
+    expect(bad.status).toBe(400);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("rejects checkout without a wallet token or client marker", async () => {
+    const stripe: StripeCheckoutClient = {
+      async createSession() { return { url: "unused" }; },
+    };
+    const handler = makeFetch(new FakeStore(), env(), { stripe });
+    const noToken = await request("/v1/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "donation", choice: "small" }),
+    }, null);
+    expect((await handler(noToken)).status).toBe(401);
+    const noMarker = new Request("https://credits.example/v1/checkout", {
+      method: "POST",
+      headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+      body: JSON.stringify({ kind: "donation", choice: "small" }),
+    });
+    expect((await handler(noMarker)).status).toBe(403);
+  });
+
+  it("accepts a signed webhook without a client marker and rejects a bad signature", async () => {
+    const events = makeFetch(new FakeStore(), env(), {
+      constructEvent: (_body, signature) => {
+        if (signature !== "valid") throw new Error("bad signature");
+        return {
+          id: "evt_route",
+          type: "checkout.session.completed",
+          data: { object: { payment_status: "paid", client_reference_id: "wallet-route", metadata: { kind: "donation", credit_micros: "0" } } },
+        } satisfies StripeEvent;
+      },
+    });
+    const signed = new Request("https://credits.example/v1/stripe/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": "valid" },
+      body: "{}",
+    });
+    expect((await events(signed)).status).toBe(200);
+    const bad = new Request("https://credits.example/v1/stripe/webhook", {
+      method: "POST",
+      headers: { "stripe-signature": "bad" },
+      body: "{}",
+    });
+    expect((await events(bad)).status).toBe(400);
   });
 });
