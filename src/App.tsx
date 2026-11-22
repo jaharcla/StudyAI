@@ -8,6 +8,7 @@ import { StudyPanel } from "./learning/StudyPanel";
 import { ActivityLibrary, type ActivitySession } from "./learning/ActivityLibrary";
 import { ActivityTaskPanel } from "./learning/ActivityTaskPanel";
 import { lessonPreferenceKey, selectCourse, selectLesson } from "./workspace-state";
+import StudyStage from "./lab/StudyStage";
 const DocumentLibrary = lazy(() => import("./components/document-intelligence").then((module) => ({ default: module.DocumentLibrary })));
 
 
@@ -47,7 +48,8 @@ function Workspace() {
   const [lessonError, setLessonError] = useState("");
   const lessonTitle = lessons.find((item) => item.id === lessonId)?.title ?? "";
   const [view, setView] = useState<View>("Canvas");
-  const [sidebar, setSidebar] = useState(true);
+  const [mode, setMode] = useState<"canvas" | "study">("canvas");
+  const [sidebar, setSidebar] = useState(false);
   const [tutor, setTutor] = useState(true);
   const [dark, setDark] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -150,6 +152,7 @@ function Workspace() {
 
   const changeCourse = (next: Course) => {
     if (next.id === course.id) return;
+    setSidebar(false);
     closeActivity(); setActivityLibraryOpen(false);
     setCourse(next);
     setLessons([]);
@@ -159,6 +162,7 @@ function Workspace() {
   };
 
   const changeLesson = (nextId: string) => {
+    setSidebar(false);
     closeActivity(); setActivityLibraryOpen(false);
     setLessonId(nextId);
     setStatus("Loading lesson…");
@@ -227,8 +231,8 @@ function Workspace() {
   };
 
 
-  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell ${dark ? "dark" : ""}`}>
-    {sidebar && <aside className="sidebar">
+  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""}`}>
+    {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar">
       <div className="brand-row"><div className="brand-mark"><Sparkles size={17} /></div><span>study<span className="brand-ai">ai</span></span><button className="icon-button sidebar-close" onClick={() => setSidebar(false)} title="Collapse sidebar"><ChevronLeft size={16} /></button></div>
       <button className="search-button" disabled title="Global search is not available yet"><Search size={15} /><span>Search anything</span><kbd>⌘ K</kbd></button>
       <div className="nav-label">YOUR SPACE</div>
@@ -238,11 +242,16 @@ function Workspace() {
       <div className="course-list">{courses.map((item) => <button key={item.id} className={`course-item ${course.id === item.id ? "selected" : ""}`} onClick={() => changeCourse(item)}><i style={{ background: item.color }} /><span><b>{item.title}</b><small>{item.code}</small></span><MoreHorizontal size={15} className="course-more" /></button>)}</div>
       {course.id ? <div className="course-tree"><div className="tree-course">{course.title}</div>{lessons.map((item) => <button key={item.id} className={`tree-sub ${lessonId === item.id ? "lesson-current" : ""}`} onClick={() => changeLesson(item.id)}>{lessonId === item.id && <span className="lesson-dot" />}{item.title}</button>)}<button className="tree-sub" onClick={() => void addLesson()}>+ Add lesson</button>{lessonError && <small role="alert">{lessonError}</small>}</div> : <div className="course-tree"><span>{courseError || (status === "No courses yet" ? "Add a course to begin." : "Loading courses…")}</span><button className="tree-sub" onClick={() => void addCourse()}>+ Add course</button></div>}
       <div className="sidebar-bottom"><button className="nav-item" onClick={() => setSettings(true)}><Settings2 size={17} /> Settings</button><div className="local-status"><span />{status}</div></div>
-    </aside>}
+    </aside></>}
 
     <main className="main-area">
       <header className="topbar">
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
+        <div className="immersive-actions">
+          <button className="primary" disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
+          <button disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Flashcards and review"><BookOpen size={14} /> Cards</button>
+          <button className="icon-only" onClick={() => setTutor(!tutor)} title="Toggle study tutor"><Sparkles size={15} /></button>
+        </div>
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" disabled title="Help is not available yet"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
       <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" disabled={!course.id || !lessonId} onClick={() => setStudyOpen(true)}><Brain size={15} /> Study this lesson</button></section>
@@ -265,6 +274,7 @@ function Workspace() {
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
     {studyOpen && course.id && lessonId && <StudyPanel courseId={course.id} lessonId={lessonId} close={() => setStudyOpen(false)} />}
+    {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} />}
   </div></>;
 }
 

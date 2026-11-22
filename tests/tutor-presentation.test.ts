@@ -251,4 +251,34 @@ describe("Tutor semantic canvas context", () => {
     expect(ordinary).not.toContain('"x"');
     expect(projectTutorContexts(raw, true)).toBe(raw);
   });
+
+  it("keeps meaningful scientific detail for every nearby object kind without raw ids", () => {
+    const projected = JSON.stringify(projectTutorContexts([{ description: "Active canvas scene", value: {
+      selected: [], visible: [], spatialRelationships: [], truncated: false,
+      nearbyObjects: [
+        { id: "obj-mol", kind: "molecule", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { name: "Molecule", atomCount: 6, formula: "C2H4", atoms: [{ id: "atom-aaa", element: "C", nonbondingElectrons: 0 }, { id: "atom-bbb", element: "H", nonbondingElectrons: 0 }], bonds: [{ from: "atom-aaa", to: "atom-bbb", order: 1 }], activeResonanceId: "form-a", resonanceForms: [{ name: "Form A", bondCount: 1 }] } },
+        { id: "obj-graph", kind: "graph", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { expression: "y=x^2", xRange: [-2, 2], xLabel: "x", yLabel: "y", pointCount: 3, points: [[0, 0], [1, 1], [2, 4]], evaluationError: "domain" } },
+        { id: "obj-eq", kind: "equation", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { expression: "F=ma", variables: { m: 2, a: 3 }, units: "N", result: 6, evaluationError: "" } },
+        { id: "obj-force", kind: "force", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { components: [3, 4, 0], units: "N", label: "F", pointOfApplication: { x: 10, y: 20 } } },
+        { id: "obj-atom", kind: "atom", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { element: "O", label: "O", nonbondingElectrons: 4, bondOrderSum: 2 } },
+        { id: "obj-rel", kind: "relationship", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { fromId: "obj-atom", toId: "obj-force", label: "acts on" } },
+        { id: "obj-anat", kind: "anatomy", bounds: { x: 0, y: 0, w: 1, h: 1 }, detail: { structureId: "heart", system: "circulatory", labels: ["aorta"] } },
+      ],
+    } }], false));
+
+    expect(projected).toContain("C2H4");
+    expect(projected).toContain('"label":"C1"');
+    expect(projected).toContain('"label":"H1"');
+    expect(projected).toContain('"from":"C1"');
+    expect(projected).toContain('"points":[[0,0],[1,1],[2,4]]');
+    expect(projected).toContain('"evaluationError":"domain"');
+    expect(projected).toContain('"result":6');
+    expect(projected).toContain('"magnitude":5');
+    expect(projected).toContain('"nonbondingElectrons":4');
+    expect(projected).toContain('"acts on"');
+    expect(projected).toContain('"structureId":"heart"');
+    expect(projected).not.toContain("atom-aaa");
+    expect(projected).not.toContain("atom-bbb");
+    expect(projected).not.toContain("obj-mol");
+  });
 });
