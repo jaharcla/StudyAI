@@ -60,6 +60,8 @@ export interface LedgerStore {
 const MAX_PACK_VALUE = 20_000_000; // $20
 const DAILY_CAP = 1_000_000; // $1 per wallet per day
 const PER_REQUEST_MAX = 50_000; // $0.05 per request
+/** Exported so the gateway can reserve exactly the maximum permitted per-request cost. */
+export const PER_REQUEST_MAX_MICROS = PER_REQUEST_MAX;
 
 /** Helper to get current UTC day string */
 function utcDay(): string {
