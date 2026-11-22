@@ -815,7 +815,14 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>
     </div>
-    {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} />}
+    {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} onRegisterCard={async (front, back, conceptId) => {
+      try {
+        const response = await fetch(`${API}/study/cards`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId, lessonId, conceptId, front, back }) });
+        const value = await response.json().catch(() => ({})) as { error?: string };
+        if (!response.ok) throw new Error(value.error || "Card registration failed");
+        onStatus("Added to review deck");
+      } catch (error) { onStatus(error instanceof Error ? error.message : "Could not add card to review deck"); }
+    }} />}
   </div>;
 }
 
@@ -824,7 +831,7 @@ function CanvasAnalysisTutorContext({ analysis }: { analysis: CanvasAnalysisResu
   return null;
 }
 
-function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreateLinkedGraph }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void; onCreateLinkedGraph: () => void }) {
+function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreateLinkedGraph, onRegisterCard }: { object: ScientificObject; objects: ScientificObject[]; onChange: (object: Partial<ScientificObject>) => void; onClose: () => void; onOpenNote: (id: string) => void; onCreateLinkedGraph: () => void; onRegisterCard: (front: string, back: string, conceptId: string) => Promise<void> }) {
   const patch = (key: string, value: unknown) => onChange({ [key]: value } as Partial<ScientificObject>);
   const numberInput = (label: string, value: number, update: (value: number) => void, step = 1) => <label>{label}<input type="number" step={step} value={value} onChange={(event) => update(Number(event.target.value))} /></label>;
   const textInput = (label: string, value: string, update: (value: string) => void) => <label>{label}<input value={value} onChange={(event) => update(event.target.value)} /></label>;
@@ -845,7 +852,7 @@ function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreate
     {object.kind === "linked-note" && <>{textInput("Note title", object.title, (title) => patch("title", title))}<label>Excerpt<textarea value={object.excerpt} onChange={(event) => patch("excerpt", event.target.value)} /></label><button className="button-soft" onClick={() => onOpenNote(object.noteId)}>Open source note</button></>}
     {object.kind === "linked-document" && <>{textInput("Document title", object.title, (title) => patch("title", title))}{textInput("Document ID", object.documentId, (documentId) => patch("documentId", documentId))}<label>Excerpt<textarea value={object.excerpt} onChange={(event) => patch("excerpt", event.target.value)} /></label></>}
     {object.kind === "question" && <>{textInput("Course concept ID", object.conceptId ?? "", (conceptId) => patch("conceptId", conceptId))}<label>Question<textarea value={object.prompt} onChange={(event) => patch("prompt", event.target.value)} /></label><label>Answer<textarea value={object.answer ?? ""} onChange={(event) => patch("answer", event.target.value)} /></label></>}
-    {object.kind === "flashcard" && <>{textInput("Course concept ID", object.conceptId ?? "", (conceptId) => patch("conceptId", conceptId))}<label>Front<textarea value={object.front} onChange={(event) => patch("front", event.target.value)} /></label><label>Back<textarea value={object.back} onChange={(event) => patch("back", event.target.value)} /></label></>}
+    {object.kind === "flashcard" && <>{textInput("Course concept ID", object.conceptId ?? "", (conceptId) => patch("conceptId", conceptId))}<label>Front<textarea value={object.front} onChange={(event) => patch("front", event.target.value)} /></label><label>Back<textarea value={object.back} onChange={(event) => patch("back", event.target.value)} /></label>{object.conceptId?.trim() && <button className="button-soft" aria-label="Add to review deck" onClick={() => void onRegisterCard(object.front, object.back, object.conceptId ?? "")}>Add to review deck</button>}</>}
     {("geometry" in object && object.geometry) && <><h4>Attachments</h4><p>{object.geometry.tailRef ? `Start: ${object.geometry.tailRef.scope} / ${object.geometry.tailRef.id}` : "Start: free"}<br />{object.geometry.tipRef ? `End: ${object.geometry.tipRef.scope} / ${object.geometry.tipRef.id}` : "End: free"}</p><button className="button-soft" onClick={() => patch("geometry", { ...object.geometry!, tailRef: undefined, tipRef: undefined })}>Detach endpoints</button></>}
   </div><footer><button className="button-primary" onClick={onClose}>Done</button></footer></section></div>;
 }

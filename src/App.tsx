@@ -5,6 +5,7 @@ import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./scienc
 import { CanvasStudio } from "./canvas/CanvasStudio";
 import { parseSourceReference } from "./components/document-intelligence/api";
 import { StudyPanel } from "./learning/StudyPanel";
+import FlashcardReview from "./learning/FlashcardReview";
 import { ActivityLibrary, type ActivitySession } from "./learning/ActivityLibrary";
 import { ActivityTaskPanel } from "./learning/ActivityTaskPanel";
 import { lessonPreferenceKey, selectCourse, selectLesson } from "./workspace-state";
@@ -58,6 +59,7 @@ function Workspace() {
   const [progressOpen, setProgressOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tutorMenuOpen, setTutorMenuOpen] = useState(false);
+  const [flashcardReviewOpen, setFlashcardReviewOpen] = useState(false);
   const tutorConfig = useCopilotChatConfiguration();
   const [tutor, setTutor] = useState(true);
   const [dark, setDark] = useState(false);
@@ -266,7 +268,7 @@ function Workspace() {
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
         <div className="immersive-actions">
           <button className="primary" disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
-          <button disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Flashcards and review"><BookOpen size={14} /> Cards</button>
+          <button disabled={!course.id || !lessonId} onClick={() => setFlashcardReviewOpen(true)} title="Flashcards and review"><BookOpen size={14} /> Cards</button>
           <button className="icon-only" onClick={() => setTutor(!tutor)} title="Toggle study tutor"><Sparkles size={15} /></button>
         </div>
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => setHelpOpen(true)} title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
@@ -295,6 +297,7 @@ function Workspace() {
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} onOpenSettings={() => { setHelpOpen(false); setSettings(true); }} onOpenCanvas={() => { setHelpOpen(false); setView("Canvas"); }} />}
     {progressOpen && course.id && <ProgressDialog courseId={course.id} onClose={() => setProgressOpen(false)} />}
     {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
+    {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} close={() => setFlashcardReviewOpen(false)} />}
     {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} />}
   </div></>;
 }
