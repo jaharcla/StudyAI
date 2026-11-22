@@ -11,6 +11,7 @@ import { providerUsageSnapshot } from "../canvas-intelligence/provider-usage.js"
 import { CanvasAnalysisValidationError, createCanvasAnalysisResult, currentCanvasRevision, type AuthoritativeCanvasRevision, type CanvasAnalysisResult } from "./contract.js";
 import { provenanceForStage } from "../canvas-intelligence/failure-contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./receiver.js";
+import { saveCanvasAnalysis } from "./storage.js";
 import { CANVAS_OCR_DEFAULT_PADDING, CANVAS_OCR_MAX_REGIONS_LIMIT, canvasOCRRegionTransform, clampOCRRegionLimit, planCanvasOCRCrops, sameCanvasRegionBounds } from "../../src/canvas/ocr-regions.js";
 
 type CanvasRow = AuthoritativeCanvasRevision & { name?: string };
@@ -214,6 +215,7 @@ export function createCanvasAnalysisProducerHandler(database: Database.Database,
     try {
       const usageBefore = usageTotals();
       const analysis = await produceCanvasAnalysisForPersistedBoard(database, { boardId, courseId, lessonId }, input, options);
+      saveCanvasAnalysis(database, boardId, courseId, lessonId, analysis.revision, analysis);
       send(200, { analysis, telemetry: { totalMs: analysis.diagnostics.timings?.totalMs ?? 0, imageEgress: isImageEgressAllowed(input.allowImageEgress), usage: usageDelta(usageBefore) } });
     } catch (error) {
       if (error instanceof CanvasAnalysisValidationError) {

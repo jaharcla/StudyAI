@@ -15,6 +15,7 @@ import { createLearningHandler } from "./learning/http.js";
 import { LearningActivityService } from "./learning/activities/service.js";
 import { createLearningActivityHandler } from "./learning/activities/http.js";
 import { createCanvasAnalysisHandler } from "./canvas-analysis/http.js";
+import { initializeCanvasAnalysisStorage } from "./canvas-analysis/storage.js";
 import { createCanvasAnalysisProducerHandler } from "./canvas-analysis/producer.js";
 import { createCanvasPersistenceHandler } from "./canvas-persistence/http.js";
 import { createCanvasSceneHandler } from "./canvas-intelligence/scene/http.js";
@@ -39,6 +40,7 @@ function rejectUntrustedRequest(req: import("node:http").IncomingMessage): strin
 configureProviderBudgetDatabase(db);
 configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
+initializeCanvasAnalysisStorage(db);
 const legacyDocuments = await migrateLegacyDocuments(db);
 if (legacyDocuments.failures.length) console.warn("Legacy document indexing failures:", legacyDocuments.failures);
 const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": config.webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };

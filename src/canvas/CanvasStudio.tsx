@@ -440,6 +440,14 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       onBoardState?.({ id: currentBoard.id, revision: currentBoard.revision, saved: true });
       documentRef.current = next;
       setDocument(next);
+      void fetch(`${API}/canvases/${encodeURIComponent(currentBoard.id)}/analysis?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`)
+        .then(async (response) => response.ok ? response.json() as Promise<{ analysis?: CanvasAnalysisResult | null }> : null)
+        .then((value) => {
+          if (sequence !== loadSequence.current || !value?.analysis) return;
+          setCanvasAnalysis(value.analysis);
+          onStatus("Canvas analysis restored for this board");
+        })
+        .catch(() => { /* no stored analysis; the user can run Analyze board */ });
     } catch {
       if (sequence !== loadSequence.current) return;
       const next = emptyCanvasDocument();

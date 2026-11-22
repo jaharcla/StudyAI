@@ -6,6 +6,7 @@ import { clearCanvasRecognitionCache, understandCanvas, type UnderstandCanvasArg
 export async function useMockGroqCanvasAnalysis(page: Page, courseId: string, lessonId: string) {
   const capture: { crops: Array<{ id: string; sourceIds: string[]; worldBounds: unknown; cropBounds: unknown; pixelWidth: number; pixelHeight: number; pixelToWorld: unknown }>; ocrCalls: number } = { crops: [], ocrCalls: 0 };
   await page.route(/\/api\/canvases\/[^/]+\/analysis\?/, async (route) => {
+    if (route.request().method() !== "POST") { await route.continue(); return; }
     const url = new URL(route.request().url());
     const boardId = url.pathname.split("/").at(-2)!;
     const payload = route.request().postDataJSON() as CanvasAnalysisRequest;
