@@ -14,7 +14,7 @@ Date: 2026-11-22. Branch: `work/studyai-credits` (isolated worktree at `C:\Users
 | `npx vitest run tests/gateway.hosted.test.ts` | 6 passed |
 | `npx vitest run tests/routes.hosted.test.ts` | 6 passed |
 | `npx vitest run tests/generate-codes.hosted.test.ts` | 4 passed |
-| `npx vitest run` (full suite) | 69 test files passed, 473 tests passed, 0 failed |
+| `npx vitest run` (full suite) | 70 test files passed, 474 tests passed, 0 failed (after the final-review config fix) |
 | `npx playwright test tests/e2e/credits-ui.spec.ts` | 1 passed |
 | `npm run verify` (full gate) | NOT GREEN on final run — 2 live-tutor e2e failures; see detail below |
 | GitNexus `detect_changes({scope:"all"})` | `changed_count: 0`, `risk_level: "none"`, no `partial` or `truncated` flag |
@@ -34,6 +34,8 @@ Running 33 tests using 1 worker
   3 skipped
   28 passed (6.4m)
 ```
+
+The quoted unit-test numbers are from before the final-review fix, which added one config-contract test (`tests/credits-config.test.ts`); the post-fix suite is 70 files / 474 tests. No e2e behavior changed.
 
 **The final `npm run verify` was not green.** An earlier run of the same command passed all 30 active e2e tests, including both of these. Isolated retries afterwards: `direct-vector` passed; `tutor-math` failed again because the live tutor returned the raw, malformed string `$\text{m},\text{s` instead of rendered KaTeX. Both failing tests depend on a live provider response and neither exercises the credit rail (the app defaults to the unchanged "local" provider). They are recorded as live-provider flakiness, not as a clean gate. The credits-specific browser test passed in both full runs and in isolation.
 
