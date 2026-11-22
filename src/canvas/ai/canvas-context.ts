@@ -1,5 +1,5 @@
 import { localBounds, pageBounds, type Bounds, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
-import type { ScientificObject } from "../model";
+import { moleculeBonds, type ScientificObject } from "../model";
 import { tutorMathWorkspace } from "../math-workspace";
 
 export type CanvasScope = { boardId: string; courseId: string; lessonId: string; revision?: number };
@@ -248,13 +248,28 @@ function arrowConnections(
 function scientificSummary(object: ScientificObject) {
   const strings = (values: Record<string, unknown>) => Object.fromEntries(Object.entries(values).map(([key, value]) => [key, typeof value === "string" ? value.slice(0, 300) : value]));
   let detail: Record<string, unknown>;
-  if (object.kind === "molecule") detail = { name: object.name.slice(0, 300), atomCount: object.atoms.length, activeResonanceId: object.activeResonanceId };
-  else if (object.kind === "graph") detail = { ...strings({ expression: object.expression, xLabel: object.xLabel, yLabel: object.yLabel }), xRange: object.xRange, pointCount: object.points.length };
+  if (object.kind === "molecule") {
+    // The agent cannot identify a structure from a count alone. Send the bounded
+    // atom elements and active-form bond orders so it can name/derive the molecule.
+    const atoms = object.atoms.slice(0, 32).map((atom) => ({ id: atom.id, element: atom.element, nonbondingElectrons: atom.nonbondingElectrons }));
+    const bonds = moleculeBonds(object).slice(0, 64).map((bond) => ({ from: bond.from, to: bond.to, order: bond.order }));
+    const counts = atoms.reduce<Record<string, number>>((acc, atom) => { acc[atom.element] = (acc[atom.element] ?? 0) + 1; return acc; }, {});
+    detail = {
+      name: object.name.slice(0, 300),
+      atomCount: object.atoms.length,
+      formula: Object.entries(counts).map(([element, count]) => `${element}${count > 1 ? count : ""}`).join(""),
+      atoms,
+      bonds,
+      activeResonanceId: object.activeResonanceId,
+      resonanceForms: object.resonanceForms.slice(0, 8).map((form) => ({ name: form.name.slice(0, 120), bondCount: form.bonds.length })),
+    };
+  }
+  else if (object.kind === "graph") detail = { ...strings({ expression: object.expression, xLabel: object.xLabel, yLabel: object.yLabel }), xRange: object.xRange, pointCount: object.points.length, points: object.points.slice(0, 64), ...(object.evaluationError ? { evaluationError: object.evaluationError.slice(0, 300) } : {}) };
   else if (object.kind === "anatomy") detail = { structureId: object.structureId, system: object.system.slice(0, 300), labels: object.labels.slice(0, 12).map((value) => value.slice(0, 120)) };
-  else if (object.kind === "equation") detail = { expression: object.expression.slice(0, 300), variables: Object.fromEntries(Object.entries(object.variables).slice(0, 20)), units: object.units?.slice(0, 100), ...(object.mathWorkspace ? { mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : {}) };
-  else if (object.kind === "vector" || object.kind === "force") detail = { components: object.components, units: object.units.slice(0, 100), label: object.label.slice(0, 300) };
+  else if (object.kind === "equation") detail = { expression: object.expression.slice(0, 300), variables: Object.fromEntries(Object.entries(object.variables).slice(0, 20)), units: object.units?.slice(0, 100), ...(object.result !== undefined ? { result: object.result } : {}), ...(object.evaluationError ? { evaluationError: object.evaluationError.slice(0, 300) } : {}), ...(object.mathWorkspace ? { mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : {}) };
+  else if (object.kind === "vector" || object.kind === "force") detail = { components: object.components, units: object.units.slice(0, 100), label: object.label.slice(0, 300), ...(object.kind === "force" && object.pointOfApplication ? { pointOfApplication: object.pointOfApplication } : {}) };
   else if (object.kind === "measurement") detail = { value: object.value, units: object.units.slice(0, 100), label: object.label.slice(0, 300) };
-  else if (object.kind === "atom") detail = { element: object.element, label: object.label.slice(0, 300), bondOrderSum: object.bondOrderSum };
+  else if (object.kind === "atom") detail = { element: object.element, label: object.label.slice(0, 300), nonbondingElectrons: object.nonbondingElectrons, bondOrderSum: object.bondOrderSum };
   else if (object.kind === "bond") detail = { from: object.from, to: object.to, order: object.order, label: object.label.slice(0, 300) };
   else if (object.kind === "concept") detail = strings({ title: object.title, definition: object.definition });
   else if (object.kind === "relationship") detail = strings({ fromId: object.fromId, toId: object.toId, label: object.label });

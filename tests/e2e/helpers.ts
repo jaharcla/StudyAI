@@ -21,6 +21,11 @@ export async function createCourseWithLesson(request: APIRequestContext, courseT
 
 export async function selectCourseOnPage(page: Page, title: string): Promise<void> {
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // The immersive shell keeps courses in a slide-over until the hamburger opens it.
+  const toggle = page.getByTitle("Toggle courses");
+  if (await toggle.isVisible() && !(await page.locator(".app-shell").evaluate((el) => el.classList.contains("sidebar-open")))) {
+    await toggle.click();
+  }
   await page.locator(".course-list").getByRole("button", { name: new RegExp(escaped) }).click();
 }
 

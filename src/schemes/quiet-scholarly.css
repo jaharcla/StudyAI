@@ -1,0 +1,179 @@
+/* ============================================================
+   QUIET SCHOLARLY — throwaway UI scheme experiment
+   A restrained, paper-and-ink system. One accent, real hierarchy,
+   readable type, generous rhythm. No gradients, no gray filling.
+   ============================================================ */
+
+@font-face{font-family:"Literata";font-style:normal;font-weight:400 700;font-display:swap;src:url("../../assets/fonts/literata-latin.woff2") format("woff2")}
+@font-face{font-family:"DM Sans";font-style:normal;font-weight:400 700;font-display:swap;src:url("../../assets/fonts/dm-sans-latin.woff2") format("woff2")}
+
+:root{
+  --paper:#f5f2ea;
+  --paper-2:#efebe1;
+  --surface:#fffdf8;
+  --ink:#28241e;
+  --ink-2:#5e564b;
+  --ink-3:#877e71;
+  --rule:#ded7c9;
+  --rule-soft:#ebe5da;
+  --accent:#7a452e;
+  --accent-2:#9a6244;
+  --accent-tint:#f4ebe3;
+  --ok:#4f7358;
+  --shadow:0 1px 2px rgba(51,42,30,.06),0 10px 30px rgba(51,42,30,.07);
+}
+
+/* ---- base ---- */
+html,body,#root{height:100%}
+body{font:400 13px/1.6 "DM Sans",system-ui,sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}
+*{scrollbar-width:thin;scrollbar-color:#cbc2b3 transparent}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#cbc2b3;border:2px solid var(--surface);border-radius:99px}
+::-webkit-scrollbar-track{background:transparent}
+::selection{background:#e3d2c1;color:var(--ink)}
+button,input,select,textarea{font-family:inherit}
+.app-shell{background:var(--paper)}
+
+/* ---- sidebar ---- */
+.sidebar{flex-basis:248px;padding:22px 16px 18px;background:var(--paper-2);border-right:1px solid var(--rule)}
+.brand-row{gap:11px;padding:0 6px 24px;font:600 19px/1.1 "Literata",Georgia,serif;letter-spacing:-.02em;color:var(--ink)}
+.brand-mark{width:32px;height:32px;border-radius:7px;background:var(--ink);color:#fffdf8}
+.brand-ai{color:var(--accent);font-weight:500}
+
+.search-button{height:36px;margin-bottom:26px;padding:0 11px;border:1px solid var(--rule);border-radius:7px;background:var(--surface);color:var(--ink-3);font-size:12px}
+.search-button kbd{padding:1px 5px;border:1px solid var(--rule);border-radius:4px;color:var(--ink-3);font:10px "DM Sans",sans-serif}
+
+.nav-label,.course-heading{margin:0 8px 9px;color:var(--ink-3);font:600 10px "DM Sans",sans-serif;letter-spacing:.13em;text-transform:uppercase}
+.search-button,.nav-item,.course-item,.tree-course,.tree-sub{gap:11px;padding:10px;border-radius:7px;color:var(--ink-2);font-size:12px}
+.nav-item{margin-bottom:2px}
+.nav-item.active,.course-item.selected,.tree-sub.lesson-current{background:var(--accent-tint);color:var(--accent);font-weight:600}
+.course-heading{margin-top:22px}
+.course-list{gap:2px}
+.course-item span{color:var(--ink);font-size:12px;font-weight:600}
+.course-item small,.tree-sub{color:var(--ink-3);font-size:10px}
+.course-tree{margin-top:18px;border-top:1px solid var(--rule);padding-top:14px}
+.tree-course{color:var(--ink-2);font-weight:600}
+.local-status{padding:12px 6px;color:var(--ink-3);font-size:10px}
+.lesson-dot,.local-status>span,.saved>span,.live-dot{background:var(--ok)}
+
+/* ---- top bars ---- */
+.topbar{flex-basis:52px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--rule-soft)}
+.breadcrumbs{color:var(--ink-2);font-size:12px}
+.breadcrumbs b{color:var(--ink);font-weight:600}
+.saved{font-size:10px;color:var(--ink-3)}
+
+.lesson-header{padding:24px 26px 20px;background:var(--surface);border-bottom:1px solid var(--rule-soft)}
+.lesson-header h1{margin:8px 0 13px;color:var(--ink);font:600 27px/1.2 "Literata",Georgia,serif;letter-spacing:-.02em}
+.lesson-header p{color:var(--ink-2);font-size:12px}
+.eyebrow{gap:8px;color:var(--accent);font:600 10px "DM Sans",sans-serif;letter-spacing:.13em;text-transform:uppercase}
+.eyebrow-icon{width:24px;height:24px;border-radius:6px;background:var(--accent-tint);color:var(--accent)}
+
+.button-primary{padding:10px 15px;border-radius:7px;background:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(60,30,15,.2);font:600 12px "DM Sans",sans-serif}
+.button-primary:hover{background:#683a27}
+.button-soft{padding:10px 14px;border:1px solid var(--rule);border-radius:7px;background:var(--surface);color:var(--ink-2);font:600 12px "DM Sans",sans-serif}
+.button-soft:hover{border-color:var(--accent-2);color:var(--accent)}
+
+.workspace-toolbar{flex-basis:46px;padding:0 22px;background:var(--surface);border-bottom:1px solid var(--rule-soft)}
+.view-switch button,.tool-chip{padding:8px 11px;border-radius:6px;color:var(--ink-2);font:500 12px "DM Sans",sans-serif}
+.view-switch button.current,.tool-chip.active{background:var(--accent-tint);color:var(--accent)}
+.icon-button{border-radius:6px;color:var(--ink-3)}
+.icon-button:hover{background:var(--accent-tint);color:var(--accent)}
+
+/* ---- canvas ---- */
+.canvas-pane,.lecture-pane{padding:14px 16px}
+.pane-label{flex-basis:28px;color:var(--ink-3);font:600 10px "DM Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.canvas-tip,.canvas-footer{color:var(--ink-3);font-size:11px}
+.canvas-board{border:1px solid var(--rule);border-radius:9px;background-color:#fdfbf6;background-image:radial-gradient(#dcd3c4 1px,transparent 1px);background-size:22px 22px}
+
+.canvas-tools-bar{border-bottom:1px solid var(--rule-soft);background:var(--surface)}
+.canvas-board-button{color:var(--ink);font:600 12px "DM Sans",sans-serif}
+.canvas-board-menu{border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow)}
+.canvas-board-menu button{color:var(--ink-2);font-size:11px}
+.canvas-board-menu button:hover,.canvas-board-menu button.current{background:var(--accent-tint);color:var(--accent)}
+.canvas-viewport{background:#faf7f0}
+.canvas-tool-palette{padding:12px;border:1px solid var(--rule);border-radius:9px;background:var(--surface);box-shadow:var(--shadow)}
+.palette-heading{color:var(--ink-3);font:600 10px "DM Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.palette-group h2{color:var(--ink-3);font:600 9px "DM Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.palette-search{height:34px;border-color:var(--rule)}
+.palette-search input{font-size:11px;color:var(--ink)}
+.palette-tool{padding:8px 7px;border-radius:6px;color:var(--ink-2);font:500 12px "DM Sans",sans-serif}
+.palette-tool:hover{background:var(--accent-tint);color:var(--accent)}
+.palette-tool-icon{width:24px;height:24px;border:1px solid #eadfd3;border-radius:5px;background:var(--accent-tint);color:var(--accent);font-size:10px}
+.open-tool-palette{border-color:var(--rule);border-radius:8px;background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+
+.canvas-object{border-color:var(--rule);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-size:11px}
+.canvas-object.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(122,69,46,.15),var(--shadow)}
+.object-link{color:var(--accent)}
+.canvas-object-editor{border:1px solid var(--rule);background:var(--surface)}
+.canvas-object-editor>header{border-bottom:1px solid var(--rule-soft)}
+.canvas-object-editor>header span{color:var(--ink-3);font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.canvas-object-editor>header h3{color:var(--ink);font:600 17px "Literata",Georgia,serif}
+.object-editor-fields h4{color:var(--accent);font-size:9px;letter-spacing:.1em;text-transform:uppercase}
+.editor-calculation{background:var(--accent-tint);color:var(--ink-2)}
+.editor-calculation b{color:var(--accent)}
+
+/* ---- tutor ---- */
+.tutor-panel{border-left:1px solid var(--rule);background:var(--surface)}
+.tutor-header{flex-basis:58px;padding:0 18px;border-bottom:1px solid var(--rule-soft)}
+.tutor-avatar{width:32px;height:32px;border-radius:8px;background:var(--accent-tint);color:var(--accent)}
+.tutor-title b{color:var(--ink);font:600 14px "Literata",Georgia,serif}
+.tutor-title small{color:var(--ink-3);font-size:10px}
+.tutor-title small i{background:var(--ok)}
+
+.tutor-context{padding:16px 18px;border-bottom:1px solid var(--rule-soft)}
+.context-label{color:var(--ink-3);font:600 10px "DM Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.context-card{gap:10px;margin-top:9px;padding:11px;border:1px solid var(--rule);border-radius:8px;background:var(--paper)}
+.context-icon{width:28px;height:28px;border-radius:7px;background:var(--accent-tint);color:var(--accent)}
+.context-card b{color:var(--ink);font:600 13px "Literata",Georgia,serif}
+.tutor-context p{color:var(--ink-2);font-size:11px;line-height:1.6}
+
+.suggestions>span{color:var(--ink-3);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.suggestions button{border-radius:6px;background:var(--paper);color:var(--ink-2);font-size:11px}
+.tutor-disclaimer{flex-basis:34px;padding:0 18px;border-top:1px solid var(--rule-soft);color:var(--ink-3);font-size:10px}
+
+/* CopilotKit welcome state — calm, left-aligned, properly scaled */
+.copilot-slot h1[class*="cpk:text-xl"]{color:var(--ink-2);font:500 17px/1.5 "Literata",Georgia,serif;letter-spacing:-.01em;text-align:left}
+.copilot-slot [class*="cpk:max-w-3xl"]{max-width:34rem}
+
+/* ---- modals & panels ---- */
+.modal-shade{background:rgba(40,36,30,.48)}
+.settings-modal,.notes-modal,.activity-library,.canvas-object-editor{border:1px solid var(--rule);border-radius:12px;box-shadow:0 24px 60px rgba(40,30,20,.22)}
+.modal-head h2{color:var(--ink);font:600 19px "Literata",Georgia,serif}
+.settings-modal>label{color:var(--ink-2);font-size:11px}
+.settings-modal label input,.settings-modal label select,.notes-modal textarea{border:1px solid var(--rule);border-radius:7px;color:var(--ink);font-size:12px}
+.settings-modal p{color:var(--ink-3);font-size:11px}
+.activity-task-panel{border:1px solid var(--rule);border-radius:9px;background:var(--surface);color:var(--ink)}
+.activity-task-panel h3{font-family:"Literata",Georgia,serif;font-size:14px}
+.science-result{border-color:var(--rule);background:var(--accent-tint)}
+.science-result b{color:var(--accent);font-family:"Literata",Georgia,serif}
+
+/* ---- quickdraw dock: paper, not a black pill ---- */
+.qd-root{background:var(--paper)}
+.qd-dock{padding:5px 7px;border:1px solid var(--rule);border-radius:11px;background:rgba(255,253,248,.97);box-shadow:var(--shadow);backdrop-filter:none;-webkit-backdrop-filter:none}
+.qd-dock button{border-radius:7px;color:var(--ink-2)}
+.qd-dock button:hover{background:var(--accent-tint);color:var(--accent)}
+.qd-dock button.on{background:var(--accent);color:#fff}
+.qd-div{background:var(--rule)}
+.qd-grid-pop{border:1px solid var(--rule);border-radius:9px;background:var(--surface);box-shadow:var(--shadow)}
+.qd-grid-pop .qd-tool{color:var(--ink-2)}
+.qd-grid-pop .qd-tool.on{background:var(--accent);color:#fff}
+.dark .qd-root{background:var(--surface)}
+.dark .qd-dock{border-color:var(--rule);background:rgba(38,35,31,.97)}
+.dark .qd-dock button{color:var(--ink-2)}
+
+/* a course label above the lesson title is a kicker the heading already replaces */
+.lesson-header .eyebrow{display:none}
+
+/* ---- dark scene ---- */
+.dark,body.dark,.dark .app-shell,.dark .main-area{--paper:#1b1a17;--paper-2:#211f1c;--surface:#26231f;--ink:#f0eae0;--ink-2:#c6bdb0;--ink-3:#9c9386;--rule:#3c382f;--rule-soft:#302d27;--accent:#d3a17e;--accent-2:#e0b592;--accent-tint:#3a2d24;--ok:#88a98d}
+.dark body,.dark .app-shell,.dark .main-area,.dark .topbar,.dark .lesson-header,.dark .workspace-toolbar,.dark .tutor-panel,.dark .tutor-header,.dark .tutor-context,.dark .suggestions,.dark .tutor-disclaimer,.dark .canvas-tools-bar,.dark .canvas-object,.dark .canvas-object-editor,.dark .canvas-tool-palette,.dark .canvas-board-menu,.dark .activity-task-panel,.dark .activity-library,.dark .settings-modal,.dark .notes-modal{background:var(--surface);color:var(--ink)}
+.dark .sidebar{background:var(--paper-2);color:var(--ink);border-right-color:var(--rule)}
+.dark .canvas-viewport{background:#1f1d1a}
+.dark .canvas-board{background-color:#23211d;background-image:radial-gradient(#3b372f 1px,transparent 1px)}
+.dark .brand-mark{background:var(--ink);color:var(--surface)}
+.dark .search-button,.dark .context-card,.dark .suggestions button,.dark .palette-search,.dark .button-soft{border-color:var(--rule);background:var(--paper);color:var(--ink)}
+.dark .copilot-slot h1[class*="cpk:text-xl"]{color:var(--ink-2)}
+
+/* ---- responsive ---- */
+@media(max-width:980px){.sidebar{flex-basis:216px}.lesson-header h1{font-size:23px}}
+@media(max-width:760px){.sidebar{flex-basis:190px}.lesson-header h1{font-size:21px}.lesson-header{padding:18px 16px 14px}}
