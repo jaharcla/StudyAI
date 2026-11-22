@@ -24,7 +24,7 @@ export default function FreeKeyGuide() {
       </details>
 
       <p>Never commit <code>.env</code> — your keys stay on your machine.</p>
-      <a data-testid="free-key-config-link" href="docs/CONFIGURATION.md">All provider variables</a>
+      <a data-testid="free-key-config-link" href="https://github.com/jaharcla/StudyAI/blob/main/docs/CONFIGURATION.md">All provider variables</a>
     </section>
   );
 }

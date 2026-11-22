@@ -27,7 +27,7 @@ describe("FreeKeyGuide", () => {
 
   it("starts collapsed and links to a real config file", () => {
     expect(html.match(/<details(?! open)/g)).toHaveLength(2);
-    expect(html).toContain('href="docs/CONFIGURATION.md"');
+    expect(html).toContain('href="https://github.com/jaharcla/StudyAI/blob/main/docs/CONFIGURATION.md"');
     expect(existsSync("docs/CONFIGURATION.md")).toBe(true);
   });
 });

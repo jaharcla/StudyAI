@@ -18,5 +18,5 @@ test("settings shows the free-tier keys guide", async ({ page }) => {
   await expect(page.getByTestId("free-key-groq")).toContainText("GROQ_API_KEY=gsk_...");
   await expect(page.getByTestId("free-key-groq").getByRole("link", { name: "console.groq.com" })).toHaveAttribute("target", "_blank");
 
-  await expect(page.getByTestId("free-key-config-link")).toHaveAttribute("href", "docs/CONFIGURATION.md");
+  await expect(page.getByTestId("free-key-config-link")).toHaveAttribute("href", "https://github.com/jaharcla/StudyAI/blob/main/docs/CONFIGURATION.md");
 });
