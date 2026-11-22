@@ -11,4 +11,4 @@ STUDYAI_ORIGIN = "https://jaharcla.github.io"
 [[d1_databases]]
 binding = "CREDITS_DB"
 database_name = "studyai-credits"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "7e1a3859-2a2e-4944-acda-584a85d2509f"
