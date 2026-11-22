@@ -65,3 +65,16 @@ The choice of upstream does not remove this constraint; it only changes the word
 No runtime dependency is added. `wrangler.toml` uses a placeholder `database_id`, and secrets (`GROQ_API_KEY`, `STUDYAI_CLIENT_TOKEN`, plus CI `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`) are set through the platform and never committed.
 
 Limits: the structural D1 types in `hosted/src/index.ts` were written from the plan without a live D1 instance; the first real deploy must confirm the statement shapes against Wrangler 4.166.0. Deployment is not part of this branch's verification.
+
+## Amendment (2026-11-22): Stripe Checkout, Stripe Tax, and manual refunds
+
+`stripe@23.2.0` (MIT) is a Worker dependency, added so students can support the project and buy credits through Stripe Checkout. Key decisions:
+
+- **Two optional paths, no paywall.** Donation ($2/$5/$10) and credit packs ($5/$10/$20), both from a Support panel in settings. BYOK and every existing feature remain free. Amounts are server-side allowlists; the browser sends only a `kind` and a `choice`.
+- **Webhook is the only fulfillment authority.** `checkout.session.completed` and `checkout.session.async_payment_succeeded` credit only when `payment_status !== "unpaid"`; `checkout.session.async_payment_failed` records without crediting. Signatures are verified with Stripe's SDK using subtle crypto. Stripe event IDs are recorded in a `stripe_events` table, and the ledger entry reason is `stripe_event:<id>`.
+- **Stripe Tax, with a known launch limitation.** Credit Sessions use `automatic_tax: { enabled: true }`, tax code `txcd_10103000` (SaaS, personal use, cloud delivered), and `tax_behavior: "exclusive"` in USD. Donation Sessions do not enable automatic tax. Verified in the Stripe sandbox on 2026-11-22: Tax Settings `pending` with no head office, zero registrations, no threshold data — **automatic_tax collects no tax until the user sets a head office and adds registrations with a tax advisor**. No tax advice is given here.
+- **Planner reconciliation.** `stripe tools plan` produced a hosted-invoice blueprint because Invoicing was listed as a required product. It conflicts with anonymous browser wallets (no customer emails). The user selected Checkout + Stripe Tax, so Billing subscriptions and emailed Invoicing are explicitly out of scope for this integration.
+- **Stripe API practices:** API version `2026-11-18.endive`, restricted key (`rk_`) in a Worker secret, `integration_identifier` with an 8-letter suffix, no `payment_method_types` (dynamic methods enabled).
+- **Refunds are manual** in the Stripe Dashboard. Credits are not revoked automatically on refund; this limitation is stated in the UI.
+
+Limits: no live Stripe payment, webhook delivery, tax calculation, or deployment was exercised. Legal and tax review remain gates before real money is taken.
