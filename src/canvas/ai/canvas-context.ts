@@ -56,7 +56,7 @@ const gap = (a: Bounds, b: Bounds) => {
 const round = (n: number) => Math.round(n * 10) / 10;
 const validBounds = (b: Bounds) => [b.x, b.y, b.w, b.h].every(Number.isFinite) && b.w >= 0 && b.h >= 0;
 
-function shapeBounds(shape: ShapeRecord): Bounds {
+export function estimateShapeBounds(shape: ShapeRecord): Bounds {
   if (shape.type !== "text" && shape.type !== "note") return pageBounds(shape);
   const text = String(shape.props.text ?? "");
   const scale = Number(shape.props.scale || 1);
@@ -75,7 +75,7 @@ function shapes(source: Store | Snapshot): ShapeRecord[] {
 }
 
 function summarize(shape: ShapeRecord): CanvasShapeContext {
-  const bounds = shapeBounds(shape);
+  const bounds = estimateShapeBounds(shape);
   const result: CanvasShapeContext = {
     id: shape.id,
     type: shape.type,
@@ -153,8 +153,8 @@ function elementDistance(point: { x: number; y: number }, shape: ShapeRecord): n
     return pointSegmentDistance(point, segment.start, segment.end);
   }
   return shape.type === "geo" || shape.type === "image"
-    ? boundsBoundaryDistance(point, shapeBounds(shape))
-    : boundsDistance(point, shapeBounds(shape));
+    ? boundsBoundaryDistance(point, estimateShapeBounds(shape))
+    : boundsDistance(point, estimateShapeBounds(shape));
 }
 
 function objectLabel(object: ScientificObject): string | undefined {
@@ -173,7 +173,7 @@ function nearestTextToShape(shape: ShapeRecord, all: readonly ShapeRecord[], tol
   return all
     .filter((candidate) => (candidate.type === "text" || candidate.type === "note") && String(candidate.props.text ?? "").trim())
     .map((candidate) => {
-      const point = center(shapeBounds(candidate));
+      const point = center(estimateShapeBounds(candidate));
       const distance = horizontal
         ? point.x <= rightEdge ? Math.abs(point.y - segment.start.y) : Infinity
         : pointSegmentDistance(point, segment.start, segment.end);
@@ -191,7 +191,7 @@ function arrowConnections(
   selfId: string,
 ) {
   const length = Math.round(Math.hypot(arrow.to.x - arrow.from.x, arrow.to.y - arrow.from.y));
-  const bounds = all.map(shapeBounds);
+  const bounds = all.map(estimateShapeBounds);
   const minX = Math.min(...bounds.map((item) => item.x), 0), maxX = Math.max(...bounds.map((item) => item.x + item.w), 1);
   const minY = Math.min(...bounds.map((item) => item.y), 0), maxY = Math.max(...bounds.map((item) => item.y + item.h), 1);
   const diagonal = Math.hypot(maxX - minX, maxY - minY);
@@ -201,7 +201,7 @@ function arrowConnections(
     .filter((shape) => (shape.type === "text" || shape.type === "note") && String(shape.props.text ?? "").trim())
     .map((shape) => ({
       text: String(shape.props.text).trim(),
-      distance: pointSegmentDistance(center(shapeBounds(shape)), arrow.from, arrow.to),
+      distance: pointSegmentDistance(center(estimateShapeBounds(shape)), arrow.from, arrow.to),
     }))
     .filter((item) => item.text.length <= 8 && !/^\d+$/.test(item.text) && item.distance <= labelTolerance)
     .sort((left, right) => left.distance - right.distance)
@@ -278,7 +278,7 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
   const selectedCandidates = [...new Set(options.selectedIds)].map((id) => byId.get(id)).filter((shape): shape is ShapeRecord => Boolean(shape));
   const selected = selectedCandidates.slice(0, maxItems).map(summarize);
   const selectedSet = new Set(selected.map((shape) => shape.id));
-  const visibleCandidates = all.filter((shape) => !selectedSet.has(shape.id) && intersects(shapeBounds(shape), viewport));
+  const visibleCandidates = all.filter((shape) => !selectedSet.has(shape.id) && intersects(estimateShapeBounds(shape), viewport));
   const visible = visibleCandidates.slice(0, maxItems).map(summarize);
   const focus = [...selected, ...visible];
   for (const shape of focus) {

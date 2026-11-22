@@ -25,6 +25,7 @@ export class CanvasGridSpatialIndex implements CanvasSpatialIndex {
   private readonly nodes = new Map<string, CanvasSceneNode>();
   private readonly cells = new Map<string, Set<string>>();
   private readonly overflow = new Set<string>();
+  private gridActive = false;
 
   constructor(options: { cellSize?: number; linearThreshold?: number; maxCellsPerNode?: number } = {}) {
     this.cellSize = Math.max(64, Math.min(256, Math.floor(options.cellSize ?? 128)));
@@ -33,12 +34,19 @@ export class CanvasGridSpatialIndex implements CanvasSpatialIndex {
   }
 
   insert(node: CanvasSceneNode): void {
+    // Re-inserting an id replaces its geometry; clear the old cells first so no stale references remain.
+    if (this.nodes.has(node.id)) this.detach(node.id);
     this.nodes.set(node.id, node);
-    if (this.nodes.size <= this.linearThreshold) return;
-    this.insertGrid(node);
+    if (!this.gridActive && this.nodes.size > this.linearThreshold) {
+      // Crossing the threshold must backfill every previously stored node, not just the new one.
+      this.gridActive = true;
+      for (const existing of this.nodes.values()) this.attach(existing);
+      return;
+    }
+    if (this.gridActive) this.attach(node);
   }
 
-  private insertGrid(node: CanvasSceneNode) {
+  private attach(node: CanvasSceneNode) {
     const bounds = node.bounds;
     const x0 = Math.floor(bounds.x / this.cellSize), y0 = Math.floor(bounds.y / this.cellSize);
     const x1 = Math.floor((bounds.x + bounds.width) / this.cellSize), y1 = Math.floor((bounds.y + bounds.height) / this.cellSize);
@@ -52,16 +60,21 @@ export class CanvasGridSpatialIndex implements CanvasSpatialIndex {
     }
   }
 
-  remove(id: string): void {
-    const node = this.nodes.get(id);
-    if (!node) return;
-    this.nodes.delete(id);
+  private detach(id: string) {
     this.overflow.delete(id);
-    for (const cell of this.cells.values()) cell.delete(id);
+    for (const [key, cell] of this.cells) {
+      if (!cell.delete(id)) continue;
+      if (!cell.size) this.cells.delete(key);
+    }
+  }
+
+  remove(id: string): void {
+    if (!this.nodes.delete(id)) return;
+    this.detach(id);
   }
 
   query(bounds: CanvasSceneBounds): CanvasSceneNode[] {
-    if (this.nodes.size <= this.linearThreshold) return [...this.nodes.values()].filter((node) => intersects(node.bounds, bounds)).sort((a, b) => a.id.localeCompare(b.id));
+    if (!this.gridActive) return [...this.nodes.values()].filter((node) => intersects(node.bounds, bounds)).sort((a, b) => a.id.localeCompare(b.id));
     const ids = new Set(this.overflow);
     const x0 = Math.floor(bounds.x / this.cellSize), y0 = Math.floor(bounds.y / this.cellSize);
     const x1 = Math.floor((bounds.x + bounds.width) / this.cellSize), y1 = Math.floor((bounds.y + bounds.height) / this.cellSize);
