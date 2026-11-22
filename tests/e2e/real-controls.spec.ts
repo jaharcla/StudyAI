@@ -26,3 +26,14 @@ test("global search finds an indexed source and opens it", async ({ page }) => {
   await expect(page.locator(".lecture-pane")).toBeVisible();
   await expect(dialog).toHaveCount(0);
 });
+
+test("learning progress opens with real or honestly empty data", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/");
+  await selectCourseOnPage(page, course.title);
+  await page.getByTitle("Toggle courses").click();
+  await page.getByRole("button", { name: "Learning progress" }).click();
+  const dialog = page.getByRole("dialog", { name: "Learning progress" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/No study activity yet|Questions answered/)).toBeVisible();
+});
