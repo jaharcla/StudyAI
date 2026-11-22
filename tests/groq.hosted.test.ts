@@ -1,0 +1,1 @@
+import '../hosted/tests/groq.test.js';
