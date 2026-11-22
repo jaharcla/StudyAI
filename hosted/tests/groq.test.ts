@@ -1,6 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
 import { costMicros } from '../src/pricing.js';
-import { callGroq, type ChatRequest } from '../src/groq.js';
+import { callGroq, type ChatRequest, type ChatMessage } from '../src/groq.js';
+
+// @ts-expect-error invalid role should be rejected
+const _invalidChatMessage: ChatMessage = { role: 'invalid', content: 'oops' };
 
 describe('pricing.costMicros', () => {
   test('input rate for 1M tokens', () => {
