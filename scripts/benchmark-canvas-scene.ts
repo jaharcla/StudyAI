@@ -9,7 +9,7 @@ import type { CanvasSceneBounds, CanvasSceneNode } from "../src/canvas/spatial/t
  * The ADR target is p95 < 5 ms; this script reports the measurement and never
  * fails the process on timing (item 6 records or tunes the result).
  *
- * Usage: npx tsx scripts/benchmark-canvas-scene.ts [--cell-size=N] [--max-cells=N] [--linear-threshold=N]
+ * Usage: npx tsx scripts/benchmark-canvas-scene.ts [--cell-size=N] [--max-cells=N] [--linear-threshold=N] [--kind=mixed|rect|nearest]
  */
 
 const NODE_COUNT = 10_000;
@@ -17,17 +17,22 @@ const QUERY_COUNT = 1_000;
 const BOARD = { width: 4_000, height: 3_000 };
 const ADR_P95_TARGET_MS = 5;
 
-function intArg(name: string): number | undefined {
+function arg(name: string): string | undefined {
   const prefix = `--${name}=`;
-  const match = process.argv.find((arg) => arg.startsWith(prefix));
-  if (!match) return undefined;
-  const value = Number(match.slice(prefix.length));
-  return Number.isFinite(value) ? value : undefined;
+  return process.argv.find((value) => value.startsWith(prefix))?.slice(prefix.length);
+}
+
+function intArg(name: string): number | undefined {
+  const value = arg(name);
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 const cellSize = intArg("cell-size");
 const maxCellsPerNode = intArg("max-cells");
 const linearThreshold = intArg("linear-threshold");
+const kind = arg("kind") === "rect" || arg("kind") === "nearest" ? arg("kind") : "mixed";
 
 function mulberry32(seed: number) {
   let state = seed >>> 0;
@@ -88,7 +93,8 @@ const buildMs = performance.now() - buildStart;
 const WINDDOWN_QUERIES = 100;
 function runQuery(turn: number): number {
   const start = performance.now();
-  if (turn % 2 === 0) {
+  const rect = kind === "rect" || (kind === "mixed" && turn % 2 === 0);
+  if (rect) {
     const width = 32 + random() * 480;
     const height = 32 + random() * 480;
     index.query(boundsAt(random() * (BOARD.width - width), random() * (BOARD.height - height), width, height));
@@ -107,13 +113,13 @@ const p50 = percentile(timings, 0.5);
 const p95 = percentile(timings, 0.95);
 const p99 = percentile(timings, 0.99);
 const max = Math.max(...timings);
-const rectCount = Math.ceil(QUERY_COUNT / 2);
+const rectCount = kind === "nearest" ? 0 : kind === "rect" ? QUERY_COUNT : Math.ceil(QUERY_COUNT / 2);
 const nearestCount = QUERY_COUNT - rectCount;
 
 const fmt = (value: number) => value.toFixed(3);
 console.log(`nodes: ${index.size()} (${NODE_COUNT} inserted, ${NODE_COUNT / 10} large/overflow candidates)`);
 console.log(`build time: ${fmt(buildMs)} ms`);
-console.log(`queries: ${QUERY_COUNT} mixed (${rectCount} rect, ${nearestCount} nearest 6)`);
+console.log(`queries: ${QUERY_COUNT} ${kind} (${rectCount} rect, ${nearestCount} nearest 6)`);
 console.log(`query p50: ${fmt(p50)} ms`);
 console.log(`query p95: ${fmt(p95)} ms`);
 console.log(`query p99: ${fmt(p99)} ms`);

@@ -33,7 +33,7 @@ export function buildTutorCanvasContext(input: {
     };
   }
   return {
-    scene: buildCanvasSceneAIContext(input.scene),
+    scene: buildCanvasSceneAIContext(input.scene, { selectedIds: input.selectedIds, viewport: input.viewport }),
     shapes,
     selectedIds: [...input.selectedIds],
     viewport,
