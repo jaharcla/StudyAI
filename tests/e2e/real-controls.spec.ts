@@ -47,3 +47,16 @@ test("help opens a real guide and its settings action works", async ({ page }) =
   await help.getByRole("button", { name: "Open settings" }).click();
   await expect(page.getByRole("dialog", { name: "StudyAI settings" })).toBeVisible();
 });
+
+test("tutor menu exposes real actions", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".tutor-header button[title*='options']").click();
+  const menu = page.getByRole("menu", { name: "Tutor options" });
+  await expect(menu.getByRole("menuitem", { name: "New conversation" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Toggle lesson context" })).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: () => Promise.resolve() }, configurable: true });
+  });
+  await menu.getByRole("menuitem", { name: "Copy last answer" }).click();
+  await expect(page.getByText(/Copied|No answer to copy yet|Copy failed/)).toBeVisible();
+});
