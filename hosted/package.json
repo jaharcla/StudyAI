@@ -1,0 +1,19 @@
+{
+  "name": "studyai-credits-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "deploy": "wrangler deploy",
+    "db:apply": "wrangler d1 migrations apply CREDITS_DB --remote"
+  },
+  "dependencies": {
+    "stripe": "23.2.0"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4",
+    "wrangler": "4.166.0"
+  }
+}

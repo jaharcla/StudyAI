@@ -293,6 +293,17 @@ it("reports tool-calling incompatibility without returning JSON as ordinary chat
   expect(result.messages.at(-1)?.content).not.toContain("{\"kind\"");
 });
 
+it("does not report tool-calling incompatibility after a canvas proposal was already made in the thread", async () => {
+  const priorProposal = new AIMessage({ content: "", tool_calls: [{ name: "propose_scientific_object", id: "prior-1", args: { boardId: "board-1", kind: "concept", x: 10, y: 20, fieldsJson: "{}", reason: "requested" } }] });
+  mocks.invoke.mockResolvedValue(new AIMessage("The object has been proposed for your review."));
+  const result = await graph.invoke({
+    copilotkit: { context, actions: [{ name: "propose_scientific_object" }] },
+    messages: [new HumanMessage("Add a concept object to my board"), priorProposal],
+  });
+  expect(result.messages.at(-1)?.content).not.toContain("did not receive a structured canvas tool call");
+  expect(result.messages.at(-1)?.content).toContain("proposed");
+});
+
 it("recovers from a provider tool-call validation error with one corrective retry", async () => {
   const validationError = new Error('400 {"error":{"message":"Tool call validation failed: parameters for tool propose_canvas_action did not match schema"}}');
   const proposal = new AIMessage({ content: "", tool_calls: [{ name: "propose_canvas_action", id: "retry-1", args: { boardId: "board-1", actions: [{ kind: "createText", x: 10, y: 20, text: "Moment arm question", style: {} }] } }] });

@@ -26,6 +26,35 @@ export function requestsCanvasAction(query: string): boolean {
   return false;
 }
 
+/**
+ * Deterministic tool retrieval. Returns the tool names most relevant to the
+ * current request so the model can be given a short, query-specific routing
+ * hint. This never removes a tool from the bound tool set — it only decides
+ * which tools are named in the system prompt.
+ */
+const TOOL_ROUTES: Array<{ test: RegExp; names: string[] }> = [
+  { test: /\b(?:handwriting|handwritten|ink|transcribe|read the (?:writing|ink|text))\b/i, names: ["read_canvas_ink"] },
+  { test: /\b(?:near|overlap(?:ping|s)?|spatial|nearby|adjacent|connected to|relationship between)\b/i, names: ["get_canvas_scene"] },
+  { test: /\b(?:shape|shapes|arrow|arrows|line|lines|text box|rectangle|ellipse|highlight|select)\b/i, names: ["get_canvas_state", "propose_canvas_action"] },
+  { test: /\b(?:edit|change|modify|correct|fix|update|remove|delete|rename|set the|make the)\b/i, names: ["propose_canvas_edit"] },
+  { test: /\b(?:add|create|place|insert|put|draw|make)\b/i, names: ["propose_scientific_object", "propose_canvas_action"] },
+  { test: /\b(?:search|find|across (?:my |the )?(?:boards|course)|evidence|label)\b/i, names: ["search_canvas_evidence", "describe_canvas"] },
+  { test: /\b(?:according to|based on|from (?:the |my )?(?:lecture|course|notes|document|pdf|slides)|cite|source)\b/i, names: ["search_course_documents"] },
+  { test: /\b(?:verify|fact.?check|is it true|claimed)\b/i, names: ["search_fact_checks"] },
+];
+
+export function recommendedToolsForQuery(query: string, available: readonly string[]): string[] {
+  const present = new Set(available);
+  const found: string[] = [];
+  for (const route of TOOL_ROUTES) {
+    if (!route.test.test(query)) continue;
+    for (const name of route.names) {
+      if (present.has(name) && !found.includes(name)) found.push(name);
+    }
+  }
+  return found.slice(0, 3);
+}
+
 export function requestsCanvasMetadata(query: string): boolean {
   if (requestsCanvasAction(query)) return true;
   if (/\b(?:don't|do not|dont|never|without|no need to|not)\b[^.!?]{0,48}\b(?:ids?|identifiers?|coordinates?|bounds?|bounding boxes|raw json|metadata|diagnostics?)\b/i.test(query)) return false;

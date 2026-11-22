@@ -1,0 +1,14 @@
+name = "studyai-credits"
+main = "src/index.ts"
+compatibility_date = "2026-11-22"
+
+# Secrets are set with `wrangler secret put`, never written to this file:
+#   GROQ_API_KEY, STUDYAI_CLIENT_TOKEN
+
+[vars]
+STUDYAI_ORIGIN = "https://jaharcla.github.io"
+
+[[d1_databases]]
+binding = "CREDITS_DB"
+database_name = "studyai-credits"
+database_id = "7e1a3859-2a2e-4944-acda-584a85d2509f"
