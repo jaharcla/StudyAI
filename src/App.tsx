@@ -9,6 +9,7 @@ import { ActivityLibrary, type ActivitySession } from "./learning/ActivityLibrar
 import { ActivityTaskPanel } from "./learning/ActivityTaskPanel";
 import { lessonPreferenceKey, selectCourse, selectLesson } from "./workspace-state";
 import StudyStage from "./lab/StudyStage";
+import SearchDialog from "./components/SearchDialog";
 const DocumentLibrary = lazy(() => import("./components/document-intelligence").then((module) => ({ default: module.DocumentLibrary })));
 
 
@@ -50,6 +51,7 @@ function Workspace() {
   const [view, setView] = useState<View>("Canvas");
   const [mode, setMode] = useState<"canvas" | "study">("canvas");
   const [sidebar, setSidebar] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [tutor, setTutor] = useState(true);
   const [dark, setDark] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -78,6 +80,14 @@ function Workspace() {
   const [canvasSummary, setCanvasSummary] = useState({ objectCount: 0, objectTypes: {} as Record<string, number> });
   const updateCanvasSummary = useCallback((summary: { objectCount: number; objectTypes: Record<string, number> }) => setCanvasSummary(summary), []);
   const updateStatus = useCallback((next: string) => setStatus(next), []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen((open) => !open); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const updateActivityCanvas = useCallback((state: { id: string; revision: number; saved: boolean }) => setActivityCanvasState(state), []);
   const launchActivity = useCallback((session: ActivitySession) => {
     setActiveActivity(session);
@@ -234,7 +244,7 @@ function Workspace() {
   return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""}`}>
     {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar">
       <div className="brand-row"><div className="brand-mark"><Sparkles size={17} /></div><span>study<span className="brand-ai">ai</span></span><button className="icon-button sidebar-close" onClick={() => setSidebar(false)} title="Collapse sidebar"><ChevronLeft size={16} /></button></div>
-      <button className="search-button" disabled title="Global search is not available yet"><Search size={15} /><span>Search anything</span><kbd>⌘ K</kbd></button>
+      <button className="search-button" onClick={() => setSearchOpen(true)} title="Search anything"><Search size={15} /><span>Search anything</span><kbd>⌘ K</kbd></button>
       <div className="nav-label">YOUR SPACE</div>
       <button className="nav-item active"><GraduationCap size={17} /> Study workspace</button>
       <button className="nav-item" disabled title="Learning progress is not available yet"><Activity size={17} /> Learning progress</button>
@@ -274,6 +284,7 @@ function Workspace() {
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
     {studyOpen && course.id && lessonId && <StudyPanel courseId={course.id} lessonId={lessonId} close={() => setStudyOpen(false)} />}
+    {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
     {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} />}
   </div></>;
 }
