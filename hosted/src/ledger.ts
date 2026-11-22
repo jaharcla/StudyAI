@@ -102,6 +102,32 @@ export async function getWallet(walletId: string, store: LedgerStore): Promise<W
   return refreshDaily(w);
 }
 
+/** Add credits to a wallet and record the entry. Single authority for all credit grants. */
+export async function creditWallet(
+  walletId: string,
+  amountMicros: number,
+  reason: string,
+  store: LedgerStore,
+): Promise<{ balanceMicros: number }> {
+  if (!Number.isInteger(amountMicros) || amountMicros <= 0) throw new Error('Credit amount must be a positive integer');
+  if (amountMicros > MAX_PACK_VALUE) throw new Error('Credit amount exceeds max pack');
+
+  const wallet = await getWallet(walletId, store);
+  const updated: WalletRow = {
+    ...wallet,
+    balance_micros: wallet.balance_micros + amountMicros,
+    version: wallet.version + 1,
+  };
+  await store.updateWallet(updated);
+  await store.insertEntry({
+    wallet_id: walletId,
+    delta_micros: amountMicros,
+    reason,
+    created_at: new Date().toISOString(),
+  });
+  return { balanceMicros: updated.balance_micros };
+}
+
 /** Redeem a credit code, adding its value to the wallet */
 export async function redeemCode(
   rawCode: string,
@@ -113,18 +139,8 @@ export async function redeemCode(
   if (code.redeemed_by) throw new CodeError('Code already redeemed');
   if (code.value_micros > MAX_PACK_VALUE) throw new CodeError('Code value exceeds max pack');
 
-  const wallet = await getWallet(walletId, store);
-  // Update wallet balance and version atomically (optimistic)
-  const newBalance = wallet.balance_micros + code.value_micros;
-  const updated: WalletRow = { ...wallet, balance_micros: newBalance, version: wallet.version + 1 };
-  await store.updateWallet(updated);
+  await creditWallet(walletId, code.value_micros, 'code_redeem', store);
   await store.markCodeRedeemed(rawCode, walletId);
-  await store.insertEntry({
-    wallet_id: walletId,
-    delta_micros: code.value_micros,
-    reason: 'code_redeem',
-    created_at: new Date().toISOString(),
-  });
   return { creditedMicros: code.value_micros };
 }
 
