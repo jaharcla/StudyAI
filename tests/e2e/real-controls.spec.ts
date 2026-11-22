@@ -37,3 +37,13 @@ test("learning progress opens with real or honestly empty data", async ({ page }
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/No study activity yet|Questions answered/)).toBeVisible();
 });
+
+test("help opens a real guide and its settings action works", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".top-actions button[title*='Help']").click();
+  const help = page.getByRole("dialog", { name: "StudyAI help" });
+  await expect(help).toBeVisible();
+  await expect(help.getByText("Analyze board")).toBeVisible();
+  await help.getByRole("button", { name: "Open settings" }).click();
+  await expect(page.getByRole("dialog", { name: "StudyAI settings" })).toBeVisible();
+});
