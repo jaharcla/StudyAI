@@ -1,18 +1,90 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f7f8fa" />
-    <meta name="description" content="StudyAI is a local-first study workspace with a scientific canvas, course documents, adaptive review, and an AI tutor." />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="ard" href="/.well-known/ard.json" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="font" type="font/woff2" crossorigin href="https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yygg_vb.woff2" />
-    <title>StudyAI</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudyAI — one place for the work of learning</title>
+<meta name="description" content="StudyAI is a local-first study workspace: course notes, imported documents, a scientific canvas and an AI tutor working on the same hard concept.">
+<style>
+  :root { --ink:#1b1f24; --muted:#5b6572; --line:#dde3ea; --accent:#3c6e71; --bg:#f7f9fb; --card:#fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; padding:0 20px; }
+  header { padding:64px 0 40px; border-bottom:1px solid var(--line); }
+  h1 { font-size:clamp(2rem,6vw,3.4rem); line-height:1.1; margin:0 0 16px; letter-spacing:-.02em; }
+  h2 { font-size:1.4rem; margin:0 0 12px; }
+  .lede { font-size:1.2rem; color:var(--muted); max-width:44rem; margin:0; }
+  .tag { display:inline-block; font-size:.8rem; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:16px; }
+  .actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:28px; }
+  a.btn { display:inline-block; padding:11px 18px; border-radius:8px; text-decoration:none; font-weight:600; }
+  a.primary { background:var(--accent); color:#fff; }
+  a.secondary { border:1px solid var(--line); background:var(--card); color:var(--ink); }
+  section { padding:40px 0; border-bottom:1px solid var(--line); }
+  ul { padding-left:20px; }
+  li { margin:8px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; }
+  .card p { margin:0; color:var(--muted); }
+  .note { background:#fff8e6; border:1px solid #f0dfae; border-radius:10px; padding:18px 20px; }
+  footer { padding:40px 0 64px; color:var(--muted); font-size:.95rem; }
+  code { background:#eceff3; padding:1px 5px; border-radius:4px; font-size:.9em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="tag">Local-first · source-available</div>
+  <h1>One place for the work of learning.</h1>
+  <p class="lede">StudyAI puts your course notes, imported documents, a scientific canvas and an AI tutor in the same workspace — so you can work through a hard concept visually instead of stitching together four different apps.</p>
+  <div class="actions">
+    <a class="btn primary" href="https://github.com/jaharcla/StudyAI">View the repository</a>
+    <a class="btn secondary" href="https://github.com/jaharcla/StudyAI/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">Starter issues</a>
+  </div>
+</header>
+
+<section>
+  <h2>Why it exists</h2>
+  <p>The study tools that work well are text-first, and the good ones want a subscription. StudyAI was built because the useful way to understand a hard idea is often to draw it, move it, and ask questions about it — without paying for the privilege or handing over your notes.</p>
+</section>
+
+<section>
+  <h2>What is in it today</h2>
+  <div class="grid">
+    <div class="card"><h3>Course workspace</h3><p>Lessons with notes and PDF, DOCX, PPTX and TXT documents, searchable with source references.</p></div>
+    <div class="card"><h3>Scientific canvas</h3><p>Vectors, forces, equations and graphs with recognition, direct manipulation and a revision-tracked scene graph.</p></div>
+    <div class="card"><h3>AI tutor</h3><p>Answers from your documents and your canvas together. Proposes canvas edits you review before anything changes.</p></div>
+    <div class="card"><h3>Adaptive review</h3><p>A review queue tied to what you are studying, with spacing driven by <code>ts-fsrs</code>.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Your material stays yours</h2>
+  <p>StudyAI is single-user and stores data locally. The tutor can run entirely on your machine through Ollama, or through a provider you configure yourself. There is no hosted service and no multi-user account.</p>
+</section>
+
+<section>
+  <h2>Why the licence matters</h2>
+  <p class="note">StudyAI is released under <strong>MIT + Commons Clause</strong>: you can read, use, modify and share the source, but you cannot sell the software. That is a deliberate choice for now, and it means the project is <strong>source-available, not OSI open source</strong>. It will not be a fit for communities that require an open-source licence — and that is fine.</p>
+</section>
+
+<section>
+  <h2>Looking for people to own a piece</h2>
+  <p>This is an invitation, not a roadmap. The author keeps the learning experience and the vision; the hope is to find two or three people who want to own one of these areas:</p>
+  <ul>
+    <li>The visual canvas — drawing, rendering, recognition, direct manipulation.</li>
+    <li>The tutor and study workflows — review, learning activities, progress.</li>
+    <li>The document and knowledge layer — import, retrieval, source grounding.</li>
+    <li>Provider plumbing — routing, disclosure, budgets, benchmarks, CI.</li>
+    <li>Student experience — onboarding, docs, examples.</li>
+  </ul>
+  <p>There are three small, well-described starter issues if you would rather begin there. Read the <a href="https://github.com/jaharcla/StudyAI/blob/main/docs/VISION.md">vision</a> and say hello.</p>
+</section>
+
+<footer>
+  <p><a href="https://github.com/jaharcla/StudyAI">StudyAI on GitHub</a> · <a href="https://github.com/jaharcla/StudyAI/blob/main/docs/VISION.md">Vision</a> · <a href="https://github.com/jaharcla/StudyAI/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22">Good first issues</a></p>
+</footer>
+
+</div>
+</body>
 </html>
