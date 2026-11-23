@@ -14,6 +14,10 @@ describe("sanitizeCourseText", () => {
     expect(sanitizeCourseText("wavelength λ and π with − and × stays")).toBe("wavelength λ and π with − and × stays");
   });
 
+  it("collapses doubled mathematical italic glyphs from PDF extraction", () => {
+    expect(sanitizeCourseText("𝑥𝑥 + 𝑦𝑦 = 60 8 ∗ 𝑥𝑥 + 12 ∗ 𝑦𝑦 = 600")).toBe("x + y = 60 8 * x + 12 * y = 600");
+  });
+
   it("leaves ordinary course prose unchanged", () => {
     expect(sanitizeCourseText("Friction opposes motion.")).toBe("Friction opposes motion.");
   });
