@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { pageBounds, Store } from "@quickdrawjs/core";
+import { pageBounds, Store, type Diff, type DiffSource, type ShapeRecord } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
@@ -32,6 +32,7 @@ import type { CanvasSceneNode } from "./spatial/types";
 import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
 import { captureQuickdrawOCRRegions } from "./ocr-capture.js";
 import { NarrationPanel } from "./NarrationPanel";
+import { smoothCapturedPressure } from "./pen-input.js";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -51,6 +52,27 @@ const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (sou
 // ending an active pointer session; match the set so we can close it first.
 const TOOL_KEYS = new Set(["v", "1", "h", "d", "p", "b", "i", "e", "k", "a", "l", "t", "n", "g", "r", "o"]);
 
+// Smoothing is applied once, at the documented onChange boundary when Quickdraw
+// marks a draw stroke done. The write uses Store.update inside the still-open
+// gesture batch (store.js:99-120,170-182), so undo stays one step and no document
+// is written directly. The guard stops the resulting diff from re-entering.
+function smoothCompletedInk(diff: Diff, editor: Editor, guard: { current: boolean }) {
+  if (guard.current) return;
+  let completed: ShapeRecord | undefined;
+  for (const [, pair] of Object.entries(diff.updated ?? {})) {
+    const next = pair[1];
+    if (next?.typeName === "shape" && next.type === "draw" && next.props?.done === true) { completed = next; break; }
+  }
+  if (!completed) return;
+  const pts = completed.props.pts;
+  if (!Array.isArray(pts) || pts.length < 9 || !pts.every((value) => typeof value === "number" && Number.isFinite(value))) return;
+  const smoothed = smoothCapturedPressure(pts);
+  if (smoothed.every((value, index) => value === pts[index])) return;
+  guard.current = true;
+  try { editor.store.update(completed.id, { props: { pts: smoothed } }); }
+  finally { guard.current = false; }
+}
+
 export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, onSelectedObject, preferredBoardId, onBoardState, activityMode = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -65,6 +87,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const revisions = useRef(new Map<string, number>());
   const skipQuickdrawSave = useRef<unknown>(undefined);
+  // Guards the documented Store.update smoothing write so its own diff cannot recurse.
+  const pressureSmoothing = useRef(false);
   const boardElement = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [boards, setBoards] = useState<Board[]>([]);
@@ -714,8 +738,9 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     refreshHistory();
   }, [refreshHistory]);
 
-  const handleQuickdrawChange = useCallback((_diff: unknown, source: string, editor: Editor) => {
+  const handleQuickdrawChange = useCallback((diff: Diff, source: DiffSource, editor: Editor) => {
     if (source !== "user") return;
+    smoothCompletedInk(diff, editor, pressureSmoothing);
     if (skipQuickdrawSave.current) {
       const expected = skipQuickdrawSave.current;
       skipQuickdrawSave.current = undefined;
