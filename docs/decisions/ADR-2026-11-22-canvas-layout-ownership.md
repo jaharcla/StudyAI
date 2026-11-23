@@ -30,8 +30,9 @@ Decisions this settles for later phases:
 
 ## Limits
 
-- First-fit can leave holes between placements; tidy is not optimal. Acceptable and visible.
-- Text extent remains an approximation (`shapeBounds` estimates width from glyph count), so long labels in unusual fonts may under-block slightly. Mitigation is the 60 unit clearance, not a font metrics engine.
+- Text extent in the **tutor context** remains an approximation (`shapeBounds` estimates from glyph count and tags the result `boundsEstimate`). **Occupancy no longer uses that estimate**: a wrapped note renders 337 units tall where the estimate said 200, so `boardOccupancy` now calls the renderer's `pageBounds` (text layout, note wrapping, rotation). Long single-paragraph notes were previously under-blocked by ~40% and a placed box could cross the student's text; a test pins the measured-vs-estimated gap and asserts occupancy follows the measured value.
+- First-fit can still leave holes between placements; tidy is not optimal. Acceptable and visible.
+- The unit-test measurer (`tests/setup/node-offscreen-canvas.ts`) deliberately mirrors `shapeBounds`' 0.62 glyph ratio so occupancy and highlight geometry agree in tests. That means **unit tests prove geometry, not font accuracy** — real metrics are still only proven in a browser.
 - Only `propose_teaching_scene` uses the planner today; `propose_scientific_object` still takes model coordinates by design (decision 2).
 - Scientific-object bounds are now part of occupancy: the bridge unions `boardOccupancy(store)` with `objectOccupancy(objects)`, and `objectOccupancy` delegates to `objectBounds` rather than recomputing centres, so a force blocks tail-to-tip and a flat vector still blocks via a 24-unit extent floor. What is still not modelled is a figure's *future* footprint — labels and highlights added around a shape extend it, and the planner sizes the request rather than measuring the rendered result.
 - Playwright e2e is owed, not run; see the Phase 1 verification record for why.

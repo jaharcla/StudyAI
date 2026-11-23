@@ -48,6 +48,15 @@ occupancy wiring, and exact reproduction of the legacy grid for callers without 
   be flaky on top of that. The store→occupancy→placement path is covered by unit tests instead, and
   the browser check is listed as owed rather than claimed.
 
+## Corrections to this record (2026-11-22, later same day)
+
+Two claims above turned out to be wrong, and are left visible rather than quietly rewritten:
+
+1. **"local Ollama unavailable — 5 failures, unrelated to this change."** Ollama is installed and running; the probe that produced that conclusion was taken while the server was not yet listening, and the port is the one this project expects. Re-run with it reachable: 10 passed / 2 failed, and both of those two pass individually (`direct-vector` 3/3, `canvas-analysis` 4/4). Generalising from one probe to "environment, unrelated" was the error; the failures were never characterised until I re-ran them.
+2. **"no DOM environment, so the note/text path is left to the browser."** Wrong dependency reading: `@quickdrawjs/core` prefers `OffscreenCanvas` and only falls back to `document.createElement`. A deterministic measurer in `tests/setup/node-offscreen-canvas.ts` now runs that path in unit tests, and doing so exposed a second, real defect: occupancy was using an estimated text box (200) where the renderer measures 337, so long notes were under-blocked and a placed box could cross the student's text. See [canvas-text-bounds-occupancy](2026-11-22-canvas-text-bounds-occupancy.md).
+
+Still owed from this phase: the Playwright assertion that two scenes drawn onto one board do not overlap.
+
 ## What this does not yet do
 
 The planner is not wired into `propose_scientific_object` (Phase 4). Scientific objects **are** now part of occupancy — commit `9733d70` unions `boardOccupancy(store)` with `objectOccupancy(objects)`, and `objectOccupancy` delegates to `objectBounds` so a force blocks tail-to-tip.
