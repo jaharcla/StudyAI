@@ -45,6 +45,33 @@ describe("Tutor context budgeting", () => {
     })).toThrow(TutorContextBudgetError);
   });
 
+  it("drops course excerpts instead of refusing the request when the frame is tight", () => {
+    // The model holds the search tool on every turn with a course active, so prefetched excerpts
+    // are re-fetchable and are the last thing worth killing a request over.
+    const result = budgetTutorContext({
+      systemInstructions: "Instructions",
+      contexts: [{ description: "StudyAI active scientific canvas objects", value: { objects: [{ id: "shape-1", text: "Arrow" }] } }],
+      evidence: { status: "evidence", results: [{ sourceRef: "doc:page:3", excerpt: "y".repeat(4000) }] },
+      conversation: [{ type: "human", content: "What is the arrow I drew pointing at?" }],
+      budgetTokens: 600,
+    });
+    expect(result.courseEvidenceDropped).toBe(true);
+    expect(result.evidenceJson).toBe("null");
+    expect(result.estimatedTokens).toBeLessThanOrEqual(600);
+  });
+
+  it("keeps course excerpts when they fit", () => {
+    const result = budgetTutorContext({
+      systemInstructions: "Instructions",
+      contexts: [{ description: "StudyAI active scientific canvas objects", value: { objects: [] } }],
+      evidence: { status: "evidence", results: [{ sourceRef: "doc:page:3", excerpt: "Restoring force." }] },
+      conversation: [{ type: "human", content: "What is the arrow I drew pointing at?" }],
+      budgetTokens: 2000,
+    });
+    expect(result.courseEvidenceDropped).toBe(false);
+    expect(result.evidenceJson).toContain("doc:page:3");
+  });
+
   it("reports per-context and per-tool-result sizes when the required turn exceeds budget", () => {
     const toolResult = JSON.stringify({ boardId: "board-1", shapes: Array.from({ length: 20 }, (_, index) => ({ id: `shape-${index}`, text: "x".repeat(400) })) });
     const providerMessages = [
