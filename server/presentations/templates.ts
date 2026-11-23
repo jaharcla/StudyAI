@@ -3,7 +3,7 @@ import { z } from "zod";
 export const deckTemplateSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   name: z.string().min(1).max(120),
-  licence: z.enum(["CC0", "CC BY"]),
+  licence: z.enum(["CC0", "CC BY", "Apache-2.0"]),
   attribution: z.string().min(1).max(300),
   language: z.literal("en"),
   builtin: z.boolean(),
@@ -20,7 +20,7 @@ export const deckTemplates: readonly DeckTemplate[] = deckTemplateSchema.array()
   {
     id: "general-en",
     name: "General (education)",
-    licence: "CC BY",
+    licence: "Apache-2.0",
     attribution: "Presenton built-in General template (Apache-2.0 project)",
     language: "en",
     builtin: true,
@@ -29,7 +29,7 @@ export const deckTemplates: readonly DeckTemplate[] = deckTemplateSchema.array()
   {
     id: "training-en",
     name: "Training / coursework",
-    licence: "CC BY",
+    licence: "Apache-2.0",
     attribution: "Presenton built-in General template (Apache-2.0 project)",
     language: "en",
     builtin: true,

@@ -7,7 +7,7 @@ describe("slide deck template manifest", () => {
     expect(deckTemplates.length).toBeLessThanOrEqual(12);
     for (const template of deckTemplates) {
       expect(template.language).toBe("en");
-      expect(["CC0", "CC BY"]).toContain(template.licence);
+      expect(["CC0", "CC BY", "Apache-2.0"]).toContain(template.licence);
       expect(template.id).toMatch(/^[a-z0-9-]+$/);
       expect(template.attribution.length).toBeGreaterThan(0);
     }

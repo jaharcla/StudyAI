@@ -16,6 +16,7 @@ import { createLearningHandler } from "./learning/http.js";
 import { createStudioHandler } from "./studio/http.js";
 import { createSlideDeckHandler } from "./presentations/http.js";
 import { renderPresentonDeck } from "./presentations/renderer.js";
+import { artifactDataDir } from "./presentations/paths.js";
 import { extractDocument } from "./document-intelligence/extract.js";
 import { initializeStudioSchema } from "./studio/schema.js";
 import { LearningActivityService } from "./learning/activities/service.js";
@@ -55,7 +56,7 @@ const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYA
 const learningService = new LearningService(db);
 const learningHandler = createLearningHandler(learningService, config.webOrigin);
 const studioHandler = createStudioHandler(db, learningService, config.webOrigin);
-const artifactDataDir = resolve(process.cwd(), "data", "artifacts");
+const artifactsDir = artifactDataDir();
 const slideDeckHandler = createSlideDeckHandler(db, {
   renderer: (request) => renderPresentonDeck(request, {
     fetch,
@@ -63,11 +64,11 @@ const slideDeckHandler = createSlideDeckHandler(db, {
     apiKey: process.env.PRESENTON_API_KEY ?? "",
   }),
   readDeckText: async (pptxPath) => {
-    const bytes = await readFile(resolve(artifactDataDir, pptxPath));
+    const bytes = await readFile(resolve(artifactsDir, pptxPath));
     const document = await extractDocument("deck.pptx", new Uint8Array(bytes));
     return document.units.map((unit) => unit.text).join("\n");
   },
-}, config.webOrigin, artifactDataDir);
+}, config.webOrigin, artifactsDir);
 const activityService = new LearningActivityService(db, learningService);
 const activityHandler = createLearningActivityHandler(activityService, config.webOrigin);
 const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);

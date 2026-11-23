@@ -25,7 +25,8 @@ Context: the Tutor must produce a course-grounded, editable `.pptx` that appears
 
 ## Limits and non-goals
 
-- English templates only, at most 12 entries, CC0/CC BY sources only; no `ppt4web`/`lusana` corpora.
+- English templates only, at most 12 entries. Presenton built-ins are Apache-2.0; any dataset-derived template must be CC0/CC BY. No `ppt4web`/`lusana` corpora.
+- Self-hosted Presenton must mount its `/app_data` volume at the host directory given by `STUDYAI_ARTIFACTS_DIR` (default `data/artifacts`); otherwise the renderer's returned path is not readable locally.
 - Course-native figure extraction is deferred: Document Intelligence extracts text only, not images.
 - AI raster illustration is a labelled last resort; every image needs alt text, attribution and a rendered visual check.
 - No claim that generated decks improve learning outcomes without a learner study.
