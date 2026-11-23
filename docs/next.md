@@ -20,6 +20,18 @@ Phase 1 (in-app BYOK manager, optional local embeddings — note `ADR-2026-11-18
 - Canvas gate (from Plan 1): 0 hard failures, 4/6 math exact, F1 0.951, PhysAlign 0.875–1.000, $0 — baseline JSON untouched.
 - Full trail: `docs/verification/2026-11-22-canvas-reliability.md`, `docs/verification/2026-11-22-canvas-frontier.md`.
 
+## Parallelization map (agents may run concurrently under these rules)
+
+Safe concurrent tracks (disjoint hot files):
+- **Phase 1 — BYOK/provider manager** (`server/config.ts`, provider modules, a carved-out settings component).
+- **Phase 2 logic only — deterministic physics rules** as `server/canvas-intelligence/scene/physics-rules.ts` + unit tests, no UI. Its UI stage (sliders/parameter objects) waits until it can take `CanvasStudio.tsx`/`SceneGlyph.tsx` without another agent in them.
+- **Phase 5 — pen UX** (`Quickdraw` input path) — parallel with the above *logic* stages, not with their UI stages.
+- **author_board track** (existing agent) — `server/agent.ts`, teaching scene, layout solver; owns all interactive-practice generation (Phase 3.3 must extend it, not open a second path).
+
+True serial dependencies: Phase 3 needs Phase 2's solver diagnostics; Phase 4.2 needs the error taxonomy from 2–3; Phase 4.1 (mindmap) is done.
+
+Concurrency rules (all learned 2026-11-22): one worktree + one branch per agent, never a shared checkout; each worktree its own `.env` with a unique port quad **and** matching `LANGGRAPH_DEPLOYMENT_URL`; isolated per-run e2e data; no `npm install` from worktrees sharing junctioned `node_modules` (use direct-node entrypoints or PATH shims — `.bin` churn breaks `npm run dev`); stagger full Playwright/benchmark runs (shared Gemini/Groq free-tier budgets manufacture flakes and confound gate numbers); merge to `main` daily; any new `ScientificObject` kind carries the six-part rule and coordinates `model.ts`/`registry.ts`/`SceneGlyph.tsx` landings explicitly.
+
 ## Environment notes (learned the hard way today)
 
 - Shared `node_modules/.bin` churns when sessions run npm — if shims vanish, use `node node_modules/vitest/vitest.mjs`, `node node_modules/typescript/bin/tsc`, `node node_modules/@playwright/test/cli.js test …` or PATH shims in `%LOCALAPPDATA%\Temp\opencode\shims`. Never `npm install` casually.
