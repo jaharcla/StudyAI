@@ -1,0 +1,450 @@
+# Artifact quality blind review sheet
+
+Score each generation 0–5 on six dimensions. Model identity and provider are recorded separately, not shown here.
+Keep disagreements instead of forcing consensus.
+
+| Dimension | Weight | Score 0–5 |
+|---|---:|---:|
+| Intent fidelity | 20 | |
+| Factual accuracy | 25 | |
+| Course grounding | 20 | |
+| Pedagogy | 20 | |
+| Visual quality | 10 | |
+| Interaction quality | 5 | |
+
+The insufficient-source case uses the separate refusal rubric registered in docs/decisions/ADR-2026-11-23-artifact-quality-refusal-rubric.md.
+
+## ambiguous-request
+
+**Request:** Make me something useful from this lesson on forces. Use your judgement about what to include.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "forces-incline-lesson-03-package",
+  "objective": "Apply force-direction rules to a block on an incline by interpreting a force diagram and transferring the directions to a new ramp orientation.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "explanation-force-directions",
+      "sourceRefs": [
+        "studyai://document/module-1/text/4?chunk=0"
+      ],
+      "text": "For a block on an incline, draw gravity vertically downward, the normal force perpendicular to the surface and away from it, and friction parallel to the surface opposite the sliding direction. For a ramp rising to the right with the block sliding down-left, friction points up-right along the ramp.",
+      "concepts": [
+        "forces",
+        "incline",
+        "gravity",
+        "normal force",
+        "friction"
+      ]
+    },
+    {
+      "kind": "diagram",
+      "id": "diagram-incline-forces",
+      "sourceRefs": [
+        "studyai://document/module-1/text/4?chunk=0"
+      ],
+      "title": "Forces on a block sliding down a 30° incline with μk = 0.20",
+      "forces": [
+        {
+          "label": "gravity",
+          "components": [
+            0,
+            -9.8
+          ]
+        },
+        {
+          "label": "normal",
+          "components": [
+            -4.24,
+            7.35
+          ]
+        },
+        {
+          "label": "friction",
+          "components": [
+            1.47,
+            0.85
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "question-transfer-directions",
+      "sourceRefs": [
+        "studyai://document/module-1/text/4?chunk=0"
+      ],
+      "prompt": "A crate slides down a ramp that rises to the left. In axes where +x is right and +y is up, state the direction of each force: gravity, normal, and friction.",
+      "answer": "Gravity is straight down, (0,-9.8). The normal is perpendicular to the ramp and away from it, so it points up-right. Friction is parallel to the ramp and opposes the downward slide, so it points up-left along the ramp."
+    }
+  ],
+  "relations": [
+    {
+      "from": "explanation-force-directions",
+      "to": "diagram-incline-forces",
+      "relation": "explains"
+    },
+    {
+      "from": "diagram-incline-forces",
+      "to": "question-transfer-directions",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {
+    "generatedAt": "2026-06-24"
+  },
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## documented-request
+
+**Request:** From the retrieved lecture note, make a study artifact that explains friction on an incline and includes one question. Keep it grounded in the note.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "artifact-friction-incline-01",
+  "objective": "Explain friction direction and normal force for a block sliding down an incline, then apply both to a new ramp angle.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-friction-incline",
+      "sourceRefs": [
+        "studyai://document/module-1/text/4?chunk=0"
+      ],
+      "text": "For a block sliding down an incline, friction opposes the sliding motion and therefore acts up along the incline. The normal force acts perpendicular to the surface and has magnitude mg cos(theta).",
+      "concepts": [
+        "friction",
+        "incline",
+        "normal force"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "q-friction-incline",
+      "sourceRefs": [
+        "studyai://document/module-1/text/4?chunk=0"
+      ],
+      "prompt": "A crate slides down a ramp toward the lower end. If the ramp angle is alpha instead of theta, what direction does friction act relative to the ramp, and what is the normal-force magnitude?",
+      "answer": "Friction acts up the incline, opposite the crate's sliding motion. The normal-force magnitude is mg cos(alpha)."
+    }
+  ],
+  "relations": [
+    {
+      "from": "exp-friction-incline",
+      "to": "q-friction-incline",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {
+    "generatedAt": "2026-06-24T00:00:00Z"
+  },
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## held-out-ph (held out)
+
+**Request:** Build a short artifact explaining pH with one application question that requires a calculation.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "chem-120-lesson-03-ph-artifact",
+  "objective": "Explain pH and apply pH = -log10[H+] to calculate pH from a hydrogen ion concentration.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "ph-explanation",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "text": "pH is the negative base-ten logarithm of the hydrogen ion concentration: pH = -log10[H+]. This means each tenfold increase in [H+] lowers pH by 1 unit, so pH provides a compact scale for reporting hydrogen ion concentration.",
+      "concepts": [
+        "pH",
+        "hydrogen ion concentration",
+        "base-ten logarithm"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "ph-calculation-question",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "prompt": "A solution has [H+] = 2.5 × 10^-5 M. Calculate its pH to two decimal places.",
+      "answer": "pH = -log10(2.5 × 10^-5) ≈ 4.60"
+    }
+  ],
+  "relations": [
+    {
+      "from": "ph-explanation",
+      "to": "ph-calculation-question",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {
+    "generatedAt": "2026-06-24T00:00:00Z"
+  },
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## held-out-graph-reading (held out)
+
+**Request:** From the note, explain what the slope of a distance-time graph tells you, then add one question that asks the student to read a value from a new graph.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "chem-120-lesson-03-held-out-graph-reading",
+  "objective": "Explain slope as speed on a distance-time graph and practice reading speed from a new graph.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-slope-speed",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "text": "On a distance-time graph, the slope of the line tells you the speed. A steeper line means a greater speed, so comparing slopes tells you which motion is faster.",
+      "concepts": [
+        "distance-time graph",
+        "slope",
+        "speed"
+      ]
+    },
+    {
+      "kind": "graph",
+      "id": "graph-new-distance-time",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "expression": "5x",
+      "xRange": [
+        0,
+        4
+      ],
+      "xLabel": "x",
+      "yLabel": "y"
+    },
+    {
+      "kind": "question",
+      "id": "q-read-speed",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "prompt": "Using the new distance-time graph above, with distance in meters and time in seconds, what speed does the line show?",
+      "answer": "5 m/s; the line rises 20 m over 4 s, so its slope is 5 m/s."
+    }
+  ],
+  "relations": [
+    {
+      "from": "exp-slope-speed",
+      "to": "q-read-speed",
+      "relation": "explains"
+    },
+    {
+      "from": "graph-new-distance-time",
+      "to": "q-read-speed",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {
+    "generatedAt": "2026-06-24T00:00:00Z"
+  },
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## multi-component-torque
+
+**Request:** Build a package about torque with a diagram, an explanation, a question, a summary, and a short interactive exercise.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "torque-package-chem-120-lesson-03",
+  "objective": "Build a multi-component torque package with a beam diagram, explanation, application question, summary, and short graph-reading exercise.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "diagram",
+      "id": "diagram-balanced-beam",
+      "sourceRefs": [
+        "studyai://document/module-2/text/9?chunk=1"
+      ],
+      "title": "Balanced beam with equal opposing torques",
+      "forces": [
+        {
+          "label": "left load",
+          "components": [
+            0,
+            -10
+          ],
+          "position": {
+            "x": -2,
+            "y": 0
+          }
+        },
+        {
+          "label": "right load",
+          "components": [
+            0,
+            -10
+          ],
+          "position": {
+            "x": 2,
+            "y": 0
+          }
+        },
+        {
+          "label": "pivot support",
+          "components": [
+            0,
+            20
+          ],
+          "position": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ]
+    },
+    {
+      "kind": "explanation",
+      "id": "explanation-torque-basics",
+      "sourceRefs": [
+        "studyai://document/module-2/text/9?chunk=1"
+      ],
+      "text": "Torque is the turning effect of a force and equals the lever arm multiplied by the force component perpendicular to it. For a beam in equilibrium, the clockwise and anticlockwise torques balance in magnitude, so there is no net turning effect.",
+      "concepts": [
+        "torque",
+        "lever arm",
+        "perpendicular force",
+        "rotational equilibrium"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "question-balance-new-beam",
+      "sourceRefs": [
+        "studyai://document/module-2/text/9?chunk=1"
+      ],
+      "prompt": "A horizontal beam is balanced about a pivot. A 6 N downward force acts 0.5 m to the left of the pivot. Where should an 8 N downward force act on the right to keep the beam level?",
+      "answer": "0.375 m to the right of the pivot, because the left-side torque of 6 × 0.5 = 3 N·m is matched by 8 × 0.375 = 3 N·m."
+    },
+    {
+      "kind": "summary",
+      "id": "summary-torque-equilibrium",
+      "sourceRefs": [
+        "studyai://document/module-2/text/9?chunk=1"
+      ],
+      "title": "Torque and beam equilibrium",
+      "sections": [
+        {
+          "heading": "Torque",
+          "body": "Torque is the turning effect found from the lever arm and the force perpendicular to it. A force applied farther from the pivot has a larger lever arm and produces more torque for the same force."
+        },
+        {
+          "heading": "Equilibrium",
+          "body": "A beam is in rotational equilibrium when clockwise and anticlockwise torques balance. To solve balance problems, compute each side's torque and set the opposing totals equal."
+        }
+      ]
+    },
+    {
+      "kind": "interactive-exercise",
+      "id": "interactive-torque-graph-read",
+      "sourceRefs": [
+        "studyai://document/module-2/text/9?chunk=1"
+      ],
+      "prompt": "For the balanced beam with a 6 N force 0.5 m left of the pivot and an 8 N force on the right, the graph shows the needed right-side distance as the left-side torque changes. Read the distance when the left-side torque is 3 N·m.",
+      "exercise": {
+        "mode": "graph-interpretation",
+        "slope": 0.125,
+        "intercept": 0,
+        "xRange": [
+          0,
+          4
+        ],
+        "atX": 3
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from": "diagram-balanced-beam",
+      "to": "explanation-torque-basics",
+      "relation": "demonstrates"
+    },
+    {
+      "from": "explanation-torque-basics",
+      "to": "question-balance-new-beam",
+      "relation": "explains"
+    },
+    {
+      "from": "question-balance-new-beam",
+      "to": "interactive-torque-graph-read",
+      "relation": "extends"
+    },
+    {
+      "from": "summary-torque-equilibrium",
+      "to": "explanation-torque-basics",
+      "relation": "summarizes"
+    }
+  ],
+  "provenance": {
+    "generatedAt": "2026-06-23"
+  },
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## insufficient-source
+
+**Request:** What topics did my professor say would be on the final exam? Make a study artifact if you can.
+
+**Outcome:**
+
+```json
+{
+  "status": "insufficient-source",
+  "missing": [
+    "the professor's final exam review slides, transcript, or announcement listing exam topics",
+    "the syllabus section describing final exam coverage",
+    "any course handout or lecture note identifying what will be on the final exam"
+  ],
+  "nextStep": "Upload or paste the professor's final exam review material, transcript, syllabus excerpt, or course handout that lists the final exam topics; then the topics can be extracted and turned into a study artifact."
+}
+```

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { SCENARIOS, WEIGHTS, scoreGeneration, evaluateQualityGate, type QualityGate } from "../src/artifacts/benchmark";
+import { SCENARIOS, WEIGHTS, scoreGeneration, evaluateQualityGate, gateScenarios, type QualityGate } from "../src/artifacts/benchmark";
 
 describe("benchmark dimensions", () => {
   it("uses the owner's six weights summing to 100", () => {
@@ -31,6 +31,17 @@ describe("scoreGeneration", () => {
     expect(result.completeness).toBe("pending-human-review");
     expect("overall" in result).toBe(false);
     expect(Object.keys(result.scores)).toEqual(["intent", "accuracy", "grounding"]);
+  });
+});
+
+describe("gateScenarios", () => {
+  it("excludes held-out prompts from the frozen gate", () => {
+    const scenarios = [
+      { name: "fixed", heldOut: false },
+      { name: "held", heldOut: true },
+      { name: "another fixed" },
+    ];
+    expect(gateScenarios(scenarios).map((scenario) => scenario.name)).toEqual(["fixed", "another fixed"]);
   });
 });
 
@@ -70,7 +81,7 @@ describe("evaluateQualityGate", () => {
 describe("committed baseline", () => {
   it("is explicitly pending human review and carries no scores", () => {
     const baseline = JSON.parse(readFileSync("docs/verification/artifact-quality-baseline.json", "utf8")) as Record<string, unknown>;
-    expect(baseline.reviewStatus).toBe("reviewed");
+    expect(baseline.reviewStatus).toBe("pending-human-review");
     expect(baseline).not.toHaveProperty("scores");
     expect(baseline).not.toHaveProperty("overall");
     expect(baseline.weights).toEqual(WEIGHTS);
@@ -87,17 +98,18 @@ describe("committed baseline", () => {
     for (const scenario of baseline.scenarios) {
       const record = records.generations.find((item) => item.id === scenario.generationId);
       expect(record).toBeDefined();
-      expect(["validated", "insufficient-evidence"]).toContain(record?.status);
-      expect(Object.keys(scenario.labels).sort()).toEqual([...Object.keys(WEIGHTS)].sort());
+      expect(["validated", "insufficient-outcome"]).toContain(record?.status);
+      expect(scenario.labels).toEqual({});
     }
-    expect(records.generations).toHaveLength(4);
+    expect(records.generations).toHaveLength(6);
     expect(baseline.gate).toMatchObject({ pedagogyOverallMin: 4, pedagogyScenarioMin: 3.5, determinismRepeats: 5 });
     const legality = JSON.parse(readFileSync(baseline.legalityRepeats, "utf8")) as {
       repeatsRequired: number;
       results: Array<{ status: string }>;
     };
     expect(legality.repeatsRequired).toBe(5);
-    expect(legality.results.filter((result) => result.status === "passed")).toHaveLength(4);
+    expect(legality.results.filter((result) => result.status === "passed")).toHaveLength(5);
+    expect(legality.results.filter((result) => result.status === "exempt")).toHaveLength(1);
     expect(legality.results.filter((result) => result.status === "failed")).toHaveLength(0);
     expect(readFileSync(baseline.meta, "utf8")).toContain("provider");
     const sheet = readFileSync(baseline.reviewSheet, "utf8");

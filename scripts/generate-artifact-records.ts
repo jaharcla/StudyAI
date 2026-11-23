@@ -13,6 +13,8 @@ const SHEET = `docs/verification/artifact-blind-review-sheet${SUFFIX}.md`;
 
 const REF = "studyai://document/module-1/text/4?chunk=0";
 const TORQUE_REF = "studyai://document/module-2/text/9?chunk=1";
+const GRAPH_REF = "studyai://document/module-3/text/12?chunk=2";
+const PH_REF = "studyai://document/module-4/text/18?chunk=0";
 
 type Scenario = {
   id: string;
@@ -23,6 +25,7 @@ type Scenario = {
   requireCitations?: boolean;
   forbidPlaceholders?: boolean;
   missingSource?: boolean;
+  heldOut?: boolean;
 };
 
 const scenarios: Scenario[] = [
@@ -59,6 +62,26 @@ const scenarios: Scenario[] = [
     retrieved: [],
     missingSource: true,
   },
+  {
+    id: "held-out-graph-reading",
+    name: "held-out graph reading",
+    prompt: "From the note, explain what the slope of a distance-time graph tells you, then add one question that asks the student to read a value from a new graph.",
+    retrieved: [{ ref: GRAPH_REF, text: "On a distance-time graph, the slope of the line gives the speed. A steeper line means a greater speed." }],
+    topicTerms: ["slope"],
+    requireCitations: true,
+    forbidPlaceholders: true,
+    heldOut: true,
+  },
+  {
+    id: "held-out-ph",
+    name: "held-out pH",
+    prompt: "Build a short artifact explaining pH with one application question that requires a calculation.",
+    retrieved: [{ ref: PH_REF, text: "pH is defined as the negative base-ten logarithm of the hydrogen ion concentration: pH = -log10[H+]. A solution with [H+] = 1e-3 has pH 3." }],
+    topicTerms: ["ph"],
+    requireCitations: true,
+    forbidPlaceholders: true,
+    heldOut: true,
+  },
 ];
 
 const SYSTEM = `You produce one artifact package as JSON. Output ONLY a JSON object, no markdown fences and no prose.
@@ -66,7 +89,10 @@ const SYSTEM = `You produce one artifact package as JSON. Output ONLY a JSON obj
 Shape:
 {"schemaVersion":1,"id":"string","objective":"string","courseId":"chem-120","lessonId":"lesson-03",
  "components":[...],"relations":[{"from":"id","to":"id","relation":"explains"}],
+ "outcome":{"status":"insufficient-source","missing":["what is absent"],"nextStep":"what to supply"},
  "provenance":{},"acceptance":{"decision":"pending"}}
+
+Use "outcome" ONLY when no course material was supplied. Otherwise omit it.
 
 Allowed component kinds and required fields:
 - explanation: {"id","kind":"explanation","sourceRefs":[],"text":"...","concepts":[]}
@@ -82,11 +108,14 @@ Allowed component kinds and required fields:
 Rules:
 - Every sourceRef must be exactly one of the retrieved refs given in the user message. When evidence refs are supplied, EVERY component must carry at least one of them in sourceRefs. Never leave a component's sourceRefs empty when refs are available.
 - Component ids must be unique and relations must point to existing ids without cycles.
+- Include AT MOST ONE figure component in total across diagram, graph, equation and mind-map. Pick the single figure that best serves the request and omit the others.
+- "provenance" may contain only "generatedAt" and "claims". Do not add sourceRefs or retrievedEvidence there.
 - Every diagram force's "components" must be exactly two finite numbers, for example [0,-9.8], never one or three. Gravity on a level surface is (0,-9.8); the normal force is (0,+9.8) on a level surface and perpendicular to the surface on an incline; friction is parallel to the surface and opposes sliding. Never point friction straight down or use placeholder numbers. Each force "label" must be at most 60 characters; use short labels such as "gravity", "normal", "friction".
 - Never write placeholder prose such as "the diagram should show" or "placeholder"; write the actual content the component claims to provide.
-- Questions must test the topic named in the scenario, not an adjacent concept. The question prompt and answer must both be about that topic.
-- If you include an interactive-exercise, its prompt must ask for exactly the quantity its config computes; a graph-interpretation exercise must ask for a value read from the line at atX, not a torque calculation.
-- For an insufficient-source request, return an explanation whose text explicitly says the course material is not available, names what is missing, and offers a concrete next step such as uploading the announcement or outline. Do not echo the question as the whole answer, and do not invent course facts. Use empty sourceRefs.`;
+- Questions must test the topic named in the scenario, not an adjacent concept, and must require applying or transferring the idea to a new situation. Do not ask for a definition or a value copied directly from the explanation.
+- An interactive-exercise's prompt must NOT state the equation it uses. It must ask the student to read or infer a value, and it must reuse the numbers from the package's question so the two are connected.
+- For a torque diagram, give each force a "position" {x,y} marking where it acts, so lever arms can be read from the diagram.
+- For an insufficient-source request, return "components":[] and an "outcome" object. Name the specific missing material in "missing" and give a concrete next step in "nextStep". Do not create a dummy explanation component or invent course facts.`;
 
 function balanceTruncatedJson(source: string): string {
   let result = source;
@@ -154,9 +183,13 @@ function assertComposerConstraints(value: unknown, scenario: Scenario): void {
   const components = object.components ?? [];
 
   if (scenario.missingSource) {
-    const acknowledgement = `${object.objective ?? ""} ${object.reason ?? ""} ${components.map((component) => component.text ?? "").join(" ")}`.toLowerCase();
-    if (!/not (?:available|supplied|provided)|could not find|cannot find|don't have|no relevant/.test(acknowledgement)) problems.push("Acknowledgement does not say the course material is missing.");
-    if (!/upload|provide|share|send/.test(acknowledgement)) problems.push("Acknowledgement offers no concrete next step.");
+    const outcome = (object as { outcome?: { status?: string; missing?: string[]; nextStep?: string } }).outcome;
+    if (outcome?.status !== "insufficient-source") problems.push("Expected a first-class insufficient-source outcome.");
+    else {
+      if (!outcome.missing?.length) problems.push("Outcome does not name what is missing.");
+      if (!outcome.nextStep || !/upload|provide|share|send|supply/.test(outcome.nextStep.toLowerCase())) problems.push("Outcome has no concrete next step.");
+    }
+    if (components.length) problems.push("A refusal must not package a dummy explanation component.");
   }
   if (scenario.requireCitations && components.some((component) => !component.sourceRefs?.length)) {
     problems.push("At least one component has empty sourceRefs despite supplied evidence.");
@@ -200,7 +233,23 @@ const reviewLines = [
   "| Visual quality | 10 | |",
   "| Interaction quality | 5 | |",
   "",
+  "The insufficient-source case uses the separate refusal rubric registered in docs/decisions/ADR-2026-11-23-artifact-quality-refusal-rubric.md.",
+  "",
 ];
+const sections: string[][] = [];
+
+function shuffle<T>(items: readonly T[], seed: number): T[] {
+  const copy = [...items];
+  let state = seed >>> 0;
+  const next = (): number => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 2 ** 32; };
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(next() * (index + 1));
+    const temporary = copy[index]!;
+    copy[index] = copy[swap]!;
+    copy[swap] = temporary;
+  }
+  return copy;
+}
 
 for (const scenario of scenarios) {
   const userText = `Scenario: ${scenario.name}\nRequest: ${scenario.prompt}\nRetrieved evidence (ref and text):\n${scenario.retrieved.map((item) => `${item.ref} :: ${item.text}`).join("\n") || "(none supplied)"}`;
@@ -219,12 +268,18 @@ for (const scenario of scenarios) {
       const text = contentText.trim() ? contentText : reasoning;
       lastRawText = text;
       parsed = parseJson(text);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const source = parsed as { provenance?: unknown };
+        if (source.provenance && typeof source.provenance === "object" && !Array.isArray(source.provenance)) {
+          const provenance = source.provenance as Record<string, unknown>;
+          source.provenance = typeof provenance.generatedAt === "string" ? { generatedAt: provenance.generatedAt } : {};
+        }
+      }
       assertComposerConstraints(parsed, scenario);
       const refs = scenario.retrieved.map((item) => item.ref);
       if (parsed && typeof parsed === "object" && Array.isArray((parsed as { components?: unknown }).components)
         && (parsed as { components: unknown[] }).components.length === 0) {
-        const acknowledgement = String((parsed as { objective?: unknown; reason?: unknown }).objective
-          ?? (parsed as { reason?: unknown }).reason ?? "No course material was supplied, so no artifact was invented.");
+        const outcome = (parsed as { outcome?: { status: string; missing: string[]; nextStep: string } }).outcome!;
         records.push({
           id: scenario.id,
           scenario: scenario.name,
@@ -232,12 +287,24 @@ for (const scenario of scenarios) {
           retrievedRefs: refs,
           retrieved: scenario.retrieved,
           generatedAt: new Date().toISOString(),
-          status: "insufficient-evidence",
-          acknowledgement,
+          status: "insufficient-outcome",
+          outcome,
+          heldOut: Boolean(scenario.heldOut),
         });
-        meta.push({ id: scenario.id, provider, model: modelName, attempts: attempt + 1 });
-        reviewLines.push(`## ${scenario.id}`, "", `**Request:** ${scenario.prompt}`, "", `**Acknowledgement:** ${acknowledgement}`, "");
-        console.log(`${scenario.id}: insufficient-evidence (no artifact invented)`);
+        meta.push({ id: scenario.id, provider, model: modelName, attempts: attempt + 1, heldOut: Boolean(scenario.heldOut) });
+        sections.push([
+          `## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`,
+          "",
+          `**Request:** ${scenario.prompt}`,
+          "",
+          "**Outcome:**",
+          "",
+          "```json",
+          JSON.stringify(outcome, null, 2),
+          "```",
+          "",
+        ]);
+        console.log(`${scenario.id}: insufficient-outcome (no artifact invented)`);
         break;
       }
       const pkg = parseArtifactPackage(parsed, refs);
@@ -250,17 +317,29 @@ for (const scenario of scenarios) {
         package: pkg,
         generatedAt: new Date().toISOString(),
         status: "validated",
+        heldOut: Boolean(scenario.heldOut),
       });
-      meta.push({ id: scenario.id, provider, model: modelName, attempts: attempt + 1 });
-      reviewLines.push(`## ${scenario.id}`, "", `**Request:** ${scenario.prompt}`, "", "**Generated package:**", "", "```json", JSON.stringify(pkg, null, 2), "```", "");
+      meta.push({ id: scenario.id, provider, model: modelName, attempts: attempt + 1, heldOut: Boolean(scenario.heldOut) });
+      sections.push([
+        `## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`,
+        "",
+        `**Request:** ${scenario.prompt}`,
+        "",
+        "**Generated package:**",
+        "",
+        "```json",
+        JSON.stringify(pkg, null, 2),
+        "```",
+        "",
+      ]);
       console.log(`${scenario.id}: validated (${pkg.components.length} components, attempt ${attempt + 1})`);
       break;
     } catch (error) {
       lastError = error instanceof Error ? error.message : "Invalid package.";
       if (attempt === 1) {
-        records.push({ id: scenario.id, scenario: scenario.name, status: "failed", error: lastError, rawOutput: String(lastRawText ?? "").slice(0, 4000) });
-        meta.push({ id: scenario.id, provider: "ollama", model: modelName, attempts: 2 });
-        reviewLines.push(`## ${scenario.id}`, "", `**Request:** ${scenario.prompt}`, "", `**Generation failed validation:** ${lastError}`, "");
+        records.push({ id: scenario.id, scenario: scenario.name, status: "failed", error: lastError, rawOutput: String(lastRawText ?? "").slice(0, 4000), heldOut: Boolean(scenario.heldOut) });
+        meta.push({ id: scenario.id, provider, model: modelName, attempts: 2, heldOut: Boolean(scenario.heldOut) });
+        sections.push([`## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`, "", `**Request:** ${scenario.prompt}`, "", `**Generation failed validation:** ${lastError}`, ""]);
         console.log(`${scenario.id}: FAILED — ${lastError}`);
       }
     }
@@ -269,5 +348,6 @@ for (const scenario of scenarios) {
 
 writeFileSync(OUTPUT, JSON.stringify({ generations: records }, null, 2) + "\n");
 writeFileSync(META, JSON.stringify({ records: meta, note: "Not for reviewers. Reveal only after scores are committed." }, null, 2) + "\n");
-writeFileSync(SHEET, reviewLines.join("\n"));
+const seed = Number(CYCLE) * 7919 + 13;
+writeFileSync(SHEET, [...reviewLines, ...shuffle(sections, seed).flat()].join("\n"));
 console.log(`Wrote ${OUTPUT}, ${META}, ${SHEET}`);

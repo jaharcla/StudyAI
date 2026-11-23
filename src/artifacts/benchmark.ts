@@ -50,6 +50,11 @@ export type QualityGate = {
 export type ScenarioScore = { name: string; pedagogy: number };
 export type GateResult = { eligible: boolean; reasons: string[] };
 
+/** Held-out prompts are reported but never enter the frozen four-scenario gate. */
+export function gateScenarios<T extends { heldOut?: boolean }>(scenarios: readonly T[]): T[] {
+  return scenarios.filter((scenario) => !scenario.heldOut);
+}
+
 /** Equal-weight scenario averaging with a per-scenario floor and two critical-failure vetoes. */
 export function evaluateQualityGate(
   scenarios: readonly ScenarioScore[],

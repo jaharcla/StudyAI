@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
-import { SCENARIOS, WEIGHTS, scoreGeneration, evaluateQualityGate, type Dimension, type HumanLabels, type QualityGate } from "../src/artifacts/benchmark";
+import { SCENARIOS, WEIGHTS, scoreGeneration, evaluateQualityGate, gateScenarios, type Dimension, type HumanLabels, type QualityGate } from "../src/artifacts/benchmark";
 
 type Baseline = {
   reviewStatus: string;
   weights: Record<string, number>;
   gate?: QualityGate;
-  scenarios: Array<{ name: string; labels: HumanLabels }>;
+  scenarios: Array<{ name: string; labels: HumanLabels; heldOut?: boolean }>;
 };
 
 const baseline = JSON.parse(readFileSync("docs/verification/artifact-quality-baseline.json", "utf8")) as Baseline;
@@ -22,7 +22,7 @@ for (const scenario of baseline.scenarios) {
   console.log(`${scenario.name.padEnd(32)} ${detail}  overall: ${overall}`);
 }
 if (baseline.gate && !incomplete) {
-  const gate = evaluateQualityGate(baseline.scenarios.map((scenario) => ({ name: scenario.name, pedagogy: scenario.labels.pedagogy ?? 0 })), baseline.gate);
+  const gate = evaluateQualityGate(gateScenarios(baseline.scenarios).map((scenario) => ({ name: scenario.name, pedagogy: scenario.labels.pedagogy ?? 0 })), baseline.gate);
   console.log(`Gate: ${gate.eligible ? "QUALIFIED" : "NOT QUALIFIED"}${gate.reasons.length ? ` — ${gate.reasons.join("; ")}` : ""}`);
 } else if (baseline.gate) {
   console.log("Gate: not evaluated — human labels pending.");

@@ -1,0 +1,47 @@
+{
+  "records": [
+    {
+      "id": "documented-request",
+      "provider": "opencode-go",
+      "model": "hy4-flash-free",
+      "attempts": 1,
+      "heldOut": false
+    },
+    {
+      "id": "ambiguous-request",
+      "provider": "opencode-go",
+      "model": "hy4-flash-free",
+      "attempts": 2,
+      "heldOut": false
+    },
+    {
+      "id": "multi-component-torque",
+      "provider": "opencode-go",
+      "model": "hy4-flash-free",
+      "attempts": 2,
+      "heldOut": false
+    },
+    {
+      "id": "insufficient-source",
+      "provider": "opencode-go",
+      "model": "hy4-flash-free",
+      "attempts": 1,
+      "heldOut": false
+    },
+    {
+      "id": "held-out-graph-reading",
+      "provider": "opencode-go",
+      "model": "hy4-flash-free",
+      "attempts": 1,
+      "heldOut": true
+    },
+    {
+      "id": "held-out-ph",
+      "provider": "opencode-go",
+      "model": "hy4-flash-free",
+      "attempts": 1,
+      "heldOut": true
+    }
+  ],
+  "note": "Not for reviewers. Reveal only after scores are committed."
+}
