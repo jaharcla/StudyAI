@@ -53,6 +53,24 @@ describe("compileSlideDeck", () => {
     expect(markdown).toContain(`- Friction opposes motion.\n> Source: ${REF}\n- Normal force is perpendicular.\n> Source: ${secondRef}`);
   });
 
+  it("renders a computed worked example with steps and verification", () => {
+    const worked: SlideDeckComponent = {
+      ...component,
+      slides: [{
+        role: "example", title: "Two-variable example", claims: [],
+        math: { equations: ["x + y = 60", "8x + 12y = 600"], variables: ["x", "y"] },
+        notes: "Check the solution in both equations.",
+      }],
+    };
+    const markdown = compileSlideDeck(worked, findDeckTemplate("general-en")).slides_markdown[0];
+    expect(markdown).toContain("y = 60 - x");
+    expect(markdown).toContain("8x + 12(60 - x) = 600");
+    expect(markdown).toContain("x = 30");
+    expect(markdown).toContain("y = 30");
+    expect(markdown).toContain("30 + 30 = 60");
+    expect(markdown).toContain("8*30 + 12*30 = 600");
+  });
+
   it("extracts visual intents without a query for diagrams", () => {
     const plan = imagePlan(component);
     expect(plan).toEqual([{

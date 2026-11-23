@@ -56,6 +56,10 @@ export const artifactComponentSchema = z.discriminatedUnion("kind", [
         credit: z.string().max(300).optional(),
       }).strict().optional(),
       notes: z.string().max(2000).optional(),
+      math: z.object({
+        equations: z.array(z.string().min(1).max(200)).min(1).max(4),
+        variables: z.array(z.string().min(1).max(2)).min(1).max(4),
+      }).strict().optional(),
     }).strict()).min(2).max(20),
   }).strict(),
 ]);
