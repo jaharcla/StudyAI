@@ -48,8 +48,8 @@ function deriveBrief(pkg: ArtifactPackage, ctx: CompilePackageContext): Artifact
       })),
       ...(diagram.surfaceAngleDeg === undefined ? {} : { context: { surfaceAngleDeg: diagram.surfaceAngleDeg } }),
     };
-  } else if (graph) figure = { kind: "graph", title: pkg.objective, expression: graph.expression, xRange: graph.xRange };
-  else if (equation) figure = { kind: "equation", title: pkg.objective, expression: equation.expression };
+  } else if (graph) figure = { kind: "graph", title: pkg.objective.slice(0, 120), expression: graph.expression, xRange: graph.xRange };
+  else if (equation) figure = { kind: "equation", title: pkg.objective.slice(0, 120), expression: equation.expression };
   else if (mindmap) figure = { kind: "mindmap", title: mindmap.title, ...(mindmap.nodes.length ? { concepts: mindmap.nodes.map((node) => node.label).slice(0, 8) } : {}) };
 
   const shared = {

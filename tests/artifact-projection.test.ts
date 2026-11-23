@@ -82,6 +82,19 @@ describe("cycle 4 schema integration", () => {
     });
   });
 
+  it("keeps a long objective within the brief figure title limit", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1,
+      id: "long-title",
+      objective: "A very long objective that repeats many details about distance time graphs and slopes and several other things that would otherwise overflow the figure title field in the brief schema",
+      courseId: "c1", lessonId: "l1",
+      components: [{ id: "g1", kind: "graph", expression: "5*x", xRange: [0, 4], sourceRefs: [REF] }],
+    }, [REF]);
+    const result = compilePackage(pkg, ctx);
+    expect(result.report.ok).toBe(true);
+    expect(result.canvas?.objects.some((object) => object.kind === "graph")).toBe(true);
+  });
+
   it("carries a force application point into the compiled object", () => {
     const pkg = parseArtifactPackage({
       schemaVersion: 1, id: "torque-pos", objective: "Torque", courseId: "c1", lessonId: "l1",

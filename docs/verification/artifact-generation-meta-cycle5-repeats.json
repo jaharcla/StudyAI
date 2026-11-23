@@ -1,0 +1,47 @@
+{
+  "records": [
+    {
+      "id": "held-out-graph-reading-r1",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 2,
+      "heldOut": true
+    },
+    {
+      "id": "held-out-graph-reading-r2",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 2,
+      "heldOut": true
+    },
+    {
+      "id": "held-out-graph-reading-r3",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 1,
+      "heldOut": true
+    },
+    {
+      "id": "held-out-ph-r1",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 2,
+      "heldOut": true
+    },
+    {
+      "id": "held-out-ph-r2",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 2,
+      "heldOut": true
+    },
+    {
+      "id": "held-out-ph-r3",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 1,
+      "heldOut": true
+    }
+  ],
+  "note": "Not for reviewers. Reveal only after scores are committed."
+}

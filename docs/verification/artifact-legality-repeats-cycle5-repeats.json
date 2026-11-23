@@ -1,0 +1,47 @@
+{
+  "repeatsRequired": 5,
+  "results": [
+    {
+      "id": "held-out-graph-reading-r1",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "held-out-graph-reading-r2",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "held-out-graph-reading-r3",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "held-out-ph-r1",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "held-out-ph-r2",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "held-out-ph-r3",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    }
+  ]
+}

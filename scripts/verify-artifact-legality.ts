@@ -6,7 +6,8 @@ import { DEFAULT_VIEWPORT } from "../src/canvas/ai/teaching-scene.js";
 import { compilePackage } from "../server/artifact-intelligence/service.js";
 
 const CYCLE = process.env.ARTIFACT_CYCLE ?? "1";
-const SUFFIX = CYCLE === "1" ? "" : `-cycle${CYCLE}`;
+const RAW_SUFFIX = process.env.ARTIFACT_SUFFIX ?? (CYCLE === "1" ? "" : `-cycle${CYCLE}`);
+const SUFFIX = RAW_SUFFIX.startsWith("-") || RAW_SUFFIX === "" ? RAW_SUFFIX : `-${RAW_SUFFIX}`;
 const GENERATIONS = `docs/verification/artifact-generations${SUFFIX}.json`;
 const OUTPUT = `docs/verification/artifact-legality-repeats${SUFFIX}.json`;
 const REPEATS = 5;

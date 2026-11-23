@@ -1,0 +1,364 @@
+# Artifact quality blind review sheet
+
+Score each generation 0–5 on six dimensions. Model identity and provider are recorded separately, not shown here.
+Keep disagreements instead of forcing consensus.
+
+| Dimension | Weight | Score 0–5 |
+|---|---:|---:|
+| Intent fidelity | 20 | |
+| Factual accuracy | 25 | |
+| Course grounding | 20 | |
+| Pedagogy | 20 | |
+| Visual quality | 10 | |
+| Interaction quality | 5 | |
+
+The insufficient-source case uses the separate refusal rubric registered in docs/decisions/ADR-2026-11-23-artifact-quality-refusal-rubric.md.
+
+## Generation 3
+
+**Request:** From the note, explain what the slope of a distance-time graph tells you, then add one question that asks the student to read a value from a new graph.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "held-out-graph-reading",
+  "objective": "Explain what the slope of a distance-time graph indicates and practice reading a value from a graph",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-slope",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "text": "On a distance-time graph, the slope of the line gives the speed. A steeper line means a greater speed.",
+      "concepts": [
+        "slope",
+        "speed",
+        "distance-time graph"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "q-read-graph",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "prompt": "What distance does the graph show at 5 s?",
+      "answer": "12 m",
+      "scenario": "A cart's distance-time graph is linear from (0,0) to (3,6), then changes to a steeper linear segment from (3,6) to (6,15).",
+      "bloomLevel": "application"
+    },
+    {
+      "kind": "interactive-exercise",
+      "id": "ix-read-graph",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "prompt": "Read the distance value from the displayed graph at 5 s.",
+      "exercise": {
+        "mode": "graph-interpretation",
+        "slope": 3,
+        "intercept": -3,
+        "xRange": [
+          3,
+          6
+        ],
+        "atX": 5
+      }
+    }
+  ],
+  "relations": [
+    {
+      "from": "exp-slope",
+      "to": "q-read-graph",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {},
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## Generation 6
+
+**Request:** Build a short artifact explaining pH with one application question that requires a calculation.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "ph-short-artifact",
+  "objective": "Explain pH and apply its definition in a calculation",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-ph",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "text": "pH is defined as the negative base-ten logarithm of the hydrogen ion concentration: pH = -log10[H+]. For example, a solution with [H+] = 1 × 10^-3 M has pH 3.",
+      "concepts": [
+        "pH",
+        "hydrogen ion concentration"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "q-ph-dilution",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "prompt": "Calculate the pH of the diluted solution.",
+      "answer": "4.40",
+      "scenario": "A stock acid solution has [H+] = 4.0 × 10^-3 M. It is diluted so that the hydrogen ion concentration becomes 4.0 × 10^-5 M.",
+      "bloomLevel": "application"
+    }
+  ],
+  "relations": [],
+  "provenance": {},
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## Generation 1
+
+**Request:** From the note, explain what the slope of a distance-time graph tells you, then add one question that asks the student to read a value from a new graph.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "held-out-graph-reading",
+  "objective": "Explain that the slope of a distance-time graph gives speed and ask an application question about reading a value from a graph.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-slope",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "text": "On a distance-time graph, the slope of the line gives the speed. A steeper line means a greater speed.",
+      "concepts": [
+        "distance-time graph",
+        "slope",
+        "speed"
+      ]
+    },
+    {
+      "kind": "graph",
+      "id": "graph-distance-time",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "expression": "4.5*x+3",
+      "xRange": [
+        0,
+        10
+      ],
+      "xLabel": "x",
+      "yLabel": "y"
+    },
+    {
+      "kind": "question",
+      "id": "q-read-value",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "prompt": "Determine the cart's distance at t = 10 s.",
+      "answer": "The slope between 2 s and 6 s is (30 m - 12 m)/(6 s - 2 s) = 4.5 m/s, so from 6 s to 10 s the cart travels 4.5 m/s × 4 s = 18 m; its distance at 10 s is 30 m + 18 m = 48 m.",
+      "scenario": "A distance-time graph shows a cart at 12 m when t = 2 s and 30 m when t = 6 s; after 6 s it travels at the same speed for 4 more seconds.",
+      "bloomLevel": "application"
+    }
+  ],
+  "relations": [
+    {
+      "from": "exp-slope",
+      "to": "q-read-value",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {},
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## Generation 5
+
+**Request:** Build a short artifact explaining pH with one application question that requires a calculation.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "ph-artifact-001",
+  "objective": "Explain pH and apply it to calculate a new pH after a concentration change.",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-ph",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "text": "pH measures acidity using pH = -log10[H+], where [H+] is the hydrogen ion concentration in moles per liter.",
+      "concepts": [
+        "pH",
+        "hydrogen ion concentration"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "q-ph-calc",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "prompt": "Determine the pH after the base is added.",
+      "answer": "pH = -log10(5.0e-6) ≈ 5.30.",
+      "scenario": "A solution initially has [H+] = 2.0e-4 M; after base is added, [H+] becomes 5.0e-6 M.",
+      "bloomLevel": "application"
+    }
+  ],
+  "relations": [
+    {
+      "from": "exp-ph",
+      "to": "q-ph-calc",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {},
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## Generation 4
+
+**Request:** Build a short artifact explaining pH with one application question that requires a calculation.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "ph-artifact-001",
+  "objective": "Explain pH and apply it to a dilution calculation",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-ph",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "text": "pH is the negative base-ten logarithm of the hydrogen ion concentration: pH = -log10[H+].",
+      "concepts": [
+        "pH",
+        "hydrogen ion concentration"
+      ]
+    },
+    {
+      "kind": "question",
+      "id": "q-ph-dilution",
+      "sourceRefs": [
+        "studyai://document/module-4/text/18?chunk=0"
+      ],
+      "prompt": "Calculate the pH before dilution and after dilution.",
+      "answer": "Before dilution, pH = -log10(2.0×10^-4) ≈ 3.70; after dilution, pH = -log10(5.0×10^-5) ≈ 4.30.",
+      "scenario": "A beaker contains 0.00020 M H+ ions. After dilution with water, the concentration becomes 0.000050 M H+.",
+      "bloomLevel": "application"
+    }
+  ],
+  "relations": [],
+  "provenance": {},
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```
+
+## Generation 2
+
+**Request:** From the note, explain what the slope of a distance-time graph tells you, then add one question that asks the student to read a value from a new graph.
+
+**Generated package:**
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "held-out-graph-reading",
+  "objective": "Explain what the slope of a distance-time graph indicates and apply it to a new graph",
+  "courseId": "chem-120",
+  "lessonId": "lesson-03",
+  "components": [
+    {
+      "kind": "explanation",
+      "id": "exp-slope",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "text": "On a distance-time graph, the slope of the line gives the speed. A steeper line means a greater speed.",
+      "concepts": [
+        "distance-time graph",
+        "slope",
+        "speed"
+      ]
+    },
+    {
+      "kind": "graph",
+      "id": "graph-new",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "expression": "2*x+1",
+      "xRange": [
+        0,
+        4
+      ],
+      "xLabel": "x",
+      "yLabel": "y"
+    },
+    {
+      "kind": "question",
+      "id": "q-slope",
+      "sourceRefs": [
+        "studyai://document/module-3/text/12?chunk=2"
+      ],
+      "prompt": "Determine the speed represented by the slope of this new graph.",
+      "answer": "(9 m - 1 m)/(4 s - 0 s) = 2 m/s.",
+      "scenario": "A new distance-time graph is linear from (0, 1 m) to (4, 9 m), and its slope is steeper than the 0.5 m/s reference line.",
+      "bloomLevel": "application"
+    }
+  ],
+  "relations": [
+    {
+      "from": "exp-slope",
+      "to": "q-slope",
+      "relation": "explains"
+    }
+  ],
+  "provenance": {},
+  "acceptance": {
+    "decision": "pending"
+  }
+}
+```

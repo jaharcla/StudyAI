@@ -7,7 +7,8 @@ import { getTutorProviderSettings } from "../server/tutor-provider.js";
 import { createTutorChatModel } from "../server/tutor-chat-model.js";
 
 const CYCLE = process.env.ARTIFACT_CYCLE ?? "1";
-const SUFFIX = process.env.ARTIFACT_SUFFIX ?? (CYCLE === "1" ? "" : `-cycle${CYCLE}`);
+const RAW_SUFFIX = process.env.ARTIFACT_SUFFIX ?? (CYCLE === "1" ? "" : `-cycle${CYCLE}`);
+const SUFFIX = RAW_SUFFIX.startsWith("-") || RAW_SUFFIX === "" ? RAW_SUFFIX : `-${RAW_SUFFIX}`;
 const ONLY = process.env.ARTIFACT_ONLY?.split(",").map((id) => id.trim()).filter(Boolean);
 const REPEATS = Math.max(1, Number(process.env.ARTIFACT_REPEATS ?? 1));
 const OUTPUT = `docs/verification/artifact-generations${SUFFIX}.json`;
