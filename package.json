@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "verify": "tsc -b && vitest run && playwright test",
-    "benchmark:canvas": "tsx scripts/benchmark-canvas.ts"
+    "benchmark:canvas": "tsx scripts/benchmark-canvas.ts",
+    "benchmark:artifacts": "tsx scripts/benchmark-artifacts.ts"
   },
   "dependencies": {
     "@ag-ui/client": "1.0.2",
