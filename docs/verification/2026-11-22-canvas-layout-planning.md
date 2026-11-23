@@ -50,7 +50,9 @@ occupancy wiring, and exact reproduction of the legacy grid for callers without 
 
 ## What this does not yet do
 
-The planner is not wired into `propose_scientific_object` (Phase 4), and scientific objects are not yet part of occupancy — `boardOccupancy` reads QuickDraw records, while registry objects live in the canvas document.
+The planner is not wired into `propose_scientific_object` (Phase 4). Scientific objects **are** now part of occupancy — commit `9733d70` unions `boardOccupancy(store)` with `objectOccupancy(objects)`, and `objectOccupancy` delegates to `objectBounds` so a force blocks tail-to-tip.
+
+Implementation note, corrected after the fact: occupancy is computed from store records plus the document's objects, **not** from the built scene graph as this document originally implied. It is available without waiting for scene indexing, at the cost of not reusing the scene's `overlaps` edges — so the measurement plan scoring legality from the scene graph cross-checks the two paths rather than letting them agree by construction.
 
 **Superseded by Phase 2:** the note below said same-batch aliases were unimplemented and highlights were gated by `existingShapeIds`. Phase 2 removed that workaround, and also found that `Store.transact` does not roll back a throwing apply. See [2026-11-22-canvas-batch-references.md](2026-11-22-canvas-batch-references.md).
 

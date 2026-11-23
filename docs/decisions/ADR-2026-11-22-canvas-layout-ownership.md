@@ -33,7 +33,7 @@ Decisions this settles for later phases:
 - First-fit can leave holes between placements; tidy is not optimal. Acceptable and visible.
 - Text extent remains an approximation (`shapeBounds` estimates width from glyph count), so long labels in unusual fonts may under-block slightly. Mitigation is the 60 unit clearance, not a font metrics engine.
 - Only `propose_teaching_scene` uses the planner today; `propose_scientific_object` still takes model coordinates by design (decision 2).
-- Scientific-object bounds are not yet part of occupancy — `boardOccupancy` reads QuickDraw records, while registry objects live in the canvas document. Phases 3 and 4 must close that gap before figures and questions can be guaranteed clear of each other.
+- Scientific-object bounds are now part of occupancy: the bridge unions `boardOccupancy(store)` with `objectOccupancy(objects)`, and `objectOccupancy` delegates to `objectBounds` rather than recomputing centres, so a force blocks tail-to-tip and a flat vector still blocks via a 24-unit extent floor. What is still not modelled is a figure's *future* footprint — labels and highlights added around a shape extend it, and the planner sizes the request rather than measuring the rendered result.
 - Playwright e2e is owed, not run; see the Phase 1 verification record for why.
 
 ## Verification
