@@ -1,6 +1,16 @@
+import { z } from "zod";
 import type { ArtifactBrief } from "../canvas/ai/teaching-scene";
 import type { LayoutRect } from "../canvas/ai/layout";
 import type { ScientificObject } from "../canvas/model";
+
+export const claimProvenanceSchema = z.object({
+  claim: z.string().min(1).max(2000),
+  sourceRef: z.string().min(1).max(400),
+  excerpt: z.string().min(1).max(3000),
+  relationship: z.enum(["direct", "interpretation", "extension", "unresolved-conflict"]),
+  confidence: z.number().min(0).max(1).optional(),
+}).strict();
+export type ClaimProvenance = z.infer<typeof claimProvenanceSchema>;
 
 /** A model-actionable validation finding. `requestedCorrection` is always prose, never a boolean. */
 export type ValidationProblem = {
