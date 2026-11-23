@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createCourseWithLesson, selectCourseOnPage } from "./helpers";
+import { useMockGroqCanvasAnalysis } from "./canvas-grounding-helpers";
 
 type PenPoint = { x: number; y: number; pressure: number };
 
@@ -46,6 +47,31 @@ async function drawStrokeCount(page: Page, courseId: string, lessonId: string): 
   const board = await savedBoard(page, courseId, lessonId);
   return Object.values(board.parsed).filter((record) => record.type === "draw").length;
 }
+
+test("double-tap proposes handwriting-to-LaTeX; declining changes neither document nor revision", async ({ page }) => {
+  test.setTimeout(120_000);
+  const { course, lesson } = await openBoard(page);
+  await useMockGroqCanvasAnalysis(page, course.id, lesson.id);
+  await penStroke(page, Array.from({ length: 6 }, (_, i) => ({ x: 180 + i * 10, y: 260 - (i % 2) * 18, pressure: 0.6 })), "pen");
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(1);
+  const before = await savedBoard(page, course.id, lesson.id);
+
+  const tap = { x: 180, y: 180, pressure: 0.5 };
+  await firePointer(page, "pointerdown", tap, "pen", 11);
+  await firePointer(page, "pointerup", tap, "pen", 11);
+  await firePointer(page, "pointerdown", tap, "pen", 12);
+  await firePointer(page, "pointerup", tap, "pen", 12);
+
+  const proposal = page.getByRole("region", { name: "Canvas object proposal" });
+  await expect(proposal).toBeVisible({ timeout: 30_000 });
+  await expect(proposal).toContainText("F = 5 N");
+  await proposal.getByRole("button", { name: "Dismiss proposal" }).click();
+  await expect(proposal).toHaveCount(0);
+
+  await expect.poll(async () => (await savedBoard(page, course.id, lesson.id)).revision, { timeout: 15_000 }).toBe(before.revision);
+  const after = await savedBoard(page, course.id, lesson.id);
+  expect(JSON.stringify(after.parsed)).toBe(JSON.stringify(before.parsed));
+});
 
 test("scratch-out erases the covered stroke and one undo restores it", async ({ page }) => {
   test.setTimeout(120_000);
