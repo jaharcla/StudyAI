@@ -15,6 +15,10 @@ Workspace snapshot: `main` at `4961dbb` (2026-11-22 23:53 -05:00), 78 commits ah
 - Physics/FBD scene mechanics (Phase 2, rescued in `cc3226c`): deterministic rule diagnostics inside the single scene authority — incline geometry, normal perpendicularity, friction parallelism, force balance — surfaced through `get_canvas_scene` / `search_canvas_evidence`, with an interactive force editor and `tests/e2e/canvas-physics-fbd.spec.ts`.
 - `author_board` authoring verb (`6049227` … `4961dbb`, ADR `docs/decisions/ADR-2026-11-22-author-board-verb.md`): one `ArtifactBrief` compiles into a layout-planned, citation-contained proposal applied in one `postDocument` transaction (one revision bump, one undo step, one review dialog). Generated content is labelled unverified, answers stay behind the existing reveal toggle, the model supplies no coordinates, and tutor keyword routing remains bound to `author_board` (`4961dbb`).
 
+## Next big step (planned, not built)
+
+Artifact Intelligence System — extends the shipped `author_board` verb into a compositional, deterministically validated, claim-grounded artifact-construction environment. Design: `docs/superpowers/specs/2026-11-23-artifact-intelligence-system-design.md`; task plan: `docs/superpowers/plans/2026-11-23-artifact-intelligence-system.md`. Phase 0 (fresh-worktree baseline + boundary ADR) comes first; no product code has changed for this initiative. `docs/next.md` is the coordination authority.
+
 ## Limits
 
 - Document extraction is text-based; scanned PDFs are not OCR'd, and embedded images or charts are not interpreted. Search uses lexical FTS5 rather than embeddings. Canvas OCR is a separate feature.

@@ -2,6 +2,17 @@
 
 This page is the handoff for agents starting after the 2026-11-22 consolidation. An alignment plan circulated earlier was baselined on `main` at `d380c9c`; that tree is superseded. **Current `main` = `4961dbb`** (2026-11-22 23:53 -05:00, 78 commits ahead of `origin/main`; `work/studyai-studio` was merged at `5eb8922`, and `work/canvas-integration-2026-11-22` at `5ab5abb` is the reconciliation history). `work/adaptive-canvas-authoring` and `work/canvas-pen-ux` are checked out in other worktrees — do not reuse their checkouts.
 
+## Next big step — Artifact Intelligence System (adopted 2026-11-23)
+
+This is the next major initiative; the older open items below sit behind it. StudyAI moves from an artifact-*generation* tool to an artifact-*construction* environment: the model composes a typed `ArtifactPackage`, existing scientific authorities validate it deterministically, and Canvas / Studio / Learning render only the components they own.
+
+- Design: `docs/superpowers/specs/2026-11-23-artifact-intelligence-system-design.md`
+- Plan: `docs/superpowers/plans/2026-11-23-artifact-intelligence-system.md`
+- Status: **planned, nothing built**. Phase 0 establishes a fresh-worktree baseline and the boundary ADR; Phase 1 makes the shipped `author_board` verb tell the truth and is independently shippable. Phases 2–4 are charters expanded when opened.
+- Foundation: extends the shipped `author_board` verb — do not open a second authoring path. No new `ScientificObject` kind, no new board-interpretation authority, no change to the 3-call cap without an ADR.
+- Concrete Phase 1 gaps in today's code: `artifact.kind` is ignored (all five kinds compile to questions + optional figure); `problem-set` repeats one prompt; `graph` compiles to an equation and `vector` to a hardcoded `[1,0,0]`; no deterministic validator is wired into authoring.
+- Precondition: fresh worktree and quoted `npm run verify` / canvas gate numbers from Phase 0 before any product edit. `/canvas-verify` is absent in this worktree; use its underlying commands.
+
 ## Already done — do not rebuild
 
 - **Mindmap scientific object kind** (the "Phase 4.1 queued" item): shipped in `4b9eb75` + `6fadf78` — model variant + caps (≤12 nodes/≤16 edges), validation, registry tool, scene evidence (labels in `summaryOf`), `SceneGlyph` SVG rendering, browser spec `tests/e2e/canvas-mindmap.spec.ts`, committed fixture `tests/fixtures/mindmap-board.json`, ADR `docs/decisions/ADR-2026-11-22-mindmap-kind.md`. Whole-object move/inspect only; per-node editing is the open extension.
@@ -13,6 +24,8 @@ This page is the handoff for agents starting after the 2026-11-22 consolidation.
 - **Learning UI + canvas-first shell + Stripe/hosted + studio scaffold** all merged: flashcard review, question authoring, reveal toggle, "Add to review deck", StudyStage modes, credits/FreeKeyGuide/settings union App, `server/studio` + `src/studio` scaffold (see `docs/STUDIO_HANDOFF.md`).
 
 ## What is genuinely open (from the alignment plan)
+
+The adopted next big step is the Artifact Intelligence System section above; these older items remain open behind it.
 
 Phase 1 (in-app BYOK manager, optional local embeddings — note `ADR-2026-11-18-spatial-canvas-scene.md` keeps the embeddings gate closed *on measured evidence*; re-open only with new misses). Phase 3.1 physics diagnostics in tutor context and 3.2 tutor ghost-correction proposals remain open; 3.3 coursework practice is delivered by the shipped `author_board` verb — extend it, do not open a second authoring path. Still open in the physics UI: parameter-linked vectors beyond `ForceVectorEditor`, math-workspace step interactivity, reaction-arrow semantics. Phase 4.2 misconception→BKT loop. Phase 5 pen UX and layout fluidity (`work/canvas-pen-ux` is checked out elsewhere). Rescued Phase 2 debt before Phase 3 builds on it: collapse `server/canvas-intelligence/scene/physics-rules.ts` into the `src/canvas/physics.ts` superset and re-point `scene/build.ts`, remove the `as any` in `scene/build.ts`'s physics call, and write `docs/decisions/ADR-2026-11-22-physics-rules.md` for the `PhysicsIssueCode` vocabulary. The grounding plan's own owed items (its `npm run verify` / `benchmark:canvas` close-out, `detect_changes`) are still open on top of the merged tree.
 
@@ -29,7 +42,7 @@ Safe concurrent tracks (disjoint hot files):
 - **Phase 1 — BYOK/provider manager** (`server/config.ts`, provider modules, a carved-out settings component).
 - **Phase 2 — RESCUED COMPLETE through Task 2.3 at `cc3226c`** (the alignment agent ran out of quota mid-work; the stranded tree was verified and committed: tsc 0, vitest 549/549, `tests/e2e/canvas-physics-fbd.spec.ts` green). Remaining debt before Phase 3 builds on it: collapse the duplicate modules (`server/canvas-intelligence/scene/physics-rules.ts` vs `src/canvas/physics.ts` — keep the src superset, re-point `scene/build.ts`, delete the server copy), remove the `as any` in `scene/build.ts`'s physics call, and write `docs/decisions/ADR-2026-11-22-physics-rules.md` recording the `PhysicsIssueCode` vocabulary that Phase 3 consumes. The UI slider stage beyond `ForceVectorEditor` still needs `CanvasStudio.tsx`/`SceneGlyph.tsx` quiet.
 - **Phase 5 — pen UX** (`Quickdraw` input path) — parallel with the above *logic* stages, not with their UI stages.
-- **author_board track** (existing agent) — `server/agent.ts`, teaching scene, layout solver; owns all interactive-practice generation (Phase 3.3 must extend it, not open a second path).
+- **author_board track** (existing agent) — `server/agent.ts`, teaching scene, layout solver; owns all interactive-practice generation (Phase 3.3 must extend it, not open a second path). Now owned by the Artifact Intelligence System plan at the top of this page; its Phase 1 extends this verb rather than creating a parallel one.
 
 True serial dependencies: Phase 3 needs Phase 2's solver diagnostics; Phase 4.2 needs the error taxonomy from 2–3; Phase 4.1 (mindmap) is done.
 
