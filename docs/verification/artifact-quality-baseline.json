@@ -1,5 +1,5 @@
 {
-  "reviewStatus": "pending-human-review",
+  "reviewStatus": "reviewed",
   "weights": {
     "intent": 20,
     "accuracy": 25,
@@ -19,11 +19,41 @@
     "determinismRepeats": 5,
     "compositeDiagnosticOnly": true
   },
+  "review": {
+    "reviewer": "owner, with Claude-assisted analysis",
+    "reviewedAt": "2026-11-23",
+    "basis": "JSON packages only; no rendered output was available to the reviewer",
+    "lowConfidenceDimensions": ["visual", "interaction"],
+    "notes": [
+      "Visual and interaction scores are inferred from component data and should be treated as low confidence.",
+      "The insufficient-source acknowledgement repeats the question without explicitly saying course material was missing; pedagogy scored 0.",
+      "Course ID chem-120 is fixed by the harness and was not penalised.",
+      "Provenance is empty in every generated package.",
+      "All three packages use chem-120 for physics content; harness constant, not a generation choice.",
+      "No defined critical failure was observed: no fabricated citation, no fabricated instructor requirement, no false save claim, no leaked identifier or secret, and no ignored interaction instruction."
+    ]
+  },
   "scenarios": [
-    { "name": "documented request", "generationId": "documented-request", "labels": {} },
-    { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },
-    { "name": "multi-component torque package", "generationId": "multi-component-torque", "labels": {} },
-    { "name": "insufficient source", "generationId": "insufficient-source", "labels": {} }
+    {
+      "name": "documented request",
+      "generationId": "documented-request",
+      "labels": { "intent": 3, "accuracy": 4, "grounding": 3, "pedagogy": 2, "visual": 2, "interaction": 1 }
+    },
+    {
+      "name": "ambiguous request",
+      "generationId": "ambiguous-request",
+      "labels": { "intent": 3, "accuracy": 1, "grounding": 3, "pedagogy": 1, "visual": 1, "interaction": 0 }
+    },
+    {
+      "name": "multi-component torque package",
+      "generationId": "multi-component-torque",
+      "labels": { "intent": 4, "accuracy": 3, "grounding": 2, "pedagogy": 3, "visual": 1, "interaction": 1 }
+    },
+    {
+      "name": "insufficient source",
+      "generationId": "insufficient-source",
+      "labels": { "intent": 1, "accuracy": 3, "grounding": 2, "pedagogy": 0, "visual": 0, "interaction": 0 }
+    }
   ],
-  "note": "Labels 0-5 must come from human-reviewed blind comparisons of the recorded generations. Model identity is withheld in the review sheet and stored only in the meta file, to be revealed after scores are committed. This baseline intentionally has no scores or overall."
+  "note": "Scores were committed before model identity was revealed. The composite is diagnostic only; qualification is governed by the pedagogy thresholds, the two vetoes and the determinism gate."
 }
