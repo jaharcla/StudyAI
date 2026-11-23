@@ -5,8 +5,10 @@ import { stableJson } from "../src/canvas/stable-json.js";
 import { DEFAULT_VIEWPORT } from "../src/canvas/ai/teaching-scene.js";
 import { compilePackage } from "../server/artifact-intelligence/service.js";
 
-const GENERATIONS = "docs/verification/artifact-generations.json";
-const OUTPUT = "docs/verification/artifact-legality-repeats.json";
+const CYCLE = process.env.ARTIFACT_CYCLE ?? "1";
+const SUFFIX = CYCLE === "1" ? "" : `-cycle${CYCLE}`;
+const GENERATIONS = `docs/verification/artifact-generations${SUFFIX}.json`;
+const OUTPUT = `docs/verification/artifact-legality-repeats${SUFFIX}.json`;
 const REPEATS = 5;
 
 type Generation = {

@@ -1,0 +1,29 @@
+{
+  "records": [
+    {
+      "id": "documented-request",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 1
+    },
+    {
+      "id": "ambiguous-request",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 2
+    },
+    {
+      "id": "multi-component-torque",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 1
+    },
+    {
+      "id": "insufficient-source",
+      "provider": "opencode-go",
+      "model": "beam-free",
+      "attempts": 1
+    }
+  ],
+  "note": "Not for reviewers. Reveal only after scores are committed."
+}
