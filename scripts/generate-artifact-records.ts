@@ -7,7 +7,9 @@ import { getTutorProviderSettings } from "../server/tutor-provider.js";
 import { createTutorChatModel } from "../server/tutor-chat-model.js";
 
 const CYCLE = process.env.ARTIFACT_CYCLE ?? "1";
-const SUFFIX = CYCLE === "1" ? "" : `-cycle${CYCLE}`;
+const SUFFIX = process.env.ARTIFACT_SUFFIX ?? (CYCLE === "1" ? "" : `-cycle${CYCLE}`);
+const ONLY = process.env.ARTIFACT_ONLY?.split(",").map((id) => id.trim()).filter(Boolean);
+const REPEATS = Math.max(1, Number(process.env.ARTIFACT_REPEATS ?? 1));
 const OUTPUT = `docs/verification/artifact-generations${SUFFIX}.json`;
 const META = `docs/verification/artifact-generation-meta${SUFFIX}.json`;
 const SHEET = `docs/verification/artifact-blind-review-sheet${SUFFIX}.md`;
@@ -262,7 +264,13 @@ function shuffle<T>(items: readonly T[], seed: number): T[] {
   return copy;
 }
 
-for (const scenario of scenarios) {
+const selected = ONLY ? scenarios.filter((scenario) => ONLY.includes(scenario.id)) : scenarios;
+let generationIndex = 0;
+for (const scenario of selected) {
+  for (let repeat = 0; repeat < REPEATS; repeat += 1) {
+    generationIndex += 1;
+    const recordId = REPEATS > 1 ? `${scenario.id}-r${repeat + 1}` : scenario.id;
+    const heading = REPEATS > 1 ? `## Generation ${generationIndex}` : `## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`;
   const userText = `Scenario: ${scenario.name}\nRequest: ${scenario.prompt}\nRetrieved evidence (ref and text):\n${scenario.retrieved.map((item) => `${item.ref} :: ${item.text}`).join("\n") || "(none supplied)"}`;
   let lastError = "";
   let lastRawText = "";
@@ -304,7 +312,7 @@ for (const scenario of scenarios) {
         && (parsed as { components: unknown[] }).components.length === 0) {
         const outcome = (parsed as { outcome?: { status: string; missing: string[]; nextStep: string } }).outcome!;
         records.push({
-          id: scenario.id,
+          id: recordId,
           scenario: scenario.name,
           prompt: scenario.prompt,
           retrievedRefs: refs,
@@ -314,9 +322,9 @@ for (const scenario of scenarios) {
           outcome,
           heldOut: Boolean(scenario.heldOut),
         });
-        meta.push({ id: scenario.id, provider, model: modelName, attempts: attempt + 1, heldOut: Boolean(scenario.heldOut) });
+        meta.push({ id: recordId, provider, model: modelName, attempts: attempt + 1, heldOut: Boolean(scenario.heldOut) });
         sections.push([
-          `## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`,
+          heading,
           "",
           `**Request:** ${scenario.prompt}`,
           "",
@@ -332,7 +340,7 @@ for (const scenario of scenarios) {
       }
       const pkg = parseArtifactPackage(parsed, refs);
       records.push({
-        id: scenario.id,
+        id: recordId,
         scenario: scenario.name,
         prompt: scenario.prompt,
         retrievedRefs: refs,
@@ -342,9 +350,9 @@ for (const scenario of scenarios) {
         status: "validated",
         heldOut: Boolean(scenario.heldOut),
       });
-      meta.push({ id: scenario.id, provider, model: modelName, attempts: attempt + 1, heldOut: Boolean(scenario.heldOut) });
+      meta.push({ id: recordId, provider, model: modelName, attempts: attempt + 1, heldOut: Boolean(scenario.heldOut) });
       sections.push([
-        `## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`,
+        heading,
         "",
         `**Request:** ${scenario.prompt}`,
         "",
@@ -360,12 +368,13 @@ for (const scenario of scenarios) {
     } catch (error) {
       lastError = error instanceof Error ? error.message : "Invalid package.";
       if (attempt === 1) {
-        records.push({ id: scenario.id, scenario: scenario.name, status: "failed", error: lastError, rawOutput: String(lastRawText ?? "").slice(0, 4000), heldOut: Boolean(scenario.heldOut) });
-        meta.push({ id: scenario.id, provider, model: modelName, attempts: 2, heldOut: Boolean(scenario.heldOut) });
-        sections.push([`## ${scenario.id}${scenario.heldOut ? " (held out)" : ""}`, "", `**Request:** ${scenario.prompt}`, "", `**Generation failed validation:** ${lastError}`, ""]);
+        records.push({ id: recordId, scenario: scenario.name, status: "failed", error: lastError, rawOutput: String(lastRawText ?? "").slice(0, 4000), heldOut: Boolean(scenario.heldOut) });
+        meta.push({ id: recordId, provider, model: modelName, attempts: 2, heldOut: Boolean(scenario.heldOut) });
+        sections.push([heading, "", `**Request:** ${scenario.prompt}`, "", `**Generation failed validation:** ${lastError}`, ""]);
         console.log(`${scenario.id}: FAILED — ${lastError}`);
       }
     }
+  }
   }
 }
 
