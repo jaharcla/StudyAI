@@ -42,7 +42,7 @@ jobs:
 
       # Root tests import hosted/src modules, which need hosted's own pinned deps.
       - name: Install hosted Worker deps
-        run: npm ci --prefix hosted
+        run: npm ci --prefix hosted --legacy-peer-deps
 
       - name: Lint
         run: npm run lint
