@@ -64,7 +64,7 @@ Allowed component kinds and required fields:
 - interactive-exercise: {"id","kind":"interactive-exercise","sourceRefs":[],"prompt":"...","exercise":{"mode":"graph-interpretation","slope":2,"intercept":0,"xRange":[-1,1],"atX":1}}
 - summary: {"id","kind":"summary","sourceRefs":[],"title":"...","sections":[{"heading":"...","body":"..."}]}
 
-Rules: every sourceRef must be exactly one of the retrieved refs given in the user message. Use an empty array when no refs are supplied. Component ids must be unique and relations must point to existing ids without cycles. For an insufficient-source request, acknowledge the gap in text rather than inventing course facts, and use empty sourceRefs.`;
+Rules: every sourceRef must be exactly one of the retrieved refs given in the user message. Use an empty array when no refs are supplied. Component ids must be unique and relations must point to existing ids without cycles. Every diagram force's "components" must be exactly two finite numbers, for example [0,-9.8], never one or three. A graph xRange must be exactly two numbers with the second greater than the first. For an insufficient-source request, acknowledge the gap in text rather than inventing course facts, and use empty sourceRefs.`;
 
 function parseJson(text: string): unknown {
   const fenced = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
@@ -116,6 +116,7 @@ for (const scenario of scenarios) {
           scenario: scenario.name,
           prompt: scenario.prompt,
           retrievedRefs: refs,
+          retrieved: scenario.retrieved,
           generatedAt: new Date().toISOString(),
           status: "insufficient-evidence",
           acknowledgement,
@@ -131,6 +132,7 @@ for (const scenario of scenarios) {
         scenario: scenario.name,
         prompt: scenario.prompt,
         retrievedRefs: refs,
+        retrieved: scenario.retrieved,
         package: pkg,
         generatedAt: new Date().toISOString(),
         status: "validated",

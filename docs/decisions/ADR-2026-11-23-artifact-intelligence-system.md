@@ -1,7 +1,7 @@
 # ADR-2026-11-23 — Artifact Intelligence System boundary
 
 Date: 2026-11-23
-Status: proposed (owner approval required before Phase 2 opens)
+Status: accepted (owner approval recorded before Phase 2 opened; reaffirmed 2026-11-23 when the quality-gate thresholds were frozen in `docs/decisions/ADR-2026-11-23-artifact-quality-threshold.md`)
 Baseline: `main` at `d0b4398`; plan `docs/superpowers/plans/2026-11-23-artifact-intelligence-system.md`; design `docs/superpowers/specs/2026-11-23-artifact-intelligence-system-design.md`; response-quality acceptance criteria `docs/superpowers/specs/2026-11-23-response-quality-acceptance.md`.
 
 ## Decision

@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
-import { SCENARIOS, WEIGHTS, scoreGeneration, type Dimension, type HumanLabels } from "../src/artifacts/benchmark";
+import { SCENARIOS, WEIGHTS, scoreGeneration, evaluateQualityGate, type Dimension, type HumanLabels, type QualityGate } from "../src/artifacts/benchmark";
 
 type Baseline = {
   reviewStatus: string;
   weights: Record<string, number>;
+  gate?: QualityGate;
   scenarios: Array<{ name: string; labels: HumanLabels }>;
 };
 
@@ -19,6 +20,12 @@ for (const scenario of baseline.scenarios) {
     .join("  ");
   const overall = result.overall === undefined ? "no overall (human review pending)" : result.overall.toFixed(3);
   console.log(`${scenario.name.padEnd(32)} ${detail}  overall: ${overall}`);
+}
+if (baseline.gate && !incomplete) {
+  const gate = evaluateQualityGate(baseline.scenarios.map((scenario) => ({ name: scenario.name, pedagogy: scenario.labels.pedagogy ?? 0 })), baseline.gate);
+  console.log(`Gate: ${gate.eligible ? "QUALIFIED" : "NOT QUALIFIED"}${gate.reasons.length ? ` — ${gate.reasons.join("; ")}` : ""}`);
+} else if (baseline.gate) {
+  console.log("Gate: not evaluated — human labels pending.");
 }
 if (incomplete) console.log("INCOMPLETE — human blind review required; no overall quality score is claimed.");
 else if (!SCENARIOS.every((name) => baseline.scenarios.some((scenario) => scenario.name === name))) {

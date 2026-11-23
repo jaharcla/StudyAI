@@ -4,19 +4,19 @@
       "id": "documented-request",
       "provider": "ollama",
       "model": "qwen3:latest",
-      "attempts": 2
+      "attempts": 1
     },
     {
       "id": "ambiguous-request",
       "provider": "ollama",
       "model": "qwen3:latest",
-      "attempts": 2
+      "attempts": 1
     },
     {
       "id": "multi-component-torque",
       "provider": "ollama",
       "model": "qwen3:latest",
-      "attempts": 2
+      "attempts": 1
     },
     {
       "id": "insufficient-source",

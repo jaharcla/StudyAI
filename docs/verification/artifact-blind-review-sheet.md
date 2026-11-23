@@ -33,18 +33,14 @@ Keep disagreements instead of forcing consensus.
         "studyai://document/module-1/text/4?chunk=0"
       ],
       "text": "Friction opposes the motion of a block sliding down an incline. The normal force acts perpendicular to the surface and has magnitude mg cos(theta).",
-      "concepts": [
-        "friction",
-        "incline",
-        "normal force"
-      ]
+      "concepts": []
     },
     {
       "kind": "question",
       "id": "question-001",
       "sourceRefs": [],
       "prompt": "If a block is sliding down an incline, how does the normal force relate to the angle of the incline?",
-      "answer": "The normal force is equal to mg cos(theta), where theta is the angle of the incline."
+      "answer": "The normal force is proportional to the cosine of the angle of the incline."
     }
   ],
   "relations": [
@@ -70,7 +66,7 @@ Keep disagreements instead of forcing consensus.
 ```json
 {
   "schemaVersion": 1,
-  "id": "artifact-001",
+  "id": "package-001",
   "objective": "Understand forces on an incline",
   "courseId": "chem-120",
   "lessonId": "lesson-03",
@@ -81,14 +77,8 @@ Keep disagreements instead of forcing consensus.
       "sourceRefs": [
         "studyai://document/module-1/text/4?chunk=0"
       ],
-      "text": "Forces on a block on an incline include gravity, the normal force, and friction. These forces act in specific directions and can be analyzed using vector components.",
-      "concepts": [
-        "gravity",
-        "normal force",
-        "friction",
-        "incline",
-        "vector components"
-      ]
+      "text": "Forces on a block include gravity, the normal force, and friction. The diagram should show their directions on an incline.",
+      "concepts": []
     },
     {
       "kind": "diagram",
@@ -96,27 +86,27 @@ Keep disagreements instead of forcing consensus.
       "sourceRefs": [
         "studyai://document/module-1/text/4?chunk=0"
       ],
-      "title": "Forces on an incline",
+      "title": "Forces on an Incline",
       "forces": [
         {
-          "label": "gravity",
+          "label": "Gravity",
           "components": [
             0,
-            0
+            -9.8
           ]
         },
         {
-          "label": "normal force",
+          "label": "Normal Force",
           "components": [
             0,
-            0
+            9.8
           ]
         },
         {
-          "label": "friction",
+          "label": "Friction",
           "components": [
             0,
-            0
+            -1
           ]
         }
       ]
@@ -171,17 +161,17 @@ Keep disagreements instead of forcing consensus.
       "title": "Torque Diagram",
       "forces": [
         {
-          "label": "Force 1",
+          "label": "Clockwise Torque",
           "components": [
             0,
-            1
+            -9.8
           ]
         },
         {
-          "label": "Force 2",
+          "label": "Anticlockwise Torque",
           "components": [
-            2,
-            3
+            0,
+            9.8
           ]
         }
       ]
@@ -190,15 +180,13 @@ Keep disagreements instead of forcing consensus.
       "kind": "question",
       "id": "question-001",
       "sourceRefs": [],
-      "prompt": "What is the torque produced by a 10 N force applied at a 2 m lever arm with a 90-degree angle?",
-      "answer": "20 N·m"
+      "prompt": "What is the net torque on a beam if the clockwise torque is 10 N·m and the anticlockwise torque is 10 N·m?",
+      "answer": "The net torque is 0 N·m, indicating the beam is in equilibrium."
     },
     {
       "kind": "summary",
       "id": "summary-001",
-      "sourceRefs": [
-        "studyai://document/module-2/text/9?chunk=1"
-      ],
+      "sourceRefs": [],
       "title": "Summary of Torque",
       "sections": [
         {
@@ -215,7 +203,7 @@ Keep disagreements instead of forcing consensus.
       "kind": "interactive-exercise",
       "id": "interactive-exercise-001",
       "sourceRefs": [],
-      "prompt": "Calculate the torque for a force of 5 N applied at a lever arm of 3 m with a 90-degree angle.",
+      "prompt": "Calculate the torque for a force of 5 N applied at a lever arm of 2 m, perpendicular to the force.",
       "exercise": {
         "mode": "graph-interpretation",
         "slope": 2,
@@ -236,18 +224,18 @@ Keep disagreements instead of forcing consensus.
     },
     {
       "from": "explanation-001",
+      "to": "question-001",
+      "relation": "explains"
+    },
+    {
+      "from": "explanation-001",
       "to": "summary-001",
-      "relation": "summarizes"
+      "relation": "explains"
     },
     {
-      "from": "question-001",
-      "to": "explanation-001",
-      "relation": "tests"
-    },
-    {
-      "from": "interactive-exercise-001",
-      "to": "explanation-001",
-      "relation": "demonstrates"
+      "from": "explanation-001",
+      "to": "interactive-exercise-001",
+      "relation": "explains"
     }
   ],
   "provenance": {},

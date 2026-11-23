@@ -20,7 +20,8 @@
     "verify": "tsc -b && vitest run && playwright test",
     "benchmark:canvas": "tsx scripts/benchmark-canvas.ts",
     "benchmark:artifacts": "tsx scripts/benchmark-artifacts.ts",
-    "generate:artifacts": "tsx scripts/generate-artifact-records.ts"
+    "generate:artifacts": "tsx scripts/generate-artifact-records.ts",
+    "verify:artifact-legality": "tsx scripts/verify-artifact-legality.ts"
   },
   "dependencies": {
     "@ag-ui/client": "1.0.2",

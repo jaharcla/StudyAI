@@ -11,6 +11,14 @@
   "generations": "docs/verification/artifact-generations.json",
   "meta": "docs/verification/artifact-generation-meta.json",
   "reviewSheet": "docs/verification/artifact-blind-review-sheet.md",
+  "legalityRepeats": "docs/verification/artifact-legality-repeats.json",
+  "gate": {
+    "pedagogyOverallMin": 4.0,
+    "pedagogyScenarioMin": 3.5,
+    "criticalFailureVeto": ["package", "system"],
+    "determinismRepeats": 5,
+    "compositeDiagnosticOnly": true
+  },
   "scenarios": [
     { "name": "documented request", "generationId": "documented-request", "labels": {} },
     { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },

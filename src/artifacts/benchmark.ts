@@ -39,3 +39,30 @@ export function scoreGeneration(labels: HumanLabels): ScoreResult {
   const weighted = DIMENSIONS.reduce((sum, dimension) => sum + (scores[dimension] ?? 0) * WEIGHTS[dimension], 0);
   return { scores, completeness: "complete", overall: Math.round((weighted / 100) * 1000) / 1000 };
 }
+
+export type QualityGate = {
+  pedagogyOverallMin: number;
+  pedagogyScenarioMin: number;
+  criticalFailureVeto: readonly string[];
+  determinismRepeats: number;
+  compositeDiagnosticOnly: boolean;
+};
+export type ScenarioScore = { name: string; pedagogy: number };
+export type GateResult = { eligible: boolean; reasons: string[] };
+
+/** Equal-weight scenario averaging with a per-scenario floor and two critical-failure vetoes. */
+export function evaluateQualityGate(
+  scenarios: readonly ScenarioScore[],
+  gate: QualityGate,
+  criticalFailures: readonly string[] = [],
+): GateResult {
+  const reasons: string[] = [];
+  if (!scenarios.length) return { eligible: false, reasons: ["No scored scenarios."] };
+  const overall = scenarios.reduce((sum, scenario) => sum + scenario.pedagogy, 0) / scenarios.length;
+  if (overall < gate.pedagogyOverallMin) reasons.push(`Overall pedagogy ${overall.toFixed(2)} is below ${gate.pedagogyOverallMin}.`);
+  for (const scenario of scenarios) {
+    if (scenario.pedagogy < gate.pedagogyScenarioMin) reasons.push(`${scenario.name} pedagogy ${scenario.pedagogy.toFixed(2)} is below ${gate.pedagogyScenarioMin}.`);
+  }
+  for (const failure of criticalFailures) reasons.push(`Critical failure (${failure}) blocks qualification.`);
+  return { eligible: reasons.length === 0, reasons };
+}
