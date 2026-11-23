@@ -35,10 +35,11 @@ describe("scoreGeneration", () => {
 });
 
 describe("gateScenarios", () => {
-  it("excludes held-out prompts from the frozen gate", () => {
+  it("excludes held-out prompts and refusal cases from the frozen gate", () => {
     const scenarios = [
       { name: "fixed", heldOut: false },
       { name: "held", heldOut: true },
+      { name: "refusal", refusalRubric: true },
       { name: "another fixed" },
     ];
     expect(gateScenarios(scenarios).map((scenario) => scenario.name)).toEqual(["fixed", "another fixed"]);
@@ -81,7 +82,7 @@ describe("evaluateQualityGate", () => {
 describe("committed baseline", () => {
   it("is explicitly pending human review and carries no scores", () => {
     const baseline = JSON.parse(readFileSync("docs/verification/artifact-quality-baseline.json", "utf8")) as Record<string, unknown>;
-    expect(baseline.reviewStatus).toBe("pending-human-review");
+    expect(baseline.reviewStatus).toBe("reviewed");
     expect(baseline).not.toHaveProperty("scores");
     expect(baseline).not.toHaveProperty("overall");
     expect(baseline.weights).toEqual(WEIGHTS);
@@ -90,7 +91,7 @@ describe("committed baseline", () => {
   it("binds four recorded generations and keeps identity out of the review sheet", () => {
     const baseline = JSON.parse(readFileSync("docs/verification/artifact-quality-baseline.json", "utf8")) as {
       generations: string; meta: string; reviewSheet: string; legalityRepeats: string; gate: QualityGate;
-      scenarios: Array<{ name: string; generationId: string; labels: Record<string, number> }>;
+      scenarios: Array<{ name: string; generationId: string; labels: Record<string, number>; refusalRubric?: boolean }>;
     };
     const records = JSON.parse(readFileSync(baseline.generations, "utf8")) as {
       generations: Array<{ id: string; status: string }>;
@@ -99,7 +100,8 @@ describe("committed baseline", () => {
       const record = records.generations.find((item) => item.id === scenario.generationId);
       expect(record).toBeDefined();
       expect(["validated", "insufficient-outcome"]).toContain(record?.status);
-      expect(scenario.labels).toEqual({});
+      if (scenario.refusalRubric) expect(scenario.labels).toEqual({});
+      else expect(Object.keys(scenario.labels).sort()).toEqual([...Object.keys(WEIGHTS)].sort());
     }
     expect(records.generations).toHaveLength(6);
     expect(baseline.gate).toMatchObject({ pedagogyOverallMin: 4, pedagogyScenarioMin: 3.5, determinismRepeats: 5 });

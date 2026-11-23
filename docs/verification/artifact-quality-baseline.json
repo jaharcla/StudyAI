@@ -1,5 +1,5 @@
 {
-  "reviewStatus": "pending-human-review",
+  "reviewStatus": "reviewed",
   "qualificationCycle": 4,
   "cycleHistory": [
     {
@@ -41,13 +41,66 @@
     "determinismRepeats": 5,
     "compositeDiagnosticOnly": true
   },
+  "review": {
+    "reviewer": "owner, with Claude-assisted analysis",
+    "reviewedAt": "2026-11-23",
+    "basis": "JSON packages only; no rendered output, source chunks or refusal-rubric ADR were visible to the reviewer",
+    "lowConfidenceDimensions": ["visual", "interaction"],
+    "limitations": [
+      "Single reviewer who saw cycles 1-3 in order; shuffled sheet order helps but comparisons are not strictly blind.",
+      "One generation per case; some cycle-to-cycle movement may be sampling noise.",
+      "The reviewer declined to assign numeric refusal scores without seeing the rubric; the refusal case has no numeric labels.",
+      "Held-out cases are labelled as such in the sheet and are excluded from the gate by the pre-registered protocol."
+    ],
+    "notes": [
+      "Documented-request pedagogy 3 is a cosmetic variable swap; the reviewer notes part of the 82 to 78 drop is recalibration, not regression.",
+      "Torque improved from 70 to 88 through force positions and a transfer question, supporting the schema/composer diagnosis.",
+      "Held-out cases scored 80 and 81, in line with fixed cases, as generalisation evidence.",
+      "Model-supplied provenance timestamps were invalid and are not credited; the generator now stamps time on the record instead.",
+      "Course ID chem-120 remains a harness constant on physics and pH content.",
+      "No defined critical failure was observed."
+    ]
+  },
   "scenarios": [
-    { "name": "documented request", "generationId": "documented-request", "labels": {} },
-    { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },
-    { "name": "multi-component torque package", "generationId": "multi-component-torque", "labels": {} },
-    { "name": "insufficient source", "generationId": "insufficient-source", "labels": {}, "refusalRubric": true },
-    { "name": "held-out graph reading", "generationId": "held-out-graph-reading", "labels": {}, "heldOut": true },
-    { "name": "held-out pH", "generationId": "held-out-ph", "labels": {}, "heldOut": true }
+    {
+      "name": "documented request",
+      "generationId": "documented-request",
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 3, "visual": 2, "interaction": 1 }
+    },
+    {
+      "name": "ambiguous request",
+      "generationId": "ambiguous-request",
+      "labels": { "intent": 5, "accuracy": 4, "grounding": 3, "pedagogy": 4, "visual": 3, "interaction": 1 }
+    },
+    {
+      "name": "multi-component torque package",
+      "generationId": "multi-component-torque",
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 4, "visual": 4, "interaction": 3 }
+    },
+    {
+      "name": "insufficient source",
+      "generationId": "insufficient-source",
+      "labels": {},
+      "refusalRubric": true,
+      "refusalNarrative": {
+        "namesMissing": "pass — lists three specific source types",
+        "avoidsFabrication": "pass — no invented topics or citations",
+        "concreteNextStep": "pass — asks for review material, syllabus excerpt or handout",
+        "gap": "does not offer to build a general study artifact from retrieved lessons"
+      }
+    },
+    {
+      "name": "held-out graph reading",
+      "generationId": "held-out-graph-reading",
+      "labels": { "intent": 4, "accuracy": 5, "grounding": 4, "pedagogy": 4, "visual": 3, "interaction": 2 },
+      "heldOut": true
+    },
+    {
+      "name": "held-out pH",
+      "generationId": "held-out-ph",
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 4, "visual": 1, "interaction": 1 },
+      "heldOut": true
+    }
   ],
-  "note": "Cycle 4 uses first-class refusal outcomes, force application points, transferred questions, connected exercises, two held-out prompts excluded from the frozen gate, and a seeded-shuffled review sheet. Thresholds remain frozen from before cycle 1."
+  "note": "The frozen gate averages pedagogy over the three non-refusal, non-held-out scenarios: documented 3, ambiguous 4, torque 4. Thresholds were fixed before cycle 1 and were not changed."
 }

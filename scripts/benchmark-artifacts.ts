@@ -21,13 +21,15 @@ for (const scenario of baseline.scenarios) {
   const overall = result.overall === undefined ? "no overall (human review pending)" : result.overall.toFixed(3);
   console.log(`${scenario.name.padEnd(32)} ${detail}  overall: ${overall}`);
 }
-if (baseline.gate && !incomplete) {
-  const gate = evaluateQualityGate(gateScenarios(baseline.scenarios).map((scenario) => ({ name: scenario.name, pedagogy: scenario.labels.pedagogy ?? 0 })), baseline.gate);
+const gateSet = gateScenarios(baseline.scenarios);
+const gateReady = gateSet.every((scenario) => typeof scenario.labels.pedagogy === "number");
+if (baseline.gate && gateReady) {
+  const gate = evaluateQualityGate(gateSet.map((scenario) => ({ name: scenario.name, pedagogy: scenario.labels.pedagogy ?? 0 })), baseline.gate);
   console.log(`Gate: ${gate.eligible ? "QUALIFIED" : "NOT QUALIFIED"}${gate.reasons.length ? ` — ${gate.reasons.join("; ")}` : ""}`);
 } else if (baseline.gate) {
-  console.log("Gate: not evaluated — human labels pending.");
+  console.log("Gate: not evaluated — gate scenario labels pending.");
 }
-if (incomplete) console.log("INCOMPLETE — human blind review required; no overall quality score is claimed.");
+if (incomplete) console.log("INCOMPLETE — refusal case has no numeric labels under its registered rubric; no overall quality score is claimed for it.");
 else if (!SCENARIOS.every((name) => baseline.scenarios.some((scenario) => scenario.name === name))) {
   console.log("INCOMPLETE — baseline does not cover all four scenarios.");
 }

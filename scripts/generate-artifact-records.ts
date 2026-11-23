@@ -271,8 +271,8 @@ for (const scenario of scenarios) {
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         const source = parsed as { provenance?: unknown };
         if (source.provenance && typeof source.provenance === "object" && !Array.isArray(source.provenance)) {
-          const provenance = source.provenance as Record<string, unknown>;
-          source.provenance = typeof provenance.generatedAt === "string" ? { generatedAt: provenance.generatedAt } : {};
+          // Timestamps are stamped on the generation record, never accepted from the model.
+          source.provenance = {};
         }
       }
       assertComposerConstraints(parsed, scenario);
