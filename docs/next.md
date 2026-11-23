@@ -24,7 +24,7 @@ Phase 1 (in-app BYOK manager, optional local embeddings — note `ADR-2026-11-18
 
 Safe concurrent tracks (disjoint hot files):
 - **Phase 1 — BYOK/provider manager** (`server/config.ts`, provider modules, a carved-out settings component).
-- **Phase 2 logic only — deterministic physics rules** as `server/canvas-intelligence/scene/physics-rules.ts` + unit tests, no UI. Its UI stage (sliders/parameter objects) waits until it can take `CanvasStudio.tsx`/`SceneGlyph.tsx` without another agent in them.
+- **Phase 2 — IN PROGRESS 2026-11-22** by the original alignment agent, directly in the `main` checkout (`server/canvas-intelligence/scene/physics-rules.ts` + scene-builder integration, tests green at first look; known debt: an `as any` in `build.ts` to fix, ADR + frequent commits owed — acceptance prompt in `docs/agent-prompts-2026-11-22.md`). Do NOT launch a second physics agent; its `PhysicsIssueCode` vocabulary becomes the Phase 3 contract once the ADR lands. The headless module exists, so its UI stage (parameter sliders) is now the gated item: it needs `CanvasStudio.tsx`/`SceneGlyph.tsx` quiet.
 - **Phase 5 — pen UX** (`Quickdraw` input path) — parallel with the above *logic* stages, not with their UI stages.
 - **author_board track** (existing agent) — `server/agent.ts`, teaching scene, layout solver; owns all interactive-practice generation (Phase 3.3 must extend it, not open a second path).
 

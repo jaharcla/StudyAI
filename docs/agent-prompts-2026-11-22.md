@@ -4,7 +4,14 @@ Companion to `docs/next.md` "Parallelization map". Each prompt is self-contained
 
 ---
 
-## Prompt A — Physics rules engine (Phase 2, logic stage only)
+## Prompt A — SUPERSEDED (2026-11-22)
+
+Phase 2 was started by the original alignment agent directly in the `main` checkout (`server/canvas-intelligence/scene/physics-rules.ts`, `tests/canvas-physics-rules.test.ts`, scene-builder integration — 16/16 green as of ~22:40). Do not launch a second physics agent. Use this acceptance prompt with that agent instead:
+
+> Continue your Phase 2 work with these corrections and gates. (1) `server/canvas-intelligence/scene/build.ts` passes `objects: input.input.scientificObjects as any` into `analyzePhysicsFreeBodyDiagram` — AGENTS.md forbids `as any` on type friction; type the parameter against the actual input shape (it likely needs `ScientificObject[]` narrowed to force/vector members or a minimal structural type) and prove the narrowing is real, not suppressed. If suppression is truly unavoidable, `@ts-expect-error` + explanation + tell the partner. (2) You are uncommitted in the shared `main` worktree — commit your Phase 2 slice in named-path pieces now and at least daily (two sessions lost a full reconciliation pass to exactly this today); keep working here only if you commit frequently, otherwise move to your own worktree. (3) Your `PhysicsIssueCode` vocabulary is now the Phase 3 contract — record it in an ADR (`docs/decisions/ADR-2026-11-22-physics-rules.md`: rule semantics, tolerances, role classification basis, uncalibrated→underconstrained policy) and update the vocabulary pointer in `docs/next.md` in the same commit. (4) State explicitly in your handoff that `benchmark:canvas` is NOT required (no OCR prompt/model/provider change — scene graph facts only) and show the four gate numbers are untouched by citing the last recorded run, or run the gate if you touched anything prompt-shaped. (5) Keep `tests/canvas-scene.test.ts` (the 2026-11-22 recall test) green — your build.ts changes must not alter node ids/edges for non-physics boards. (6) Full-suite evidence before declaring the slice done: `node node_modules/typescript/bin/tsc -b`, `node node_modules/vitest/vitest.mjs run`, both quoted with counts.
+
+## Prompt A-legacy — Physics rules engine (kept for reference only)
+
 
 You are implementing the deterministic physics-rules core for StudyAI's Scientific Canvas. Read first, in order: `AGENTS.md` (canvas invariants), `docs/next.md` (status + parallelization map), `docs/decisions/2026-11-22-canvas-deep-latency.md` (gate discipline), `src/canvas/model.ts` (vector/force shapes), `src/canvas/geometry.ts` (arrowGeometry), `src/canvas/spatial/types.ts` + `server/canvas-intelligence/scene/build.ts` (scene nodes/edges you will consume), `docs/CANVAS_INTELLIGENCE_HANDOFF_2026-11-18.md` §2–3.
 
