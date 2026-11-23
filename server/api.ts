@@ -14,6 +14,9 @@ import { LearningService } from "./learning/service.js";
 import { getCourseProgress } from "./progress.js";
 import { createLearningHandler } from "./learning/http.js";
 import { createStudioHandler } from "./studio/http.js";
+import { createSlideDeckHandler } from "./presentations/http.js";
+import { renderPresentonDeck } from "./presentations/renderer.js";
+import { extractDocument } from "./document-intelligence/extract.js";
 import { initializeStudioSchema } from "./studio/schema.js";
 import { LearningActivityService } from "./learning/activities/service.js";
 import { createLearningActivityHandler } from "./learning/activities/http.js";
@@ -52,6 +55,19 @@ const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYA
 const learningService = new LearningService(db);
 const learningHandler = createLearningHandler(learningService, config.webOrigin);
 const studioHandler = createStudioHandler(db, learningService, config.webOrigin);
+const artifactDataDir = resolve(process.cwd(), "data", "artifacts");
+const slideDeckHandler = createSlideDeckHandler(db, {
+  renderer: (request) => renderPresentonDeck(request, {
+    fetch,
+    baseUrl: process.env.PRESENTON_URL ?? "http://127.0.0.1:5001",
+    apiKey: process.env.PRESENTON_API_KEY ?? "",
+  }),
+  readDeckText: async (pptxPath) => {
+    const bytes = await readFile(resolve(artifactDataDir, pptxPath));
+    const document = await extractDocument("deck.pptx", new Uint8Array(bytes));
+    return document.units.map((unit) => unit.text).join("\n");
+  },
+}, config.webOrigin, artifactDataDir);
 const activityService = new LearningActivityService(db, learningService);
 const activityHandler = createLearningActivityHandler(activityService, config.webOrigin);
 const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
@@ -67,6 +83,7 @@ const server = createServer(async (req, res) => {
   if (await activityHandler(req, res)) return;
   if (await learningHandler(req, res)) return;
   if (await studioHandler(req, res)) return;
+  if (await slideDeckHandler(req, res)) return;
   if (await documentHandler(req, res)) return;
   if (await canvasRecognitionHandler(req, res)) return;
   if (await canvasPersistenceHandler(req, res)) return;

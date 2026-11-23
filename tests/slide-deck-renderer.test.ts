@@ -28,7 +28,7 @@ describe("renderPresentonDeck", () => {
     const deps: RendererDeps = { fetch: fetchMock as unknown as typeof fetch, baseUrl: "http://127.0.0.1:5001", apiKey: "secret-key" };
     const result = await renderPresentonDeck(request, deps);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("http://127.0.0.1:5001/api/v1/ppt/presentation/generate");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer secret-key");
     expect(JSON.parse(init.body as string)).toEqual(request);
