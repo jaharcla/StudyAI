@@ -17,8 +17,10 @@ import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
 import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
-import { artifactBriefSchema } from "./ai/teaching-scene";
+import { artifactBriefSchema, type ArtifactBrief } from "./ai/teaching-scene";
+import { buildBriefRepairResult, briefRepairSignature, checkBriefPreserve } from "./ai/author-repair";
 import { ArtifactValidationError } from "../artifacts/contracts";
+import type { PreserveList } from "../artifacts/repair-message";
 import { boardOccupancy } from "./ai/canvas-context";
 import { objectOccupancy, type LayoutRect } from "./ai/layout";
 import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
@@ -136,9 +138,29 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     },
   }, [courseId, lessonId]);
 
+  type AuthorAttempt = { signature: string; attempts: number; preserve: PreserveList; brief: ArtifactBrief };
+  const authorAttemptRef = useRef<AuthorAttempt | null>(null);
+
   /** The single authoring verb: the model states intent, this handler asks the planner for geometry. */
   const handleAuthorBoard = useCallback(async (input: unknown) => {
+    const parsed = artifactBriefSchema.safeParse(input);
+    const signature = parsed.success ? briefRepairSignature(parsed.data) : null;
+    const previous = signature ? authorAttemptRef.current : null;
+    const isRepeat = Boolean(previous && previous.signature === signature);
     try {
+      if (isRepeat && previous && parsed.success) {
+        const check = checkBriefPreserve(previous.brief, parsed.data, previous.preserve);
+        if (!check.ok) {
+          const error = `preserve-list: the repair changed ${check.changed.join(", ")}. Keep question text and citations unchanged.`;
+          setArtifactError(error);
+          setArtifactProposal(undefined);
+          return {
+            status: "rejected",
+            error,
+            repair: { messages: [], preserve: previous.preserve, attempt: 2, maxAttempts: 2 },
+          };
+        }
+      }
       const board = boardRef.current;
       if (!board) throw new Error("The active board is not ready.");
       const store = editorRef.current?.store ?? null;
@@ -158,16 +180,38 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         occupancy: [...(store ? boardOccupancy(store) : []), ...objectOccupancy(documentRef.current.objects)],
         viewport, anchors,
       }, input);
+      authorAttemptRef.current = null;
       setArtifactError(null);
       setArtifactProposal(proposal);
       return { status: "pending_user_review", proposalId: proposal.id, description: proposal.description, requiresConfirmation: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invalid board artifact.";
-      // The tool result keeps the JSON report for the model; the student-facing panel shows prose only.
+      // The tool result keeps the structured report for the model; the student-facing panel shows prose only.
       setArtifactError(error instanceof ArtifactValidationError
         ? error.report.problems.map((problem) => `${problem.validator}: ${problem.message}`).join("\n")
         : message);
       setArtifactProposal(undefined);
+
+      if (error instanceof ArtifactValidationError && parsed.success && signature && previous && isRepeat) {
+        const limit = "The single allowed repair call still failed validation. No package was applied.";
+        setArtifactError("Validation still fails after the allowed repair. Start a new authoring request.");
+        return {
+          status: "provider_call_limit",
+          error: limit,
+          repair: { messages: [], preserve: previous.preserve, attempt: 2, maxAttempts: 2 },
+        };
+      }
+      if (error instanceof ArtifactValidationError && parsed.success && signature) {
+        const result = buildBriefRepairResult(parsed.data, error.report);
+        if (result.status === "needs_repair") {
+          authorAttemptRef.current = { signature, attempts: 1, preserve: result.preserve, brief: parsed.data };
+          return {
+            status: "rejected",
+            error: result.text,
+            repair: { messages: result.messages, preserve: result.preserve, attempt: 1, maxAttempts: 2 },
+          };
+        }
+      }
       return { status: "rejected", error: message };
     }
   }, [courseId, lessonId]);

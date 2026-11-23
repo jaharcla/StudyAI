@@ -70,13 +70,18 @@ describe("briefRepairSignature", () => {
     expect(briefRepairSignature(repaired)).toBe(briefRepairSignature(original));
   });
 
-  it("changes when the question text or a citation changes", () => {
+  it("survives a changed question or citation so a repair cannot hide as a new request", () => {
     const original = makeBrief();
-    expect(briefRepairSignature(makeBrief({ topic: "different topic" }))).not.toBe(briefRepairSignature(original));
-    expect(briefRepairSignature(makeBrief({ sourceRefs: ["studyai://document/module-1/text/5?chunk=0"] }))).not.toBe(briefRepairSignature(original));
+    expect(briefRepairSignature(makeBrief({ sourceRefs: ["studyai://document/module-1/text/5?chunk=0"] }))).toBe(briefRepairSignature(original));
     expect(briefRepairSignature(makeBrief({
       artifact: { ...original.artifact, prompt: "Different question?" },
-    }))).not.toBe(briefRepairSignature(original));
+    }))).toBe(briefRepairSignature(original));
+  });
+
+  it("changes only for a different topic, board or artifact kind", () => {
+    const original = makeBrief();
+    expect(briefRepairSignature(makeBrief({ topic: "different topic" }))).not.toBe(briefRepairSignature(original));
+    expect(briefRepairSignature(makeBrief({ boardId: "another-board" }))).not.toBe(briefRepairSignature(original));
   });
 });
 

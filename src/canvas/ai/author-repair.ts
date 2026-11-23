@@ -31,15 +31,13 @@ export function briefComponents(brief: ArtifactBrief): BriefComponent[] {
   return components;
 }
 
-/** Keeps its value across a figure repair, so one authoring intent gets at most one repair attempt. */
+/**
+ * Identity of the authoring intent. It deliberately excludes question text, citations and figure,
+ * because those are the fields a repair may not change (or may legitimately fix). Only a different
+ * topic/board/kind starts a fresh attempt sequence.
+ */
 export function briefRepairSignature(brief: ArtifactBrief): string {
-  return stableJson({
-    topic: brief.topic,
-    kind: brief.artifact.kind,
-    prompt: brief.artifact.prompt,
-    itemPrompts: brief.artifact.items?.map((item) => item.prompt) ?? [],
-    sourceRefs: brief.sourceRefs,
-  });
+  return stableJson({ boardId: brief.boardId, topic: brief.topic, kind: brief.artifact.kind });
 }
 
 function mapComponentId(validator: string, components: readonly BriefComponent[]): string {
