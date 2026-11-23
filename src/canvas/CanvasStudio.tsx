@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { pageBounds, Store, type Diff, type DiffSource, type ShapeRecord } from "@quickdrawjs/core";
+import { Store, hitShape, pageBounds, type Diff, type DiffSource, type ShapeRecord } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
@@ -32,7 +32,7 @@ import type { CanvasSceneNode } from "./spatial/types";
 import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
 import { captureQuickdrawOCRRegions } from "./ocr-capture.js";
 import { NarrationPanel } from "./NarrationPanel";
-import { readPalmRejection, writePalmRejection, smoothCapturedPressure } from "./pen-input.js";
+import { readPalmRejection, writePalmRejection, smoothCapturedPressure, smoothPenTrail, isScratchOut, isCircle, type PenPoint2D, type CircleGesture } from "./pen-input.js";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -73,6 +73,38 @@ function smoothCompletedInk(diff: Diff, editor: Editor, guard: { current: boolea
   finally { guard.current = false; }
 }
 
+/**
+ * Apply a recognised pen gesture through Quickdraw's own documented APIs.
+ * `Store.transact`/`remove` and `Editor.setSelection` keep undo, persistence and
+ * selection ownership where they already live; no document is written directly.
+ */
+function applyPenGesture(kind: "scratch" | "circle", points: PenPoint2D[], circle: CircleGesture | null, editor: Editor) {
+  const shapes = editor.store.shapes();
+  // The gesture stroke Quickdraw committed on this pointer-up is the topmost ink.
+  const gestureId = shapes.filter((shape) => shape.type === "draw").sort((a, b) => b.z - a.z)[0]?.id;
+  if (kind === "scratch") {
+    const ids = new Set<string>();
+    const tolerance = 8 / editor.camera.z;
+    // hitShape (not hitTest): hitTest only returns the topmost shape, which is
+    // the scratch stroke itself; we need every stroke the scribble crosses.
+    for (const shape of shapes) {
+      if (shape.id === gestureId) continue;
+      if (points.some((point) => hitShape(shape, point.x, point.y, tolerance, editor.store))) ids.add(shape.id);
+    }
+    if (gestureId) ids.add(gestureId);
+    if (ids.size) editor.store.transact(() => editor.store.remove([...ids]));
+    return;
+  }
+  if (!circle) return;
+  if (gestureId) editor.store.remove([gestureId]);
+  const enclosed = editor.store.shapes().filter((shape) => {
+    const bounds = pageBounds(shape);
+    return [[bounds.x, bounds.y], [bounds.x + bounds.w, bounds.y], [bounds.x, bounds.y + bounds.h], [bounds.x + bounds.w, bounds.y + bounds.h]]
+      .every(([x, y]) => Math.hypot(x - circle.center.x, y - circle.center.y) <= circle.radius);
+  }).map((shape) => shape.id);
+  editor.setSelection(enclosed);
+}
+
 export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, onSelectedObject, preferredBoardId, onBoardState, activityMode = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -93,6 +125,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const palmRejectionRef = useRef(palmRejection);
   palmRejectionRef.current = palmRejection;
   const activePenPointer = useRef<number | null>(null);
+  const gestureTrail = useRef<PenPoint2D[]>([]);
+  const gesturePointerId = useRef<number | null>(null);
+  const [lastPenGesture, setLastPenGesture] = useState<"none" | "scratch" | "circle">("none");
   const boardElement = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [boards, setBoards] = useState<Board[]>([]);
@@ -1027,18 +1062,45 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         return tools.length ? <section className="palette-group" key={group}><h2>{group}</h2>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
-      <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
+      <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} data-selected-shape-ids={selectedShapeIds.join(",")} data-last-pen-gesture={lastPenGesture} onPointerDownCapture={(event) => {
         if (event.pointerType === "pen") activePenPointer.current = event.pointerId;
         // Explicit pointerType filtering complements Quickdraw's penMode gate:
         // a palm landing mid-stroke never even reaches the editor's listeners.
         if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) { event.stopPropagation(); return; }
         if ((event.target as HTMLElement).closest(".quickdraw-native") && !(event.target as HTMLElement).closest("button,input,textarea,select") && event.button === 0) { nativeGesture.current = structuredClone(currentDocument()); setSelectedId(undefined); }
+        const editor = editorRef.current;
+        if (editor && (editor.tool === "draw" || editor.tool === "highlight") && event.button === 0) {
+          const rect = editor.container.getBoundingClientRect();
+          const page = editor.screenToPage(event.clientX - rect.left, event.clientY - rect.top);
+          gestureTrail.current = [{ x: page.x, y: page.y, pointerType: event.pointerType, pressure: event.pressure }];
+          gesturePointerId.current = event.pointerId;
+        }
       }} onPointerMoveCapture={(event) => {
         if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) event.stopPropagation();
+        const editor = editorRef.current;
+        if (!editor || gesturePointerId.current !== event.pointerId) return;
+        const rect = editor.container.getBoundingClientRect();
+        const page = editor.screenToPage(event.clientX - rect.left, event.clientY - rect.top);
+        gestureTrail.current.push({ x: page.x, y: page.y, pointerType: event.pointerType, pressure: event.pressure });
       }} onPointerUpCapture={(event) => {
         if (activePenPointer.current === event.pointerId) activePenPointer.current = null;
+        const trail = gestureTrail.current;
+        const pointerId = gesturePointerId.current;
+        gestureTrail.current = [];
+        gesturePointerId.current = null;
+        const editor = editorRef.current;
+        if (editor && pointerId === event.pointerId && trail.length >= 6) {
+          const smoothed = smoothPenTrail(trail);
+          const circle = isCircle(smoothed);
+          const kind = circle ? "circle" : isScratchOut(smoothed) ? "scratch" : null;
+          setLastPenGesture(kind ?? "none");
+          // Quickdraw commits the stroke in its own pointerup handler, which runs
+          // after this capture phase; a microtask lands after that commit but
+          // before finishNativeGesture's timeout closes the history snapshot.
+          if (kind) queueMicrotask(() => applyPenGesture(kind, smoothed, circle, editor));
+        }
         finishNativeGesture();
-      }} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
+      }} onPointerCancelCapture={() => { nativeGesture.current = null; gestureTrail.current = []; gesturePointerId.current = null; }} onKeyDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
         if (nativeGesture.current && TOOL_KEYS.has(event.key.toLowerCase())) cancelNativeGesture();
         if (event.code === "Space") setSpaceHeld(true);

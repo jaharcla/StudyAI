@@ -47,6 +47,47 @@ async function drawStrokeCount(page: Page, courseId: string, lessonId: string): 
   return Object.values(board.parsed).filter((record) => record.type === "draw").length;
 }
 
+test("scratch-out erases the covered stroke and one undo restores it", async ({ page }) => {
+  test.setTimeout(120_000);
+  const { course, lesson } = await openBoard(page);
+  await penStroke(page, Array.from({ length: 7 }, (_, i) => ({ x: 150 + i * 18, y: 200, pressure: 0.5 })), "mouse");
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(1);
+
+  const scratch = Array.from({ length: 8 }, (_, i) => ({ x: i % 2 === 0 ? 160 : 240, y: 198 + (i % 3) * 2, pressure: 0.6 }));
+  await penStroke(page, scratch, "mouse");
+  await expect(page.locator(".canvas-board")).toHaveAttribute("data-last-pen-gesture", "scratch");
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(0);
+
+  await page.getByRole("button", { name: "Undo canvas change" }).click();
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(1);
+});
+
+test("circle-select selects only enclosed strokes without erasing them", async ({ page }) => {
+  test.setTimeout(120_000);
+  const { course, lesson } = await openBoard(page);
+  await penStroke(page, Array.from({ length: 6 }, (_, i) => ({ x: 200 + i * 12, y: 200, pressure: 0.5 })), "mouse");
+  await penStroke(page, Array.from({ length: 6 }, (_, i) => ({ x: 420 + i * 12, y: 300, pressure: 0.5 })), "mouse");
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(2);
+
+  const before = await savedBoard(page, course.id, lesson.id);
+  const draws = Object.entries(before.parsed).filter(([, record]) => record.type === "draw") as Array<[string, { x: number; props?: { pts?: number[] } }]>;
+  const pageX = (record: { x: number; props?: { pts?: number[] } }) => record.x + (record.props?.pts?.[0] ?? 0);
+  const insideId = draws.find(([, record]) => pageX(record) < 300)![0];
+  const outsideId = draws.find(([, record]) => pageX(record) > 300)![0];
+
+  const circle = Array.from({ length: 17 }, (_, i) => ({
+    x: 232 + 72 * Math.cos((i * 2 * Math.PI) / 16),
+    y: 205 + 72 * Math.sin((i * 2 * Math.PI) / 16),
+    pressure: 0.5,
+  }));
+  await penStroke(page, circle, "mouse");
+
+  const selection = page.locator(".canvas-board");
+  await expect(selection).toHaveAttribute("data-selected-shape-ids", new RegExp(`(^|,)${insideId}(,|$)`));
+  expect(await selection.getAttribute("data-selected-shape-ids")).not.toContain(outsideId);
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(2);
+});
+
 test("palm rejection ignores touch after a pen is seen, opts out cleanly, and persists", async ({ page }) => {
   test.setTimeout(120_000);
   const { course, lesson } = await openBoard(page);

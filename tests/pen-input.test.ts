@@ -1,5 +1,36 @@
 import { describe, expect, it, vi } from "vitest";
-import { PALM_REJECTION_KEY, readPalmRejection, writePalmRejection, smoothCapturedPressure } from "../src/canvas/pen-input.js";
+import { PALM_REJECTION_KEY, readPalmRejection, writePalmRejection, smoothCapturedPressure, smoothPenTrail, isScratchOut, isCircle, type PenPoint2D } from "../src/canvas/pen-input.js";
+
+describe("gesture recognition — feature 3", () => {
+  const straight: PenPoint2D[] = Array.from({ length: 7 }, (_, i) => ({ x: 100 + i * 20, y: 100 + i * 5 }));
+  const scratch: PenPoint2D[] = [
+    { x: 100, y: 100 }, { x: 200, y: 105 }, { x: 100, y: 110 }, { x: 200, y: 115 },
+    { x: 100, y: 120 }, { x: 200, y: 125 }, { x: 100, y: 130 },
+  ];
+  const circle: PenPoint2D[] = Array.from({ length: 17 }, (_, i) => ({
+    x: 200 + 60 * Math.cos((i * 2 * Math.PI) / 16),
+    y: 200 + 60 * Math.sin((i * 2 * Math.PI) / 16),
+  }));
+
+  it("distinguishes a scratch-out zigzag from an ordinary straight stroke", () => {
+    expect(isScratchOut(straight)).toBe(false);
+    expect(isScratchOut(scratch)).toBe(true);
+  });
+
+  it("recognises a closed circle and rejects a straight line", () => {
+    const found = isCircle(circle);
+    expect(found).not.toBeNull();
+    expect(found!.center.x).toBeCloseTo(200, 0);
+    expect(found!.radius).toBeGreaterThan(40);
+    expect(isCircle(straight)).toBeNull();
+  });
+
+  it("smooths jitter before classification so a shaky circle still reads as a circle", () => {
+    const jittery = circle.map((point, index) => ({ ...point, x: point.x + (index % 2 ? 10 : -10), y: point.y + (index % 3 ? -9 : 9) }));
+    expect(isCircle(jittery)).toBeNull();
+    expect(isCircle(smoothPenTrail(jittery))).not.toBeNull();
+  });
+});
 
 describe("palm rejection toggle — feature 2", () => {
   it("defaults to on, which leaves Quickdraw's pen-triggered auto-arm intact for mouse users", () => {
