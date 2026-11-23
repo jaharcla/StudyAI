@@ -1,0 +1,16 @@
+{
+  "source": "yctimlin/mcp_excalidraw seven-point screenshot checklist (upstream claim, not reproduced here) plus campaign STEM extensions",
+  "checks": [
+    { "id": "textTruncation", "description": "Is all label text fully visible?" },
+    { "id": "overlap", "description": "Do any shapes share the same space?" },
+    { "id": "arrowCrossing", "description": "Do arrows cut through unrelated elements?" },
+    { "id": "arrowLabelOverlap", "description": "Do arrow labels overlap shapes at arrow midpoints?" },
+    { "id": "spacing", "description": "At least 40px gap between elements" },
+    { "id": "readability", "description": "Font size at least 16 for body, 20 for titles" },
+    { "id": "zoneLabelPlacement", "description": "Background-zone labels must not be centered over children" },
+    { "id": "labelToElementAssociation", "description": "Extension: each label refers to the correct shape or arrow", "extension": true },
+    { "id": "stemSymbolCorrectness", "description": "Extension: mathematical and chemical symbols rendered correctly", "extension": true },
+    { "id": "chemistryBondOrder", "description": "STEM: single, double and triple bonds annotated correctly", "extension": true },
+    { "id": "vectorArrowDirection", "description": "STEM: vector and force arrow direction and sense correct", "extension": true }
+  ]
+}
