@@ -1,6 +1,7 @@
 import { localBounds, pageBounds, type Bounds, type ShapeRecord, type Snapshot, type Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
 import { tutorMathWorkspace } from "../math-workspace";
+import type { LayoutRect } from "./layout";
 
 export type CanvasScope = { boardId: string; courseId: string; lessonId: string; revision?: number };
 export type CanvasContextOptions = {
@@ -56,7 +57,7 @@ const gap = (a: Bounds, b: Bounds) => {
 const round = (n: number) => Math.round(n * 10) / 10;
 const validBounds = (b: Bounds) => [b.x, b.y, b.w, b.h].every(Number.isFinite) && b.w >= 0 && b.h >= 0;
 
-function shapeBounds(shape: ShapeRecord): Bounds {
+export function shapeBounds(shape: ShapeRecord): Bounds {
   if (shape.type !== "text" && shape.type !== "note") return pageBounds(shape);
   const text = String(shape.props.text ?? "");
   const scale = Number(shape.props.scale || 1);
@@ -72,6 +73,18 @@ function shapeBounds(shape: ShapeRecord): Bounds {
 function shapes(source: Store | Snapshot): ShapeRecord[] {
   const records = "all" in source ? source.shapes() : Object.values(source.document.store);
   return records.filter((record): record is ShapeRecord => record.typeName === "shape");
+}
+
+/**
+ * Rectangles that already claim space on the board, in the form the layout planner consumes.
+ * Single source of truth for occupancy: it uses the same record filter and the same
+ * rotation-and-text-aware bounds as the tutor's own canvas context.
+ */
+export function boardOccupancy(source: Store | Snapshot): LayoutRect[] {
+  return shapes(source).map((shape) => {
+    const bounds = shapeBounds(shape);
+    return { x: bounds.x, y: bounds.y, width: bounds.w, height: bounds.h };
+  });
 }
 
 function summarize(shape: ShapeRecord): CanvasShapeContext {

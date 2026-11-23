@@ -8,7 +8,7 @@ import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasSt
 import { boundedSceneSlice, CANVAS_DESIGN_GUIDE, canvasDescribeSchema, canvasEvidenceSearchSchema, canvasSceneReadSchema, describeCanvas, invalidateCanvasSceneCache, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
 import { compileTeachingScene, teachingSceneSchema } from "./teaching-scene";
 import { buildTutorCanvasContext } from "./tutor-canvas-context";
-import { buildCanvasAIContext, type CanvasScope } from "./canvas-context";
+import { boardOccupancy, buildCanvasAIContext, type CanvasScope } from "./canvas-context";
 
 export type QuickdrawAIBridgeOptions = {
   store: Store | null;
@@ -138,7 +138,13 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
       try {
         if (input.boardId !== options.scope.boardId) throw new Error("The active board changed.");
         if (!options.store) throw new Error("The active canvas is not ready.");
-        const batch = compileTeachingScene(input, { existingShapeIds: new Set(options.store.ids()) });
+        // Occupancy comes from the canvas context's own bounds math, so placement respects what is
+        // really on the board — including rotated shapes, ink, and text whose extent is estimated.
+        const batch = compileTeachingScene(input, {
+          existingShapeIds: new Set(options.store.ids()),
+          occupancy: boardOccupancy(options.store),
+          viewport: { x: options.viewport.x, y: options.viewport.y, width: options.viewport.w, height: options.viewport.h },
+        });
         const proposal = proposeCanvasAction(options.store, options.scope.boardId, batch, options.scope.revision);
         options.onProposal(proposal);
         return { status: "pending_user_review", proposalId: proposal.id, description: proposal.description, requiresConfirmation: proposal.requiresConfirmation };
