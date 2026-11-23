@@ -25,6 +25,11 @@ describe("validateDeckText", () => {
     expect(report.problems).toEqual([]);
   });
 
+  it("accepts a compiled bullet line before a source citation", () => {
+    const report = validateDeckText("# Friction\n# Friction opposes motion\n- Friction opposes motion.\n> Source: " + REF, deck, retrieved);
+    expect(report.ok).toBe(true);
+  });
+
   it("rejects an invented sourceRef", () => {
     const report = validateDeckText("> Source: invented#p99", deck, retrieved);
     expect(report.problems.some((p) => p.validator === "citation-containment")).toBe(true);

@@ -49,7 +49,8 @@ export function validateDeckText(
     }
     const preceding = [...lines.slice(0, index)].reverse().find((line) => line.trim() && !line.startsWith(">") && !line.startsWith("#"));
     const chunk = retrieved.get(ref) ?? "";
-    if (preceding && !chunk.includes(preceding.trim())) {
+    const claimText = preceding?.trim().replace(/^[-*]\s+/, "") ?? "";
+    if (claimText && !chunk.includes(claimText)) {
       problems.push(problem("bundle", "citation-containment", `A rendered claim above ${ref} is not supported by the retrieved chunk.`, `Restate the claim using only the course evidence, or label it as an interpretation.`));
     }
   }

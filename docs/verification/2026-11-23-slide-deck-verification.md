@@ -55,6 +55,17 @@ GitNexus has no index registered for this worktree (the shared index is 101 comm
 - Website artifacts page: Playwright spec passed with DOM assertions for list, collection filter, slide cards, citation navigation, download link, rename, and delete.
 - Editable PPTX path: the renderer returns a native Presenton deck path; no image-only export path was introduced.
 
+## Free-model smoke test (OpenCode models)
+
+Stateless generation via `POST /api/experimental/generate/text`, then each reply was parsed with the real `artifactComponentSchema`, compiled with `compileSlideDeck`, and checked with `validateDeckText`:
+
+| Model | Schema | Slides | Template | Citation validation |
+|---|---|---|---|---|
+| `opencode-go/hy4-flash-free` | pass | 2 | general | pass |
+| `opencode-go/beam-free` | pass | 2 | general | pass |
+
+This test found a real bug: `validateDeckText` compared the raw bullet line (`- claim`) against the retrieved excerpt and reported a false citation failure. Fixed by stripping the markdown bullet marker before containment checking; test `slide-deck-validate.test.ts` now passes 8/8 and both models re-tested green. The harness is at `.superpowers/sdd/2026-11-23-slide-deck-artifact/model-smoke.ts` (scratch, gitignored). This does **not** exercise Presenton rendering — it tests the model-facing semantic contract and validation only.
+
 ## What was not verified
 
 - Live generation against a running Presenton instance (no self-hosted service or API key in this environment); renderer was tested with an injected fake `fetch`.
