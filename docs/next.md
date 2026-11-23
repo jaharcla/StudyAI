@@ -2,6 +2,11 @@
 
 This page is the handoff for agents starting after the 2026-11-22 consolidation. An alignment plan circulated earlier was baselined on `main` at `d380c9c`; that tree is superseded. **Current `main` = `4961dbb`** (2026-11-22 23:53 -05:00, 78 commits ahead of `origin/main`; `work/studyai-studio` was merged at `5eb8922`, and `work/canvas-integration-2026-11-22` at `5ab5abb` is the reconciliation history). `work/adaptive-canvas-authoring` and `work/canvas-pen-ux` are checked out in other worktrees — do not reuse their checkouts.
 
+## Deferred 2026-11-23 — partner asked to park these (tired, not tonight)
+
+- **Lewis structures are still a fail.** The lab-notebook sidebar/radial UI shipped, but the overall Lewis flow does not work well enough. Treat as open work; do not assume the new UI fixed it.
+- **Tutor canvas description is poor.** Current response dumps geometry and raw component arrays with `referenced canvas item-<uuid>` placeholders (e.g. "the referenced canvas item‑206d4831‑…") instead of describing what the student actually drew. Relevant: `server/tutor-canvas-context.ts`, `server/agent.ts` prompt, tutor presentation. Desired: human-level description of drawn work, source-linked but not robotic.
+
 ## Next big step — Artifact Intelligence System (adopted 2026-11-23)
 
 This is the next major initiative; the older open items below sit behind it. StudyAI moves from an artifact-*generation* tool to an artifact-*construction* environment: the model composes a typed `ArtifactPackage`, existing scientific authorities validate it deterministically, and Canvas / Studio / Learning render only the components they own.
