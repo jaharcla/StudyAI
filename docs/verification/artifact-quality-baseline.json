@@ -1,5 +1,5 @@
 {
-  "reviewStatus": "pending-human-review",
+  "reviewStatus": "reviewed",
   "qualificationCycle": 3,
   "cycleHistory": [
     {
@@ -34,11 +34,42 @@
     "determinismRepeats": 5,
     "compositeDiagnosticOnly": true
   },
+  "review": {
+    "reviewer": "owner, with Claude-assisted analysis",
+    "reviewedAt": "2026-11-23",
+    "basis": "JSON packages only; no rendered output and no source chunks were visible to the reviewer",
+    "lowConfidenceDimensions": ["visual", "interaction"],
+    "notes": [
+      "Course grounding rewards citation presence and consistency, not verified chunk text.",
+      "Insufficient-source scored 0 on interaction as N/A, consistent with earlier cycles.",
+      "Documented-request now tests friction, fixing the cycle-1 and cycle-2 topic error.",
+      "Ambiguous-request physics is fully self-consistent (static case, zero net force), though it dropped the explanation component.",
+      "Torque relations are now consistently explanation-to-other-component, fixing cycle 2's backwards relations.",
+      "Torque diagram has a pivot reaction but still cannot show lever arms from vector components alone.",
+      "Course ID chem-120 is a harness constant; provenance remains empty in every package."
+    ]
+  },
   "scenarios": [
-    { "name": "documented request", "generationId": "documented-request", "labels": {} },
-    { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },
-    { "name": "multi-component torque package", "generationId": "multi-component-torque", "labels": {} },
-    { "name": "insufficient source", "generationId": "insufficient-source", "labels": {} }
+    {
+      "name": "documented request",
+      "generationId": "documented-request",
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 4, "visual": 2, "interaction": 1 }
+    },
+    {
+      "name": "ambiguous request",
+      "generationId": "ambiguous-request",
+      "labels": { "intent": 4, "accuracy": 5, "grounding": 3, "pedagogy": 4, "visual": 3, "interaction": 1 }
+    },
+    {
+      "name": "multi-component torque package",
+      "generationId": "multi-component-torque",
+      "labels": { "intent": 4, "accuracy": 4, "grounding": 4, "pedagogy": 3, "visual": 2, "interaction": 2 }
+    },
+    {
+      "name": "insufficient source",
+      "generationId": "insufficient-source",
+      "labels": { "intent": 4, "accuracy": 4, "grounding": 5, "pedagogy": 2, "visual": 1, "interaction": 0 }
+    }
   ],
-  "note": "Cycle 3 uses only the opencode-go free tier with model hy4-flash-free. Composer constraints are identical to cycle 2, so this is a model comparison. Thresholds remain frozen from before cycle 1. Model identity is withheld in the review sheet and stored only in the cycle-3 meta file."
+  "note": "Thresholds are unchanged from before cycle 1. Composite is diagnostic only. Model identity is withheld in the review sheet and stored only in the cycle-3 meta file."
 }
