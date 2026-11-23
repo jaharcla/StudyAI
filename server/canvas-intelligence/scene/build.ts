@@ -3,6 +3,7 @@ import type { CanvasRecognitionStage } from "../recognition/types.js";
 import { normalizeRecognitionLabel, type CanvasRecognitionFeedback } from "../recognition/feedback.js";
 import { normalizeInkText } from "./ink.js";
 import { groupQuickdrawStrokes } from "../regions.js";
+import { analyzePhysicsFreeBodyDiagram, classifyForceRole } from "./physics-rules.js";
 import { createCanvasSpatialIndex } from "../../../src/canvas/spatial/index.js";
 import { sceneEdgeId, shortHash } from "../../../src/canvas/spatial/identity.js";
 import {
@@ -57,6 +58,8 @@ function scientificFacts(object: CanvasInput["scientificObjects"][number]): stri
   if (object.kind === "vector" || object.kind === "force") {
     const components = numbers(object.components);
     if (components) facts.push(`components [${components.join(", ")}]`);
+    const role = classifyForceRole(text(object.label) ?? "");
+    if (role !== "unknown") facts.push(`role ${role}`);
   } else if (object.kind === "measurement") {
     const value = number(object.value);
     if (value !== null) facts.push(`value ${value}`);
@@ -174,6 +177,90 @@ export function buildCanvasSceneGraph(input: {
     };
     nodes.set(node.id, node);
     sourceNodes.push(node);
+  }
+
+  if (input.input.scientificObjects.some((o) => o.kind === "force" || o.kind === "vector")) {
+    const physics = analyzePhysicsFreeBodyDiagram({ objects: input.input.scientificObjects as any });
+    for (const issue of physics.issues) {
+      const targetId = issue.targetId ? `s:${issue.targetId}` : undefined;
+      const targetNode = targetId ? nodes.get(targetId) : undefined;
+      const bounds = targetNode ? targetNode.bounds : { x: 0, y: 0, width: 100, height: 50 };
+      const diagnosticId = `p:${issue.code}:${issue.targetId ?? "scene"}`;
+      nodes.set(diagnosticId, {
+        id: diagnosticId,
+        kind: "model-observation",
+        ref: { scope: "scene", id: diagnosticId },
+        bounds,
+        boundsBasis: "derived",
+        text: issue.message,
+        recordType: "physics-diagnostic",
+        origin: "geometry",
+        verificationStatus: "derived",
+        confidence: 1,
+        sourceRefs: issue.targetId ? [{ scope: "science", id: issue.targetId }] : [],
+        geometry: null,
+        uncertaintyReasons: [],
+      });
+      if (targetId && nodes.has(targetId)) {
+        addEdge(edges, {
+          kind: "derived-from",
+          from: diagnosticId,
+          to: targetId,
+          origin: "geometry",
+          verificationStatus: "derived",
+          basis: "explicit",
+          distance: null,
+          confidence: 1,
+          sourceRefs: [{ scope: "science", id: issue.targetId! }],
+          uncertaintyReasons: [],
+        });
+      }
+    }
+
+    if (physics.isValid && physics.forces.length >= 2) {
+      const summaryId = "p:fbd-summary";
+      const forceNodes = physics.forces.map((f) => nodes.get(`s:${f.id}`)).filter(Boolean) as CanvasSceneNode[];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const fn of forceNodes) {
+        minX = Math.min(minX, fn.bounds.x);
+        minY = Math.min(minY, fn.bounds.y);
+        maxX = Math.max(maxX, fn.bounds.x + fn.bounds.width);
+        maxY = Math.max(maxY, fn.bounds.y + fn.bounds.height);
+      }
+      const bounds = Number.isFinite(minX) ? { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) } : { x: 0, y: 0, width: 100, height: 100 };
+      nodes.set(summaryId, {
+        id: summaryId,
+        kind: "model-observation",
+        ref: { scope: "scene", id: summaryId },
+        bounds,
+        boundsBasis: "derived",
+        text: physics.summary,
+        recordType: "physics-summary",
+        origin: "geometry",
+        verificationStatus: "derived",
+        confidence: 1,
+        sourceRefs: physics.forces.map((f) => ({ scope: "science" as const, id: f.id })),
+        geometry: null,
+        uncertaintyReasons: [],
+      });
+      for (const f of physics.forces) {
+        const targetId = `s:${f.id}`;
+        if (nodes.has(targetId)) {
+          addEdge(edges, {
+            kind: "derived-from",
+            from: summaryId,
+            to: targetId,
+            origin: "geometry",
+            verificationStatus: "derived",
+            basis: "explicit",
+            distance: null,
+            confidence: 1,
+            sourceRefs: [{ scope: "science", id: f.id }],
+            uncertaintyReasons: [],
+          });
+        }
+      }
+    }
   }
 
   const groups = groupQuickdrawStrokes(input.input);
