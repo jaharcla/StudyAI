@@ -2,6 +2,7 @@ import { z } from "zod";
 import { newId, type ScientificObject } from "../model";
 import { canvasActionSchema, type CanvasActionBatch } from "./canvas-actions";
 import { planLayout, type LayoutRect, type LayoutRequest } from "./layout";
+import { compileExpressionSync } from "../expressions";
 
 const nodeId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
 
@@ -145,6 +146,13 @@ export const artifactBriefSchema = z.object({
         label: z.string().min(1).max(60),
         components: z.tuple([z.number(), z.number()]),
       })).min(1).max(8).optional(),
+      expression: z.string().min(1).max(500).optional(),
+      xRange: z.tuple([z.number(), z.number()]).optional(),
+      vector: z.object({
+        components: z.tuple([z.number(), z.number(), z.number()]),
+        units: z.string().min(1).max(40).optional(),
+        label: z.string().max(120).optional(),
+      }).optional(),
     }).optional(),
   }).strict(),
   placement: z.object({
@@ -169,6 +177,13 @@ export const artifactBriefSchema = z.object({
       context.addIssue({ code: "custom", message: `Item sourceRef "${item.sourceRef}" was not retrieved.`, path: ["artifact", "items"] });
     }
   }
+  const figure = value.artifact.figure;
+  if (figure?.kind === "graph") {
+    if (!figure.expression) context.addIssue({ code: "custom", message: "A graph figure requires an expression.", path: ["artifact", "figure", "expression"] });
+    if (!figure.xRange || figure.xRange[1] <= figure.xRange[0]) context.addIssue({ code: "custom", message: "A graph figure requires an xRange with maximum greater than minimum.", path: ["artifact", "figure", "xRange"] });
+  }
+  if (figure?.kind === "vector" && !figure.vector) context.addIssue({ code: "custom", message: "A vector figure requires components.", path: ["artifact", "figure", "vector"] });
+  if (figure?.kind === "equation" && !figure.expression) context.addIssue({ code: "custom", message: "An equation figure requires an expression.", path: ["artifact", "figure", "expression"] });
 });
 
 export type ArtifactBrief = z.infer<typeof artifactBriefSchema>;
@@ -295,10 +310,36 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
         edges: [],
         provenance: tagged(ctx),
       });
+    } else if (figure.kind === "graph") {
+      const expression = figure.expression;
+      const range = figure.xRange;
+      if (!expression || !range || range[1] <= range[0]) throw new Error("A graph figure requires an expression and an xRange with maximum greater than minimum.");
+      const evaluator = compileExpressionSync(expression);
+      if (evaluator.variables.some((name) => name !== "x")) throw new Error("A graph expression may only use x.");
+      const points: Array<[number, number]> = [];
+      try {
+        for (let index = 0; index <= 120; index++) {
+          const x = range[0] + (range[1] - range[0]) * index / 120;
+          points.push([x, evaluator.evaluate({ x })]);
+        }
+      } catch (error) {
+        throw new Error(`Graph expression produced a non-finite sample: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+      objects.push({
+        id: newId("graph"), kind: "graph", x: figureRect.x, y: figureRect.y,
+        width: figureRect.width, height: figureRect.height, expression,
+        xRange: [range[0], range[1]], points, xLabel: "x", yLabel: "y",
+        provenance: tagged(ctx),
+      });
     } else if (figure.kind === "vector") {
+      const spec = figure.vector;
+      if (!spec) throw new Error("A vector figure requires components.");
+      const [cx, cy, cz] = spec.components;
+      if (![cx, cy, cz].every(Number.isFinite) || Math.hypot(cx, cy, cz) === 0) throw new Error("A vector figure requires finite components with non-zero magnitude.");
       objects.push({
         id: newId("vector"), kind: "vector", x: figureRect.x, y: figureRect.y,
-        width: figureRect.width, height: figureRect.height, components: [1, 0, 0], units: "N", label: figure.title,
+        width: figureRect.width, height: figureRect.height, components: [cx, cy, cz],
+        units: spec.units ?? "N", label: spec.label ?? figure.title,
         provenance: tagged(ctx),
       });
     } else if (figure.kind === "anatomy") {
@@ -308,12 +349,17 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
         labels: input.artifact.concepts.slice(0, 8),
         provenance: tagged(ctx),
       });
-    } else {
+    } else if (figure.kind === "equation") {
+      const expression = figure.expression;
+      if (!expression) throw new Error("An equation figure requires an expression.");
+      compileExpressionSync(expression);
       objects.push({
         id: newId("equation"), kind: "equation", x: figureRect.x, y: figureRect.y,
-        width: figureRect.width, height: figureRect.height, expression: figure.title, variables: {},
+        width: figureRect.width, height: figureRect.height, expression, variables: {},
         provenance: tagged(ctx),
       });
+    } else {
+      throw new Error(`Unsupported figure kind: ${figure.kind}`);
     }
   }
 

@@ -57,4 +57,20 @@ export const canvasAuthoringTasks: CanvasAuthoringTask[] = [
     occupancy: [{ x: 100, y: 100, width: 500, height: 300 }],
     expected: { kinds: Array(8).fill("question"), sourceRefs: friction.sourceRefs },
   },
+  {
+    id: "graph-figure", brief: {
+      ...friction,
+      artifact: { ...friction.artifact, kind: "figure", figure: { kind: "graph", title: "y = x^2", expression: "x^2", xRange: [-2, 2] } },
+    },
+    occupancy: [],
+    expected: { kinds: ["graph"], sourceRefs: friction.sourceRefs },
+  },
+  {
+    id: "vector-figure", brief: {
+      ...friction,
+      artifact: { ...friction.artifact, kind: "figure", figure: { kind: "vector", title: "Applied force", vector: { components: [3, 4, 0], units: "N" } } },
+    },
+    occupancy: [],
+    expected: { kinds: ["vector"], sourceRefs: friction.sourceRefs },
+  },
 ];

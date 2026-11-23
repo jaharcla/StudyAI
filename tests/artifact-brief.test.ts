@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { artifactBriefSchema, compileArtifactBrief } from "../src/canvas/ai/teaching-scene";
+import { compileExpression } from "../src/canvas/expressions";
 import { applyArtifactBriefProposal, proposeArtifactBrief } from "../src/canvas/tutor";
 import { emptyCanvasDocument, parseCanvasDocument, type ScientificObject } from "../src/canvas/model";
 import type { LayoutRect } from "../src/canvas/ai/layout";
@@ -164,7 +165,7 @@ describe("problem-set items", () => {
     { prompt: "Name the normal force.", answer: "Perpendicular to the surface.", sourceRef: "module-1#p4" },
     { prompt: "What does gravity do here?", answer: "Acts downward.", sourceRef: "module-1#p4" },
   ];
-  const briefWithItems = (items: unknown, count = items.length as number) => ({
+  const briefWithItems = (items: Array<{ prompt: string; answer?: string; sourceRef?: string }>, count = items.length) => ({
     ...frictionBrief,
     artifact: { ...frictionBrief.artifact, kind: "problem-set", count, figure: undefined, items },
   });
@@ -198,6 +199,65 @@ describe("problem-set items", () => {
     expect(() => artifactBriefSchema.parse(briefWithItems([
       { ...problemItems[0], sourceRef: "invented#p99" }, ...problemItems.slice(1),
     ]))).toThrow(/sourceRef/i);
+  });
+});
+
+describe("real graph and vector figures", () => {
+  it("compiles a graph figure into sampled points that match the expression evaluator", async () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "graph", title: "y = x^2", expression: "x^2", xRange: [-2, 2] },
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    const graph = compiled.objects.find((object) => object.kind === "graph") as Extract<ScientificObject, { kind: "graph" }> | undefined;
+    expect(graph).toBeDefined();
+    expect(graph!.points.length).toBeGreaterThan(1);
+    expect(graph!.xRange).toEqual([-2, 2]);
+    const evaluator = await compileExpression(graph!.expression);
+    for (const [x, y] of graph!.points) expect(y).toBeCloseTo(evaluator.evaluate({ x }), 6);
+  });
+
+  it("compiles a vector figure with the supplied components and units, not a hardcoded arrow", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "vector", title: "Applied force", vector: { components: [3, 4, 0], units: "N" } },
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    const vector = compiled.objects.find((object) => object.kind === "vector") as Extract<ScientificObject, { kind: "vector" }> | undefined;
+    expect(vector).toBeDefined();
+    expect(vector!.components).toEqual([3, 4, 0]);
+    expect(vector!.units).toBe("N");
+    expect(vector!.components).not.toEqual([1, 0, 0]);
+  });
+
+  it("rejects a graph with no expression or an inverted range instead of emitting an equation", () => {
+    const base = {
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "figure" },
+    };
+    expect(() => artifactBriefSchema.parse({
+      ...base, artifact: { ...base.artifact, figure: { kind: "graph", title: "No expression", xRange: [-1, 1] } },
+    })).toThrow(/expression/i);
+    expect(() => artifactBriefSchema.parse({
+      ...base, artifact: { ...base.artifact, figure: { kind: "graph", title: "Inverted", expression: "x^2", xRange: [2, -2] } },
+    })).toThrow(/range/i);
+  });
+
+  it("rejects a zero-magnitude vector", () => {
+    const brief = {
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "vector", title: "Zero", vector: { components: [0, 0, 0], units: "N" } },
+      },
+    };
+    expect(() => compileArtifactBrief(artifactBriefSchema.parse(brief), { viewport })).toThrow(/magnitude/i);
   });
 });
 
