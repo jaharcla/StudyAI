@@ -51,6 +51,7 @@ export function consumeProviderFallbacks() { return fallbackEvents.splice(0, 8);
 type GroqInferenceOptions = { model: string; system: string; prompt: string; baseUrl?: string; signal?: AbortSignal; fetcher?: typeof fetch; onFallback?: () => void };
 
 const OCR_SYSTEM = "Transcribe visible handwritten scientific text only. Return JSON {items:[{text,kind,confidence,alternatives}],uncertain:boolean}. Each kind is word, symbol, number, equation, or unknown. Use null for uncalibrated confidence. Do NOT infer a label's arrow or position. Do NOT fabricate pixel coordinates or object IDs.";
+const DIAGRAM_OCR_SYSTEM = OCR_SYSTEM + " When two symbols are stacked with a visible horizontal bar between them, transcribe the pair as a fraction of the two symbols (for example F/N), reading the symbol above the bar first; do not insert unrelated letters between the symbol and the bar.";
 const OCR_PROMPT = "Extract actual visible characters, one JSON item per label or expression. Return only JSON.";
 const MATH_OCR_SYSTEM = "Transcribe the handwritten mathematical expression in the image as LaTeX. Preserve fractions, roots, sums, integrals, subscripts, superscripts, Greek letters, delimiters, and grouping. This expression is mathematical handwriting, not prose: Greek letters are common and Latin lookalikes are rare. Read a u-shaped glyph with a descender as \\mu, and an epsilon-like or o-like glyph in a fraction as \\sigma. Prefer the Greek reading whenever the glyph is ambiguous. Return only the LaTeX expression, with no explanation or markdown fences.";
 const MATH_OCR_PROMPT = "Write the visible handwritten mathematical expression as one LaTeX string. Do not describe the image.";
@@ -187,7 +188,7 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
     if (!allowEgress) throw new Error("Cloud canvas image egress is disabled (CANVAS_ALLOW_IMAGE_EGRESS=0 or user opt-out) and no local OCR provider is configured.");
     throw new Error("No canvas OCR provider is configured. Set GROQ_API_KEY, OPENCODE_GO_API_KEY, OPENROUTER_API_KEY, or configure OMNIROUTE_BASE_URL.");
   }
-  const system = math ? MATH_OCR_SYSTEM : OCR_SYSTEM;
+  const system = math ? MATH_OCR_SYSTEM : diagram ? DIAGRAM_OCR_SYSTEM : OCR_SYSTEM;
   const prompt = math ? MATH_OCR_PROMPT : OCR_PROMPT;
   const format = math ? "latex" as const : "json" as const;
   const attempts: string[] = [];

@@ -33,4 +33,40 @@ Ruling: leave the OCR prompt unchanged and record the remaining exactness gap in
 
 Conclusion: task acceptance (≥0.8 F1 on two runs) is met by the current shipped prompt; no code change is committed by this task, only this record. Remaining gap: nested logistic is not exact (prime, `\equiv`, `\sigma_i` subscript) — tracked in `PLAN.md` item 10 as an unresolved OCR limit.
 
+## PhysAlign `F/N` diagram OCR (PLAN.md item 11)
+
+Board: `physalign-spring-graph`. Expected concept tokens: wall, spring, o, a, f, n, axis, graph.
+
+Before (current shipped prompt), two runs:
+
+| Run | Latency | Coverage | OCR label text |
+| --- | ---: | ---: | --- |
+| 1 | 11,618 ms | 0.875 | `A E / N` |
+| 2 | 12,182 ms | 0.875 | `A E / N` |
+
+Change: added `DIAGRAM_OCR_SYSTEM` in `server/canvas-intelligence/groq.ts` — the general OCR instruction plus one explicit rule that stacked symbols separated by a visible horizontal bar are transcribed as a fraction of the two symbols (`F/N` as the worked example, symbol above the bar first, no unrelated letters between symbol and bar). Wired the diagram profile to it (`math ? MATH_OCR_SYSTEM : diagram ? DIAGRAM_OCR_SYSTEM : OCR_SYSTEM`). No model, provider-chain, region-cap, budget, or threshold changes; the general profile keeps the original `OCR_SYSTEM`.
+
+After, two runs:
+
+| Run | Latency | Coverage | OCR label text |
+| --- | ---: | ---: | --- |
+| 3 | 14,312 ms | 1.000 | `A F/N _ \|` |
+| 4 | 11,152 ms | 1.000 | `A F/N _ \|` |
+
+`F/N` now reads correctly and coverage rose 0.875 → 1.000 on both runs. Full gate after the change: see next section.
+
+## Full gate after the diagram change (2026-11-22)
+
+`npm run benchmark:canvas` → exit 0, "benchmark passed against docs/verification/canvas-benchmark-baseline.json".
+
+- hard failures: **0**
+- math exact: **4/6**
+- math average F1: **0.951** (baseline 0.910, failure floor 0.810)
+- PhysAlign coverage: **1.000** (baseline 0.750, regression floor 0.600)
+- cost: $0.000000; per-board latencies 9.4–15.8 s
+
+No `--update-baseline` was passed. `npx tsc -b` exits 0; `npx vitest run tests/canvas-ocr-selection.test.ts` passes 5/5.
+
+
+
 
