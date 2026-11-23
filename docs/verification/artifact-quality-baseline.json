@@ -1,5 +1,5 @@
 {
-  "reviewStatus": "pending-human-review",
+  "reviewStatus": "reviewed",
   "qualificationCycle": 5,
   "cycleHistory": [
     {
@@ -48,13 +48,61 @@
     "determinismRepeats": 5,
     "compositeDiagnosticOnly": true
   },
+  "review": {
+    "reviewer": "owner, with Claude-assisted analysis",
+    "reviewedAt": "2026-11-23",
+    "basis": "JSON packages only; no rendered output, source chunks or refusal-rubric ADR were visible to the reviewer",
+    "lowConfidenceDimensions": ["visual", "interaction"],
+    "notes": [
+      "Fixed-case pedagogy is 4, 4, 4, so the frozen three-scenario gate qualifies.",
+      "Held-out pedagogy is 3 and 3; if they were counted the mean would be 3.6 and both would miss the 3.5 floor. They are pre-registered as excluded from the gate.",
+      "The 'then X changes' twist is used in ambiguous and torque but dead in documented, pH and graph-reading; bloomLevel is a model label and was not credited as evidence.",
+      "Relations regressed to 'explains' only and several components are orphaned; not penalised under the frozen rubric but recorded as a composer regression.",
+      "The reviewer noted that questions reference the scenario field; compilation and UI rendering of that field were fixed after scoring and verified by unit and browser tests.",
+      "No defined critical failure was observed. Provenance is empty rather than carrying wrong timestamps.",
+      "Course ID chem-120 remains a harness constant on physics and pH content."
+    ]
+  },
   "scenarios": [
-    { "name": "documented request", "generationId": "documented-request", "labels": {} },
-    { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },
-    { "name": "multi-component torque package", "generationId": "multi-component-torque", "labels": {} },
-    { "name": "insufficient source", "generationId": "insufficient-source", "labels": {}, "refusalRubric": true },
-    { "name": "held-out graph reading", "generationId": "held-out-graph-reading", "labels": {}, "heldOut": true },
-    { "name": "held-out pH", "generationId": "held-out-ph", "labels": {}, "heldOut": true }
+    {
+      "name": "documented request",
+      "generationId": "documented-request",
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 3, "pedagogy": 4, "visual": 2, "interaction": 1 }
+    },
+    {
+      "name": "ambiguous request",
+      "generationId": "ambiguous-request",
+      "labels": { "intent": 4, "accuracy": 4, "grounding": 3, "pedagogy": 4, "visual": 3, "interaction": 1 }
+    },
+    {
+      "name": "multi-component torque package",
+      "generationId": "multi-component-torque",
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 4, "visual": 4, "interaction": 3 }
+    },
+    {
+      "name": "insufficient source",
+      "generationId": "insufficient-source",
+      "labels": {},
+      "refusalRubric": true,
+      "refusalNarrative": {
+        "namesMissing": "pass but less specific than cycle 4 — one sentence of absence rather than a list of source types",
+        "avoidsFabrication": "pass — no invented topics or citations",
+        "concreteNextStep": "pass — gives a concrete next step",
+        "gap": "overbroad 'no course material was supplied' claim despite retrieved lecture notes"
+      }
+    },
+    {
+      "name": "held-out graph reading",
+      "generationId": "held-out-graph-reading",
+      "labels": { "intent": 3, "accuracy": 5, "grounding": 4, "pedagogy": 3, "visual": 3, "interaction": 2 },
+      "heldOut": true
+    },
+    {
+      "name": "held-out pH",
+      "generationId": "held-out-ph",
+      "labels": { "intent": 4, "accuracy": 5, "grounding": 4, "pedagogy": 3, "visual": 1, "interaction": 1 },
+      "heldOut": true
+    }
   ],
-  "note": "Cycle 5 integrates BloomAssessmentItemGeneration's scenario-first Application-level method. Held-out and refusal cases are pre-registered exclusions from the frozen three-scenario gate."
+  "note": "Thresholds were frozen before cycle 1 and were not changed. Held-out and refusal cases are excluded from the gate by the pre-registered protocol but reported here in full."
 }

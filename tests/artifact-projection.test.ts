@@ -66,6 +66,22 @@ describe("cycle 4 schema integration", () => {
     expect(result.report).toEqual({ ok: true, problems: [] });
   });
 
+  it("carries a question scenario through compilation so the student can answer it", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1, id: "scenario-q", objective: "Friction", courseId: "c1", lessonId: "l1",
+      components: [{
+        id: "q1", kind: "question", prompt: "Compute the friction for the 4 kg crate.", answer: "16.6 N", sourceRefs: [REF],
+        scenario: "A 4 kg crate rests on a 20 degree incline with coefficient 0.30. An applied force of 6 N acts up the slope.",
+        bloomLevel: "application",
+      }],
+    }, [REF]);
+    const result = compilePackage(pkg, ctx);
+    expect(result.canvas?.objects.find((object) => object.kind === "question")).toMatchObject({
+      prompt: "Compute the friction for the 4 kg crate.",
+      scenario: "A 4 kg crate rests on a 20 degree incline with coefficient 0.30. An applied force of 6 N acts up the slope.",
+    });
+  });
+
   it("carries a force application point into the compiled object", () => {
     const pkg = parseArtifactPackage({
       schemaVersion: 1, id: "torque-pos", objective: "Torque", courseId: "c1", lessonId: "l1",

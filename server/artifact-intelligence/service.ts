@@ -72,6 +72,7 @@ function deriveBrief(pkg: ArtifactPackage, ctx: CompilePackageContext): Artifact
         items: questions.map((question) => ({
           prompt: question.prompt,
           ...(question.answer ? { answer: question.answer } : {}),
+          ...(question.scenario ? { scenario: question.scenario } : {}),
           ...(question.sourceRefs[0] ? { sourceRef: question.sourceRefs[0] } : {}),
         })),
       },
@@ -80,7 +81,11 @@ function deriveBrief(pkg: ArtifactPackage, ctx: CompilePackageContext): Artifact
   if (questions.length === 1) {
     return artifactBriefSchema.parse({
       ...shared,
-      artifact: { ...shared.artifact, kind: "question", count: 1, prompt: questions[0].prompt, ...(questions[0].answer ? { answer: questions[0].answer } : {}) },
+      artifact: {
+        ...shared.artifact, kind: "question", count: 1, prompt: questions[0].prompt,
+        ...(questions[0].answer ? { answer: questions[0].answer } : {}),
+        ...(questions[0].scenario ? { scenario: questions[0].scenario } : {}),
+      },
     });
   }
   if (worked.length) {

@@ -131,10 +131,12 @@ export const artifactBriefSchema = z.object({
     count: z.number().int().min(1).max(8).default(1),
     prompt: z.string().min(1).max(2000),
     answer: z.string().max(2000).optional(),
+    scenario: z.string().min(1).max(2000).optional(),
     citationLabel: z.string().max(200).optional(),
     items: z.array(z.object({
       prompt: z.string().min(1).max(2000),
       answer: z.string().max(2000).optional(),
+      scenario: z.string().min(1).max(2000).optional(),
       citationLabel: z.string().max(200).optional(),
       sourceRef: z.string().min(1).max(400).optional(),
     }).strict()).max(8).optional(),
@@ -248,7 +250,11 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   };
   const indices = (count: number) => Array.from({ length: count }, (_, index) => index);
   const tagged = (ctx: CompileContext) => ({ ...ctx.provenance, sourceRefs: [...ctx.provenance.sourceRefs] });
-  const itemAt = (ctx: CompileContext, index: number) => ctx.input.artifact.items?.[index] ?? { prompt: ctx.input.artifact.prompt, ...(ctx.input.artifact.answer ? { answer: ctx.input.artifact.answer } : {}) };
+  const itemAt = (ctx: CompileContext, index: number) => ctx.input.artifact.items?.[index] ?? {
+    prompt: ctx.input.artifact.prompt,
+    ...(ctx.input.artifact.answer ? { answer: ctx.input.artifact.answer } : {}),
+    ...(ctx.input.artifact.scenario ? { scenario: ctx.input.artifact.scenario } : {}),
+  };
   const provenanceAt = (ctx: CompileContext, index: number) => {
     const sourceRef = ctx.input.artifact.items?.[index]?.sourceRef;
     return sourceRef ? { ...tagged(ctx), sourceRefs: [sourceRef] } : tagged(ctx);
@@ -261,6 +267,7 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
       id: newId("question"), kind: "question", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
       prompt: item.prompt,
       ...(answer ? { answer } : {}),
+      ...("scenario" in item && item.scenario ? { scenario: item.scenario } : {}),
       provenance: provenanceAt(ctx, index),
     };
   };

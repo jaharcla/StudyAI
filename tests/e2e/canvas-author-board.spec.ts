@@ -12,6 +12,7 @@ const mockedTurn = (boardId: string) => ({
     count: 1,
     prompt: "Draw the three forces on the block and name them.",
     answer: "Friction opposes the motion down the slope.",
+    scenario: "A 2 kg block rests on a 20 degree incline with an applied 5 N force up the slope.",
     citationLabel: "Module 1 · p. 4",
     concepts: ["friction", "free-body diagram"],
     figure: {
@@ -59,6 +60,7 @@ test("one friction authoring turn: one review, one revision, cited and labelled 
   await expect(dialog).toContainText("gravity");
   await expect(dialog).toContainText("normal");
   await expect(dialog).toContainText("friction");
+  await expect(dialog.getByTestId("artifact-scenario")).toContainText("20 degree incline");
   await expect(dialog.getByTestId("generated-unverified")).toHaveText(/generated, not verified/i);
   await expect(dialog.locator("a[href*='studyai-citation']")).toHaveCount(1);
   await expect(page.locator('[role="region"][aria-label="QuickDraw AI proposal"]')).toHaveCount(0);
@@ -76,12 +78,13 @@ test("one friction authoring turn: one review, one revision, cited and labelled 
   await expect(dialog).toHaveCount(0, { timeout: 20_000 });
   await expect.poll(async () => (await readSaved()).revision, { timeout: 20_000 }).toBe(before.revision + 1);
 
-  const saved = JSON.parse((await readSaved()).document) as { objects: Array<{ kind: string; prompt?: string; label?: string; provenance?: { status: string; sourceRefs: string[] } }> };
+  const saved = JSON.parse((await readSaved()).document) as { objects: Array<{ kind: string; prompt?: string; scenario?: string; label?: string; provenance?: { status: string; sourceRefs: string[] } }> };
   const kinds = saved.objects.map((object) => object.kind);
   expect(kinds).toContain("question");
   expect(kinds.filter((kind) => kind === "force")).toHaveLength(3);
   expect(saved.objects.every((object) => object.provenance?.status === "generated-unverified")).toBe(true);
   expect(saved.objects.find((object) => object.kind === "question")?.prompt).toContain("three forces");
+  expect(saved.objects.find((object) => object.kind === "question")?.scenario).toContain("20 degree incline");
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect.poll(async () => (await readSaved()).revision).toBe(before.revision + 1);

@@ -44,7 +44,7 @@ export type ScientificObject =
   | (CanvasObjectBase & { kind: "relationship"; fromId: string; toId: string; label: string; geometry?: ArrowGeometry })
   | (CanvasObjectBase & { kind: "linked-note"; noteId: string; title: string; excerpt: string })
   | (CanvasObjectBase & { kind: "linked-document"; documentId: string; title: string; excerpt: string })
-  | (CanvasObjectBase & { kind: "question"; prompt: string; answer?: string; conceptId?: string })
+  | (CanvasObjectBase & { kind: "question"; prompt: string; answer?: string; conceptId?: string; scenario?: string })
   | (CanvasObjectBase & { kind: "flashcard"; front: string; back: string; conceptId?: string })
   | (CanvasObjectBase & { kind: "mindmap"; title: string; nodes: MindmapNode[]; edges: MindmapEdge[] });
 
