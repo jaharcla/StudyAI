@@ -11,7 +11,7 @@ import { retrieveCourseDocuments, type RetrievalResult } from "./document-intell
 import { canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema } from "../src/canvas/tutor.js";
 import { CANVAS_ACTION_TOOL_DESCRIPTION, canvasActionSchema, canvasReadSchema } from "../src/canvas/ai/canvas-actions.js";
 import { canvasDescribeSchema, canvasEvidenceSearchSchema, canvasSceneReadSchema, readCanvasInkSchema } from "../src/canvas/ai/scene-tools.js";
-import { teachingSceneSchema } from "../src/canvas/ai/teaching-scene.js";
+import { artifactBriefSchema, teachingSceneSchema } from "../src/canvas/ai/teaching-scene.js";
 import { buildCanvasAIContext } from "../src/canvas/ai/canvas-context.js";
 import { buildCanvasChunks, reasonOverCanvas } from "./canvas-reasoning/index.js";
 import { compactTutorShapes } from "./tutor-canvas-context.js";
@@ -158,6 +158,8 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ? { name: "read_design_guide", description: "Read-only. Returns the canonical layout and annotation guide for the scientific canvas. Read it before proposing a diagram.", schema: z.object({}).strict() } : undefined;
   const teachingScene = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "propose_teaching_scene")
     ? { name: "propose_teaching_scene", description: "Consequential: requires user approval. Compile a semantic teaching scene of nodes, labeled arrows and ordered steps into a review-gated QuickDraw action batch. You provide meaning and stable node ids; the app computes bounded layout positions instead of you supplying coordinates.", schema: teachingSceneSchema } : undefined;
+  const authorBoard = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "author_board")
+    ? { name: "author_board", description: "Consequential: requires user approval. ONE verb for composing learning content onto the board: a question with a figure, a problem set (count 1-8), a worked example or a review deck. Describe what the artifact must show and where it belongs relative to the board; never supply x/y. The app resolves geometry against real board occupancy. Citations must be exact sourceRef values you retrieved; invented refs are removed server-side. The whole artifact is applied in one review and is labelled generated, not verified.", schema: artifactBriefSchema } : undefined;
   let evidence: RetrievalResult | null = null;
   if (course && retrievalRequested) evidence = retrieveCourseDocuments(db, course.id, query);
 
@@ -230,6 +232,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ...(canvasDescribe ? ["describe_canvas"] : []),
     ...(canvasDesignGuide ? ["read_design_guide"] : []),
     ...(teachingScene ? ["propose_teaching_scene"] : []),
+    ...(authorBoard ? ["author_board"] : []),
     "search_fact_checks",
   ];
   const recommendedTools = recommendedToolsForQuery(query, availableToolNames);
@@ -264,7 +267,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     instructions + " Workspace and canvas context: " + budgeted.canvasJson + ". Course evidence from the server: " + budgeted.evidenceJson,
   );
   const executableBaseTools = [...(retrieval ? [retrieval] : []), ...scienceTools];
-  const baseTools = [...executableBaseTools, ...(canvasTool ? [canvasTool] : []), ...(quickdrawActions ? [quickdrawActions] : []), ...(quickdrawRead ? [quickdrawRead] : []), ...(canvasSceneRead ? [canvasSceneRead] : []), ...(canvasInkRead ? [canvasInkRead] : []), ...(canvasEvidenceSearch ? [canvasEvidenceSearch] : []), ...(canvasObjectCreate ? [canvasObjectCreate] : []), ...(moleculeTool ? [moleculeTool] : []), ...(canvasDescribe ? [canvasDescribe] : []), ...(canvasDesignGuide ? [canvasDesignGuide] : []), ...(teachingScene ? [teachingScene] : [])];
+  const baseTools = [...executableBaseTools, ...(canvasTool ? [canvasTool] : []), ...(quickdrawActions ? [quickdrawActions] : []), ...(quickdrawRead ? [quickdrawRead] : []), ...(canvasSceneRead ? [canvasSceneRead] : []), ...(canvasInkRead ? [canvasInkRead] : []), ...(canvasEvidenceSearch ? [canvasEvidenceSearch] : []), ...(canvasObjectCreate ? [canvasObjectCreate] : []), ...(moleculeTool ? [moleculeTool] : []), ...(canvasDescribe ? [canvasDescribe] : []), ...(canvasDesignGuide ? [canvasDesignGuide] : []), ...(teachingScene ? [teachingScene] : []), ...(authorBoard ? [authorBoard] : [])];
   const factCheckTool = createFactCheckTool();
   const requestSignal = signalFromConfig(config);
   const run: TutorModelRun = { provider: providerSettings.provider, model: activeModel, providersTried: [providerSettings.provider], invocationCount: 0, retries: 0, groqReservedCostUsd: 0, groqAccountedCostUsd: 0, maxGroqCostUsd: providerSettings.maxGroqCostUsd, maxProviderCalls: providerSettings.maxProviderCalls, groqInputUsdPerMillion: providerSettings.groqInputUsdPerMillion, groqOutputUsdPerMillion: providerSettings.groqOutputUsdPerMillion, startedAt: Date.now() };
@@ -276,7 +279,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     const candidates = toolsForProvider(provider);
     if (!recommendedTools.length) return candidates;
     const selected = candidates.filter((tool) => recommendedTools.includes(tool.name));
-    if (selected.some((tool) => ["propose_canvas_action", "propose_canvas_edit", "propose_scientific_object"].includes(tool.name))) {
+    if (selected.some((tool) => ["propose_canvas_action", "propose_canvas_edit", "propose_scientific_object", "author_board"].includes(tool.name))) {
       for (const name of ["get_canvas_state", "describe_canvas"]) {
         const companion = candidates.find((tool) => tool.name === name);
         if (companion && !selected.includes(companion)) selected.push(companion);
@@ -352,19 +355,33 @@ async function tutor(state: typeof State.State, config?: unknown) {
         : "Your previous tool call was rejected because its arguments did not match the tool schema. Retry with only the documented fields and valid enum values, and no extra properties.");
       try { response = await invoke([...history, correction]); }
       catch (retryError) { logTutorContextOverflow(retryError); return failureResult(activeScope, scopeStart, classifyModelFailure(retryError), run); }
-    } else if (failure === "tool_call_unsupported" && (quickdrawActions || quickdrawRead || canvasTool || canvasSceneRead || canvasInkRead || canvasEvidenceSearch || canvasObjectCreate || moleculeTool || canvasDescribe || canvasDesignGuide || teachingScene)) {
+    } else if (failure === "tool_call_unsupported" && (quickdrawActions || quickdrawRead || canvasTool || canvasSceneRead || canvasInkRead || canvasEvidenceSearch || canvasObjectCreate || moleculeTool || canvasDescribe || canvasDesignGuide || teachingScene || authorBoard)) {
       const fallback = new SystemMessage("The selected model cannot call canvas tools. Answer ordinary explanatory questions normally. If the request requires inspecting or changing the canvas, explain that the canvas tool is unavailable. Do not describe freehand ink or claim to have transcribed it. Do not claim to inspect, propose, or apply a canvas change.");
       try { response = await invoke([system, fallback, ...budgeted.conversation], true); }
       catch (fallbackError) { logTutorContextOverflow(fallbackError); return failureResult(activeScope, scopeStart, classifyModelFailure(fallbackError), run); }
     } else return failureResult(activeScope, scopeStart, failure, run);
   }
   const candidateByRef = new Map((evidence?.results ?? []).map((result) => [result.sourceRef, result]));
+  let rejectedCitationCount = 0;
+  /** Containment, not judgement: drop citations the model did not actually retrieve before the tool call reaches the client. */
+  const sanitizeAuthoredCitations = (message: AIMessage) => {
+    if (!authorBoard) return;
+    for (const call of message.tool_calls ?? []) {
+      if (call.name !== authorBoard.name) continue;
+      const refs = Array.isArray(call.args?.sourceRefs) ? call.args.sourceRefs.filter((ref): ref is string => typeof ref === "string") : [];
+      const valid = refs.filter((ref) => candidateByRef.has(ref));
+      rejectedCitationCount += refs.length - valid.length;
+      call.args = { ...call.args, sourceRefs: valid };
+    }
+  };
 
   const executableTools = new Map<string, { name: string; invoke(input: any): Promise<any> }>([...executableBaseTools, ...(run.provider !== "ollama" ? [factCheckTool] : [])].map((item) => [item.name, item] as [string, { name: string; invoke(input: any): Promise<any> }]));
   for (let iteration = 0; iteration < 2 && response.tool_calls?.length; iteration++) {
-    if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene].some((tool) => tool && (response.tool_calls ?? []).some((call) => call.name === tool.name))) {
+    if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene, authorBoard].some((tool) => tool && (response.tool_calls ?? []).some((call) => call.name === tool.name))) {
       canvasToolProposed = true;
+      sanitizeAuthoredCitations(response);
       recordTutorOutcome(run, response.tool_calls?.map((call) => call.name) ?? [], "tool_proposed", budgeted);
+      if (rejectedCitationCount) response.response_metadata = { ...response.response_metadata, studyai: { retrieval: { rejectedCitationCount } } };
       return { activeScope, scopeStart, messages: [response] };
     }
     const toolMessages: ToolMessage[] = [];
@@ -393,8 +410,10 @@ async function tutor(state: typeof State.State, config?: unknown) {
     try { response = await invoke(history); }
     catch (error) { logTutorContextOverflow(error); return failureResult(activeScope, scopeStart, classifyModelFailure(error), run); }
   }
-  if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool].some((tool) => tool && response.tool_calls?.some((call) => call.name === tool.name))) {
+  if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, authorBoard].some((tool) => tool && response.tool_calls?.some((call) => call.name === tool.name))) {
+    sanitizeAuthoredCitations(response);
     recordTutorOutcome(run, response.tool_calls?.map((call) => call.name) ?? [], "tool_proposed", budgeted);
+    if (rejectedCitationCount) response.response_metadata = { ...response.response_metadata, studyai: { retrieval: { rejectedCitationCount } } };
     return { activeScope, scopeStart, messages: [response] };
   }
 
@@ -403,7 +422,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     recordTutorOutcome(run, [], "empty_answer", budgeted);
     return { activeScope, scopeStart, messages: [new AIMessage("The model returned an empty answer. Retry with a larger response limit.")] };
   }
-  const canvasActionToolNames = [canvasTool, quickdrawActions, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene]
+  const canvasActionToolNames = [canvasTool, quickdrawActions, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene, authorBoard]
     .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
     .map((tool) => tool.name);
   const priorCanvasProposal = state.messages.some((message) => {
