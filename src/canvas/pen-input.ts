@@ -3,6 +3,20 @@
 // already streamlines/tapers at render (freehand.js:9-50). We only normalise the
 // captured pressure through the documented Store.update API while a stroke is live.
 
+export const PALM_REJECTION_KEY = "studyai.canvas.palmRejection";
+
+/** Default on: Quickdraw only auto-arms pen mode after a stylus is seen, so
+ * mouse-only (and touch-only) users keep drawing until that happens. */
+export function readPalmRejection(): boolean {
+  try { return globalThis.localStorage.getItem(PALM_REJECTION_KEY) !== "off"; }
+  catch { return true; }
+}
+
+export function writePalmRejection(on: boolean): void {
+  try { globalThis.localStorage.setItem(PALM_REJECTION_KEY, on ? "on" : "off"); }
+  catch { /* storage unavailable — keep the in-memory choice */ }
+}
+
 const MIN_PRESSURE = 0.05;
 const PRESSURE_FOLLOW = 0.55;
 const PRESSURE_GAMMA = 0.85;

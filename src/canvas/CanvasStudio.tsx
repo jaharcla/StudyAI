@@ -32,7 +32,7 @@ import type { CanvasSceneNode } from "./spatial/types";
 import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
 import { captureQuickdrawOCRRegions } from "./ocr-capture.js";
 import { NarrationPanel } from "./NarrationPanel";
-import { smoothCapturedPressure } from "./pen-input.js";
+import { readPalmRejection, writePalmRejection, smoothCapturedPressure } from "./pen-input.js";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -89,6 +89,10 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const skipQuickdrawSave = useRef<unknown>(undefined);
   // Guards the documented Store.update smoothing write so its own diff cannot recurse.
   const pressureSmoothing = useRef(false);
+  const [palmRejection, setPalmRejection] = useState(readPalmRejection);
+  const palmRejectionRef = useRef(palmRejection);
+  palmRejectionRef.current = palmRejection;
+  const activePenPointer = useRef<number | null>(null);
   const boardElement = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [boards, setBoards] = useState<Board[]>([]);
@@ -733,10 +737,23 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       setSelectedShapeIds([...editor.selection]);
       if (editor.selection.size) setSelectedId(undefined);
     });
-    editorListeners.current.push(unlistenHistory, unlistenCamera, unlistenTool, unlistenSelection);
+    // Quickdraw auto-arms pen mode on the first stylus contact (editor.js:451-455).
+    // When the user opted out, undo that arm through the same public API — the
+    // documented penmode event is the only place it can be caught without patching.
+    const unlistenPenMode = editor.on("penmode", () => {
+      if (!palmRejectionRef.current && editor.penMode) editor.setPenMode(false);
+    });
+    editorListeners.current.push(unlistenHistory, unlistenCamera, unlistenTool, unlistenSelection, unlistenPenMode);
     setEditorFrame((frame) => frame + 1);
     refreshHistory();
   }, [refreshHistory]);
+
+  const togglePalmRejection = useCallback((on: boolean) => {
+    setPalmRejection(on);
+    palmRejectionRef.current = on;
+    writePalmRejection(on);
+    if (!on) editorRef.current?.setPenMode(false);
+  }, []);
 
   const handleQuickdrawChange = useCallback((diff: Diff, source: DiffSource, editor: Editor) => {
     if (source !== "user") return;
@@ -988,6 +1005,9 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         <label className="canvas-egress" title="When on, cropped ink images may be sent to the configured cloud OCR providers. When off, ink images stay on this device and text-only analysis continues.">
           <input type="checkbox" checked={allowImageEgress} onChange={(event) => { const next = event.target.checked; setAllowImageEgress(next); try { localStorage.setItem("studyai.canvas.imageEgress", next ? "on" : "off"); } catch { /* storage unavailable */ } }} />Cloud ink OCR
         </label>
+        <label className="canvas-palm" title="Once a stylus is seen, resting palms (touch pointers) stop drawing. Mouse input is never affected.">
+          <input type="checkbox" aria-label="Palm rejection" checked={palmRejection} onChange={(event) => togglePalmRejection(event.target.checked)} />Palm rejection
+        </label>
         {canvasAnalysis && analysisTelemetry && <output className="canvas-analysis-meta" title={analysisTelemetry.usage.length ? analysisTelemetry.usage.map((entry) => `${entry.provider}: ${entry.calls} call(s), ${entry.promptTokens + entry.completionTokens} tokens, $${entry.costUsd.toFixed(6)}`).join("\n") : "No cloud provider calls; deterministic and local stages only."}>
           {(analysisTelemetry.totalMs / 1000).toFixed(1)} s Â· {analysisTelemetry.usage.length ? `$${analysisTelemetry.usage.reduce((sum, entry) => sum + entry.costUsd, 0).toFixed(4)}` : "local only"}
         </output>}
@@ -1008,8 +1028,17 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
       <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
+        if (event.pointerType === "pen") activePenPointer.current = event.pointerId;
+        // Explicit pointerType filtering complements Quickdraw's penMode gate:
+        // a palm landing mid-stroke never even reaches the editor's listeners.
+        if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) { event.stopPropagation(); return; }
         if ((event.target as HTMLElement).closest(".quickdraw-native") && !(event.target as HTMLElement).closest("button,input,textarea,select") && event.button === 0) { nativeGesture.current = structuredClone(currentDocument()); setSelectedId(undefined); }
-      }} onPointerUpCapture={finishNativeGesture} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
+      }} onPointerMoveCapture={(event) => {
+        if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) event.stopPropagation();
+      }} onPointerUpCapture={(event) => {
+        if (activePenPointer.current === event.pointerId) activePenPointer.current = null;
+        finishNativeGesture();
+      }} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
         if (nativeGesture.current && TOOL_KEYS.has(event.key.toLowerCase())) cancelNativeGesture();
         if (event.code === "Space") setSpaceHeld(true);

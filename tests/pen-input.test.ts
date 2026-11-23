@@ -1,5 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { smoothCapturedPressure } from "../src/canvas/pen-input.js";
+import { describe, expect, it, vi } from "vitest";
+import { PALM_REJECTION_KEY, readPalmRejection, writePalmRejection, smoothCapturedPressure } from "../src/canvas/pen-input.js";
+
+describe("palm rejection toggle — feature 2", () => {
+  it("defaults to on, which leaves Quickdraw's pen-triggered auto-arm intact for mouse users", () => {
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
+    expect(readPalmRejection()).toBe(true);
+  });
+
+  it("persists an opted-out choice and restores it", () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+    });
+    writePalmRejection(false);
+    expect(values.get(PALM_REJECTION_KEY)).toBe("off");
+    expect(readPalmRejection()).toBe(false);
+    writePalmRejection(true);
+    expect(readPalmRejection()).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});
 
 const trail = (points: Array<[number, number, number]>): number[] => points.flat();
 

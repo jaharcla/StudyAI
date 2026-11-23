@@ -42,6 +42,38 @@ async function savedBoard(page: Page, courseId: string, lessonId: string): Promi
   return { ...row, parsed: parsed?.snapshot?.document?.store ?? {} };
 }
 
+async function drawStrokeCount(page: Page, courseId: string, lessonId: string): Promise<number> {
+  const board = await savedBoard(page, courseId, lessonId);
+  return Object.values(board.parsed).filter((record) => record.type === "draw").length;
+}
+
+test("palm rejection ignores touch after a pen is seen, opts out cleanly, and persists", async ({ page }) => {
+  test.setTimeout(120_000);
+  const { course, lesson } = await openBoard(page);
+  const palm = page.getByRole("checkbox", { name: "Palm rejection" });
+  await expect(palm).toBeChecked();
+
+  const penPoints = Array.from({ length: 6 }, (_, i) => ({ x: 110 + i * 24, y: 130 + i * 6, pressure: 0.4 + i * 0.08 }));
+  const touchPoints = Array.from({ length: 5 }, (_, i) => ({ x: 320 + i * 22, y: 300 - i * 5, pressure: 0.5 }));
+
+  await penStroke(page, penPoints, "pen");
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(1);
+
+  // A resting palm (touch pointer) must not add ink while pen mode is armed.
+  await penStroke(page, touchPoints, "touch");
+  await page.waitForTimeout(800);
+  expect(await drawStrokeCount(page, course.id, lesson.id)).toBe(1);
+
+  // Opting out re-enables touch immediately through Editor.setPenMode(false).
+  await palm.uncheck();
+  expect(await page.evaluate(() => localStorage.getItem("studyai.canvas.palmRejection"))).toBe("off");
+  await penStroke(page, touchPoints, "touch");
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(2);
+
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: "Palm rejection" })).not.toBeChecked();
+});
+
 test("pen capture smooths pressure: saved pressure differs from raw synthetic pointer pressure", async ({ page }) => {
   test.setTimeout(120_000);
   const { course, lesson } = await openBoard(page);
