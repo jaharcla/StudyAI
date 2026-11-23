@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { newId, type ScientificObject } from "../model";
 import { canvasActionSchema, type CanvasActionBatch } from "./canvas-actions";
 import { planLayout, type LayoutRect, type LayoutRequest } from "./layout";
 
@@ -113,4 +114,161 @@ export function compileTeachingScene(input: TeachingScene, options: { occupancy?
   });
 
   return canvasActionSchema.parse({ boardId: input.boardId, actions });
+}
+
+/**
+ * The single semantic authoring verb. There is deliberately no coordinate field: the model states
+ * what the artifact must show and where it should sit *relative to* the board, and the planner
+ * decides the pixels. `placement.near` may use a transient `#alias` resolved against current board
+ * anchors; aliases are intent only and are never copied into the resulting objects.
+ */
+export const artifactBriefSchema = z.object({
+  boardId: z.string().min(1).max(200),
+  topic: z.string().min(1).max(280),
+  artifact: z.object({
+    kind: z.enum(["question", "problem-set", "figure", "worked-example", "deck"]),
+    count: z.number().int().min(1).max(8).default(1),
+    prompt: z.string().min(1).max(2000),
+    answer: z.string().max(2000).optional(),
+    citationLabel: z.string().max(200).optional(),
+    concepts: z.array(z.string().min(1).max(80)).max(8).default([]),
+    figure: z.object({
+      kind: z.enum(["freebody", "vector", "graph", "anatomy", "equation", "mindmap"]),
+      title: z.string().min(1).max(120),
+      forces: z.array(z.object({
+        label: z.string().min(1).max(60),
+        components: z.tuple([z.number(), z.number()]),
+      })).min(1).max(8).optional(),
+    }).optional(),
+  }).strict(),
+  placement: z.object({
+    near: z.string().max(200).optional(),
+    relation: z.enum(["near", "below", "beside", "clear-area"]).default("clear-area"),
+  }).strict().default({ relation: "clear-area" }),
+  sourceRefs: z.array(z.string().min(1).max(400)).max(8).default([]),
+  reason: z.string().min(1).max(1000),
+}).strict().superRefine((value, context) => {
+  if (new Set(value.sourceRefs).size !== value.sourceRefs.length) context.addIssue({ code: "custom", message: "sourceRefs must be unique." });
+});
+
+export type ArtifactBrief = z.infer<typeof artifactBriefSchema>;
+export type CompiledArtifact = {
+  objects: ScientificObject[];
+  description: string;
+  sourceRefs: string[];
+  verification: "generated-unverified";
+};
+
+const QUESTION_WIDTH = 360;
+const QUESTION_HEIGHT = 130;
+const FIGURE_WIDTH = 340;
+const FIGURE_HEIGHT = 260;
+const AUTHORING_GAP = 60;
+
+/**
+ * Compiles a brief into scientific objects at planner-approved positions. Every authored object is
+ * branded generated-unverified; the brand travels with the object, not just with the review dialog.
+ */
+export function compileArtifactBrief(input: ArtifactBrief, options: {
+  occupancy?: readonly LayoutRect[];
+  viewport?: LayoutRect;
+  anchors?: ReadonlyMap<string, LayoutRect>;
+} = {}): CompiledArtifact {
+  const viewport = options.viewport ?? DEFAULT_VIEWPORT;
+  const occupancy = options.occupancy ?? [];
+  const anchors = options.anchors ?? new Map<string, LayoutRect>();
+  const provenance = { status: "generated-unverified" as const, sourceRefs: [...input.sourceRefs] };
+
+  let anchor = { x: viewport.x + AUTHORING_GAP, y: viewport.y + AUTHORING_GAP };
+  if (input.placement.near) {
+    const alias = input.placement.near;
+    const resolved = anchors.get(alias);
+    if (!resolved) throw new Error(`Unknown alias "${alias}". It must name a node on the current board or #clear-area.`);
+    if (alias === "#clear-area") anchor = { x: viewport.x + AUTHORING_GAP, y: viewport.y + AUTHORING_GAP };
+    else if (input.placement.relation === "below") anchor = { x: resolved.x, y: resolved.y + resolved.height + AUTHORING_GAP };
+    else if (input.placement.relation === "beside") anchor = { x: resolved.x + resolved.width + AUTHORING_GAP, y: resolved.y };
+    else anchor = { x: resolved.x, y: resolved.y };
+  }
+
+  const requests: LayoutRequest[] = [];
+  if (input.artifact.figure) requests.push({ id: "figure", width: FIGURE_WIDTH, height: FIGURE_HEIGHT });
+  for (let index = 0; index < input.artifact.count; index++) requests.push({ id: `question-${index}`, width: QUESTION_WIDTH, height: QUESTION_HEIGHT });
+
+  const plan = planLayout(requests, occupancy, viewport, { anchor });
+  if (plan.status === "conflict") {
+    throw new Error(`${plan.reason} Nothing was placed. Clear space, or ask for a smaller artifact. Suggested free area: ${Math.round(plan.suggestion.width)}×${Math.round(plan.suggestion.height)} at (${Math.round(plan.suggestion.x)}, ${Math.round(plan.suggestion.y)}).`);
+  }
+  const rectangles = new Map(plan.placements.map((placement) => [placement.id, placement.rect]));
+
+  const objects: ScientificObject[] = [];
+  for (let index = 0; index < input.artifact.count; index++) {
+    const rect = rectangles.get(`question-${index}`)!;
+    objects.push({
+      id: newId("question"), kind: "question", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+      prompt: input.artifact.prompt,
+      ...(index === 0 && input.artifact.answer ? { answer: input.artifact.answer } : {}),
+      provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+    });
+  }
+
+  const figure = input.artifact.figure;
+  const figureRect = rectangles.get("figure");
+  if (figure && figureRect) {
+    if (figure.kind === "freebody" && figure.forces) {
+      const centreX = figureRect.x + figureRect.width / 2;
+      const centreY = figureRect.y + figureRect.height / 2;
+      const radius = Math.min(figureRect.width, figureRect.height) / 3;
+      figure.forces.forEach((force, index) => {
+        const angle = (index / figure.forces!.length) * Math.PI * 2;
+        objects.push({
+          id: newId("force"), kind: "force",
+          x: centreX + Math.cos(angle) * radius, y: centreY + Math.sin(angle) * radius,
+          width: 24, height: 24, components: [force.components[0], force.components[1], 0],
+          units: "N", label: force.label,
+          provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        });
+      });
+    } else if (figure.kind === "mindmap") {
+      const centreX = figureRect.x + figureRect.width / 2;
+      const centreY = figureRect.y + figureRect.height / 2;
+      objects.push({
+        id: newId("mindmap"), kind: "mindmap", x: figureRect.x, y: figureRect.y,
+        width: figureRect.width, height: figureRect.height, title: figure.title,
+        nodes: [
+          { id: "root", label: figure.title, x: centreX, y: centreY },
+          ...input.artifact.concepts.slice(0, 6).map((concept, index) => ({ id: `c${index}`, label: concept, x: centreX + (index % 2 ? 100 : -100), y: centreY + (index - 1) * 44 })),
+        ],
+        edges: [],
+        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+      });
+    } else if (figure.kind === "vector") {
+      objects.push({
+        id: newId("vector"), kind: "vector", x: figureRect.x, y: figureRect.y,
+        width: figureRect.width, height: figureRect.height, components: [1, 0, 0], units: "N", label: figure.title,
+        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+      });
+    } else if (figure.kind === "anatomy") {
+      objects.push({
+        id: newId("anatomy"), kind: "anatomy", x: figureRect.x, y: figureRect.y,
+        width: figureRect.width, height: figureRect.height, structureId: figure.title, system: "",
+        labels: input.artifact.concepts.slice(0, 8),
+        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+      });
+    } else {
+      objects.push({
+        id: newId("equation"), kind: "equation", x: figureRect.x, y: figureRect.y,
+        width: figureRect.width, height: figureRect.height, expression: figure.title, variables: {},
+        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+      });
+    }
+  }
+
+  const forceLabels = figure?.forces?.map((force) => force.label) ?? [];
+  const citation = input.artifact.citationLabel ?? input.sourceRefs.join(", ") ?? "no cited source";
+  const where = input.placement.relation === "clear-area" ? "the clear area" : `${input.placement.relation} your sketch`;
+  const figureText = figure ? ` and 1 ${figure.kind} diagram${forceLabels.length ? ` (${forceLabels.join(", ")})` : ""}` : "";
+  const countText = `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`;
+  const description = `adds ${countText}${figureText} in ${where}, citing ${citation} — generated, not verified`;
+
+  return { objects, description, sourceRefs: [...input.sourceRefs], verification: "generated-unverified" };
 }

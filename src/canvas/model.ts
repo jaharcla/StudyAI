@@ -26,7 +26,9 @@ export type MoleculeBond = { id: string; from: string; to: string; order: BondOr
 export type MindmapNode = { id: string; label: string; x: number; y: number };
 export type MindmapEdge = { from: string; to: string; label?: string };
 export type ResonanceForm = { id: string; name: string; bonds: MoleculeBond[] };
-export type CanvasObjectBase = { id: string; x: number; y: number; width: number; height: number };
+/** Provenance for authored content. Generated content is never presented as verified course fact. */
+export type ObjectProvenance = { status: "generated-unverified"; sourceRefs: string[] };
+export type CanvasObjectBase = { id: string; x: number; y: number; width: number; height: number; provenance?: ObjectProvenance };
 
 export type ScientificObject =
   | (CanvasObjectBase & { kind: "atom"; element: Element; nonbondingElectrons: number; bondOrderSum: number; label: string })
