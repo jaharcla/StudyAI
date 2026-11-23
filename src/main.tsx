@@ -4,6 +4,7 @@ import "@copilotkit/react-core/v2/styles.css";
 import "@quickdrawjs/core/quickdraw.css";
 import "./styles.css";
 import "./overrides.css";
+import "./schemes/immersive-real.css";
 import "katex/dist/katex.min.css";
 import App from "./App";
 

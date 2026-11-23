@@ -27,7 +27,8 @@ test("places atoms, connects bonds, edits lone pairs/charges, moves atoms, conve
   await expect(page.locator(`[data-atom-id="${atomId}"]`)).toHaveAttribute("data-charge", "-1");
   await page.getByRole("combobox", { name: "Selected atom element", exact: true }).selectOption("O");
   for (const order of [3, 1, 2]) {
-    await molecule.locator("[data-bond-id] .science-hit").first().dblclick();
+    // The bond hit target is a transparent, often zero-height SVG line.
+    await molecule.locator("[data-bond-id] .science-hit").first().dblclick({ force: true });
     await expect(molecule.locator("[data-bond-id]").first()).toHaveAttribute("data-order", String(order));
   }
   const bondIds = await molecule.locator("[data-bond-id]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-bond-id")));

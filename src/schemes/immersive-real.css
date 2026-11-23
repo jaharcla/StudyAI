@@ -1,0 +1,113 @@
+/* Immersive workspace — real app, real components, new layout.
+   Only loaded in this branch. Scoped to .app-shell so modals stay normal. */
+
+.app-shell{position:relative;display:block;width:100vw;height:100vh;overflow:hidden;background:#f4f2ec}
+
+/* Sidebar becomes a slide-over */
+.app-shell .sidebar{position:fixed;z-index:80;top:0;bottom:0;left:0;width:276px;transform:translateX(-101%);transition:transform .22s cubic-bezier(.2,.8,.2,1);box-shadow:14px 0 50px rgba(40,30,20,.18)}
+.app-shell.sidebar-open .sidebar{transform:translateX(0)}
+.app-shell .sidebar-scrim{position:fixed;z-index:70;inset:0;background:rgba(42,38,33,.3);animation:fade-in .18s ease}
+.app-shell .sidebar .sidebar-close{display:none}
+
+/* Main area fills everything */
+.app-shell .main-area{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* Floating top strip */
+.app-shell .topbar{position:absolute;z-index:30;top:0;left:0;right:0;height:58px;padding:0 18px;border-bottom:0;background:linear-gradient(#f4f2ecf5,#f4f2ec00)}
+.app-shell .topbar .breadcrumbs{gap:9px;font-size:12px;color:#8a8072}
+.app-shell .topbar .breadcrumbs b{color:#2a2621;font-weight:600}
+.app-shell .saved{display:none}
+.app-shell .immersive-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.app-shell .immersive-actions button{display:flex;align-items:center;gap:6px;height:32px;padding:0 11px;border:1px solid #ded7c9;border-radius:8px;background:rgba(255,253,248,.94);color:#574e43;font-size:11px;font-weight:600;cursor:pointer}
+.app-shell .immersive-actions button:hover{border-color:#a66843;color:#9a623f}
+.app-shell .immersive-actions button.primary{background:#2a2621;border-color:#2a2621;color:#f7f2ea}
+.app-shell .immersive-actions .icon-only{width:32px;padding:0;justify-content:center}
+.app-shell .top-actions{gap:4px}
+.app-shell .top-actions .icon-button{width:32px;height:32px;border:1px solid #ded7c9;border-radius:8px;background:rgba(255,253,248,.94)}
+
+/* Lesson title and canvas label stay in the accessibility/DOM tree (screen-reader
+   and existing tests rely on them) but don't add a second visual header. */
+.app-shell .lesson-header,
+.app-shell .canvas-pane .pane-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+/* Toolbar becomes a floating pill, below the canvas's own tool bar */
+.app-shell .workspace-toolbar{position:absolute;z-index:20;top:108px;left:50%;transform:translateX(-50%);height:auto;padding:5px;border:1px solid #e0d9cd;border-radius:10px;background:rgba(255,253,248,.96);box-shadow:0 8px 26px rgba(60,44,25,.08);gap:6px}
+/* Keep the pill over the canvas half in Split, and out of the document heading in Lecture */
+.app-shell.view-split .workspace-toolbar{left:calc(25vw + 95px)}
+.app-shell.view-lecture .workspace-toolbar{left:18px;transform:none}
+/* Contextual molecule/Lewis tools render at the top of the board. Drop the
+   floating view pill below them so their right-hand buttons stay clickable. */
+.app-shell:has(.molecule-drawing-tools) .workspace-toolbar{top:164px}
+/* The object inspector docks on the right too — the floating tutor would cover
+   its fields and buttons. Give the inspector the space until it closes. */
+.app-shell:has(.canvas-object-editor) .tutor-panel,
+.app-shell:has(.canvas-object-editor) .reopen-tutor,
+.app-shell:has(.molecule-drawing-tools) .tutor-panel,
+.app-shell:has(.molecule-drawing-tools) .reopen-tutor,
+.app-shell:has(.canvas-recognition) .tutor-panel,
+.app-shell:has(.canvas-recognition) .reopen-tutor,
+.app-shell:has(.activity-task-panel) .tutor-panel,
+.app-shell:has(.activity-task-panel) .reopen-tutor{display:none}
+.app-shell .view-switch button,.app-shell .tool-chip{padding:6px 9px;font-size:10px;border-radius:6px}
+.app-shell .view-switch button.current,.app-shell .tool-chip.active{background:#2a2621;color:#f7f2ea}
+
+/* Work area: canvas alone, lecture alone, or a real 50/50 split */
+.app-shell .work-area{position:absolute;top:58px;right:0;bottom:0;left:0;display:flex}
+.app-shell .canvas-pane{position:relative;flex:1 1 0;min-width:0;min-height:0;padding:0;display:block}
+.app-shell .canvas-pane[hidden]{display:none}
+.app-shell .lecture-pane{position:relative;flex:1 1 0;min-width:0;min-height:0;padding:0;display:flex;flex-direction:column}
+.app-shell .work-area.lecture .lecture-pane{flex:1 1 100%}
+.app-shell .work-area.split .lecture-pane{border-left:1px solid #ded7c9}
+.app-shell .canvas-workspace{height:100%}
+.app-shell .canvas-studio{height:100%}
+.app-shell .canvas-board{height:100%}
+
+/* Tutor becomes a floating side card */
+.app-shell .resize-handle{display:none}
+.app-shell .tutor-panel{position:fixed;z-index:50;top:96px;right:16px;bottom:16px;width:340px;max-width:calc(100vw - 32px);height:auto;border:1px solid #e0d9cd;border-radius:14px;box-shadow:0 20px 60px rgba(50,36,20,.18);overflow:hidden}
+.app-shell .tutor-header{flex-basis:50px;padding:0 13px}
+.app-shell .tutor-disclaimer{flex-basis:30px}
+/* Calm the CopilotKit welcome state inside the floating card */
+.app-shell .copilot-slot h1[class*="cpk:text-xl"]{color:#5e564b;font:500 17px/1.5 Georgia,serif;letter-spacing:-.01em;text-align:left}
+.app-shell .copilot-slot [class*="cpk:max-w-3xl"]{max-width:32rem}
+.app-shell .reopen-tutor{position:fixed;z-index:50;right:16px;bottom:16px;padding:10px 14px;border:0;border-radius:10px;background:#2a2621;color:#f7f2ea;font-size:11px;font-weight:600;box-shadow:0 8px 24px rgba(40,30,20,.2);cursor:pointer}
+
+/* Study stage (real StudyPanel in a conversation-first shell) */
+.study-stage{position:fixed;z-index:120;inset:0;display:flex;background:#fbfaf7;color:#2c2a27;font-family:'DM Sans',system-ui,sans-serif;animation:fade-in .18s ease}
+.study-stage .stage-sidebar{width:240px;flex:none;padding:18px 12px;border-right:1px solid #e8e4dc;background:#f3f0e9;display:flex;flex-direction:column;gap:6px}
+.study-stage .stage-brand{display:flex;align-items:center;gap:9px;padding:2px 6px 16px;font:600 18px Georgia,serif}
+.study-stage .stage-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#2c2a27;color:#fff}
+.study-stage .stage-back{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd7cc;border-radius:8px;background:#fffdf8;color:#4a453e;font-size:11px;font-weight:600;cursor:pointer}
+.study-stage .stage-group{margin:14px 8px 3px;color:#9c9386;font-size:9px;font-weight:700;letter-spacing:.13em}
+.study-stage .stage-session{display:grid;gap:2px;text-align:left;padding:9px 10px;border:0;border-radius:8px;background:transparent;color:#544e46;font-size:11px;cursor:pointer}
+.study-stage .stage-session.active{background:#fffdf8;box-shadow:0 1px 2px rgba(50,40,25,.08);font-weight:600}
+.study-stage .stage-session small{color:#9c9386;font-size:9px;font-weight:400}
+.study-stage .stage-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.study-stage .stage-head{display:flex;align-items:center;justify-content:space-between;height:54px;padding:0 22px;border-bottom:1px solid #eae6de;background:#fffdf8}
+.study-stage .stage-head strong{display:block;font:600 14px Georgia,serif}
+.study-stage .stage-head span{display:block;margin-top:2px;color:#9c9386;font-size:10px}
+.study-stage .stage-head button{border:0;background:transparent;color:#8b8377;cursor:pointer}
+.study-stage .stage-body{flex:1;display:grid;place-items:center;padding:24px;overflow:auto}
+.study-stage .study-shade{position:static;display:block;background:transparent;padding:0}
+.study-stage .study-panel{position:static;width:min(660px,100%);max-height:none;border:1px solid #ded7ca;border-radius:14px;background:#fffdf8;box-shadow:0 14px 44px rgba(50,36,20,.10);font-family:'DM Sans',sans-serif}
+.study-stage .study-panel header{border-radius:14px 14px 0 0}
+.study-stage .stage-tip{max-width:660px;margin:14px auto 0;color:#9c9386;font-size:10px;text-align:center}
+
+/* Quickdraw dock matches the paper stage */
+.app-shell .qd-root{background:#f4f2ec}
+.app-shell .qd-dock{border:1px solid #ded7c9;border-radius:11px;background:rgba(255,253,248,.97);box-shadow:0 10px 34px rgba(60,44,25,.16);backdrop-filter:none;-webkit-backdrop-filter:none}
+.app-shell .qd-dock button{color:#6b6256;border-radius:7px}
+.app-shell .qd-dock button:hover{background:#f0ebe2}
+.app-shell .qd-dock button.on{background:#2a2621;color:#fff}
+.app-shell .qd-div{background:#ded7c9}
+.app-shell.dark .qd-dock{border-color:#3c382f;background:rgba(38,35,31,.97)}
+.app-shell.dark .qd-dock button{color:#c6bdb0}
+
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+@media(max-width:760px){
+  .app-shell .workspace-toolbar{top:104px;left:10px;transform:none;max-width:calc(100vw - 20px);overflow:auto}
+  .app-shell .tutor-panel{top:auto;bottom:0;right:0;left:0;width:100%;height:62vh;border-radius:14px 14px 0 0}
+  .study-stage .stage-sidebar{display:none}
+  .study-stage .study-panel{border-radius:10px}
+}

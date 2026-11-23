@@ -1,14 +1,20 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { CopilotChat, CopilotKitProvider, useAgentContext } from "@copilotkit/react-core/v2";
+import { CopilotChat, CopilotKitProvider, useAgentContext, useCopilotChatConfiguration } from "@copilotkit/react-core/v2";
 import { Activity, Atom, BookOpen, Brain, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Menu, Moon, MoreHorizontal, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
 import { CanvasStudio } from "./canvas/CanvasStudio";
 import { parseSourceReference } from "./components/document-intelligence/api";
 import { StudyPanel } from "./learning/StudyPanel";
+import FlashcardReview from "./learning/FlashcardReview";
 import { ActivityLibrary, type ActivitySession } from "./learning/ActivityLibrary";
 import { ActivityTaskPanel } from "./learning/ActivityTaskPanel";
 import { lessonPreferenceKey, selectCourse, selectLesson } from "./workspace-state";
 import FreeKeyGuide from "./FreeKeyGuide";
+import StudyStage from "./lab/StudyStage";
+import SearchDialog from "./components/SearchDialog";
+import ProgressDialog from "./components/ProgressDialog";
+import HelpDialog from "./components/HelpDialog";
+import TutorMenu from "./components/TutorMenu";
 const DocumentLibrary = lazy(() => import("./components/document-intelligence").then((module) => ({ default: module.DocumentLibrary })));
 
 
@@ -48,7 +54,14 @@ function Workspace() {
   const [lessonError, setLessonError] = useState("");
   const lessonTitle = lessons.find((item) => item.id === lessonId)?.title ?? "";
   const [view, setView] = useState<View>("Canvas");
-  const [sidebar, setSidebar] = useState(true);
+  const [mode, setMode] = useState<"canvas" | "study">("canvas");
+  const [sidebar, setSidebar] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [tutorMenuOpen, setTutorMenuOpen] = useState(false);
+  const [flashcardReviewOpen, setFlashcardReviewOpen] = useState(false);
+  const tutorConfig = useCopilotChatConfiguration();
   const [tutor, setTutor] = useState(true);
   const [dark, setDark] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -97,6 +110,15 @@ function Workspace() {
   const [canvasSummary, setCanvasSummary] = useState({ objectCount: 0, objectTypes: {} as Record<string, number> });
   const updateCanvasSummary = useCallback((summary: { objectCount: number; objectTypes: Record<string, number> }) => setCanvasSummary(summary), []);
   const updateStatus = useCallback((next: string) => setStatus(next), []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen((open) => !open); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const updateActivityCanvas = useCallback((state: { id: string; revision: number; saved: boolean }) => setActivityCanvasState(state), []);
   const launchActivity = useCallback((session: ActivitySession) => {
     setActiveActivity(session);
@@ -248,6 +270,7 @@ function Workspace() {
   }, [course.id]);
 
   const changeCourse = (next: Course) => {
+    setSidebar(false);
     if (next.id === course.id) return;
     closeActivity(); setActivityLibraryOpen(false);
     setCourse(next);
@@ -258,6 +281,7 @@ function Workspace() {
   };
 
   const changeLesson = (nextId: string) => {
+    setSidebar(false);
     closeActivity(); setActivityLibraryOpen(false);
     setLessonId(nextId);
     setStatus("Loading lesson…");
@@ -326,23 +350,28 @@ function Workspace() {
   };
 
 
-  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell ${dark ? "dark" : ""}`}>
-    {sidebar && <aside className="sidebar">
+  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""}`}>
+    {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar">
       <div className="brand-row"><div className="brand-mark"><Sparkles size={17} /></div><span>study<span className="brand-ai">ai</span></span><button className="icon-button sidebar-close" onClick={() => setSidebar(false)} title="Collapse sidebar"><ChevronLeft size={16} /></button></div>
-      <button className="search-button" disabled title="Global search is not available yet"><Search size={15} /><span>Search anything</span><kbd>⌘ K</kbd></button>
+      <button className="search-button" onClick={() => setSearchOpen(true)} title="Search anything"><Search size={15} /><span>Search anything</span><kbd>⌘ K</kbd></button>
       <div className="nav-label">YOUR SPACE</div>
       <button className="nav-item active"><GraduationCap size={17} /> Study workspace</button>
-      <button className="nav-item" disabled title="Learning progress is not available yet"><Activity size={17} /> Learning progress</button>
+      <button className="nav-item" onClick={() => setProgressOpen(true)}><Activity size={17} /> Learning progress</button>
       <div className="course-heading"><span>COURSES</span><button className="icon-button" onClick={() => void addCourse()} title="Add course" aria-label="Add course"><Plus size={16} /></button></div>
       <div className="course-list">{courses.map((item) => <button key={item.id} className={`course-item ${course.id === item.id ? "selected" : ""}`} onClick={() => changeCourse(item)}><i style={{ background: item.color }} /><span><b>{item.title}</b><small>{item.code}</small></span><MoreHorizontal size={15} className="course-more" /></button>)}</div>
       {course.id ? <div className="course-tree"><div className="tree-course">{course.title}</div>{lessons.map((item) => <button key={item.id} className={`tree-sub ${lessonId === item.id ? "lesson-current" : ""}`} onClick={() => changeLesson(item.id)}>{lessonId === item.id && <span className="lesson-dot" />}{item.title}</button>)}<button className="tree-sub" onClick={() => void addLesson()}>+ Add lesson</button>{lessonError && <small role="alert">{lessonError}</small>}</div> : <div className="course-tree"><span>{courseError || (status === "No courses yet" ? "Add a course to begin." : "Loading courses…")}</span><button className="tree-sub" onClick={() => void addCourse()}>+ Add course</button></div>}
       <div className="sidebar-bottom"><button className="nav-item" onClick={() => setSettings(true)}><Settings2 size={17} /> Settings</button><div className="local-status"><span />{status}</div></div>
-    </aside>}
+    </aside></>}
 
     <main className="main-area">
       <header className="topbar">
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
-        <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" disabled title="Help is not available yet"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
+        <div className="immersive-actions">
+          <button className="primary" disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
+          <button disabled={!course.id || !lessonId} onClick={() => setFlashcardReviewOpen(true)} title="Flashcards and review"><BookOpen size={14} /> Cards</button>
+          <button className="icon-only" onClick={() => setTutor(!tutor)} title="Toggle study tutor"><Sparkles size={15} /></button>
+        </div>
+        <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => setHelpOpen(true)} title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
       <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" disabled={!course.id || !lessonId} onClick={() => setStudyOpen(true)}><Brain size={15} /> Study this lesson</button></section>
       <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions"><button className="tool-chip" disabled={!course.id || !lessonId} onClick={() => setActivityLibraryOpen(true)}><Activity size={14} /> Activities</button><button className="tool-chip active" disabled={!course.id || !lessonId} onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
@@ -357,13 +386,19 @@ function Workspace() {
       else if (event.key === "ArrowRight") { event.preventDefault(); setTutorWidth((width) => Math.max(300, width - 20)); }
       else if (event.key === "Home") { event.preventDefault(); setTutorWidth(300); }
       else if (event.key === "End") { event.preventDefault(); setTutorWidth(520); }
-    }} onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small><i />{aiStatus}</small></span></div><div><button className="icon-button" title="Tutor options are not available yet" disabled><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div>{tutorContextOpen && course.id && lessonId && <div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button" onClick={() => setTutorContextOpen(false)} aria-label="Hide lesson context"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>{lessonTitle}</b><small>{course.title}</small></span></div><p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div>}{course.id && lessonId ? <div className="copilot-slot" onClick={openCitation}><CopilotChat className="study-chat" messageView={{ assistantMessage: { markdownRenderer: CustomMarkdownRenderer }, toolCallDisplay: "turn" }} inspectorTools={import.meta.env.DEV} labels={{ welcomeMessageText: `Ask about ${lessonTitle}, request a worked example, or ask about the canvas.` }} /></div> : <div className="copilot-slot"><div className="canvas-loading">Select or create a lesson to start tutoring.</div></div>}<div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
+    }} onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small><i />{aiStatus}</small></span></div><div><button className="icon-button" title="Tutor options" onClick={() => setTutorMenuOpen(true)}><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div>{tutorContextOpen && course.id && lessonId && <div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button" onClick={() => setTutorContextOpen(false)} aria-label="Hide lesson context"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>{lessonTitle}</b><small>{course.title}</small></span></div><p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div>}{course.id && lessonId ? <div className="copilot-slot" onClick={openCitation}><CopilotChat className="study-chat" messageView={{ assistantMessage: { markdownRenderer: CustomMarkdownRenderer }, toolCallDisplay: "turn" }} inspectorTools={import.meta.env.DEV} labels={{ welcomeMessageText: `Ask about ${lessonTitle}, request a worked example, or ask about the canvas.` }} /></div> : <div className="copilot-slot"><div className="canvas-loading">Select or create a lesson to start tutoring.</div></div>}<div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
     {!tutor && <button className="reopen-tutor" onClick={() => setTutor(true)}><Sparkles size={16} /> Open tutor</button>}
-    {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>Local model service<input value={aiStatus} readOnly /></label><FreeKeyGuide /><label>Model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p>{models.length ? "Your selection is used for the next tutor message." : aiStatus}</p><label>AI provider<select data-testid="credit-provider-option" value={creditProvider} onChange={(e) => { setCreditProvider(e.target.value); localStorage.setItem("studyai.credit.provider", e.target.value); }}><option value="local">Local / BYOK</option><option value="credits">StudyAI Credits</option></select></label>{creditProvider === "credits" && <div className="credits-panel"><p data-testid="credit-balance">Balance: ${(creditBalance / 1_000_000).toFixed(2)}</p><p data-testid="credit-recovery-code">{creditRecovery}</p><p data-testid="credit-disclosure">Your wallet lives in this browser only. Save the recovery code: without it a balance cannot be recovered.</p><label>Redeem code<input data-testid="credit-redeem-input" value={creditCode} onChange={(e) => setCreditCode(e.target.value)} /></label><button data-testid="credit-redeem-button" onClick={redeemCredit}>Redeem</button><label>Ask with credits<input data-testid="credit-chat-input" value={creditQuestion} onChange={(e) => setCreditQuestion(e.target.value)} /></label><button data-testid="credit-chat-send" onClick={sendCreditChat}>Send</button>{creditAnswer && <div data-testid="credit-chat-answer"><CustomMarkdownRenderer content={creditAnswer} /></div>}{creditStatus && <p>{creditStatus}</p>}</div>}<div className="credits-panel" data-testid="support-panel"><h3>Support StudyAI</h3><div className="science-tabs"><button data-testid="support-kind-donation" className={supportKind === "donation" ? "current" : ""} onClick={() => { setSupportKind("donation"); setSupportChoice("small"); }}>Donate</button><button data-testid="support-kind-credits" className={supportKind === "credits" ? "current" : ""} onClick={() => { setSupportKind("credits"); setSupportChoice("small"); }}>Buy credits</button></div><label>Amount<select data-testid="support-amount" value={supportChoice} onChange={(e) => setSupportChoice(e.target.value)}>{(supportKind === "donation" ? [["small", "$2"], ["medium", "$5"], ["large", "$10"]] : [["small", "$5"], ["medium", "$10"], ["large", "$20"]]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button data-testid="support-checkout-button" onClick={requestCheckout}>Continue to Stripe</button>{supportStatus && <p data-testid="support-status">{supportStatus}</p>}<p>Payments are processed by Stripe. Refunds are handled manually and credits are not revoked automatically.</p></div><button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
+    {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" role="dialog" aria-label="StudyAI settings" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>Local model service<input value={aiStatus} readOnly /></label><FreeKeyGuide /><label>Model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p>{models.length ? "Your selection is used for the next tutor message." : aiStatus}</p><label>AI provider<select data-testid="credit-provider-option" value={creditProvider} onChange={(e) => { setCreditProvider(e.target.value); localStorage.setItem("studyai.credit.provider", e.target.value); }}><option value="local">Local / BYOK</option><option value="credits">StudyAI Credits</option></select></label>{creditProvider === "credits" && <div className="credits-panel"><p data-testid="credit-balance">Balance: ${(creditBalance / 1_000_000).toFixed(2)}</p><p data-testid="credit-recovery-code">{creditRecovery}</p><p data-testid="credit-disclosure">Your wallet lives in this browser only. Save the recovery code: without it a balance cannot be recovered.</p><label>Redeem code<input data-testid="credit-redeem-input" value={creditCode} onChange={(e) => setCreditCode(e.target.value)} /></label><button data-testid="credit-redeem-button" onClick={redeemCredit}>Redeem</button><label>Ask with credits<input data-testid="credit-chat-input" value={creditQuestion} onChange={(e) => setCreditQuestion(e.target.value)} /></label><button data-testid="credit-chat-send" onClick={sendCreditChat}>Send</button>{creditAnswer && <div data-testid="credit-chat-answer"><CustomMarkdownRenderer content={creditAnswer} /></div>}{creditStatus && <p>{creditStatus}</p>}</div>}<div className="credits-panel" data-testid="support-panel"><h3>Support StudyAI</h3><div className="science-tabs"><button data-testid="support-kind-donation" className={supportKind === "donation" ? "current" : ""} onClick={() => { setSupportKind("donation"); setSupportChoice("small"); }}>Donate</button><button data-testid="support-kind-credits" className={supportKind === "credits" ? "current" : ""} onClick={() => { setSupportKind("credits"); setSupportChoice("small"); }}>Buy credits</button></div><label>Amount<select data-testid="support-amount" value={supportChoice} onChange={(e) => setSupportChoice(e.target.value)}>{(supportKind === "donation" ? [["small", "$2"], ["medium", "$5"], ["large", "$10"]] : [["small", "$5"], ["medium", "$10"], ["large", "$20"]]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button data-testid="support-checkout-button" onClick={requestCheckout}>Continue to Stripe</button>{supportStatus && <p data-testid="support-status">{supportStatus}</p>}<p>Payments are processed by Stripe. Refunds are handled manually and credits are not revoked automatically.</p></div><button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
     {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div className="settings-modal notes-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · {lessonTitle}</span><input aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lesson…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
     {studyOpen && course.id && lessonId && <StudyPanel courseId={course.id} lessonId={lessonId} close={() => setStudyOpen(false)} />}
+    {tutorMenuOpen && <TutorMenu config={tutorConfig} onToggleContext={() => setTutorContextOpen(!tutorContextOpen)} onClose={() => setTutorMenuOpen(false)} />}
+    {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} onOpenSettings={() => { setHelpOpen(false); setSettings(true); }} onOpenCanvas={() => { setHelpOpen(false); setView("Canvas"); }} />}
+    {progressOpen && course.id && <ProgressDialog courseId={course.id} onClose={() => setProgressOpen(false)} />}
+    {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
+    {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} close={() => setFlashcardReviewOpen(false)} />}
+    {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenActivities={() => { setMode("canvas"); setActivityLibraryOpen(true); }} onOpenSources={() => { setMode("canvas"); setView("Lecture"); }} />}
   </div></>;
 }
 
