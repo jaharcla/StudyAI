@@ -1,0 +1,14 @@
+{
+  "name": "studyai-mcp-tools-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway spike: exercise Wolfram Cloud MCP and Vega MCP as tutor tools",
+  "scripts": {
+    "test": "node --test *.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "vega-lite": "6.4.2"
+  }
+}
