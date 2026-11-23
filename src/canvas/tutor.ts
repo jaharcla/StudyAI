@@ -23,7 +23,7 @@ export type CanvasEdit = z.infer<typeof canvasEditSchema>;
 export type CanvasContext = { boardId: string; courseId: string; lessonId: string; revision?: number; objects: ScientificObject[] };
 export type CanvasProposal = CanvasEdit & { courseId: string; lessonId: string; baseRevision: number; expectedObjects: string; before: ScientificObject; after: ScientificObject };
 
-export const scientificObjectKinds = ["atom", "bond", "molecule", "equation", "vector", "force", "measurement", "graph", "anatomy", "concept", "relationship", "linked-note", "linked-document", "question", "flashcard"] as const;
+export const scientificObjectKinds = ["atom", "bond", "molecule", "equation", "vector", "force", "measurement", "graph", "anatomy", "concept", "relationship", "linked-note", "linked-document", "question", "flashcard", "mindmap"] as const;
 export const canvasObjectCreateSchema = z.object({
   boardId: z.string(),
   kind: z.enum(scientificObjectKinds),

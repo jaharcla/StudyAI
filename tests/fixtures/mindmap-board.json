@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "snapshot": { "document": { "store": {} } },
+  "objects": [
+    {
+      "id": "mindmap-photosynthesis-001",
+      "kind": "mindmap",
+      "x": 320,
+      "y": 240,
+      "width": 460,
+      "height": 300,
+      "title": "Photosynthesis",
+      "nodes": [
+        { "id": "n0", "label": "Photosynthesis", "x": 0, "y": 0 },
+        { "id": "n1", "label": "Light reaction", "x": -160, "y": 95 },
+        { "id": "n2", "label": "Calvin cycle", "x": 160, "y": 95 }
+      ],
+      "edges": [
+        { "from": "n0", "to": "n1", "label": "thylakoid" },
+        { "from": "n0", "to": "n2", "label": "stroma" }
+      ]
+    }
+  ]
+}

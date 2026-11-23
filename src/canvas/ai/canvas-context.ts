@@ -275,6 +275,7 @@ function scientificSummary(object: ScientificObject) {
   else if (object.kind === "relationship") detail = strings({ fromId: object.fromId, toId: object.toId, label: object.label });
   else if (object.kind === "linked-note" || object.kind === "linked-document") detail = strings({ title: object.title, excerpt: object.excerpt });
   else if (object.kind === "question") detail = strings({ prompt: object.prompt, answer: object.answer });
+  else if (object.kind === "mindmap") detail = strings({ title: object.title, nodes: object.nodes.map((node) => node.label).join(", ") });
   else detail = strings({ front: object.front, back: object.back });
   return { id: object.id, kind: object.kind, bounds: { x: object.x, y: object.y, w: object.width, h: object.height }, detail };
 }

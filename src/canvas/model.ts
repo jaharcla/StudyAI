@@ -23,6 +23,8 @@ export type MathWorkspaceState = {
 };
 export type MoleculeAtom = { id: string; element: Element; nonbondingElectrons: number; position?: Point };
 export type MoleculeBond = { id: string; from: string; to: string; order: BondOrder };
+export type MindmapNode = { id: string; label: string; x: number; y: number };
+export type MindmapEdge = { from: string; to: string; label?: string };
 export type ResonanceForm = { id: string; name: string; bonds: MoleculeBond[] };
 export type CanvasObjectBase = { id: string; x: number; y: number; width: number; height: number };
 
@@ -41,7 +43,8 @@ export type ScientificObject =
   | (CanvasObjectBase & { kind: "linked-note"; noteId: string; title: string; excerpt: string })
   | (CanvasObjectBase & { kind: "linked-document"; documentId: string; title: string; excerpt: string })
   | (CanvasObjectBase & { kind: "question"; prompt: string; answer?: string; conceptId?: string })
-  | (CanvasObjectBase & { kind: "flashcard"; front: string; back: string; conceptId?: string });
+  | (CanvasObjectBase & { kind: "flashcard"; front: string; back: string; conceptId?: string })
+  | (CanvasObjectBase & { kind: "mindmap"; title: string; nodes: MindmapNode[]; edges: MindmapEdge[] });
 
 export type CanvasDocument = { version: 1; snapshot: Snapshot; objects: ScientificObject[] };
 
@@ -72,12 +75,12 @@ export function parseCanvasDocument(value: unknown): CanvasDocument {
 function validateObject(value: unknown) {
   if (!value || typeof value !== "object") throw new Error("Invalid scientific object.");
   const object = value as Record<string, unknown>;
-  const kinds = ["atom", "bond", "molecule", "equation", "vector", "force", "measurement", "graph", "anatomy", "concept", "relationship", "linked-note", "linked-document", "question", "flashcard"];
+  const kinds = ["atom", "bond", "molecule", "equation", "vector", "force", "measurement", "graph", "anatomy", "concept", "relationship", "linked-note", "linked-document", "question", "flashcard", "mindmap"];
   if (!kinds.includes(String(object.kind)) || typeof object.id !== "string" || ![object.x, object.y, object.width, object.height].every((n) => typeof n === "number" && Number.isFinite(n))) throw new Error("Invalid scientific object data.");
   const textFields: Record<string, string[]> = {
     atom: ["label"], bond: ["from", "to", "label"], equation: ["expression"], vector: ["units", "label"], force: ["units", "label"],
     measurement: ["units", "label"], graph: ["expression", "xLabel", "yLabel"], anatomy: ["structureId", "system"], concept: ["title", "definition"],
-    relationship: ["fromId", "toId", "label"], "linked-note": ["noteId", "title", "excerpt"], "linked-document": ["documentId", "title", "excerpt"], question: ["prompt"], flashcard: ["front", "back"],
+    relationship: ["fromId", "toId", "label"], "linked-note": ["noteId", "title", "excerpt"], "linked-document": ["documentId", "title", "excerpt"], question: ["prompt"], flashcard: ["front", "back"], mindmap: ["title"],
   };
   if ((textFields[String(object.kind)] ?? []).some((key) => typeof object[key] !== "string")) throw new Error("Invalid scientific text fields.");
   if (Number(object.width) <= 0 || Number(object.height) <= 0) throw new Error("Invalid object dimensions.");
@@ -107,6 +110,19 @@ function validateObject(value: unknown) {
   if (object.kind === "graph" && (!Array.isArray(object.points) || !object.points.every((point) => Array.isArray(point) && point.length === 2 && point.every((n) => typeof n === "number" && Number.isFinite(n))))) throw new Error("Invalid graph data.");
   if (object.kind === "graph" && (!Array.isArray(object.xRange) || object.xRange.length !== 2 || !object.xRange.every((n) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid graph range.");
   if (object.kind === "anatomy" && (!Array.isArray(object.labels) || !object.labels.every((label) => typeof label === "string"))) throw new Error("Invalid anatomy labels.");
+  if (object.kind === "mindmap") {
+    if (String(object.title).length > 200) throw new Error("Invalid mind map title.");
+    if (!Array.isArray(object.nodes) || !Array.isArray(object.edges) || object.nodes.length > 12 || object.edges.length > 16) throw new Error("Invalid mind map structure.");
+    const nodeIds = new Set<string>();
+    for (const node of object.nodes as Array<Record<string, unknown>>) {
+      if (typeof node.id !== "string" || !node.id || nodeIds.has(node.id) || typeof node.label !== "string" || !node.label.trim() || node.label.length > 120 || ![node.x, node.y].every((n) => typeof n === "number" && Number.isFinite(n) && Math.abs(n) <= 1_000)) throw new Error("Invalid mind map node.");
+      nodeIds.add(node.id);
+    }
+    for (const edge of object.edges as Array<Record<string, unknown>>) {
+      if (typeof edge.from !== "string" || typeof edge.to !== "string" || !nodeIds.has(edge.from) || !nodeIds.has(edge.to) || edge.from === edge.to) throw new Error("Invalid mind map edge.");
+      if (edge.label !== undefined && (typeof edge.label !== "string" || edge.label.length > 120)) throw new Error("Invalid mind map edge label.");
+    }
+  }
   if (object.kind === "measurement" && (typeof object.value !== "number" || !Number.isFinite(object.value))) throw new Error("Invalid measurement.");
   if (object.kind === "equation" && (!object.variables || typeof object.variables !== "object" || Array.isArray(object.variables) || !Object.values(object.variables).every((n) => typeof n === "number" && Number.isFinite(n)))) throw new Error("Invalid equation variables.");
   if (object.kind === "equation" && object.mathWorkspace !== undefined) validateMathWorkspace(object.mathWorkspace);
@@ -224,5 +240,6 @@ export function createObject(kind: ScientificObject["kind"], x: number, y: numbe
     case "linked-document": return { ...base, kind, documentId: "", title: "Linked document", excerpt: "" };
     case "question": return { ...base, kind, prompt: "Write a practice question." };
     case "flashcard": return { ...base, kind, front: "Term", back: "Definition" };
+    case "mindmap": return { ...base, kind, width: 460, height: 300, title: "New mind map", nodes: [{ id: "n0", label: "New mind map", x: 0, y: 0 }, { id: "n1", label: "Branch one", x: -150, y: 90 }, { id: "n2", label: "Branch two", x: 150, y: 90 }], edges: [{ from: "n0", to: "n1" }, { from: "n0", to: "n2" }] };
   }
 }

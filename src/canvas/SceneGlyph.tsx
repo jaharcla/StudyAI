@@ -11,6 +11,7 @@ export function objectTitle(object: ScientificObject): string {
     case "concept": case "linked-note": case "linked-document": return object.title;
     case "question": return "Practice question";
     case "flashcard": return "Flashcard";
+    case "mindmap": return object.title;
     default: return object.label;
   }
 }

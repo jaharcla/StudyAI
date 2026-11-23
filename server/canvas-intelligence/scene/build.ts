@@ -98,6 +98,7 @@ function summaryOf(object: CanvasInput["scientificObjects"][number]): string | n
     if (typeof value === "string" && value.trim()) values.push(value.trim());
   }
   values.push(...scientificFacts(object));
+  if (object.kind === "mindmap" && Array.isArray(object.nodes)) values.push(...object.nodes.map((node) => node.label));
   return values.length ? values.join(" — ").slice(0, 2000) : null;
 }
 

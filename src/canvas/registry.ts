@@ -25,4 +25,5 @@ export const canvasTools: CanvasTool[] = [
   { id: "linked-document", label: "Link a document", description: "Place a course document reference on this board.", group: "Learning", action: "object" },
   { id: "question", label: "Practice question", description: "Add a question linked to a course concept.", group: "Learning", action: "object" },
   { id: "flashcard", label: "Flashcard", description: "Create a two-sided learning card.", group: "Learning", action: "object" },
+  { id: "mindmap", label: "Mind map", description: "Place a concept map with branch nodes; move and inspect it as one unit.", group: "Learning", action: "object" },
 ];
