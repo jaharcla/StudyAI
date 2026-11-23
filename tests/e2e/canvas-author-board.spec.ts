@@ -41,6 +41,7 @@ test("one friction authoring turn: one review, one revision, cited and labelled 
 
   const url = `/api/canvases?course=${course.id}&lesson=${lesson.id}`;
   await expect.poll(async () => (await page.request.get(url)).ok()).toBe(true);
+  await expect.poll(async () => ((await (await page.request.get(url)).json()) as Array<{ id: string }>).length).toBeGreaterThan(0);
   const boards = await (await page.request.get(url)).json() as Array<{ id: string }>;
   const boardId = boards[0].id;
   const boardUrl = `/api/canvases/${boardId}?course=${course.id}&lesson=${lesson.id}`;
@@ -99,6 +100,7 @@ test("an invalid brief is reported structurally and leaves the saved board byte-
 
   const url = `/api/canvases?course=${course.id}&lesson=${lesson.id}`;
   await expect.poll(async () => (await page.request.get(url)).ok()).toBe(true);
+  await expect.poll(async () => ((await (await page.request.get(url)).json()) as Array<{ id: string }>).length).toBeGreaterThan(0);
   const boards = await (await page.request.get(url)).json() as Array<{ id: string }>;
   const boardId = boards[0].id;
   const boardUrl = `/api/canvases/${boardId}?course=${course.id}&lesson=${lesson.id}`;
@@ -159,6 +161,7 @@ test("a failed authoring turn gets one preserve-aware repair attempt", async ({ 
 
   const url = `/api/canvases?course=${course.id}&lesson=${lesson.id}`;
   await expect.poll(async () => (await page.request.get(url)).ok()).toBe(true);
+  await expect.poll(async () => ((await (await page.request.get(url)).json()) as Array<{ id: string }>).length).toBeGreaterThan(0);
   const boards = await (await page.request.get(url)).json() as Array<{ id: string }>;
   const boardId = boards[0].id;
   const boardUrl = `/api/canvases/${boardId}?course=${course.id}&lesson=${lesson.id}`;

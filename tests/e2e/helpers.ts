@@ -38,6 +38,12 @@ export async function drawCarbonDioxide(page: Page, leaveInspectorOpen = true): 
   const box = (await page.locator(".canvas-board").boundingBox())!;
   const y = box.y + 200, left = box.x + 280;
   for (const [index, element] of ["O", "C", "O"].entries()) {
+    // A board load or tool event can dismiss the Lewis panel between placements.
+    if (!(await page.getByTestId(`lewis-element-row-${element}`).isVisible())) {
+      const reopen = page.getByRole("button", { name: "Open canvas tools", exact: true });
+      if (await reopen.isVisible()) await reopen.click();
+      await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
+    }
     await page.getByTestId(`lewis-element-row-${element}`).click();
     await page.mouse.click(left + index * 80, y);
   }
