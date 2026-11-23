@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 process.env.STUDYAI_DB = join(tmpdir(), `mcp-tools-agent-${process.pid}.sqlite`);
-process.env.TUTOR_PROVIDER = "ollama";
+process.env.TUTOR_PROVIDER ??= "ollama";
 process.env.STUDYAI_EXTERNAL_MCP_TOOLS = "1";
 process.env.TUTOR_CONTEXT_BUDGET ??= "8192";
 process.env.TUTOR_MAX_COMPLETION_TOKENS ??= "800";
