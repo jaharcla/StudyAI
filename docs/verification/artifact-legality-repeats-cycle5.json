@@ -1,0 +1,45 @@
+{
+  "repeatsRequired": 5,
+  "results": [
+    {
+      "id": "documented-request",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "ambiguous-request",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "multi-component-torque",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "insufficient-source",
+      "status": "exempt",
+      "reason": "No validated package to re-check."
+    },
+    {
+      "id": "held-out-graph-reading",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "held-out-ph",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    }
+  ]
+}

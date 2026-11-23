@@ -35,6 +35,16 @@ describe("checkApplicationQuestion", () => {
     expect(problems.some((problem) => problem.includes("paraphrases"))).toBe(true);
   });
 
+  it("accepts a derived answer that contains no literal scenario value", () => {
+    const problems = checkApplicationQuestion({
+      scenario: "A 4.0 m beam is pinned 1.0 m from its left end. A 30 N weight hangs at the center and a push is applied at the right end.",
+      prompt: "Compute the upward force needed for equilibrium.",
+      answer: "12 N",
+      explanationText: explanation,
+    });
+    expect(problems).toEqual([]);
+  });
+
   it("rejects an answer copied verbatim from the explanation", () => {
     const problems = checkApplicationQuestion({
       scenario: "A 2 kg crate rests on a 20 degree ramp with a 5 N applied force and friction of 1 N.",

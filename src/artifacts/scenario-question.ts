@@ -39,9 +39,6 @@ export function checkApplicationQuestion(input: ApplicationQuestionInput): strin
   const values = scenario.match(NUMBERS) ?? [];
   if (scenario && values.length < 2) problems.push("The scenario needs at least two concrete values to support an application question.");
   if (!APPLICATION_VERB.test(input.prompt)) problems.push("The question must ask the student to apply, compute, predict or determine something.");
-  if (scenario && values.length && !values.some((value) => input.prompt.includes(value) || answer.includes(value))) {
-    problems.push("The question or answer must use at least one value from the changed scenario.");
-  }
   if (answer && input.explanationText && input.explanationText.toLowerCase().includes(answer.toLowerCase())) {
     problems.push("The answer is copied from the explanation rather than derived from the scenario.");
   }

@@ -270,7 +270,7 @@ for (const scenario of scenarios) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const correction = attempt
-        ? `\n\nCorrection: ${lastError}. Return ONLY one JSON object. Begin your response with { and end with }. No prose, no markdown fences, no explanation.`
+        ? `\n\nCorrection: ${lastError}. Repair the package now: for every question component set "bloomLevel":"application", write a "scenario" of at least 40 characters containing at least two concrete numeric values and a changed condition, start the "prompt" with Compute/Determine/Predict/Calculate/Use, and make the "answer" use at least one scenario value. Do not copy the explanation. Return ONLY one JSON object beginning with { and ending with }. No prose, no markdown fences.`
         : "";
       const response = await model.invoke([new SystemMessage(SYSTEM), new HumanMessage(userText + correction)]);
       const contentText = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
@@ -280,10 +280,22 @@ for (const scenario of scenarios) {
       lastRawText = text;
       parsed = parseJson(text);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        const source = parsed as { provenance?: unknown };
+        const source = parsed as { provenance?: unknown; outcome?: unknown };
         if (source.provenance && typeof source.provenance === "object" && !Array.isArray(source.provenance)) {
           // Timestamps are stamped on the generation record, never accepted from the model.
           source.provenance = {};
+          if (source.outcome === null) delete source.outcome;
+        }
+        const components = (parsed as { components?: unknown }).components;
+        if (Array.isArray(components)) {
+          for (const component of components) {
+            if (!component || typeof component !== "object" || Array.isArray(component)) continue;
+            const item = component as Record<string, unknown>;
+            if (item.kind !== "explanation") delete item.concepts;
+            if (item.kind !== "worked-example") delete item.steps;
+            if (item.kind !== "diagram") delete item.surfaceAngleDeg;
+            if (item.kind !== "question" && item.kind !== "worked-example") delete item.answer;
+          }
         }
       }
       assertComposerConstraints(parsed, scenario);
