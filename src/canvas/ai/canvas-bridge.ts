@@ -141,7 +141,6 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
         // Occupancy comes from the canvas context's own bounds math, so placement respects what is
         // really on the board — including rotated shapes, ink, and text whose extent is estimated.
         const batch = compileTeachingScene(input, {
-          existingShapeIds: new Set(options.store.ids()),
           occupancy: boardOccupancy(options.store),
           viewport: { x: options.viewport.x, y: options.viewport.y, width: options.viewport.w, height: options.viewport.h },
         });

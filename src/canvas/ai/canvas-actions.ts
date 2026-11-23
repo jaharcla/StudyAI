@@ -92,11 +92,24 @@ function getShape(source: Store | Snapshot, id: string): ShapeRecord {
   return shape as ShapeRecord;
 }
 
-export function validateCanvasAction(source: Store | Snapshot, value: unknown): CanvasAction {
+const noDeclaredIds: ReadonlySet<string> = new Set();
+
+/** The id a successful action adds to the board, used for both duplicate and in-batch reference checks. */
+function createdId(action: CanvasAction): string | undefined {
+  return action.kind === "createShape" ? action.shape.id : action.kind === "createText" || action.kind === "createArrow" ? action.id : undefined;
+}
+
+/**
+ * Validates one action. `declared` carries ids that earlier actions in the same batch create, so a
+ * batch can label, highlight or select its own output instead of being forced into separate
+ * proposals. Forward references stay illegal because the batch applies in order.
+ */
+export function validateCanvasAction(source: Store | Snapshot, value: unknown, declared: ReadonlySet<string> = noDeclaredIds): CanvasAction {
   const action = parseAction(value);
   if (action.kind === "createShape") validateProps(action.shape.type, action.shape.props, false);
   if (action.kind === "createArrow" && Math.hypot(action.to.x - action.from.x, action.to.y - action.from.y) < 0.1) throw new Error("Arrow geometry must have non-zero length.");
   if (action.kind === "updateShape") {
+    if (declared.has(action.id)) throw new Error(`Cannot update "${action.id}" in the same batch that creates it: its committed properties do not exist yet.`);
     const target = getShape(source, action.id);
     if (action.patch.props) validateProps(target.type, action.patch.props, true);
     if ((target.type === "arrow" || target.type === "line") && (action.patch.props?.dx !== undefined || action.patch.props?.dy !== undefined)) {
@@ -105,8 +118,8 @@ export function validateCanvasAction(source: Store | Snapshot, value: unknown): 
     }
     if (Object.keys(action.patch).length === 0) throw new Error("An update needs at least one supported property.");
   }
-  if (action.kind === "moveShape" || action.kind === "deleteShape" || action.kind === "highlightShape") getShape(source, action.id);
-  if (action.kind === "selectShapes") for (const id of action.ids) getShape(source, id);
+  if (action.kind === "moveShape" || action.kind === "deleteShape" || action.kind === "highlightShape") { if (!declared.has(action.id)) getShape(source, action.id); }
+  if (action.kind === "selectShapes") for (const id of action.ids) { if (!declared.has(id)) getShape(source, id); }
   return action;
 }
 
@@ -114,18 +127,23 @@ export function proposeCanvasAction(source: Store | Snapshot, boardId: string, v
   requireCanvasRevision(baseRevision);
   const batch = canvasActionSchema.parse(value);
   if (!boardId || batch.boardId !== boardId) throw new Error("The active board changed. Read its current context again.");
-  const actions = batch.actions.map((action) => validateCanvasAction(source, action));
   const existing = new Set(storeOf(source)?.ids() ?? Object.keys(snapshotOf(source).document.store));
   const deleted = new Set<string>();
-  for (const action of actions) {
-    const id = action.kind === "createShape" ? action.shape.id : action.kind === "createText" || action.kind === "createArrow" ? action.id : undefined;
+  const declared = new Set<string>();
+  const actions: CanvasAction[] = [];
+  // Validate in batch order: an action may reference a shape an earlier action in this batch creates.
+  for (const value of batch.actions) {
+    const action = validateCanvasAction(source, value, declared);
+    const id = createdId(action);
     if (id) {
       if (existing.has(id)) throw new Error(`Shape ID already exists: ${id}.`);
       existing.add(id);
+      declared.add(id);
     }
     const targetIds = action.kind === "updateShape" || action.kind === "moveShape" || action.kind === "deleteShape" || action.kind === "highlightShape" ? [action.id] : action.kind === "selectShapes" ? action.ids : [];
     if (targetIds.some((targetId) => deleted.has(targetId))) throw new Error("An action targets a shape deleted earlier in this batch.");
     if (action.kind === "deleteShape") deleted.add(action.id);
+    actions.push(action);
   }
   const destructive = actions.filter((action) => action.kind === "deleteShape").length;
   return { id: newId("canvas-proposal"), boardId, baseRevision, expectedFingerprint: canvasFingerprint(source), actions, description: actions.map(describe).join("; "), requiresConfirmation: destructive > 0 || actions.length > 5 };
@@ -169,11 +187,24 @@ export function approveCanvasProposal(source: Store, activeBoardId: string, prop
   if (!activeBoardId || proposal.boardId !== activeBoardId) throw new Error("Proposal belongs to a different board.");
   assertCanvasRevision(proposal.baseRevision, currentRevision);
   if (proposal.expectedFingerprint !== canvasFingerprint(source)) throw new Error("Canvas changed after this proposal; request a fresh proposal.");
-  const actions = proposal.actions.map((action) => validateCanvasAction(source, action));
+  // Re-validate against the current board, in batch order, exactly as propose did.
+  const declared = new Set<string>();
+  const actions: CanvasAction[] = [];
+  for (const value of proposal.actions) {
+    const action = validateCanvasAction(source, value, declared);
+    const id = createdId(action);
+    if (id) declared.add(id);
+    actions.push(action);
+  }
   if (actions.length > 5 && !proposal.requiresConfirmation) throw new Error("Large changes require explicit confirmation.");
   if (actions.filter((action) => action.kind === "deleteShape").length && !proposal.requiresConfirmation) throw new Error("Destructive changes require explicit confirmation.");
   let changedId = "";
-  source.transact(() => {
+  // Records are immutable in this store, so an id -> record map is a valid snapshot. transact only
+  // groups the emitted diff; it does not buffer mutations, so a throw partway through would
+  // otherwise strand half an artifact on the board.
+  const before = new Map(source.all().map((record) => [record.id, record]));
+  try {
+    source.transact(() => {
     for (const action of actions) {
       if (action.kind === "createShape") { const shape = makeShape(source, action.shape); changedId ||= shape.id; source.put(shape); }
       else if (action.kind === "createText") { const shape = makeShape(source, { id: action.id, type: "text", x: action.x, y: action.y, props: { text: action.text, ...action.style, autosize: true } }); changedId ||= shape.id; source.put(shape); }
@@ -193,9 +224,30 @@ export function approveCanvasProposal(source: Store, activeBoardId: string, prop
         changedId ||= mark.id; source.put(mark);
       }
       else if (action.kind === "selectShapes") editor?.setSelection(action.ids);
-    }
-  });
+      }
+    });
+  } catch (error) {
+    restoreCanvasRecords(source, before);
+    throw error;
+  }
   return { changedId };
+}
+
+/**
+ * Reverts an interrupted batch. Emitted as a remote diff so a half-applied change does not add a
+ * student-visible undo step. The failed batch's own history entry stays, which means the first undo
+ * after a failure is a no-op; that is the smaller harm compared to leaving shapes behind.
+ */
+function restoreCanvasRecords(source: Store, before: Map<string, ReturnType<Store["get"]>>): void {
+  source.transact(() => {
+    for (const id of source.ids()) if (!before.has(id)) source.remove([id]);
+    for (const [id, record] of before) {
+      if (!record) continue;
+      if (source.get(id) !== record) source.put(record);
+    }
+  // DiffSource is only 'user' | 'remote'; 'remote' is the value that does not create an undo entry.
+  // The board still re-renders from the emitted diff, so the student sees it revert.
+  }, "remote");
 }
 
 export function readCanvasState(source: Store | Snapshot, boardId: string, requestedBoardId: string, selectedIds: readonly string[] = [], requestedShapeIds: readonly string[] = []) {

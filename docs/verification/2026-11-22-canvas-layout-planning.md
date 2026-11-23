@@ -50,6 +50,8 @@ occupancy wiring, and exact reproduction of the legacy grid for callers without 
 
 ## What this does not yet do
 
-The plan and planner are not wired into `propose_scientific_object` (Phase 4) and scientific objects
-still accept model-supplied coordinates. Aliases for same-batch references (Phase 2) are not
-implemented, so the `existingShapeIds` highlight workaround is still in place.
+The planner is not wired into `propose_scientific_object` (Phase 4), and scientific objects are not yet part of occupancy — `boardOccupancy` reads QuickDraw records, while registry objects live in the canvas document.
+
+**Superseded by Phase 2:** the note below said same-batch aliases were unimplemented and highlights were gated by `existingShapeIds`. Phase 2 removed that workaround, and also found that `Store.transact` does not roll back a throwing apply. See [2026-11-22-canvas-batch-references.md](2026-11-22-canvas-batch-references.md).
+
+- Aliases for same-batch references (Phase 2) are not implemented, so the `existingShapeIds` highlight workaround is still in place. *(historical: fixed in Phase 2)*

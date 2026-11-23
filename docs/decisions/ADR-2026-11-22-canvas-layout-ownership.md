@@ -10,6 +10,8 @@ Placement of tutor-authored board content is the application's job, not the mode
 - `planLayout(requests, occupancy, viewport, { gap, anchor, order })` in `src/canvas/ai/layout.ts` computes positions: first-fit in reading order, 60 unit clearance, inside the viewport, all-or-nothing. On no-fit it returns a conflict plus a suggested free area and places nothing.
 - Occupancy has exactly one authority: `boardOccupancy(source)` in `src/canvas/ai/canvas-context.ts`, which reuses the existing record filter and the existing rotation/text-aware `shapeBounds`. `shapeBounds` was exported rather than reimplemented.
 - `compileTeachingScene` is the first caller. It throws on conflict instead of emitting stacked shapes, and preserves the old grid verbatim for callers that pass no board state.
+- **In-batch references, without an alias namespace.** `createShape` already carries an explicit id, so Phase 2 threads the ids a batch creates through validation in order and lets later actions reference them. No `#alias` syntax exists, so nothing can leak into the saved document by construction. Forward references are illegal because the batch applies in order, and `updateShape` on a shape the same batch creates is refused with a reason rather than validated against properties that do not exist yet.
+- **`Store.transact` does not roll back, so apply compensates explicitly.** `transact` commits its diff in a `finally`: it groups changes, it does not buffer them. A throw partway through an apply stranded earlier shapes on the board — the exact half-written artifact the bundle and auto-apply stages depend on avoiding. `approveCanvasProposal` now snapshots the store's records (immutable, so an id→record map is a valid snapshot) and restores them on failure, emitted as a `remote` diff so the revert is not a student-visible undo step. `DiffSource` is only `'user' | 'remote'`; there is no `'system'`. Accepted cost: the failed batch's own history entry remains, so the first undo after a failed apply is a no-op — reaching into the store's `undos` array was rejected as coupling to library internals.
 
 Decisions this settles for later phases:
 
@@ -23,8 +25,8 @@ Decisions this settles for later phases:
 - **Fix it in the prompt.** Add "do not overlap existing shapes" to `CANVAS_DESIGN_GUIDE`. Rejected: that advice already exists at `scene-tools.ts:9-13` and the compiler ignored it while producing the overlap, because a prose instruction cannot be measured by the thing it addresses.
 - **Let the model read the scene graph and choose positions.** Rejected: it reinstates the mechanics-in-the-model inversion, costs context on every authoring turn, and is unreproducible.
 - **New bounds/occupancy module.** Rejected per the reuse policy: `canvas-context` already computed rotation, text extent and note sizing. A second implementation would drift, and placement correctness would depend on which one a caller used.
-- **Best-fit/area-maximising packing.** Rejected for now: first-fit in reading order is deterministic, explainable, and produces the tidy left-to-right layout students expect. Packing efficiency is not the goal; legibility is.
 - **Silent overflow placement.** Rejected because it reintroduces exactly the class of bug being fixed, in a form that only appears on busy boards.
+- **Best-fit or area-maximising packing.** Rejected for now: first-fit in reading order is deterministic, explainable, and produces the tidy left-to-right layout students expect. Packing efficiency is not the goal; legibility is.
 
 ## Limits
 

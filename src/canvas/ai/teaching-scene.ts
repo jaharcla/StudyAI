@@ -54,7 +54,7 @@ const DEFAULT_VIEWPORT = { x: 0, y: 0, width: 4_000, height: 3_000 };
  * empty board still starts at the same place, but a board with work on it gets placed into clear
  * space. If there is no clear space, this throws rather than stacking on the student's drawing.
  */
-export function compileTeachingScene(input: TeachingScene, options: { existingShapeIds?: ReadonlySet<string>; occupancy?: readonly LayoutRect[]; viewport?: LayoutRect } = {}): CanvasActionBatch {
+export function compileTeachingScene(input: TeachingScene, options: { occupancy?: readonly LayoutRect[]; viewport?: LayoutRect } = {}): CanvasActionBatch {
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
   const occupancy = options.occupancy;
   const requests: LayoutRequest[] = [
@@ -108,10 +108,8 @@ export function compileTeachingScene(input: TeachingScene, options: { existingSh
       text: `${index + 1}. ${step.title}`,
       style: { color: "black", size: "m", font: "sans", scale: 1 },
     });
-    // highlightShape validates against the current store, so it cannot target an id created in this batch.
-    for (const id of step.highlight) {
-      if (options.existingShapeIds?.has(id)) actions.push({ kind: "highlightShape", id, color: "yellow" });
-    }
+    // Batch references are legal: highlight resolves against the ids this same batch creates.
+    for (const id of step.highlight) actions.push({ kind: "highlightShape", id, color: "yellow" });
   });
 
   return canvasActionSchema.parse({ boardId: input.boardId, actions });
