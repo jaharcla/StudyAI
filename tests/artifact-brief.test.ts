@@ -110,6 +110,51 @@ describe("compileArtifactBrief", () => {
   });
 });
 
+describe("artifact.kind dispatch", () => {
+  const briefFor = (kind: string) => artifactBriefSchema.parse({
+    ...frictionBrief,
+    artifact: { ...frictionBrief.artifact, kind },
+  });
+
+  it("question compiles to a question plus its figure", () => {
+    const compiled = compileArtifactBrief(briefFor("question"), { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "force", "force", "force"]);
+  });
+
+  it("figure compiles to figure objects only, with no question", () => {
+    const compiled = compileArtifactBrief(briefFor("figure"), { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["force", "force", "force"]);
+    expect(compiled.objects.some((object) => object.kind === "question")).toBe(false);
+  });
+
+  it("worked-example compiles to a worked question carrying steps plus its figure", () => {
+    const compiled = compileArtifactBrief(briefFor("worked-example"), { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "force", "force", "force"]);
+    const worked = compiled.objects.find((object) => object.kind === "question") as Extract<ScientificObject, { kind: "question" }>;
+    expect(worked.answer).toContain("Friction opposes");
+  });
+
+  it("deck compiles to one flashcard per count rather than questions", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "deck", count: 3, figure: undefined },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["flashcard", "flashcard", "flashcard"]);
+    const cards = compiled.objects as Array<Extract<ScientificObject, { kind: "flashcard" }>>;
+    expect(cards.every((card) => card.front.length > 0 && card.back.length > 0)).toBe(true);
+  });
+
+  it("problem-set compiles to count question objects", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "problem-set", count: 2, figure: undefined },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "question"]);
+  });
+});
+
 describe("ArtifactBrief proposal", () => {
   const context = { boardId: "board-a", courseId: "chem-120", lessonId: "lesson-03", revision: 7, objects: [] as ScientificObject[] };
 

@@ -192,7 +192,8 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
 
   const requests: LayoutRequest[] = [];
   if (input.artifact.figure) requests.push({ id: "figure", width: FIGURE_WIDTH, height: FIGURE_HEIGHT });
-  for (let index = 0; index < input.artifact.count; index++) requests.push({ id: `question-${index}`, width: QUESTION_WIDTH, height: QUESTION_HEIGHT });
+  const contentCount = input.artifact.kind === "figure" ? 0 : input.artifact.count;
+  for (let index = 0; index < contentCount; index++) requests.push({ id: `question-${index}`, width: QUESTION_WIDTH, height: QUESTION_HEIGHT });
 
   const plan = planLayout(requests, occupancy, viewport, { anchor });
   if (plan.status === "conflict") {
@@ -200,16 +201,41 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   }
   const rectangles = new Map(plan.placements.map((placement) => [placement.id, placement.rect]));
 
-  const objects: ScientificObject[] = [];
-  for (let index = 0; index < input.artifact.count; index++) {
-    const rect = rectangles.get(`question-${index}`)!;
-    objects.push({
+  type CompileContext = {
+    input: ArtifactBrief;
+    rectangles: Map<string, LayoutRect>;
+    provenance: { status: "generated-unverified"; sourceRefs: string[] };
+  };
+  const indices = (count: number) => Array.from({ length: count }, (_, index) => index);
+  const tagged = (ctx: CompileContext) => ({ ...ctx.provenance, sourceRefs: [...ctx.provenance.sourceRefs] });
+  const questionAt = (ctx: CompileContext, index: number, answer?: string): ScientificObject => {
+    const rect = ctx.rectangles.get(`question-${index}`)!;
+    return {
       id: newId("question"), kind: "question", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-      prompt: input.artifact.prompt,
-      ...(index === 0 && input.artifact.answer ? { answer: input.artifact.answer } : {}),
-      provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
-    });
-  }
+      prompt: ctx.input.artifact.prompt,
+      ...(answer ? { answer } : {}),
+      provenance: tagged(ctx),
+    };
+  };
+
+  /** The advertised kind decides what is compiled. No kind silently falls through to another. */
+  const compileByKind: Record<ArtifactBrief["artifact"]["kind"], (ctx: CompileContext) => ScientificObject[]> = {
+    question: (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index, index === 0 ? ctx.input.artifact.answer : undefined)),
+    "problem-set": (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index, index === 0 ? ctx.input.artifact.answer : undefined)),
+    "worked-example": (ctx) => [questionAt(ctx, 0, ctx.input.artifact.answer ?? ctx.input.artifact.prompt)],
+    deck: (ctx) => indices(ctx.input.artifact.count).map((index) => {
+      const rect = ctx.rectangles.get(`question-${index}`)!;
+      return {
+        id: newId("flashcard"), kind: "flashcard", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+        front: ctx.input.artifact.prompt, back: ctx.input.artifact.answer ?? "",
+        provenance: tagged(ctx),
+      };
+    }),
+    figure: () => [],
+  };
+
+  const ctx: CompileContext = { input, rectangles, provenance };
+  const objects: ScientificObject[] = [...compileByKind[input.artifact.kind](ctx)];
 
   const figure = input.artifact.figure;
   const figureRect = rectangles.get("figure");
@@ -225,7 +251,7 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
           x: centreX + Math.cos(angle) * radius, y: centreY + Math.sin(angle) * radius,
           width: 24, height: 24, components: [force.components[0], force.components[1], 0],
           units: "N", label: force.label,
-          provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+          provenance: tagged(ctx),
         });
       });
     } else if (figure.kind === "mindmap") {
@@ -239,26 +265,26 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
           ...input.artifact.concepts.slice(0, 6).map((concept, index) => ({ id: `c${index}`, label: concept, x: centreX + (index % 2 ? 100 : -100), y: centreY + (index - 1) * 44 })),
         ],
         edges: [],
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        provenance: tagged(ctx),
       });
     } else if (figure.kind === "vector") {
       objects.push({
         id: newId("vector"), kind: "vector", x: figureRect.x, y: figureRect.y,
         width: figureRect.width, height: figureRect.height, components: [1, 0, 0], units: "N", label: figure.title,
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        provenance: tagged(ctx),
       });
     } else if (figure.kind === "anatomy") {
       objects.push({
         id: newId("anatomy"), kind: "anatomy", x: figureRect.x, y: figureRect.y,
         width: figureRect.width, height: figureRect.height, structureId: figure.title, system: "",
         labels: input.artifact.concepts.slice(0, 8),
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        provenance: tagged(ctx),
       });
     } else {
       objects.push({
         id: newId("equation"), kind: "equation", x: figureRect.x, y: figureRect.y,
         width: figureRect.width, height: figureRect.height, expression: figure.title, variables: {},
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        provenance: tagged(ctx),
       });
     }
   }
@@ -267,8 +293,14 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   const citation = input.artifact.citationLabel ?? input.sourceRefs.join(", ") ?? "no cited source";
   const where = input.placement.relation === "clear-area" ? "the clear area" : `${input.placement.relation} your sketch`;
   const figureText = figure ? ` and 1 ${figure.kind} diagram${forceLabels.length ? ` (${forceLabels.join(", ")})` : ""}` : "";
-  const countText = `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`;
-  const description = `adds ${countText}${figureText} in ${where}, citing ${citation} — generated, not verified`;
+  const countText: Record<ArtifactBrief["artifact"]["kind"], string> = {
+    question: `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`,
+    "problem-set": `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`,
+    "worked-example": "1 worked example",
+    deck: `${input.artifact.count} flashcard${input.artifact.count === 1 ? "" : "s"}`,
+    figure: "",
+  };
+  const description = `adds ${[countText[input.artifact.kind], figureText].filter(Boolean).join(" and ")} in ${where}, citing ${citation} — generated, not verified`;
 
   return { objects, description, sourceRefs: [...input.sourceRefs], verification: "generated-unverified" };
 }
