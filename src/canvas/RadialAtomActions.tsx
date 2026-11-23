@@ -35,7 +35,7 @@ export default function RadialAtomActions({ radialAtom, onAddPair, onRemovePair,
     "radial-bond-order": onBondOrder,
     "radial-resonance": onResonance,
   };
-  return <g className="radial-actions" data-testid="radial-actions" data-atom-id={radialAtom.id}>
+  return <g className="radial-actions" data-testid="radial-actions">
     {ACTIONS.map((action) => {
       const rad = action.angle * Math.PI / 180;
       const x = Math.cos(rad) * 40, y = Math.sin(rad) * 40;

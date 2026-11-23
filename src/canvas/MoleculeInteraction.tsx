@@ -89,11 +89,13 @@ export function useMoleculeInteraction({ objects, editor, enabled, interactive, 
   const controls = (enabled || selected) && <LewisSidebar
     element={element}
     order={selectedBond?.order ?? order}
-    onElement={(next) => { setAction("atom"); setElement(next); setAtomId(undefined); setBondFrom(undefined); onActivate(); }}
-    onBondOrder={(next) => { setOrder(next); setAction("bond"); if (selectedBond) updateBond(next); }}
+    onElement={(next) => { if (selectedAtom) { updateAtom({ element: next }); setBondFrom(undefined); return; } setAction("atom"); setElement(next); setAtomId(undefined); setBondFrom(undefined); onActivate(); }}
+    onBondOrder={(next) => { setOrder(next); setAction("bond"); const bond = selectedBond ?? (selected && selectedAtom ? moleculeBonds(selected).find((item) => item.from === selectedAtom.id || item.to === selectedAtom.id) : undefined); if (selected && bond) commit(connectAtoms(selected, bond.from, bond.to, next)); }}
     onClose={() => { setBondFrom(undefined); onFinish(); }}
     onInspect={() => { if (selected) onEdit(selected.id); }}
     onFinish={() => { setBondFrom(undefined); onFinish(); }}
+    onPlace={() => { setAction("atom"); setBondFrom(undefined); onActivate(); }}
+    onConnect={() => { setAction("bond"); setBondFrom(undefined); onActivate(); }}
   />;
   const render = (molecule: ScientificMolecule) => {
     const box = moleculeBounds(molecule), zoom = editor.camera.z, selected = selectedId === molecule.id;

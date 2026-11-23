@@ -14,9 +14,11 @@ type Props = {
   onClose: () => void;
   onInspect: () => void;
   onFinish: () => void;
+  onPlace: () => void;
+  onConnect: () => void;
 };
 
-export default function LewisSidebar({ element, order, onElement, onBondOrder, onClose, onInspect, onFinish }: Props) {
+export default function LewisSidebar({ element, order, onElement, onBondOrder, onClose, onInspect, onFinish, onPlace, onConnect }: Props) {
   const [expanded, setExpanded] = useState(false);
   return <aside className="lewis-sidebar" role="toolbar" aria-label="Lewis tools">
     <div className="palette-heading"><span>LEWIS</span><button className="icon-button" aria-label="Close Lewis tools" title="Close Lewis tools" onClick={onClose}>×</button></div>
@@ -25,6 +27,6 @@ export default function LewisSidebar({ element, order, onElement, onBondOrder, o
       {expanded && <div className="bond-options" data-testid="lewis-bond-options">{ORDERS.map((value) => <button key={value} data-testid={`lewis-bond-${value}`} className={value === order ? "current" : ""} aria-label={`Bond order ${value}`} onClick={() => { onBondOrder(value); setExpanded(false); }}><span className="bond-glyph">{bondOrderGlyph(value)}</span></button>)}</div>}
     </div>
     <div className="palette-group"><h2>Elements</h2><div className="element-list">{ELEMENTS.map((item) => <button key={item} data-testid={`lewis-element-row-${item}`} className={`element-row ${item === element ? "selected" : ""}`} aria-label={`Place ${item}`} onClick={() => onElement(item)}><span className="element-chip" aria-hidden="true">{item}</span></button>)}</div></div>
-    <div className="lewis-actions"><button className="button-soft" data-testid="lewis-inspect" onClick={onInspect}>Inspect</button><button className="button-primary" data-testid="lewis-finish" onClick={onFinish}>Done</button></div>
+    <div className="lewis-actions"><button className="button-soft" data-testid="lewis-place" onClick={onPlace}>Place atoms</button><button className="button-soft" data-testid="lewis-connect" onClick={onConnect}>Connect atoms</button><button className="button-soft" data-testid="lewis-inspect" onClick={onInspect}>Inspect</button><button className="button-primary" data-testid="lewis-finish" onClick={onFinish}>Done</button></div>
   </aside>;
 }

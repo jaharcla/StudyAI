@@ -30,29 +30,32 @@ export async function selectCourseOnPage(page: Page, title: string): Promise<voi
 }
 
 export async function drawCarbonDioxide(page: Page, leaveInspectorOpen = true): Promise<void> {
+  const closeLewis = page.getByRole("button", { name: "Close Lewis tools", exact: true });
+  if (await closeLewis.isVisible()) await closeLewis.click();
   const opener = page.getByRole("button", { name: "Open canvas tools", exact: true });
   if (await opener.isVisible()) await opener.click();
   await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
   const box = (await page.locator(".canvas-board").boundingBox())!;
   const y = box.y + 200, left = box.x + 280;
   for (const [index, element] of ["O", "C", "O"].entries()) {
-    await page.getByRole("combobox", { name: "Placement element", exact: true }).selectOption(element);
+    await page.getByTestId(`lewis-element-row-${element}`).click();
     await page.mouse.click(left + index * 80, y);
   }
-  await page.getByRole("button", { name: "Connect atoms", exact: true }).click();
-  await page.getByRole("combobox", { name: "Drawing bond order", exact: true }).selectOption("2");
+  await page.getByTestId("lewis-connect").click();
+  await page.getByTestId("lewis-bond-row-toggle").click();
+  await page.getByTestId("lewis-bond-2").click();
   await page.locator('[data-element="O"] .atom-hit').first().click();
   await page.locator('[data-element="C"] .atom-hit').click();
   await page.locator('[data-element="C"] .atom-hit').click();
   await page.locator('[data-element="O"] .atom-hit').last().click();
-  await page.getByRole("button", { name: "Place atoms", exact: true }).click();
+  await page.getByTestId("lewis-place").click();
   for (const oxygen of [page.locator('[data-element="O"] .atom-hit').first(), page.locator('[data-element="O"] .atom-hit').last()]) {
     await oxygen.click();
-    await page.getByRole("button", { name: "Add lone pair", exact: true }).click();
-    await page.getByRole("button", { name: "Add lone pair", exact: true }).click();
+    await page.getByTestId("radial-add-pair").click();
+    await page.getByTestId("radial-add-pair").click();
   }
-  await page.getByRole("button", { name: "Finish molecule", exact: true }).click();
-  await page.getByRole("button", { name: "Inspect molecule", exact: true }).click();
+  await page.getByTestId("lewis-finish").click();
+  await page.getByTestId("lewis-inspect").click();
   await page.getByLabel("Molecule name", { exact: true }).fill("Carbon dioxide");
   if (!leaveInspectorOpen) await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
 }
