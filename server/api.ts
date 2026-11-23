@@ -13,6 +13,8 @@ import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { getCourseProgress } from "./progress.js";
 import { createLearningHandler } from "./learning/http.js";
+import { createStudioHandler } from "./studio/http.js";
+import { initializeStudioSchema } from "./studio/schema.js";
 import { LearningActivityService } from "./learning/activities/service.js";
 import { createLearningActivityHandler } from "./learning/activities/http.js";
 import { createCanvasAnalysisHandler } from "./canvas-analysis/http.js";
@@ -41,6 +43,7 @@ function rejectUntrustedRequest(req: import("node:http").IncomingMessage): strin
 configureProviderBudgetDatabase(db);
 configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
+initializeStudioSchema(db);
 initializeCanvasAnalysisStorage(db);
 const legacyDocuments = await migrateLegacyDocuments(db);
 if (legacyDocuments.failures.length) console.warn("Legacy document indexing failures:", legacyDocuments.failures);
@@ -48,6 +51,7 @@ const json = (res: import("node:http").ServerResponse, status: number, data: unk
 const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYAI_DOCUMENTS);
 const learningService = new LearningService(db);
 const learningHandler = createLearningHandler(learningService, config.webOrigin);
+const studioHandler = createStudioHandler(db, learningService, config.webOrigin);
 const activityService = new LearningActivityService(db, learningService);
 const activityHandler = createLearningActivityHandler(activityService, config.webOrigin);
 const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
@@ -62,6 +66,7 @@ const server = createServer(async (req, res) => {
   if (untrusted) return json(res, 403, { error: untrusted });
   if (await activityHandler(req, res)) return;
   if (await learningHandler(req, res)) return;
+  if (await studioHandler(req, res)) return;
   if (await documentHandler(req, res)) return;
   if (await canvasRecognitionHandler(req, res)) return;
   if (await canvasPersistenceHandler(req, res)) return;
