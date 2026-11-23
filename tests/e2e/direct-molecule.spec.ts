@@ -18,18 +18,19 @@ test("places atoms, connects bonds, edits lone pairs/charges, moves atoms, conve
   const atom = molecule.locator('[data-element="O"]').first();
   expect(await atom.getAttribute("data-charge")).toBe("0");
   await atom.locator(".atom-hit").click();
-  await page.getByRole("button", { name: "Remove lone pair", exact: true }).click();
+  await page.getByTestId("radial-remove-pair").click();
   await expect(atom).toHaveAttribute("data-charge", "2");
-  await page.getByRole("button", { name: "Add lone pair", exact: true }).click();
+  await page.getByTestId("radial-add-pair").click();
   await expect(atom).toHaveAttribute("data-charge", "0");
   const atomId = await atom.getAttribute("data-atom-id");
-  await page.getByRole("combobox", { name: "Selected atom element", exact: true }).selectOption("N");
+  await page.getByTestId("lewis-element-row-N").click();
   await expect(page.locator(`[data-atom-id="${atomId}"]`)).toHaveAttribute("data-charge", "-1");
-  await page.getByRole("combobox", { name: "Selected atom element", exact: true }).selectOption("O");
+  await page.getByTestId("lewis-element-row-O").click();
   for (const order of [3, 1, 2]) {
-    // The bond hit target is a transparent, often zero-height SVG line.
-    await molecule.locator("[data-bond-id] .science-hit").first().dblclick({ force: true });
-    await expect(molecule.locator("[data-bond-id]").first()).toHaveAttribute("data-order", String(order));
+    await molecule.locator("[data-bond-id] .science-hit").first().click({ force: true });
+    await page.getByTestId("lewis-bond-row-toggle").click();
+    await page.getByTestId(`lewis-bond-${order}`).click();
+    await expect.poll(async () => molecule.locator("[data-bond-id]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-order")))).toContain(String(order));
   }
   const bondIds = await molecule.locator("[data-bond-id]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-bond-id")));
   const old = (await atom.locator(".atom-hit").boundingBox())!;

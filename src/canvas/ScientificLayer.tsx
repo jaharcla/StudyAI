@@ -86,7 +86,7 @@ export function ScientificLayer({ objects, editor, mode, placementPatch, selecte
   };
   const visible = resolveScene({ version: 1, snapshot: editor.store.getSnapshot(), objects: preview ?? molecule.preview ?? objects }).objects;
   const origin = editor.pageToScreen(0, 0), zoom = editor.camera.z;
-  return <>{molecule.controls}<svg ref={svg} className="scientific-layer" data-testid="scientific-layer" onPointerDownCapture={(event) => { if (mode && mode !== "molecule") begin(event); }} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
+  return <>{molecule.controls}{molecule.radial}<svg ref={svg} className="scientific-layer" data-testid="scientific-layer" onPointerDownCapture={(event) => { if (mode && mode !== "molecule") begin(event); }} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
     <defs><marker id="science-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="context-stroke" /></marker></defs>
     {mode && mode !== "molecule" && interactive && <rect className="science-placement-surface" width="100%" height="100%" fill="transparent" />}
     <g transform={`translate(${origin.x} ${origin.y}) scale(${zoom})`}>
