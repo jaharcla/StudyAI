@@ -74,6 +74,15 @@ it("binds author_board only when the client action is present and returns the to
   expect(mocks.invoke).toHaveBeenCalledTimes(1);
 });
 
+it("keeps author_board bound when a keyword route names a different canvas tool", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("A short answer."));
+  const allCanvasActions = [...actions, ...[
+    "propose_scientific_object", "propose_canvas_action", "get_canvas_state", "describe_canvas", "propose_canvas_edit",
+  ].map((name) => ({ name }))];
+  await graph.invoke({ copilotkit: { context, actions: allCanvasActions }, messages: [new HumanMessage("make me a question with a diagram")] });
+  expect(boundToolNames()).toContain("author_board");
+});
+
 it("does not bind author_board without the frontend action", async () => {
   mocks.invoke.mockResolvedValue(new AIMessage("A short answer."));
   await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Hello")] });

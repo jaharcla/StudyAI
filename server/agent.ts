@@ -279,6 +279,9 @@ async function tutor(state: typeof State.State, config?: unknown) {
     const candidates = toolsForProvider(provider);
     if (!recommendedTools.length) return candidates;
     const selected = candidates.filter((tool) => recommendedTools.includes(tool.name));
+    // author_board is the one composite authoring verb. A keyword route naming a lower-level tool
+    // must never make the verb unavailable — the model decides which tool fits the request.
+    if (authorBoard && !selected.includes(authorBoard)) selected.push(authorBoard);
     if (selected.some((tool) => ["propose_canvas_action", "propose_canvas_edit", "propose_scientific_object", "author_board"].includes(tool.name))) {
       for (const name of ["get_canvas_state", "describe_canvas"]) {
         const companion = candidates.find((tool) => tool.name === name);
