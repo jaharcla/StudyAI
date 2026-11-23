@@ -37,6 +37,22 @@ describe("compileSlideDeck", () => {
     }
   });
 
+  it("places each source citation immediately after its own claim", () => {
+    const secondRef = "studyai://document/module-1/text/5?chunk=0";
+    const twoClaims: SlideDeckComponent = {
+      ...component,
+      slides: [{
+        ...component.slides[1],
+        claims: [
+          ...component.slides[1].claims ?? [],
+          { claim: "Normal force is perpendicular.", sourceRef: secondRef, excerpt: "Normal force is perpendicular.", relationship: "direct" },
+        ],
+      }],
+    };
+    const markdown = compileSlideDeck(twoClaims, findDeckTemplate("general-en")).slides_markdown[0];
+    expect(markdown).toContain(`- Friction opposes motion.\n> Source: ${REF}\n- Normal force is perpendicular.\n> Source: ${secondRef}`);
+  });
+
   it("extracts visual intents without a query for diagrams", () => {
     const plan = imagePlan(component);
     expect(plan).toEqual([{

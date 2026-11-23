@@ -21,8 +21,8 @@ export type ImageIntent = {
 
 function slideMarkdown(slide: SlideDeckSlide): string {
   const lines = [`# ${slide.title}`];
-  for (const claim of slide.claims) lines.push(`- ${claim.claim}`);
   for (const claim of slide.claims) {
+    lines.push(`- ${claim.claim}`);
     if (claim.relationship === "direct") lines.push(`> Source: ${claim.sourceRef}`);
   }
   if (slide.notes) lines.push(`> Notes: ${slide.notes}`);
