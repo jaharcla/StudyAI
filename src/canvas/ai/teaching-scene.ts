@@ -47,7 +47,7 @@ const GAP_Y = 90;
 const CAPTION_WIDTH = 600;
 const CAPTION_HEIGHT = 40;
 /** Same working frame the tutor's canvas context uses, so placement and description agree. */
-const DEFAULT_VIEWPORT = { x: 0, y: 0, width: 4_000, height: 3_000 };
+export const DEFAULT_VIEWPORT = { x: 0, y: 0, width: 4_000, height: 3_000 };
 
 /**
  * Compiles a semantic teaching scene into the existing, review-gated shape action batch.
@@ -153,6 +153,10 @@ export const artifactBriefSchema = z.object({
         units: z.string().min(1).max(40).optional(),
         label: z.string().max(120).optional(),
       }).optional(),
+      context: z.object({
+        surfaceAngleDeg: z.number().min(-180).max(180).optional(),
+        motionDirectionDeg: z.number().min(-180).max(180).optional(),
+      }).strict().optional(),
     }).optional(),
   }).strict(),
   placement: z.object({
@@ -307,7 +311,7 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
           { id: "root", label: figure.title, x: centreX, y: centreY },
           ...input.artifact.concepts.slice(0, 6).map((concept, index) => ({ id: `c${index}`, label: concept, x: centreX + (index % 2 ? 100 : -100), y: centreY + (index - 1) * 44 })),
         ],
-        edges: [],
+        edges: input.artifact.concepts.slice(0, 6).map((_, index) => ({ from: "root", to: `c${index}` })),
         provenance: tagged(ctx),
       });
     } else if (figure.kind === "graph") {

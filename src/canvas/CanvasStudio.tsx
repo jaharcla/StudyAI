@@ -78,6 +78,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [shapeProposal, setShapeProposal] = useState<ShapeProposal>();
   const [artifactProposal, setArtifactProposal] = useState<ArtifactBriefProposal>();
+  const [artifactError, setArtifactError] = useState<string | null>(null);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -156,10 +157,14 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
         occupancy: [...(store ? boardOccupancy(store) : []), ...objectOccupancy(documentRef.current.objects)],
         viewport, anchors,
       }, input);
+      setArtifactError(null);
       setArtifactProposal(proposal);
       return { status: "pending_user_review", proposalId: proposal.id, description: proposal.description, requiresConfirmation: true };
     } catch (error) {
-      return { status: "rejected", error: error instanceof Error ? error.message : "Invalid board artifact." };
+      const message = error instanceof Error ? error.message : "Invalid board artifact.";
+      setArtifactError(message);
+      setArtifactProposal(undefined);
+      return { status: "rejected", error: message };
     }
   }, [courseId, lessonId]);
 
@@ -825,6 +830,11 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       void applyQuickdrawProposal();
     }}>{proposalBusy ? "Saving approved proposalâ€¦" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
     {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>{objectProposal.reason}</strong><p>Add {objectProposal.object.kind} object</p><pre>{JSON.stringify(objectProposal.object, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved objectâ€¦" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
+    {artifactError && <section className="canvas-proposal" role="alert" aria-label="Board artifact problem" data-testid="board-artifact-problem">
+      <strong>Board artifact needs correction</strong>
+      <pre>{artifactError}</pre>
+      <button className="button-soft" data-testid="dismiss-artifact-problem" onClick={() => setArtifactError(null)}>Dismiss</button>
+    </section>}
     {artifactProposal && <section className="canvas-proposal" role="region" aria-label="Board artifact proposal" data-testid="board-artifact-proposal">
       <strong>Review board artifact</strong>
       <p>{artifactProposal.description}</p>
