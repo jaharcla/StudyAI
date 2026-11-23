@@ -155,12 +155,12 @@ export default function MissionControl() {
             <tr>
               <td><Circle size={10} className="status" /></td>
               <td>Added new vector</td>
-              <td>5 min ago</td>
+              <td>5 min ago</td>
             </tr>
             <tr>
               <td><CheckCircle size={10} className="status" /></td>
               <td>Completed quiz</td>
-              <td>1 hr ago</td>
+              <td>1 hr ago</td>
             </tr>
           </tbody>
         </table>
@@ -218,3 +218,4 @@ export default function MissionControl() {
     </div>
   );
 }
+

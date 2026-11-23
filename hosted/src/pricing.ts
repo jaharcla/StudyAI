@@ -1,11 +1,11 @@
 /**
  * Compute the cost in integer micros for a given model and token usage.
  *
- * All prices are pinned to Groq's published per‑million‑token rates for the
- * `openai/gpt-oss-120b` model. The rates are expressed in micros (1 µ = 10⁻⁶ USD).
+ * All prices are pinned to Groq's published per-million-token rates for the
+ * `openai/gpt-oss-120b` model. The rates are expressed in micros (1 u = 10-6 USD).
  *
- * Input tokens: 0.15 USD per 1 M tokens → 150 000 µ per 1 M tokens.
- * Output tokens: 0.60 USD per 1 M tokens → 600 000 µ per 1 M tokens.
+ * Input tokens: 0.15 USD per 1 M tokens -> 150 000 u per 1 M tokens.
+ * Output tokens: 0.60 USD per 1 M tokens -> 600 000 u per 1 M tokens.
  *
  * The calculation uses integer arithmetic and rounds **up** each component
  * separately (i.e. Math.ceil) before summing, matching the brief's specification.
@@ -15,7 +15,7 @@ export function costMicros(
   promptTokens: number,
   completionTokens: number,
 ): number {
-  // Supported model rates (micros per 1 M tokens)
+  // Supported model rates (micros per 1 M tokens)
   const rates: Record<string, { input: number; output: number }> = {
     "openai/gpt-oss-120b": { input: 150_000, output: 600_000 },
   };
@@ -29,3 +29,4 @@ export function costMicros(
   const outputCost = Math.ceil((completionTokens * rate.output) / 1_000_000);
   return inputCost + outputCost;
 }
+
