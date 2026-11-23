@@ -1,0 +1,47 @@
+{
+  "checkpoint": "vcmf/dim0",
+  "scenarios": [
+    {
+      "id": "user-edit-during-agent-work",
+      "setup": "Agent proposes a batch against revision N; a user edit bumps the board to N+1 before apply.",
+      "actions": ["propose", "user-mutation", "apply"],
+      "expectation": "approval rejected as stale; displayed board matches persisted board"
+    },
+    {
+      "id": "agent-edit-of-changed-element",
+      "setup": "Agent reads shape S at revision N, then targets S after another actor changed it.",
+      "actions": ["read-shape", "external-mutation", "apply-update"],
+      "expectation": "fingerprint mismatch rejects the update"
+    },
+    {
+      "id": "two-agent-operations-same-object",
+      "setup": "Two agent operations target the same shape concurrently.",
+      "actions": ["propose-A", "propose-B", "apply-A", "apply-B"],
+      "expectation": "exactly one applied; second rejected as stale"
+    },
+    {
+      "id": "duplicated-operation-replay",
+      "setup": "An already-applied operation is replayed verbatim.",
+      "actions": ["apply", "replay"],
+      "expectation": "replay classified as duplicate; no second mutation"
+    },
+    {
+      "id": "cross-board-target",
+      "setup": "An operation carrying boardId B is applied while board A is active.",
+      "actions": ["propose-cross-board", "apply"],
+      "expectation": "rejected before any mutation"
+    },
+    {
+      "id": "crash-between-persist-and-broadcast",
+      "setup": "Mutation is persisted but the process stops before broadcasting.",
+      "actions": ["persist", "crash", "restart", "reconnect"],
+      "expectation": "reconnect loads persisted state; no lost acknowledged write"
+    },
+    {
+      "id": "reconnect-after-missed-changes",
+      "setup": "Client disconnects, several mutations occur, then it reconnects.",
+      "actions": ["disconnect", "mutate-x3", "reconnect", "render"],
+      "expectation": "displayed canvas equals persisted state; no duplicate application"
+    }
+  ]
+}
