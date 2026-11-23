@@ -159,6 +159,12 @@ export function geminiBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   return (env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "");
 }
 
+export function cloudOCRTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = Number(env.CANVAS_OCR_TIMEOUT_MS || 30_000);
+  if (!Number.isFinite(raw) || raw <= 0) return 30_000;
+  return Math.min(60_000, Math.max(1_000, Math.floor(raw)));
+}
+
 export function geminiModel(env: NodeJS.ProcessEnv = process.env): string {
   return env.CANVAS_GEMINI_MODEL || env.GEMINI_MODEL || "gemini-3.1-flash-lite";
 }

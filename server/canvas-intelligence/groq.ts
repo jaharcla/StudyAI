@@ -6,6 +6,7 @@ import { isProviderCircuitOpen, recordProviderFailure, recordProviderSuccess, re
 import {
   canvasInferenceMode,
   canvasOCRMode,
+  cloudOCRTimeoutMs,
   diagramOCRModelFor,
   geminiBaseUrl,
   geminiModel,
@@ -246,6 +247,7 @@ export async function canvasOCR(input: { base64: string; mimeType?: string; mode
         apiKey: cloudApiKey(provider),
         model,
         provider,
+        timeoutMs: cloudOCRTimeoutMs(),
         headers: cloudHeaders(provider),
         system,
         prompt,

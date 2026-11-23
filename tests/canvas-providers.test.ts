@@ -4,7 +4,7 @@ import { z } from "zod";
 import { canvasInferenceJson, canvasOCR, consumeProviderFallbacks, resetProviderFallbacks } from "../server/canvas-intelligence/groq.js";
 import { allowProviderRequest, configureProviderBudgetDatabase, providerBudgetRemaining, providerBudgetSnapshot, resetProviderBudgetsForTests } from "../server/canvas-intelligence/provider-budget.js";
 import { configureProviderUsageDatabase, consumeProviderUsage, persistedProviderUsageSnapshot, providerCircuitSnapshot, providerUsageSnapshot, recordProviderBackoff, recordProviderFailure, recordProviderSuccess, recordProviderUsage, resetProviderCircuitsForTests, resetProviderUsageForTests } from "../server/canvas-intelligence/provider-usage.js";
-import { providerChain, resolveCompletionProviders, resolveVisionProviders } from "../server/canvas-intelligence/providers.js";
+import { cloudOCRTimeoutMs, providerChain, resolveCompletionProviders, resolveVisionProviders } from "../server/canvas-intelligence/providers.js";
 
 const schema = z.object({ value: z.string() });
 const options = { model: "local:test", system: "Return JSON.", prompt: "Return {value:string}." };
@@ -122,6 +122,39 @@ describe("canvas provider chain", () => {
     expect(system).toContain("\\sigma");
     expect(system).toMatch(/ambiguous/i);
   });
+
+  it("reads and clamps the cloud OCR timeout from configuration", () => {
+    expect(cloudOCRTimeoutMs({} as NodeJS.ProcessEnv)).toBe(30_000);
+    expect(cloudOCRTimeoutMs({ CANVAS_OCR_TIMEOUT_MS: "45000" } as NodeJS.ProcessEnv)).toBe(45_000);
+    expect(cloudOCRTimeoutMs({ CANVAS_OCR_TIMEOUT_MS: "1" } as NodeJS.ProcessEnv)).toBe(1_000);
+    expect(cloudOCRTimeoutMs({ CANVAS_OCR_TIMEOUT_MS: "999999" } as NodeJS.ProcessEnv)).toBe(60_000);
+    expect(cloudOCRTimeoutMs({ CANVAS_OCR_TIMEOUT_MS: "abc" } as NodeJS.ProcessEnv)).toBe(30_000);
+  });
+
+  it("aborts a hung cloud OCR request at the configured timeout and falls back", async () => {
+    vi.stubEnv("CANVAS_OCR_PROVIDER", "auto");
+    vi.stubEnv("CANVAS_PROVIDER_CHAIN", "openrouter,groq");
+    vi.stubEnv("CANVAS_OCR_TIMEOUT_MS", "1000");
+    const urls: string[] = [];
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+      urls.push(String(url));
+      if (String(url).includes("openrouter")) {
+        return await new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        });
+      }
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ items: [{ text: "F/N", kind: "symbol", confidence: null, alternatives: [] }], uncertain: false }) } }] });
+    }) as typeof fetch;
+
+    const started = Date.now();
+    const result = await canvasOCR({ base64: "aW1hZ2U=", mimeType: "image/png", fetcher });
+    const elapsed = Date.now() - started;
+    expect(result.items[0]).toMatchObject({ text: "F/N" });
+    expect(elapsed).toBeLessThan(5_000);
+    expect(urls.some((url) => url.includes("openrouter"))).toBe(true);
+    expect(urls.some((url) => url.includes("api.groq.com"))).toBe(true);
+  });
+
 
   it("uses the Groq OCR model rather than an Ollama model name", async () => {
     vi.stubEnv("CANVAS_OCR_PROVIDER", "groq");
