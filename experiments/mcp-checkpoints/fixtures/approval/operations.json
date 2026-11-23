@@ -1,0 +1,81 @@
+{
+  "checkpoints": ["excalidraw/excalidraw-mcp", "MCP Elicitation 2025-06-18", "OpenAI Agents SDK HITL"],
+  "operations": [
+    {
+      "id": "get-canvas-state",
+      "tool": "get_canvas_state",
+      "class": "read-only",
+      "advertisedReadOnly": true,
+      "expectedApproval": false,
+      "notes": "Read-only native shape summary"
+    },
+    {
+      "id": "describe-canvas",
+      "tool": "describe_canvas",
+      "class": "read-only",
+      "advertisedReadOnly": true,
+      "expectedApproval": false,
+      "notes": "Plain-text revision-bound scene summary"
+    },
+    {
+      "id": "read-me-equivalent",
+      "tool": "read_design_guide",
+      "class": "read-only",
+      "advertisedReadOnly": true,
+      "expectedApproval": false,
+      "notes": "Upstream #112 analogue: a plain read must not demand approval"
+    },
+    {
+      "id": "select-shapes",
+      "tool": "propose_canvas_action/selectShapes",
+      "class": "reversible",
+      "advertisedReadOnly": false,
+      "expectedApproval": true,
+      "notes": "Changes selection only; still inside the review gate"
+    },
+    {
+      "id": "create-shape",
+      "tool": "propose_canvas_action/createShape",
+      "class": "consequential",
+      "advertisedReadOnly": false,
+      "expectedApproval": true,
+      "notes": "Mutates board on apply"
+    },
+    {
+      "id": "delete-shape",
+      "tool": "propose_canvas_action/deleteShape",
+      "class": "consequential",
+      "advertisedReadOnly": false,
+      "expectedApproval": true,
+      "notes": "Destructive; requiresConfirmation forced"
+    },
+    {
+      "id": "scientific-object",
+      "tool": "propose_scientific_object",
+      "class": "consequential",
+      "advertisedReadOnly": false,
+      "expectedApproval": true,
+      "notes": "Separate validated approval path"
+    }
+  ],
+  "negative_tests": [
+    {
+      "id": "upstream-111",
+      "source": "excalidraw/excalidraw-mcp issue #111",
+      "condition": "tool persists caller-addressable state but advertises readOnlyHint true",
+      "encodedAs": "approval.test.ts: e2"
+    },
+    {
+      "id": "upstream-112",
+      "source": "excalidraw/excalidraw-mcp issue #112",
+      "condition": "plain read without readOnlyHint triggers approval prompts",
+      "encodedAs": "approval.test.ts: e1"
+    },
+    {
+      "id": "upstream-115",
+      "source": "excalidraw/excalidraw-mcp issue #115",
+      "condition": "documented input format produces null bindings",
+      "encodedAs": "approval.test.ts: e5"
+    }
+  ]
+}
