@@ -18,6 +18,7 @@ import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
 import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
 import { artifactBriefSchema } from "./ai/teaching-scene";
+import { ArtifactValidationError } from "../artifacts/contracts";
 import { boardOccupancy } from "./ai/canvas-context";
 import { objectOccupancy, type LayoutRect } from "./ai/layout";
 import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
@@ -162,7 +163,10 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       return { status: "pending_user_review", proposalId: proposal.id, description: proposal.description, requiresConfirmation: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invalid board artifact.";
-      setArtifactError(message);
+      // The tool result keeps the JSON report for the model; the student-facing panel shows prose only.
+      setArtifactError(error instanceof ArtifactValidationError
+        ? error.report.problems.map((problem) => `${problem.validator}: ${problem.message}`).join("\n")
+        : message);
       setArtifactProposal(undefined);
       return { status: "rejected", error: message };
     }

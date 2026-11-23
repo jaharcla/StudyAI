@@ -370,7 +370,7 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   const forceLabels = figure?.forces?.map((force) => force.label) ?? [];
   const citation = input.artifact.citationLabel ?? input.sourceRefs.join(", ") ?? "no cited source";
   const where = input.placement.relation === "clear-area" ? "the clear area" : `${input.placement.relation} your sketch`;
-  const figureText = figure ? ` and 1 ${figure.kind} diagram${forceLabels.length ? ` (${forceLabels.join(", ")})` : ""}` : "";
+  const figureText = figure ? `1 ${figure.kind} diagram${forceLabels.length ? ` (${forceLabels.join(", ")})` : ""}` : "";
   const countText: Record<ArtifactBrief["artifact"]["kind"], string> = {
     question: `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`,
     "problem-set": `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`,

@@ -261,6 +261,22 @@ describe("real graph and vector figures", () => {
   });
 });
 
+describe("artifact descriptions", () => {
+  it("describes a figure brief without a dangling 'and'", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "graph", title: "y = x^2", expression: "x^2", xRange: [-2, 2] },
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    expect(compiled.description).toMatch(/^adds 1 graph diagram in /);
+    expect(compiled.description).not.toMatch(/adds\s+and /i);
+    expect(compiled.description).toContain("Module 1 · p. 4");
+  });
+});
+
 describe("ArtifactBrief proposal", () => {
   const context = { boardId: "board-a", courseId: "chem-120", lessonId: "lesson-03", revision: 7, objects: [] as ScientificObject[] };
 

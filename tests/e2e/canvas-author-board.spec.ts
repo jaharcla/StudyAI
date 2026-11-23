@@ -132,7 +132,9 @@ test("an invalid brief is reported structurally and leaves the saved board byte-
 
   const problem = page.getByTestId("board-artifact-problem");
   await expect(problem).toBeVisible();
-  await expect(problem).toContainText("force-diagram");
+  await expect(problem).toContainText("force-diagram:");
+  await expect(problem).not.toContainText("componentId");
+  await expect(problem).not.toContainText("force-00000000-0000-0000-0000-000000000000");
   await expect(page.getByTestId("board-artifact-proposal")).toHaveCount(0);
 
   const after = await readSaved();
