@@ -15,8 +15,13 @@ test("Canvas analysis is sent only after an explicit user action", async ({ page
     const boardId = url.pathname.split("/").at(-2)!;
     const payload = route.request().postDataJSON() as Record<string, any>;
     submitted.push({ url: url.toString(), payload });
-    const boardResponse = await page.request.get(`/api/canvases/${encodeURIComponent(boardId)}?course=${encodeURIComponent(course.id)}&lesson=${encodeURIComponent(lesson.id)}`);
-    const row = await boardResponse.json() as { id: string; course_id: string; lesson_id: string; revision: number; document: string };
+    const fetchRow = () => page.request.get(`/api/canvases/${encodeURIComponent(boardId)}?course=${encodeURIComponent(course.id)}&lesson=${encodeURIComponent(lesson.id)}`).then((response) => response.json()) as Promise<{ id: string; course_id: string; lesson_id: string; revision: number; document: string }>;
+    let row = await fetchRow();
+    for (let attempt = 0; attempt < 10 && typeof row?.document !== "string"; attempt++) {
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+      row = await fetchRow();
+    }
+    if (typeof row?.document !== "string") throw new Error(`board ${boardId} was not persisted before analysis (row: ${JSON.stringify(row).slice(0, 120)})`);
     const savedDocument = JSON.parse(row.document);
     const canvasInput = normalizeCanvasInput({ boardId: row.id, courseId: row.course_id, lessonId: row.lesson_id, snapshot: savedDocument.snapshot, scientificObjects: savedDocument.objects, selectedIds: payload.selectedIds, image: payload.image });
     const ocr = OCRResultSchema.parse({ items: [], uncertain: false, raw: "" });

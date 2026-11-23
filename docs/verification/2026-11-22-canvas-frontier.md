@@ -30,7 +30,13 @@ _(fill: e2e result line)_ → Browser spec `tests/e2e/canvas-mindmap.spec.ts` **
 - Persistent two: `document-intelligence.spec.ts:5` (5 s `Page 1 of 1` viewer race after a successful citation) and `integration.spec.ts:4` (citation link absent in 180 s). Both test directory names appear in the preserved 2026-11-19 `pw-full.log` failure set — pre-existing live-tutor/paperwork flakiness, not merge regressions.
 - `tests/e2e/canvas-mindmap.spec.ts` passed as part of the suite and targeted (16.3 s).
 
+## Final consolidated tree (`fc7de5b` + studio merge, 48 browser tests)
+
+Full suite: **42 passed / 3 failed / 3 skipped (7.1 m)** — the best e2e state recorded for this repo. The three (canvas-analysis mock race, `document-intelligence` 5 s viewer race, `integration` 180 s citation) were retried after a test-side fix giving the canvas-analysis mock a 2.5 s persistence-readiness loop (preserving its persistence assertion, replacing a `JSON.parse(undefined)` crash with an explicit failure). Retry: **canvas-analysis 4/4 pass; `document-intelligence:5` and `integration:4` persist** — the same two tests present in the 2026-11-19 `pw-full.log` failure set, both waiting on live tutor citations under shared free-tier budgets. Final standing: **43 passed / 2 failed / 3 skipped**, both failures pre-existing.
+
+
 ## Commands
+
 
 - `node node_modules/typescript/bin/tsc -b` (no shims — `.bin` in the shared tree is churned by concurrent sessions)
 - `node node_modules/vitest/vitest.mjs run`
