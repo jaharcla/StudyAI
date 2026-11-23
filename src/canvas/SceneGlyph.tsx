@@ -24,6 +24,19 @@ export function SceneGlyph({ object, onOpenNote, onOpenDocument }: { object: Sci
     return <g className="scene-atom" transform={`translate(${object.x} ${object.y})`}><circle r="22" /><text textAnchor="middle" y="7" fontSize="24">{object.element}</text><text x="20" y="-20" fontSize="12">{charge === 0 ? "" : charge > 0 ? `+${charge}` : charge}</text></g>;
   }
   if (object.kind === "equation") return <g className="scene-equation" transform={`translate(${object.x - object.width / 2} ${object.y})`}><text fontSize="20">{object.expression}</text><text y="25" fontSize="13">{object.evaluationError ?? (object.result === undefined ? "Evaluating…" : `= ${Number(object.result.toPrecision(8))} ${object.units ?? ""}`)}</text></g>;
+  if (object.kind === "mindmap") {
+    const byId = new Map(object.nodes.map((node) => [node.id, node]));
+    const clip = (value: string) => value.length > 20 ? `${value.slice(0, 19)}…` : value;
+    return <g className="scene-mindmap" data-testid="mindmap-root" transform={`translate(${object.x} ${object.y})`}>
+      <title>{object.title}</title>
+      {object.edges.map((edge, index) => {
+        const from = byId.get(edge.from), to = byId.get(edge.to);
+        if (!from || !to) return null;
+        return <line key={`${edge.from}->${edge.to}-${index}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} className="mindmap-edge" />;
+      })}
+      {object.nodes.map((node) => <g key={node.id} data-testid={`mindmap-node-${node.id}`} transform={`translate(${node.x} ${node.y})`}><rect className="mindmap-node-box" x={-70} y={-21} width={140} height={42} rx={12} /><text textAnchor="middle" y={5}>{clip(node.label)}</text></g>)}
+    </g>;
+  }
   let title = objectTitle(object), body = "";
   if (object.kind === "concept") body = object.definition;
   if (object.kind === "linked-note" || object.kind === "linked-document") body = object.excerpt;
