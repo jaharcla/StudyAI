@@ -69,6 +69,8 @@ describe("compileSlideDeck", () => {
     expect(markdown).toContain("y = 30");
     expect(markdown).toContain("30 + 30 = 60");
     expect(markdown).toContain("8*30 + 12*30 = 600");
+    expect(markdown).toContain("| 30 | 30 | 30 |");
+    expect(markdown).toContain("Plot two lines on an x-y plane");
   });
 
   it("extracts visual intents without a query for diagrams", () => {

@@ -1,6 +1,6 @@
 import type { SlideDeckComponent, SlideDeckSlide } from "../../src/artifacts/package";
 import type { DeckTemplate } from "./templates";
-import { explainSolution } from "./math";
+import { chartTable, explainSolution } from "./math";
 
 export type PresentonGenerateRequest = {
   content: string;
@@ -26,6 +26,11 @@ function slideMarkdown(slide: SlideDeckSlide): string {
     const solved = explainSolution(slide.math.equations, slide.math.variables);
     for (const step of solved.steps) lines.push(`- ${step}`);
     for (const check of solved.checks) lines.push(`- Check: ${check}`);
+    const table = chartTable(slide.math.equations, slide.math.variables);
+    if (table.length) {
+      lines.push("> Chart instruction: Plot two lines on an x-y plane using the numeric table below. Label axes x and y, label each line with its equation, and mark the intersection.");
+      lines.push(...table);
+    }
     if (slide.notes) lines.push(`> Notes: ${slide.notes}`);
     return lines.join("\n");
   }

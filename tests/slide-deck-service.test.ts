@@ -24,7 +24,8 @@ function setup(texts: string[]) {
   const renderer = vi.fn(async () => ({ presentationId: `p${index}`, pptxPath: `p${index}/final.pptx`, editPath: "/e" }));
   const readDeckText = vi.fn(async () => texts[index++] ?? texts[texts.length - 1]);
   const ground = vi.fn(() => grounding);
-  return { db, renderer, readDeckText, ground, deps: { renderer, readDeckText, ground } };
+  const inspect = vi.fn(async (_presentationId: string): Promise<Array<Record<string, unknown>>> => []);
+  return { db, renderer, readDeckText, ground, inspect, deps: { renderer, readDeckText, ground, inspect } };
 }
 
 describe("generateSlideDeck", () => {
@@ -48,12 +49,19 @@ describe("generateSlideDeck", () => {
   it("normalizes symbol-font glyphs from course evidence", async () => {
     const cleanText = `# Friction\n# Notes\n- For ν ≥ ν₀, electrons were ejected.\n> Source: ${REF}`;
     const { db, deps } = setup([cleanText]);
-    deps.ground = () => ({
+    deps.ground = vi.fn(() => ({
       ...grounding,
       sources: [{ ...grounding.sources[0], excerpt: "For    o , electrons were ejected." }],
-    });
+    }));
     const artifact = await generateSlideDeck(db, input, deps);
     expect(artifact.content.slides[1].claims[0].claim).toBe("For ν ≥ ν₀, electrons were ejected.");
+  });
+
+  it("fails generation when the rendered deck contains truncated fields", async () => {
+    const { db, deps } = setup([goodText]);
+    deps.inspect = vi.fn(async () => [{ title: "Solving Linked Models by", body: "This method is useful in bioenginee" }]);
+    await expect(generateSlideDeck(db, input, deps)).rejects.toThrow(/validation failed/i);
+    expect(listSlideDecks(db, "chem-120")).toHaveLength(0);
   });
 
   it("refuses to store a deck that fails after the one allowed repair", async () => {

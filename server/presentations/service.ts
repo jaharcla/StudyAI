@@ -5,7 +5,7 @@ import { findDeckTemplate } from "./templates";
 import { compileSlideDeck, type PresentonGenerateRequest } from "./compile";
 import type { RenderedDeck } from "./renderer";
 import { sanitizeCourseText } from "./sanitize";
-import { validateDeckText } from "./validate";
+import { validateDeckText, validateRenderedSlides } from "./validate";
 import { decideRepair } from "./repair";
 import { initializeStudioSchema } from "../studio/schema";
 import { buildGrounding } from "../studio/grounding";
@@ -36,6 +36,7 @@ export type SlideDeckDeps = {
   renderer: (request: PresentonGenerateRequest) => Promise<RenderedDeck>;
   readDeckText: (path: string) => Promise<string>;
   ground?: (db: Database.Database, courseId: string, lessonId: string, focus: string) => Grounding;
+  inspect?: (presentationId: string) => Promise<Array<Record<string, unknown>>>;
 };
 
 type Row = {
@@ -109,6 +110,11 @@ export async function generateSlideDeck(db: Database.Database, rawInput: unknown
     rendered = await deps.renderer(request);
     const text = await deps.readDeckText(rendered.pptxPath);
     const report = validateDeckText(text, component, new Map(component.slides.flatMap((slide) => slide.claims.map((claim) => [claim.sourceRef, claim.excerpt] as const))));
+    if (deps.inspect) {
+      const renderedSlides = await deps.inspect(rendered.presentationId);
+      report.problems.push(...validateRenderedSlides(renderedSlides).problems);
+      report.ok = report.problems.length === 0;
+    }
     const decision = decideRepair(report, generation);
     if (report.ok) break;
     if (!decision.needsRepair) throw new Error("Deck validation failed after repair.");

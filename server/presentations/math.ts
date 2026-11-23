@@ -95,6 +95,29 @@ function substitutionSteps(equations: string[], variables: string[], solution: R
   return steps;
 }
 
+/** Markdown table of sampled points for two linear equations in x and y. */
+export function chartTable(equations: string[], variables: string[]): string[] {
+  if (variables.length !== 2 || equations.length === 0) return [];
+  const [x, y] = variables;
+  const lines = equations.map((equation) => {
+    const { row, rhs } = parseEquation(equation, variables);
+    const [a, b] = row;
+    if (b === 0) return null;
+    const label = a === 1 && b === 1 && rhs > 0
+      ? `${y} = ${rhs} - ${x}`
+      : `${y} = (${rhs} - ${a}${x})/${b}`;
+    return { label, value: (sample: number) => (rhs - a * sample) / b };
+  }).filter((line): line is { label: string; value: (n: number) => number } => line !== null);
+  if (lines.length !== equations.length) return [];
+
+  const format = (value: number) => (Math.abs(value - Math.round(value)) < 1e-9 ? String(Math.round(value)) : value.toFixed(2));
+  const rows = [`| x | ${lines.map((line) => line.label).join(" | ")} |`, "| ---: | ---: | ---: |"];
+  for (let sample = 0; sample <= 60; sample += 6) {
+    rows.push(`| ${sample} | ${lines.map((line) => format(line.value(sample))).join(" | ")} |`);
+  }
+  return rows;
+}
+
 /** Deterministic linear-system solver plus human-readable steps and verification. */
 export function explainSolution(equations: string[], variablesInput?: string[]): LinearSystem {
   const variables = variablesInput ?? [...new Set(equations.join(" ").match(/[a-zA-Z]/g) ?? [])].sort();

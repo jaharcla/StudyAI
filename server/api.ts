@@ -57,12 +57,28 @@ const learningService = new LearningService(db);
 const learningHandler = createLearningHandler(learningService, config.webOrigin);
 const studioHandler = createStudioHandler(db, learningService, config.webOrigin);
 const artifactsDir = artifactDataDir();
+const presentonBase = process.env.PRESENTON_URL ?? "http://127.0.0.1:5001";
+const presentonKey = process.env.PRESENTON_API_KEY ?? "";
 const slideDeckHandler = createSlideDeckHandler(db, {
   renderer: (request) => renderPresentonDeck(request, {
     fetch,
-    baseUrl: process.env.PRESENTON_URL ?? "http://127.0.0.1:5001",
-    apiKey: process.env.PRESENTON_API_KEY ?? "",
+    baseUrl: presentonBase,
+    apiKey: presentonKey,
   }),
+  inspect: async (presentationId) => {
+    const response = await fetch(`${presentonBase.replace(/\/$/, "")}/api/v1/ppt/presentation/${encodeURIComponent(presentationId)}`, {
+      headers: { Authorization: `Bearer ${presentonKey}` },
+    });
+    if (!response.ok) throw new Error(`Presenton inspection failed (${response.status})`);
+    const payload = await response.json() as { slides?: Array<Record<string, unknown>> };
+    return (payload.slides ?? []).map((slide) => {
+      const content = slide.content;
+      const fields: Record<string, unknown> = content && typeof content === "object" && !Array.isArray(content)
+        ? Object.fromEntries(Object.entries(content as Record<string, unknown>).filter(([, value]) => typeof value === "string"))
+        : {};
+      return { ...slide, ...fields };
+    });
+  },
   readDeckText: async (pptxPath) => {
     const bytes = await readFile(resolve(artifactsDir, pptxPath));
     const document = await extractDocument("deck.pptx", new Uint8Array(bytes));

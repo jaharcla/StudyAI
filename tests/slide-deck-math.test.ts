@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { explainSolution } from "../server/presentations/math";
+import { chartTable, explainSolution } from "../server/presentations/math";
 
 describe("explainSolution", () => {
   it("produces substitution steps and a verified 2-variable solution", () => {
@@ -18,6 +18,12 @@ describe("explainSolution", () => {
     expect(result.solution).toEqual({ x: 18, y: 26, z: 16 });
     expect(result.checks).toContain("18 + 26 + 16 = 60");
     expect(result.checks).toContain("8*18 + 12*26 + 9*16 = 600");
+  });
+
+  it("produces numeric chart data whose lines intersect at the solution", () => {
+    const table = chartTable(["x + y = 60", "8x + 12y = 600"], ["x", "y"]);
+    expect(table.join("\n")).toContain("| x | y = 60 - x | y = (600 - 8x)/12 |");
+    expect(table.join("\n")).toContain("| 30 | 30 | 30 |");
   });
 
   it("rejects an inconsistent system", () => {

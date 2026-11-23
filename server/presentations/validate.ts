@@ -5,6 +5,32 @@ export type DeckValidationReport = ValidationReport & { preserve: string[] };
 
 const PLACEHOLDER = /TODO|lorem ipsum|Click to add title/i;
 const SOURCE_LINE = /^>\s*Source:\s*(\S+)\s*$/;
+const DANGLING = new Set(["a", "an", "the", "of", "to", "in", "on", "with", "for", "by", "and", "or", "as", "at", "from", "is", "are", "be"]);
+const BODY_FIELD = /body|copy|description|text|paragraph/i;
+const TYPOS: Record<string, string> = { substituion: "substitution" };
+
+/** Checks fields produced by the presentation renderer, not the semantic spec. */
+export function validateRenderedSlides(slides: readonly Record<string, unknown>[]): ValidationReport {
+  const problems: ValidationProblem[] = [];
+  slides.forEach((slide, index) => {
+    const slideId = `slide-${index + 1}`;
+    for (const [key, value] of Object.entries(slide)) {
+      if (typeof value !== "string" || !value.trim()) continue;
+      const text = value.trim();
+      const lastWord = text.split(/\s+/).at(-1)?.toLowerCase().replace(/[^a-z]/g, "") ?? "";
+      const truncated = /[,;/:-]$/.test(text) || DANGLING.has(lastWord) || (BODY_FIELD.test(key) && !/[.!?✓]$/.test(text));
+      if (truncated) {
+        problems.push(problem(slideId, "rendered-truncation", `${key} appears truncated: "${text.slice(-60)}".`, `Rewrite ${key} as a complete sentence with terminal punctuation.`));
+      }
+      for (const [wrong, right] of Object.entries(TYPOS)) {
+        if (new RegExp(`\\b${wrong}\\b`, "i").test(text)) {
+          problems.push(problem(slideId, "rendered-spelling", `${key} contains "${wrong}".`, `Replace with "${right}".`));
+        }
+      }
+    }
+  });
+  return { ok: problems.length === 0, problems };
+}
 
 function problem(componentId: string, validator: string, message: string, requestedCorrection: string): ValidationProblem {
   return { componentId, validator, message, requestedCorrection };
