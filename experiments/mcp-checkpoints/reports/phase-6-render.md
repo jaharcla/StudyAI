@@ -33,7 +33,7 @@ Results:
 
 So for this scene and the pinned node renderer, repeat render and snapshot restore were byte-identical. This **reproduces locally** the upstream claim from the earlier research; it is not a claim about every scene or the browser renderer.
 
-Notable behavior: in-memory state reported 8 elements, while `export` produced 14 elements (bound labels materialized as separate text elements). `import --replace` loaded 14, and `snapshot restore v1` returned to 8. The render hash was unaffected. This is an export-normalization detail worth remembering for any interoperability work.
+Notable behavior: in-memory state reported 8 elements, while `export` produced 14 (verified by parsing the exported JSON: 3 rectangles, 1 diamond, 4 arrows, 6 text elements). The difference is consistent with labels being materialized as separate text elements on export, but that mapping was **not** separately verified. `import --replace` loaded 14, and `snapshot restore v1` returned to 8. The render hash was unaffected. This is an export-normalization detail worth remembering for any interoperability work.
 
 ### Real StudyAI tests
 

@@ -37,7 +37,7 @@ Clones are shallow, blobless; PaddleOCR is sparse-checked-out to `mcp_server/` o
 ```
 npx --yes vitest@3.2.7 run --config experiments/mcp-checkpoints/harness/vitest.config.ts experiments/mcp-checkpoints/harness/src/evidence.test.ts
 ```
-- RED: `Cannot find module './evidence' imported from evidence.test.ts` (2026-11-23 12:51:29 UTC-ish, vitest 3.2.7).
+- RED: `Cannot find module './evidence' imported from evidence.test.ts` (vitest "Start at 12:51:29" local time, 2026-11-23, vitest 3.2.7).
 - GREEN after implementing `evidence.ts`: `Test Files 1 passed (1); Tests 1 passed (1)`.
 - The test writes a real evidence JSON under `experiments/mcp-checkpoints/evidence/phase-0/phase-0/` and verifies path, content and SHA-256.
 
