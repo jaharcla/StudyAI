@@ -3,16 +3,12 @@ import { expect, test } from "@playwright/test";
 type ChartWindow = Window & { __studyaiVegaChart?: (args: unknown) => void };
 
 const fixture = {
-  spec: {
-    $schema: "https://vega.github.io/schema/vega-lite/v6.json",
-    mark: "bar",
-    encoding: {
-      x: { field: "category", type: "nominal" },
-      y: { field: "value", type: "quantitative" },
-    },
-    data: { name: "table" },
-  },
-  data: { table: [{ category: "A", value: 10 }, { category: "B", value: 20 }] },
+  mark: "bar",
+  xField: "category",
+  yField: "value",
+  xType: "nominal",
+  yType: "quantitative",
+  data: [{ category: "A", value: 10 }, { category: "B", value: 20 }],
 };
 
 test("show_vegalite_chart renders a real svg chart in the chat DOM", async ({ page }) => {

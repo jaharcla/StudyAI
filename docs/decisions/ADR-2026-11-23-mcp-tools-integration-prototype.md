@@ -30,6 +30,8 @@ The tools are registered in `server/mcp-tools.ts`, wired into `server/agent.ts`,
 ## Limits carried into the integration
 
 - Wolfram is stateless: no definitions carry between calls.
+- `@langchain/ollama@1.0.2` serializes an assistant message with string content as `{role:"assistant", content:""}` and drops its `tool_calls`. The agent now emits a `tool_use` content block before the follow-up invocation so the second Ollama request keeps the call/result pairing. Without this, the model answered from memory despite tools being executed.
+- The chart tool deliberately accepts simple chart parameters (mark, field names, row array) rather than a raw Vega-Lite document; a 0.8B local model could not reliably produce nested JSON. The app builds and compiles the spec. Model-supplied field names that are absent from the rows are resolved from the first row's keys.
 - Wolfram output is capped at roughly 10,000 characters by the service; `normalizeWolframText` adds a second 12,000-character guard and discloses the omitted middle.
 - Wolfram failures arrive as message text (`Plot::argrx`) with `isError` unset; `normalizeWolframText` detects that and maps it to `ok:false`.
 - The Vega MCP server accepts malformed specs; `normalizeVegaSpec` compiles locally and also checks that every referenced named data source has rows.
@@ -43,6 +45,7 @@ The tools are registered in `server/mcp-tools.ts`, wired into `server/agent.ts`,
 - `npx vitest run tests/mcp-tools.test.ts` — 7 passed.
 - `npx playwright test --config playwright.spike.config.ts` — 1 passed; asserts a real SVG renders in the chat DOM.
 - `npx tsx scripts/smoke-mcp-tools.ts` — live calls to both Wolfram tools and the Vega tool succeeded.
+- `npx tsx scripts/agent-tool-selection.ts` with local `qwen3.5:0.8b` — 4/4 cases selected the expected tool (or none for a greeting); the chart call produced a valid compiled spec after field resolution. The tiny model called the chart tool three times for one request; that repetition is a model behaviour, not a server constraint.
 - GitNexus `detect_changes` before commit — 0 changed symbols, no partial/truncated. The index is 96 commits behind HEAD; that staleness is recorded rather than ignored.
 
 ## What is deliberately not done

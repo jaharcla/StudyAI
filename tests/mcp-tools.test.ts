@@ -1,22 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { normalizeVegaSpec, normalizeWolframText } from "../server/mcp-tools";
-import { referencedDataNames, vegaChartSchema } from "../src/charts/vega-contract";
+import { buildChartSpec, resolveChartFields, vegaChartSchema } from "../src/charts/vega-contract";
 
-const bar = {
-  mark: "bar",
-  encoding: { x: { field: "category", type: "nominal" }, y: { field: "value", type: "quantitative" } },
-  data: { name: "table" },
-};
+const rows = [{ category: "A", value: 10 }, { category: "B", value: 20 }];
+const chartArgs = () => vegaChartSchema.parse({ xField: "category", yField: "value", data: rows });
 
 describe("normalizeWolframText", () => {
   it("keeps a normal result unchanged", () => {
-    const result = normalizeWolframText("Out[1]= 1/3");
-    expect(result).toEqual({ result: "Out[1]= 1/3", truncated: false, hasMessage: false });
+    expect(normalizeWolframText("Out[1]= 1/3")).toEqual({ result: "Out[1]= 1/3", truncated: false, hasMessage: false });
   });
 
   it("detects a Wolfram message as a failed computation", () => {
-    const result = normalizeWolframText("Plot::argrx: Plot called with 0 arguments.");
-    expect(result.hasMessage).toBe(true);
+    expect(normalizeWolframText("Plot::argrx: Plot called with 0 arguments.").hasMessage).toBe(true);
   });
 
   it("bounds a large result and marks the omitted middle", () => {
@@ -27,26 +22,31 @@ describe("normalizeWolframText", () => {
   });
 });
 
-describe("referencedDataNames", () => {
-  it("finds named sources inside layers", () => {
-    expect(referencedDataNames({ layer: [{ data: { name: "points" } }, { data: { name: "line" } }] }).sort()).toEqual(["line", "points"]);
-  });
-});
-
-describe("normalizeVegaSpec", () => {
-  it("accepts a valid spec with matching data", () => {
-    const args = vegaChartSchema.parse({ spec: bar, data: { table: [{ category: "A", value: 1 }] } });
-    expect(normalizeVegaSpec(args).ok).toBe(true);
+describe("chart contract", () => {
+  it("builds a Vega-Lite spec from simple chart parameters", () => {
+    const spec = buildChartSpec(chartArgs());
+    expect(spec).toMatchObject({
+      mark: "bar",
+      encoding: { x: { field: "category", type: "nominal" }, y: { field: "value", type: "quantitative" } },
+      data: { name: "table" },
+    });
   });
 
-  it("rejects a malformed mark that the MCP server would accept", () => {
-    const args = vegaChartSchema.parse({ spec: { ...bar, mark: "banana" }, data: { table: [] } });
-    expect(normalizeVegaSpec(args).ok).toBe(false);
+  it("accepts valid chart parameters", () => {
+    expect(normalizeVegaSpec(chartArgs()).ok).toBe(true);
   });
 
-  it("rejects a named source with no supplied rows", () => {
-    const args = vegaChartSchema.parse({ spec: bar, data: {} });
-    expect(normalizeVegaSpec(args)).toMatchObject({ ok: false });
-    expect(normalizeVegaSpec(args).error).toContain("table");
+  it("rejects a row array that is empty", () => {
+    expect(() => vegaChartSchema.parse({ xField: "category", yField: "value", data: [] })).toThrow();
+  });
+
+  it("rejects a mark outside the published set", () => {
+    expect(() => vegaChartSchema.parse({ mark: "banana", xField: "category", yField: "value", data: rows })).toThrow();
+  });
+
+  it("resolves model-supplied field names from the actual row keys", () => {
+    const resolved = resolveChartFields(vegaChartSchema.parse({ xField: "A", yField: "B", data: rows }));
+    expect([resolved.xField, resolved.yField]).toEqual(["category", "value"]);
+    expect([resolved.xType, resolved.yType]).toEqual(["nominal", "quantitative"]);
   });
 });

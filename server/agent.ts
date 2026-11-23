@@ -259,7 +259,8 @@ async function tutor(state: typeof State.State, config?: unknown) {
     "Canvas geometry uses the Cartesian Y-up convention even though screen Y increases downward: a line's angleFromHorizontalDegrees and a vector's angleDegrees are signed from the +x axis (positive above horizontal, negative below), computed from exact endpoints. To find the angle between two directions, take the absolute difference of their signed angles and reduce it to the range 0 to 180 degrees. Never subtract the magnitudes of two absolute angle labels, never mix a screen-Y direction with a Cartesian component angle, and prefer endpoint-derived signed angles over a rounded angle label written on the drawing. " +
     "When an active learning activity is supplied, use its server-validated task, source and canvas revision. Treat checker outcomes as authoritative, describe the learner's response as observed evidence, do not infer a misconception from a single answer, and never change or regrade saved work. Any canvas edit still requires the existing user approval. Tools have exact names; JSON is a format, never a tool. Never call a tool named json; put JSON values inside the arguments of a named tool. " +
     (externalToolsEnabled
-      ? "wolfram_compute and wolfram_alpha return exact external computations or curated data: use them when the answer needs symbolic algebra, calculus, matrix algebra, units, or authoritative scientific data, and say the result comes from Wolfram. A Wolfram result ending in an error message means the computation failed; do not present it as an answer. show_vegalite_chart renders an interactive chart in the chat from a Vega-Lite v6 spec plus named data rows; use it when a visualization would help the student explore data, and pass row data explicitly rather than remote URLs. "
+      ? "TOOL RULE: If the user asks for an exact computation, symbolic algebra, calculus, a curated scientific value, or a chart, you MUST call the matching tool before you answer. If the user names a tool, call it. Never answer those requests from memory. " +
+        "wolfram_compute and wolfram_alpha return exact external computations or curated data: use them when the answer needs symbolic algebra, calculus, matrix algebra, units, or authoritative scientific data, and say the result comes from Wolfram. A Wolfram result ending in an error message means the computation failed; do not present it as an answer. show_vegalite_chart renders an interactive chart in the chat from a mark, field names, and an array of row objects; use it when a visualization would help the student explore data. "
       : "") + toolGuide;
   // Only an actual match belongs in the frame. The "no matching excerpts" envelope is ~120
   // characters of nothing, paid on every question that finds no course text.
@@ -394,7 +395,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     }
   };
 
-  const executableTools = new Map<string, { name: string; invoke(input: any): Promise<any> }>([...executableBaseTools, ...(run.provider !== "ollama" ? [factCheckTool] : [])].map((item) => [item.name, item] as [string, { name: string; invoke(input: any): Promise<any> }]));
+  const executableTools = new Map<string, { name: string; invoke(input: any): Promise<any> }>([...executableBaseTools, ...wolframTools, ...(vegaChart ? [vegaChart] : []), ...(run.provider !== "ollama" ? [factCheckTool] : [])].map((item) => [item.name, item] as [string, { name: string; invoke(input: any): Promise<any> }]));
   for (let iteration = 0; iteration < 2 && response.tool_calls?.length; iteration++) {
     if ([canvasTool, quickdrawActions, quickdrawRead, canvasSceneRead, canvasInkRead, canvasEvidenceSearch, canvasObjectCreate, moleculeTool, canvasDescribe, canvasDesignGuide, teachingScene, authorBoard].some((tool) => tool && (response.tool_calls ?? []).some((call) => call.name === tool.name))) {
       canvasToolProposed = true;
@@ -425,6 +426,15 @@ async function tutor(state: typeof State.State, config?: unknown) {
       toolMessages.push(new ToolMessage({ content: result, tool_call_id: callId }));
     }
     if (!toolMessages.length) break;
+    if (run.provider === "ollama" && response.tool_calls?.length) {
+      // @langchain/ollama@1.0.2 serializes an assistant message with string
+      // content as {role:"assistant", content:""}, dropping tool_calls. A
+      // tool_use content block makes its converter emit them for the follow-up.
+      const blocks: Array<{ type: string; text?: string; name?: string; args?: unknown; id?: string }> = [];
+      if (typeof response.content === "string" && response.content) blocks.push({ type: "text", text: response.content });
+      for (const call of response.tool_calls) blocks.push({ type: "tool_use", name: call.name, args: call.args, id: call.id });
+      response.content = blocks as typeof response.content;
+    }
     history.push(response, ...toolMessages);
     try { response = await invoke(history); }
     catch (error) { logTutorContextOverflow(error); return failureResult(activeScope, scopeStart, classifyModelFailure(error), run); }

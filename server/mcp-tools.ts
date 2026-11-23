@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { compile, type TopLevelSpec } from "vega-lite";
 import { z } from "zod";
-import { referencedDataNames, vegaChartSchema } from "../src/charts/vega-contract.js";
+import { buildChartSpec, CHART_DATASET, resolveChartFields, vegaChartSchema } from "../src/charts/vega-contract.js";
 
 // Prototype integration for the two tools evaluated in spike/mcp-tools.
 // Enabled only when STUDYAI_EXTERNAL_MCP_TOOLS=1 so the default tutor path and
@@ -72,16 +72,13 @@ export function createWolframTools() {
 }
 
 export function normalizeVegaSpec(args: z.infer<typeof vegaChartSchema>): { ok: boolean; error?: string } {
-  // compile() validates the grammar; the MCP server itself does not.
-  // TopLevelSpec is a large union, so the JSON-shaped zod input is asserted after
-  // schema validation rather than copied field by field into a second type.
+  // The built spec is compiled locally before it reaches the renderer: this is
+  // the guard the upstream Vega MCP server omits.
   try {
-    compile(args.spec as unknown as TopLevelSpec);
+    compile(buildChartSpec(args) as unknown as TopLevelSpec);
   } catch (error) {
-    return { ok: false, error: `Invalid Vega-Lite spec: ${error instanceof Error ? error.message : String(error)}` };
+    return { ok: false, error: `Invalid chart: ${error instanceof Error ? error.message : String(error)}` };
   }
-  const missing = referencedDataNames(args.spec).filter((name) => !(name in args.data));
-  if (missing.length) return { ok: false, error: `Missing data rows for: ${missing.join(", ")}` };
   return { ok: true };
 }
 
@@ -89,12 +86,18 @@ export function createVegaChartTool() {
   return tool(async (input) => {
     const parsed = vegaChartSchema.safeParse(input);
     if (!parsed.success) return JSON.stringify({ status: "error", error: "Invalid chart arguments." });
-    const checked = normalizeVegaSpec(parsed.data);
+    const args = resolveChartFields(parsed.data);
+    const checked = normalizeVegaSpec(args);
     if (!checked.ok) return JSON.stringify({ status: "error", error: checked.error });
-    return JSON.stringify({ status: "ok", spec: parsed.data.spec, data: parsed.data.data, renderer: "chat" });
+    return JSON.stringify({
+      status: "ok",
+      spec: buildChartSpec(args),
+      data: { [CHART_DATASET]: args.data },
+      renderer: "chat",
+    });
   }, {
     name: "show_vegalite_chart",
-    description: "Render an interactive chart from a Vega-Lite v6 spec. Use for data the student can explore: plotted functions, vectors over time, experimental results. Pass data as named row arrays in `data` and reference them with `data:{name:'table'}` in the spec; never use remote data URLs. The chat panel renders the chart from these arguments. The spec is compiled locally before it is accepted.",
+    description: "Render an interactive chart in the chat. Supply chart parameters, not a Vega spec: choose a mark (bar, line, point or area), give xField and yField matching keys in your rows, set xType/yType, and pass data as an array of row objects such as [{\"category\":\"A\",\"value\":10}]. Use this for plotted functions, vectors over time or experimental results. Values are supplied by the call; no remote data is fetched.",
     schema: vegaChartSchema,
   });
 }

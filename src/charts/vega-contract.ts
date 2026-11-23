@@ -1,33 +1,48 @@
 import { z } from "zod";
 
-// One contract shared by the server tool and the chat renderer.
-// Data is passed separately from the spec, mirroring the Vega MCP server's
-// contract, so the spec stays readable and no remote URL is ever fetched.
-const rows = z.array(z.record(z.string(), z.unknown()));
+// One contract shared by the server tool and the chat renderer. The model
+// supplies chart parameters, not a nested Vega-Lite document: a small local
+// model reliably picks fields and rows but not a large nested JSON spec.
+const fieldType = z.enum(["nominal", "ordinal", "quantitative", "temporal"]);
 
 export const vegaChartSchema = z.object({
-  spec: z.record(z.string(), z.unknown()),
-  data: z.record(z.string(), rows).default({}),
+  mark: z.enum(["bar", "line", "point", "area"]).default("bar"),
+  title: z.string().trim().min(1).max(160).optional(),
+  xField: z.string().trim().min(1).max(80),
+  yField: z.string().trim().min(1).max(80),
+  xType: fieldType.default("nominal"),
+  yType: fieldType.default("quantitative"),
+  data: z.array(z.record(z.string(), z.unknown())).min(1).max(200),
 }).strict();
 
 export type VegaChartArgs = z.infer<typeof vegaChartSchema>;
 
-export function referencedDataNames(spec: Record<string, unknown>): string[] {
-  const names = new Set<string>();
-  const visit = (value: unknown, depth: number) => {
-    if (depth > 6 || value === null || typeof value !== "object") return;
-    if (Array.isArray(value)) {
-      for (const item of value) visit(item, depth + 1);
-      return;
-    }
-    const record = value as Record<string, unknown>;
-    const source = record.data;
-    if (source && typeof source === "object" && !Array.isArray(source)) {
-      const name = (source as Record<string, unknown>).name;
-      if (typeof name === "string" && name.length > 0 && name.length <= 120) names.add(name);
-    }
-    for (const item of Object.values(record)) visit(item, depth + 1);
+export const CHART_DATASET = "table";
+
+// A small model often names fields after the question (e.g. "A", "B") rather
+// than the row keys it supplied. Resolve them from the data instead of
+// rejecting the call, and infer a sane type from the first row's values.
+export function resolveChartFields(args: VegaChartArgs): VegaChartArgs {
+  const keys = Object.keys(args.data[0] ?? {});
+  if (keys.length === 0) return args;
+  const infer = (field: string, fallback: VegaChartArgs["xType"]): VegaChartArgs["xType"] => {
+    const value = args.data[0]?.[field];
+    return typeof value === "number" ? "quantitative" : value === undefined ? fallback : "nominal";
   };
-  visit(spec, 0);
-  return [...names];
+  const xField = keys.includes(args.xField) ? args.xField : keys[0];
+  const yField = keys.includes(args.yField) ? args.yField : (keys.find((key) => key !== xField) ?? xField);
+  return { ...args, xField, yField, xType: infer(xField, args.xType), yType: infer(yField, args.yType) };
+}
+
+export function buildChartSpec(args: VegaChartArgs) {
+  return {
+    $schema: "https://vega.github.io/schema/vega-lite/v6.json",
+    mark: args.mark,
+    ...(args.title ? { title: args.title } : {}),
+    encoding: {
+      x: { field: args.xField, type: args.xType },
+      y: { field: args.yField, type: args.yType },
+    },
+    data: { name: CHART_DATASET },
+  };
 }
