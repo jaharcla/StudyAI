@@ -32,6 +32,10 @@ Notes:
 - Fixture boards still below exact (unchanged by this item): nested logistic
   0.625 and partial-derivative fraction 0.833; PhysAlign OCR is `A E / N`
   instead of `F/N` (items 10 and 11).
+- Superseded 2026-11-22: nested logistic now scores 0.875 (μ/σ reads correctly;
+  the residual is prime/≡/σ-subscript marks, not the μ/σ ambiguity); PhysAlign
+  reads `F/N` after `fcbc3a1`, coverage 0.875–1.000. Items 10–11 are closed
+  with evidence in `docs/verification/2026-11-22-nested-logistic-ocr.md`.
 
 ## Item 2 — Isolate and commit the phases 0–4 checkpoint
 
@@ -107,6 +111,7 @@ Verification:
 
 - A first full `vitest` run reported 4 SQLite-backed suites as collection errors (`STACK_TRACE_ERROR`); each passed in isolation and the full re-run was green, so it was parallel-run flake, not a code regression.
 - Observed but not fixed (out of scope for this item): `CanvasGridSpatialIndex.insert` only adds nodes to the grid after `linearThreshold` is exceeded, so on boards larger than 256 nodes the first 256 inserted nodes remain in `nodes` but never enter `cells` and are invisible to `query`. Affects `buildCanvasSceneGraph` only when a board exceeds 256 source nodes. Timing was unaffected; a backfill-on-threshold-crossing fix plus a test is worth its own item.
+- **Superseded 2026-11-22:** that blind spot was fixed by commit `7c29d78` (grid backfill on threshold crossing, recall test in `tests/canvas-scene.test.ts`). Do not re-open it.
 
 ## Item 6 — Run the scene index benchmark and tune cell size / overflow
 
@@ -162,6 +167,7 @@ Measured on this machine, 2026-11-19, branch `codex/whole-board-scene-experiment
 
 - p50 **20,280 ms**, p95 **106,663 ms**, average 44,012 ms.
 - Target deep p95 < 15 s: **missed** (p95 is 7.1x over; even p50 is 1.35x over).
+- **Superseded 2026-11-22:** the timeout-dominated tail is bounded by commit `d380c9c` (`CANVAS_OCR_TIMEOUT_MS`, default 30 s per OCR request; retries can still serialize — see `docs/decisions/2026-11-22-canvas-deep-latency.md`). Post-change measurement: p50 9.8–12.7 s, p95 15.3–17.8 s; the 15 s p95 target remains an accepted external-provider limit.
 - With 7 samples the nearest-rank p95 is the max board, so one slow board sets the gate. The two slow boards (106.7 s, 95.7 s) finished with `warnings: []` and no errors: the time is provider response time (Groq completions of 3.5k-4.5k tokens plus Gemini OCR), not a local pipeline fault or retry storm. Provider latency is external and variable; item 1 already saw a run where two 60 s OCR timeouts pushed average latency to 23.8 s.
 - Scope: measures OCR crop rendering + `understandCanvas` end to end in the server pipeline. Loopback HTTP transport and client rendering are not included, consistent with how the gate has always been measured.
 
