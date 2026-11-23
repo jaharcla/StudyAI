@@ -1,0 +1,271 @@
+import { randomUUID } from "node:crypto";
+import type Database from "better-sqlite3";
+import { z } from "zod";
+import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
+import { createTutorChatModel } from "../tutor-chat-model.js";
+import { getTutorProviderSettings, tutorModelForProvider } from "../tutor-provider.js";
+import { LearningService } from "../learning/service.js";
+import { buildGrounding } from "./grounding.js";
+import { initializeStudioSchema } from "./schema.js";
+import {
+  GenerateSchema, type GenerateInput, type ImportInput, type StudioArtifact, type StudioContent,
+  type StudioKind, type StudioSource,
+} from "./contracts.js";
+
+const MindMapOutput = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  nodes: z.array(z.object({
+    id: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(200),
+    parentId: z.string().trim().min(1).max(80).nullable().optional(),
+    detail: z.string().trim().max(1200).optional(),
+    sourceRef: z.string().trim().min(1).optional(),
+  })).min(2).max(30),
+});
+
+const GuideOutput = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  overview: z.string().trim().max(2000).optional(),
+  sections: z.array(z.object({
+    heading: z.string().trim().min(1).max(200),
+    body: z.string().trim().min(1).max(4000),
+    sourceRefs: z.array(z.string().trim().min(1)).max(8),
+  })).min(2).max(8),
+  keyTerms: z.array(z.object({
+    term: z.string().trim().min(1).max(160),
+    definition: z.string().trim().min(1).max(1000),
+    sourceRef: z.string().trim().min(1),
+  })).max(12).optional(),
+});
+
+const PracticeOutput = z.object({
+  cards: z.array(z.object({
+    front: z.string().trim().min(1).max(1000),
+    back: z.string().trim().min(1).max(2000),
+    concept: z.string().trim().min(1).max(160),
+    sourceRef: z.string().trim().min(1),
+  })).max(8),
+  questions: z.array(z.object({
+    concept: z.string().trim().min(1).max(160),
+    prompt: z.string().trim().min(1).max(2000),
+    choices: z.array(z.object({ id: z.string().trim().min(1).max(20), text: z.string().trim().min(1).max(500) })).min(2).max(6),
+    correctChoice: z.string().trim().min(1),
+    explanation: z.string().trim().min(1).max(2000),
+    sourceRef: z.string().trim().min(1),
+  })).max(8),
+});
+
+export type StudioGenerator = (args: { system: string; user: string; input: GenerateInput }) => Promise<unknown>;
+
+const LABELS: Record<StudioKind, string> = { "mind-map": "Mind map", "study-guide": "Study guide", practice: "Practice" };
+
+/**
+ * Generates one provenance-bound artifact. Every emitted citation must be a ref that came from
+ * the grounding packet; the server rewrites document IDs and pages from its own source map, so a
+ * model cannot invent a citation. `generator` is injectable for deterministic tests.
+ */
+export async function generateStudioArtifact(
+  db: Database.Database,
+  rawInput: unknown,
+  generator?: StudioGenerator,
+): Promise<StudioArtifact> {
+  initializeStudioSchema(db);
+  const input = GenerateSchema.parse(rawInput);
+  const grounding = buildGrounding(db, input.courseId, input.lessonId, input.focus);
+  if (!grounding.sources.length && !grounding.concepts.length && !grounding.canvas.length) {
+    throw new Error("No course sources, concepts or canvas knowledge are available for this lesson yet.");
+  }
+
+  const system = [
+    "You are StudyAI Studio, a careful study assistant inside a local-first learning app.",
+    "Return ONLY one JSON object. No prose, no Markdown fences.",
+    "Use the supplied courseSources, concepts and canvasKnowledge as your only factual grounding.",
+    "Every item MUST carry a sourceRef copied EXACTLY from a supplied courseSources ref (studyai://...).",
+    "Never invent a ref, document ID, page number, or quote.",
+    "Mind-map nodes may cite a supplied canvas: ref from canvasKnowledge; study guides and practice require studyai:// refs.",
+    "Prefer the student's own concepts and canvas labels where they fit; do not overclaim.",
+    "If the material is insufficient for the requested number of items, return fewer honest items.",
+    "Keep wording concise and suitable for a university student. Use LaTeX in $...$ for equations.",
+  ].join(" ");
+
+  const user = JSON.stringify({
+    task: input.kind,
+    focus: grounding.focus,
+    requestedCount: input.count,
+    practiceType: input.practiceType,
+    grounding: grounding.packet,
+    outputShape: input.kind === "mind-map"
+      ? '{"title":string,"nodes":[{"id":string,"label":string,"parentId":string|null,"detail"?:string,"sourceRef":string}]}'
+      : input.kind === "study-guide"
+        ? '{"title":string,"overview":string,"sections":[{"heading":string,"body":string,"sourceRefs":string[]}],"keyTerms":[{"term":string,"definition":string,"sourceRef":string}]}'
+        : '{"cards":[{"front":string,"back":string,"concept":string,"sourceRef":string}],"questions":[{"concept":string,"prompt":string,"choices":[{"id":string,"text":string}],"correctChoice":string,"explanation":string,"sourceRef":string}]}',
+  });
+
+  const raw = generator
+    ? await generator({ system, user, input })
+    : await invokeModel(system, user);
+  const content = validateContent(input.kind, raw, grounding.sources, input.count, input.practiceType, grounding.canvas.map((node) => node.ref));
+  const refs = [...new Set(collectRefs(content))];
+  const title = "title" in content && content.title ? content.title : `${LABELS[input.kind]} · ${input.focus}`;
+
+  const artifact: StudioArtifact = {
+    id: randomUUID(),
+    courseId: input.courseId,
+    lessonId: input.lessonId,
+    kind: input.kind,
+    title: title.slice(0, 200),
+    content,
+    sourceRefs: refs,
+    createdAt: new Date().toISOString(),
+  };
+  db.prepare("INSERT INTO studio_artifacts(id,course_id,lesson_id,kind,title,content,source_refs,created_at) VALUES(?,?,?,?,?,?,?,?)")
+    .run(artifact.id, artifact.courseId, artifact.lessonId, artifact.kind, artifact.title, JSON.stringify(content), JSON.stringify(refs), artifact.createdAt);
+  return artifact;
+}
+
+export function getStudioArtifact(db: Database.Database, id: string, courseId: string, lessonId?: string): StudioArtifact | undefined {
+  initializeStudioSchema(db);
+  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt FROM studio_artifacts WHERE id=? AND course_id=?")
+    .get(id, courseId) as Omit<StudioArtifact, "content" | "sourceRefs"> & { content: string; sourceRefs: string } | undefined;
+  if (!row || (lessonId && row.lessonId !== lessonId)) return undefined;
+  return { ...row, content: JSON.parse(row.content) as StudioContent, sourceRefs: JSON.parse(row.sourceRefs) as string[] };
+}
+
+export function listStudioArtifacts(db: Database.Database, courseId: string, lessonId?: string, kind?: StudioKind): StudioArtifact[] {
+  initializeStudioSchema(db);
+  const rows = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt FROM studio_artifacts WHERE course_id=? AND (?='' OR lesson_id=?) AND (?='' OR kind=?) ORDER BY created_at DESC LIMIT 20")
+    .all(courseId, lessonId ?? "", lessonId ?? "", kind ?? "", kind ?? "") as Array<Omit<StudioArtifact, "content" | "sourceRefs"> & { content: string; sourceRefs: string }>;
+  return rows.map((row) => ({ ...row, content: JSON.parse(row.content) as StudioContent, sourceRefs: JSON.parse(row.sourceRefs) as string[] }));
+}
+
+/** Imports accepted practice items through the existing learning authority (BKT + FSRS). */
+export function importStudioArtifact(db: Database.Database, learning: LearningService, rawInput: unknown): { cardsAdded: number; questionsAdded: number; errors: string[] } {
+  initializeStudioSchema(db);
+  const input: ImportInput = z.object({
+    artifactId: z.string().min(1),
+    cards: z.array(z.number().int().nonnegative()).max(8).optional().default([]),
+    questions: z.array(z.number().int().nonnegative()).max(8).optional().default([]),
+  }).strict().parse(rawInput);
+
+  const row = db.prepare("SELECT course_id AS courseId,lesson_id AS lessonId,kind,content FROM studio_artifacts WHERE id=?").get(input.artifactId) as { courseId: string; lessonId: string; kind: string; content: string } | undefined;
+  if (!row) throw new Error("Studio artifact not found.");
+  if (row.kind !== "practice") throw new Error("Only practice artifacts can be sent to the study deck.");
+  const content = JSON.parse(row.content) as { cards?: Array<{ front: string; back: string; concept: string; sourceDocumentId: string; sourcePage: number | null; sourceExcerpt: string }>; questions?: Array<{ concept: string; prompt: string; choices: Array<{ id: string; text: string }>; correctChoice: string; explanation: string; sourceDocumentId: string; sourcePage: number | null; sourceExcerpt: string }> };
+
+  let cardsAdded = 0;
+  let questionsAdded = 0;
+  const errors: string[] = [];
+  for (const index of input.cards) {
+    const card = content.cards?.[index];
+    if (!card) continue;
+    try {
+      learning.registerCard({ courseId: row.courseId, lessonId: row.lessonId, conceptId: card.concept, front: card.front, back: card.back });
+      cardsAdded += 1;
+    } catch (error) {
+      errors.push(`Card ${index + 1}: ${error instanceof Error ? error.message : "could not be added"}`);
+    }
+  }
+  for (const index of input.questions) {
+    const question = content.questions?.[index];
+    if (!question) continue;
+    try {
+      learning.addReviewedQuestion({
+        courseId: row.courseId, lessonId: row.lessonId, concept: question.concept, prompt: question.prompt,
+        choices: question.choices, correctChoice: question.correctChoice, explanation: question.explanation,
+        sourceDocumentId: question.sourceDocumentId, sourcePage: question.sourcePage, sourceExcerpt: question.sourceExcerpt,
+      });
+      questionsAdded += 1;
+    } catch (error) {
+      errors.push(`Question ${index + 1}: ${error instanceof Error ? error.message : "could not be added"}`);
+    }
+  }
+  return { cardsAdded, questionsAdded, errors };
+}
+
+async function invokeModel(system: string, user: string): Promise<unknown> {
+  const settings = getTutorProviderSettings();
+  const model = createTutorChatModel(settings.provider, tutorModelForProvider(settings.provider, settings), settings) as unknown as {
+    invoke(messages: BaseMessage[]): Promise<{ content: unknown }>;
+  };
+  const response = await model.invoke([new SystemMessage(system), new HumanMessage(user)]);
+  return parseJson(textContent(response.content));
+}
+
+export function parseJson(text: string): unknown {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("The model did not return a JSON object.");
+  return JSON.parse(cleaned.slice(start, end + 1)) as unknown;
+}
+
+function textContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map((part) => {
+    if (typeof part === "string") return part;
+    if (part && typeof part === "object" && "text" in part) return String((part as { text: unknown }).text);
+    return "";
+  }).join("");
+  return "";
+}
+
+function validateContent(kind: StudioKind, raw: unknown, sources: StudioSource[], count: number, practiceType: "cards" | "quiz" | "both", canvasRefs: string[] = []): StudioContent {
+  if (kind === "mind-map") {
+    const parsed = MindMapOutput.parse(raw);
+    const allowed = (ref: string | undefined): ref is string => Boolean(ref && (sources.some((source) => source.ref === ref) || canvasRefs.includes(ref)));
+    const byId = new Map<string, { id: string; label: string; parentId: string | null; detail?: string; sourceRef?: string }>();
+    for (const node of parsed.nodes) {
+      if (node.sourceRef && !allowed(node.sourceRef)) continue;
+      if (!byId.has(node.id)) byId.set(node.id, { ...node, parentId: node.parentId ?? null, sourceRef: node.sourceRef && allowed(node.sourceRef) ? node.sourceRef : undefined });
+    }
+    const nodes = [...byId.values()];
+    if (!nodes.some((node) => node.parentId === null)) nodes.unshift({ id: "root", label: "Key concepts", parentId: null });
+    const roots = nodes.filter((node) => node.parentId === null);
+    for (const node of nodes) if (node.parentId && !byId.has(node.parentId)) node.parentId = roots[0]?.id ?? null;
+    if (nodes.length < 2) throw new Error("No grounded mind-map nodes were generated.");
+    return { title: parsed.title ?? "Mind map", nodes };
+  }
+
+  if (kind === "study-guide") {
+    const parsed = GuideOutput.parse(raw);
+    const sections = parsed.sections.map((section) => ({ ...section, sourceRefs: [...new Set(section.sourceRefs.map((ref) => validRef(ref, sources)).filter((ref): ref is string => Boolean(ref)))] })).filter((section) => section.sourceRefs.length > 0);
+    const keyTerms = (parsed.keyTerms ?? []).map((term) => ({ ...term, sourceRef: validRef(term.sourceRef, sources) })).filter((term): term is { term: string; definition: string; sourceRef: string } => Boolean(term.sourceRef));
+    if (!sections.length) throw new Error("No grounded study-guide sections were generated.");
+    return { title: parsed.title ?? "Study guide", overview: parsed.overview ?? "", sections, keyTerms };
+  }
+
+  const parsed = PracticeOutput.parse(raw);
+  const cards = (practiceType === "quiz" ? [] : parsed.cards)
+    .map((card) => withSource(card, sources)).filter((card): card is NonNullable<typeof card> => Boolean(card)).slice(0, count);
+  const questions = (practiceType === "cards" ? [] : parsed.questions)
+    .map((question) => {
+      const source = sourceFor(question.sourceRef, sources);
+      if (!source || !question.choices.some((choice) => choice.id === question.correctChoice)) return undefined;
+      return { ...question, ...sourceFields(source) };
+    }).filter((question): question is NonNullable<typeof question> => Boolean(question)).slice(0, count);
+  if (!cards.length && !questions.length) throw new Error("No grounded practice items were generated.");
+  return { cards, questions };
+}
+
+function validRef(ref: string | undefined, sources: StudioSource[]): string | undefined {
+  return ref && sources.some((source) => source.ref === ref) ? ref : undefined;
+}
+
+function sourceFor(ref: string, sources: StudioSource[]): StudioSource | undefined {
+  return sources.find((source) => source.ref === ref);
+}
+
+function sourceFields(source: StudioSource) {
+  return { sourceRef: source.ref, sourceDocumentId: source.documentId, sourcePage: source.sourcePage, sourceExcerpt: source.excerpt };
+}
+
+function withSource<T extends { sourceRef: string }>(item: T, sources: StudioSource[]): (T & ReturnType<typeof sourceFields>) | undefined {
+  const source = sourceFor(item.sourceRef, sources);
+  return source ? { ...item, ...sourceFields(source) } : undefined;
+}
+
+function collectRefs(content: StudioContent): string[] {
+  if ("nodes" in content) return content.nodes.map((node) => node.sourceRef).filter((ref): ref is string => Boolean(ref));
+  if ("sections" in content) return [...content.sections.flatMap((section) => section.sourceRefs), ...content.keyTerms.map((term) => term.sourceRef)];
+  return [...content.cards.map((card) => card.sourceRef), ...content.questions.map((question) => question.sourceRef)];
+}

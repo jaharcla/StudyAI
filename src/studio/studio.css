@@ -1,0 +1,80 @@
+/* StudyAI Studio — real artifacts in the immersive workspace. Scoped to avoid touching the canvas. */
+.studio-surface{position:fixed;z-index:130;inset:0;display:flex;background:#fbfaf7;color:#2c2a27;font-family:'DM Sans',system-ui,sans-serif;animation:studio-fade .18s ease}
+.studio-sidebar{width:262px;flex:none;padding:18px 12px;border-right:1px solid #e8e4dc;background:#f3f0e9;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+.studio-brand{display:flex;align-items:center;gap:9px;padding:2px 6px 14px;font:600 18px Georgia,serif}
+.studio-brand small{margin-left:auto;color:#9a623f;font:600 9px 'DM Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.studio-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#2c2a27;color:#fff}
+.studio-back{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd7cc;border-radius:8px;background:#fffdf8;color:#4a453e;font-size:11px;font-weight:600;cursor:pointer}
+.studio-group{margin:14px 8px 3px;color:#9c9386;font-size:9px;font-weight:700;letter-spacing:.13em}
+.studio-lesson{padding:8px 10px;border-radius:8px;background:#fffdf8;box-shadow:0 1px 2px rgba(50,40,25,.08);font-size:11px;font-weight:600}
+.studio-lesson small{display:block;margin-top:2px;color:#9c9386;font-weight:400}
+.studio-tabs{display:grid;gap:3px}
+.studio-tabs button{display:flex;align-items:center;gap:8px;padding:10px;border:0;border-radius:8px;background:transparent;color:#544e46;text-align:left;font-size:11px;cursor:pointer}
+.studio-tabs button:hover{background:#eae6de}
+.studio-tabs button.active{background:#fffdf8;box-shadow:0 1px 2px rgba(50,40,25,.08);font-weight:600}
+.studio-field{display:grid;gap:5px;margin:3px 8px;color:#8a8072;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.studio-field input,.studio-field select{width:100%;padding:8px 9px;border:1px solid #ded7cc;border-radius:8px;background:#fffdf8;color:#3a342c;font:11px 'DM Sans',sans-serif;text-transform:none;letter-spacing:0}
+.studio-primary{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border:1px solid #2c2a27;border-radius:8px;background:#2c2a27;color:#f7f2ea;font-size:11px;font-weight:600;cursor:pointer}
+.studio-primary:hover{background:#454039}
+.studio-primary:disabled{opacity:.55;cursor:default}
+.studio-generate{margin:10px 8px 2px;justify-content:center}
+.studio-history{display:grid;gap:2px}
+.studio-history button{display:grid;gap:2px;text-align:left;padding:8px 10px;border:0;border-radius:7px;background:transparent;color:#6b6256;font-size:10px;cursor:pointer}
+.studio-history button.active{background:#eae6de;color:#2c2a27;font-weight:600}
+.studio-history small{color:#9c9386;font-size:9px}
+.studio-main{flex:1;display:flex;flex-direction:column;min-width:0}
+.studio-head{display:flex;align-items:center;justify-content:space-between;height:54px;padding:0 22px;border-bottom:1px solid #eae6de;background:#fffdf8}
+.studio-head strong{display:block;font:600 14px Georgia,serif}
+.studio-head span{display:block;margin-top:2px;color:#9c9386;font-size:10px}
+.studio-head button{border:0;background:transparent;color:#8b8377;cursor:pointer}
+.studio-body{flex:1;min-height:0;padding:18px;overflow:auto}
+.studio-error{padding:10px 12px;border-left:2px solid #c9715c;background:#fdf1ee;color:#98503f;font-size:11px}
+.studio-muted{color:#9c9386;font-size:11px;line-height:1.6}
+.studio-eyebrow{color:#9c9386;font-size:9px;font-weight:700;letter-spacing:.13em}
+.studio-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#9a623f}
+.studio-empty h3{margin:14px 0 6px;font:600 20px Georgia,serif;color:#2c2a27}
+.studio-empty p{max-width:430px;margin:0 0 18px;color:#6f665a;font-size:12px;line-height:1.6}
+.studio-source-button,.studio-citations button{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid #ded7ca;border-radius:7px;background:#fbf8f2;color:#9a623f;font-size:10px;font-weight:600;cursor:pointer}
+.studio-citations{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+
+/* Mind map */
+.studio-map{display:flex;height:100%;gap:14px}
+.studio-map-canvas{flex:1;min-width:0;border:1px solid #e5dfd4;border-radius:12px;background:#fffdf8;overflow:hidden}
+.studio-map-inspector{width:236px;flex:none;padding:14px;border:1px solid #e5dfd4;border-radius:12px;background:#fffdf8;overflow:auto}
+.studio-map-inspector h4{margin:8px 0;font:600 15px Georgia,serif}
+.studio-map-inspector p{color:#6f665a;font-size:11px;line-height:1.6}
+.studio-map-node{min-width:168px;max-width:230px;padding:10px 12px;border:1px solid #dcd5c9;border-radius:9px;background:#fffdf8;box-shadow:0 6px 18px rgba(50,36,20,.08);color:#2c2a27}
+.studio-map-node-label{font:600 12px/1.35 Georgia,serif}
+.studio-map-node-detail{margin-top:5px;color:#6f665a;font-size:10px;line-height:1.45}
+.studio-map-node-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:8px}
+.studio-map-source{display:flex;align-items:center;gap:4px;color:#9a623f;font-size:9px}
+.studio-map-toggle{display:grid;place-items:center;width:22px;height:22px;border:1px solid #ded7cc;border-radius:6px;background:#faf7f1;color:#6b6256;cursor:pointer}
+.studio-map-handle{width:7px!important;height:7px!important;background:#a66843!important;border:0!important}
+
+/* Study guide */
+.studio-guide{max-width:760px;margin:0 auto;padding:8px 4px 30px}
+.studio-guide h3{font:600 24px Georgia,serif}
+.studio-guide-overview{color:#6f665a;font-size:13px;line-height:1.7}
+.studio-guide-section{margin:20px 0;padding:16px 18px;border:1px solid #e5dfd4;border-radius:12px;background:#fffdf8}
+.studio-guide-section h4,.studio-guide-terms h4{margin:0 0 8px;font:600 15px Georgia,serif}
+.studio-guide-section p{color:#4a453e;font-size:12px;line-height:1.7}
+.studio-guide-terms dl{display:grid;gap:10px}
+.studio-guide-terms div{padding:12px 14px;border:1px solid #eae5db;border-radius:10px;background:#fffdf8}
+.studio-guide-terms dt{font:600 12px Georgia,serif}
+.studio-guide-terms dd{margin:4px 0 8px;color:#6f665a;font-size:11px}
+
+/* Practice */
+.studio-practice{max-width:900px;margin:0 auto;padding:8px 4px 30px}
+.studio-practice-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;color:#6f665a;font-size:11px}
+.studio-status{padding:9px 12px;border-left:2px solid #5d8f68;background:#f0f7f1;color:#3c6647;font-size:11px}
+.studio-practice section{margin:18px 0}
+.studio-practice h4{font:600 15px Georgia,serif}
+.studio-practice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.studio-practice-card{display:grid;gap:6px;padding:13px;border:1px solid #e5dfd4;border-radius:11px;background:#fffdf8;cursor:pointer}
+.studio-practice-card.selected{border-color:#a66843;background:#fffaf2}
+.studio-practice-card strong{font:600 12px/1.45 Georgia,serif}
+.studio-practice-card span{color:#6f665a;font-size:11px}
+.studio-practice-card small{color:#9c9386;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.studio-practice-card button{justify-self:start;display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #ded7ca;border-radius:6px;background:#fbf8f2;color:#9a623f;font-size:9px;cursor:pointer}
+@keyframes studio-fade{from{opacity:0}to{opacity:1}}
+@media(max-width:760px){.studio-sidebar{width:210px}.studio-map{flex-direction:column}.studio-map-inspector{width:auto}.studio-surface{flex-direction:column}}
