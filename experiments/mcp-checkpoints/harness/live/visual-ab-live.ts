@@ -23,6 +23,7 @@ if (phaseArg !== "A" && phaseArg !== "B") {
 const taskId = taskArg ?? "signup-flow";
 const session = sessionArg && sessionArg !== "-" ? sessionArg : undefined;
 const model = process.env.LIVE_MODEL ?? "opencode-go/beam-free";
+const modelSlug = model.replace(/[^a-zA-Z0-9]+/g, "-");
 const repo = process.cwd();
 const upstream = path.resolve(repo, "experiments/mcp-checkpoints/checkpoints/upstream/mcp_excalidraw");
 const evidenceDir = path.resolve(repo, `experiments/mcp-checkpoints/evidence/phase-1-live/${taskId}`);
@@ -49,7 +50,7 @@ if (run.status !== 0) {
   const detail = [run.error?.message, run.signal, run.stderr, run.stdout].filter(Boolean).join(" | ").slice(-1500);
   throw new Error(`opencode failed (status=${run.status}, signal=${run.signal}): ${detail}`);
 }
-await writeFile(path.join(evidenceDir, `${taskId}-${phaseArg}-opencode.jsonl`), run.stdout);
+await writeFile(path.join(evidenceDir, `${taskId}-${modelSlug}-${phaseArg}-opencode.jsonl`), run.stdout);
 const events: OpencodeEvent[] = run.stdout
   .split(/\r?\n/)
   .filter((line) => line.trim().startsWith("{"))
@@ -104,11 +105,11 @@ const clear = spawnSync("node", ["dist/bin.js", "clear", "--yes"], { cwd: upstre
 if (clear.status !== 0) throw new Error(`clear failed: ${clear.stderr}`);
 const add = spawnSync("node", ["dist/bin.js", "add"], { cwd: upstream, encoding: "utf8", input: JSON.stringify(elements) });
 if (add.status !== 0) throw new Error(`add failed: ${add.stderr}`);
-const screenshotPath = path.join(evidenceDir, `${taskId}-${phaseArg}.png`);
+const screenshotPath = path.join(evidenceDir, `${taskId}-${modelSlug}-${phaseArg}.png`);
 const shot = spawnSync("node", ["dist/bin.js", "screenshot", "--out", screenshotPath], { cwd: upstream, encoding: "utf8" });
 if (shot.status !== 0) throw new Error(`screenshot failed: ${shot.stderr}`);
 
-await writeFile(path.join(evidenceDir, `${taskId}-${phaseArg}.json`), JSON.stringify(artifact, null, 2));
+await writeFile(path.join(evidenceDir, `${taskId}-${modelSlug}-${phaseArg}.json`), JSON.stringify(artifact, null, 2));
 const payload = {
   model,
   phase: phaseArg,

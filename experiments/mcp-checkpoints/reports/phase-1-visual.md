@@ -66,6 +66,19 @@ After the human partner authorized model calls, I ran two artifact A/B loops wit
 
 Feedback round cost: ~6.5k–12k tokens and 15–35 s per correction. One round fixed all major *visual* defects in both artifacts. It did not guarantee semantic correctness, and it changed label wording to achieve the visual fix.
 
+## hy4-flash-free replication
+
+The same A/B harness was run with `opencode-go/hy4-flash-free` on signup-flow (evidence files prefixed `signup-flow-hy4-*`).
+
+| Stage | Tokens (in+out+reasoning) | Time | Inspection |
+|---|---|---|---|
+| A | 34,820 + 902 + 3,505 = **39,227** | 26.5 s | Fewer defects than beam-free A: one branch ellipse overlapped the "Open signup page" box, stray arrow-label characters |
+| B | 5,019 + 892 + 980 = **6,891** | 14.6 s | Overlap removed, labels cleaned; a few minor stray line fragments remain |
+
+Note on token accounting: hy4-flash-free reported 34,820 uncached input tokens on turn A, while beam-free reported 3,892 input plus 31,104 cached reads. The effective costs are closer than the raw input numbers suggest; only the B-turn figures (~6.5–7k tokens) are directly comparable.
+
+**Model comparison:** both capable models needed exactly one correction round for the major visual defects, versus three hand-authored rounds in the original 0.8b attempt. hy4-flash-free started from a cleaner A artifact; beam-free's correction changed more label text. The consistent finding is that a capable model plus one feedback round is sufficient for visual correctness, and that the correction can introduce or leave semantic errors.
+
 ## StudyAI bridge — not run
 
 Root dependencies are now installed, but there is still no `.env` with model credentials and no `data/studyai.sqlite` board. Conditions A and B were therefore **not** executed through the actual StudyAI tutor. The live A/B above used a standalone model + upstream renderer, not our bridge, so it cannot answer whether our bridge benefits from the same loop.
