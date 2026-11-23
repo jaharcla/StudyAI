@@ -12,6 +12,14 @@ export const claimProvenanceSchema = z.object({
 }).strict();
 export type ClaimProvenance = z.infer<typeof claimProvenanceSchema>;
 
+export type ClaimReview = {
+  componentId: string;
+  claim: string;
+  outcome: "verified" | "needs-review";
+  relationship: ClaimProvenance["relationship"];
+  reason: string;
+};
+
 /** A model-actionable validation finding. `requestedCorrection` is always prose, never a boolean. */
 export type ValidationProblem = {
   componentId: string;
