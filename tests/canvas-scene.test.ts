@@ -224,4 +224,59 @@ describe("canvas scene graph", () => {
     expect(() => queryCourseCanvasScene(db, "other-course", { courseId: "course-1", query: "force" })).toThrow(CanvasSceneError);
     db.close();
   });
+
+  it("builds physics-diagnostic nodes and edges when a force issue exists", () => {
+    const physicsObjects: any[] = [
+      {
+        id: "fn-bad",
+        kind: "force",
+        x: 100,
+        y: 100,
+        width: 10,
+        height: 50,
+        components: [0, 100, 0],
+        units: "N",
+        label: "F_N",
+        geometry: { tail: { x: 100, y: 100 }, tip: { x: 100, y: 50 } },
+      },
+      {
+        id: "fg",
+        kind: "force",
+        x: 100,
+        y: 100,
+        width: 10,
+        height: 50,
+        components: [100, 0, 0], // drawn horizontally instead of down!
+        units: "N",
+        label: "F_g",
+        geometry: { tail: { x: 100, y: 100 }, tip: { x: 200, y: 100 } },
+      },
+    ];
+    const physicsInput = normalizeCanvasInput({
+      boardId: "board-physics",
+      courseId: "course-1",
+      lessonId: "lesson-1",
+      snapshot,
+      scientificObjects: physicsObjects,
+      selectedIds: [],
+    });
+    const graph = buildCanvasSceneGraph({
+      input: physicsInput,
+      scope: { boardId: "board-physics", courseId: "course-1", lessonId: "lesson-1" },
+      revision: 1,
+      revisionHash: "rev-1",
+      snapshotHash: "snap-1",
+    });
+
+    const diagnostic = graph.nodes.find((n) => n.recordType === "physics-diagnostic");
+    expect(diagnostic).toBeDefined();
+    expect(diagnostic?.text).toContain("Gravity must point directly downward");
+    expect(graph.edges).toContainEqual(
+      expect.objectContaining({
+        kind: "derived-from",
+        from: diagnostic?.id,
+        to: "s:fg",
+      })
+    );
+  });
 });

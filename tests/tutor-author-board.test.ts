@@ -42,7 +42,7 @@ const briefArgs = {
   artifact: { kind: "question", count: 1, prompt: "Name the three forces.", citationLabel: "Module 1 · p. 4", figure: { kind: "freebody", title: "Forces", forces: [{ label: "gravity", components: [0, -9.8] }] } },
   placement: { relation: "clear-area" }, reason: "Student asked for a friction question.",
 };
-const toolCall = (args: unknown, name = "author_board") => new AIMessage({ content: "", tool_calls: [{ name, args, id: "call-1", type: "tool_call" }] });
+const toolCall = (args: Record<string, unknown>, name = "author_board") => new AIMessage({ content: "", tool_calls: [{ name, args, id: "call-1", type: "tool_call" }] });
 
 function boundToolNames(): string[] {
   return ((mocks.bindTools.mock.calls[0]?.[0] ?? []) as Array<{ function?: { name?: string } }>).map((tool) => tool.function?.name ?? "");

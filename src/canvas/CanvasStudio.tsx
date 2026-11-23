@@ -5,7 +5,8 @@ import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
 import { API } from "../api";
 import { ScientificLayer, type ScienceMode } from "./ScientificLayer";
-import { arrowGeometry, synchronizeObject, withArrowEndpoints } from "./geometry";
+import { arrowGeometry, directionAngleDegrees, synchronizeObject, withArrowEndpoints } from "./geometry";
+import { analyzePhysicsFreeBodyDiagram } from "./physics";
 import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
 import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
@@ -922,11 +923,8 @@ function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreate
     {object.kind === "molecule" && <MoleculeEditor molecule={object} onChange={(next) => onChange(next)} />}
     {object.kind === "atom" && <>{textInput("Label", object.label, (label) => patch("label", label))}<label>Element<select value={object.element} onChange={(event) => patch("element", event.target.value as Element)}>{elementOptions}</select></label>{numberInput("Nonbonding electrons", object.nonbondingElectrons, (value) => patch("nonbondingElectrons", value))}{numberInput("Bond order sum", object.bondOrderSum, (value) => patch("bondOrderSum", value), 0.5)}<div className="editor-calculation">Formal charge <b>{formatCharge(formalCharge(object.element, object.nonbondingElectrons, object.bondOrderSum))}</b></div></>}
     {object.kind === "bond" && <>{textInput("Label", object.label, (label) => patch("label", label))}{textInput("From atom ID", object.from, (from) => patch("from", from))}{textInput("To atom ID", object.to, (to) => patch("to", to))}<label>Bond order<select value={object.order} onChange={(event) => patch("order", Number(event.target.value) as BondOrder)}>{bondOrders.map((order) => <option key={order} value={order}>{order}</option>)}</select></label></>}
-    {object.kind === "equation" && <>{!object.mathWorkspace && textInput("Equation", object.expression, (expression) => patch("expression", expression))}{textInput("Units", object.units ?? "", (units) => patch("units", units))}{object.mathWorkspace ? null : <EquationVariables object={object} onChange={onChange} />}<output className="expression-result">{object.evaluationError ?? (object.result === undefined ? "Evaluatingâ€¦" : `Result: ${object.result}`)}</output><MathWorkspaceEditor object={object} onChange={onChange} onCreateLinkedGraph={onCreateLinkedGraph} /></>}
-    {(object.kind === "vector" || object.kind === "force") && <>{textInput("Label", object.label, (label) => patch("label", label))}<div className="vector-input-grid">{object.components.map((value, index) => numberInput(["x", "y", "z"][index], value, (next) => patch("components", object.components.map((component, i) => i === index ? next : component) as [number, number, number]), 0.1))}</div>{textInput("Units", object.units, (units) => patch("units", units))}<label>Units per canvas unit<input aria-label="Units per canvas unit" type="number" min="0.000001" step="any" placeholder="Uncalibrated" value={object.geometry?.unitsPerCanvasUnit ?? ""} onChange={(event) => {
-      const geometry = arrowGeometry(object); const scale = event.target.value === "" ? undefined : Number(event.target.value); if (scale !== undefined && (!Number.isFinite(scale) || scale <= 0)) return;
-      onChange(withArrowEndpoints({ ...object, geometry: { ...geometry, unitsPerCanvasUnit: scale } }, geometry.tail, geometry.tip));
-    }} /></label><p>{object.geometry?.unitsPerCanvasUnit === undefined ? "Uncalibrated: x/y components use canvas units; upward is positive y." : "Scale supplied by you. The arrow shows x/y; z remains part of the magnitude."}</p><div className="editor-calculation">Magnitude <b>{vectorMagnitude(...object.components).toFixed(3)} {object.geometry?.unitsPerCanvasUnit === undefined ? "canvas units" : object.units}</b></div></>}
+    {object.kind === "equation" && <>{!object.mathWorkspace && textInput("Equation", object.expression, (expression) => patch("expression", expression))}{textInput("Units", object.units ?? "", (units) => patch("units", units))}{object.mathWorkspace ? null : <EquationVariables object={object} onChange={onChange} />}<output className="expression-result">{object.evaluationError ?? (object.result === undefined ? "Evaluating…" : `Result: ${object.result}`)}</output><MathWorkspaceEditor object={object} onChange={onChange} onCreateLinkedGraph={onCreateLinkedGraph} /></>}
+    {(object.kind === "vector" || object.kind === "force") && <ForceVectorEditor object={object} objects={objects} onChange={onChange} patch={patch} textInput={textInput} numberInput={numberInput} />}
     {object.kind === "measurement" && <>{textInput("Label", object.label, (label) => patch("label", label))}{numberInput("Value", object.value, (value) => { const g = lineGeometry(object), distance = Math.hypot(g.tip.x - g.tail.x, g.tip.y - g.tail.y); if (value > 0 && distance) onChange(withLineEndpoints({ ...object, geometry: { ...g, unitsPerCanvasUnit: value / distance } }, g.tail, g.tip)); }, 0.01)}{textInput("Units", object.units, (units) => patch("units", units))}<label>Units per canvas unit<input aria-label="Units per canvas unit" type="number" min="0" step="any" value={object.geometry?.unitsPerCanvasUnit ?? ""} placeholder="Uncalibrated" onChange={(event) => { const g = lineGeometry(object), scale = event.target.value === "" ? undefined : Number(event.target.value); if (scale === undefined || Number.isFinite(scale) && scale > 0) onChange(withLineEndpoints({ ...object, geometry: { ...g, unitsPerCanvasUnit: scale } }, g.tail, g.tip)); }} /></label><p>Distance follows the endpoints. Uncalibrated distances use canvas units.</p></>}
     {object.kind === "graph" && <>{textInput("Graph expression", object.expression, (expression) => patch("expression", expression))}<div className="vector-input-grid">{numberInput("x minimum", object.xRange[0], (value) => onChange({ xRange: [value, object.xRange[1]] } as Partial<ScientificObject>))}{numberInput("x maximum", object.xRange[1], (value) => onChange({ xRange: [object.xRange[0], value] } as Partial<ScientificObject>))}</div>{textInput("x-axis label", object.xLabel, (xLabel) => patch("xLabel", xLabel))}{textInput("y-axis label", object.yLabel, (yLabel) => patch("yLabel", yLabel))}<output className="expression-result">{object.evaluationError ?? `${object.points.length} sampled points`}</output><p>Hover over the plot to inspect coordinates. Drag its corner to resize.</p></>}
     {object.kind === "anatomy" && <>{textInput("Structure ID", object.structureId, (structureId) => patch("structureId", structureId))}{textInput("Body system", object.system, (system) => patch("system", system))}{textInput("Labels (comma-separated)", object.labels.join(", "), (labels) => patch("labels", labels.split(",").map((label) => label.trim()).filter(Boolean)))}</>}
@@ -1031,6 +1029,156 @@ function MoleculeEditor({ molecule, onChange }: { molecule: Extract<ScientificOb
     <h4>Atoms</h4>{molecule.atoms.map((atom) => <div className="molecule-row" key={atom.id}><select aria-label="Atom element" value={atom.element} onChange={(event) => updateAtom(atom.id, { element: event.target.value as Element })}>{elementOptions}</select><span>{atom.id.slice(0, 8)}</span><input aria-label="Nonbonding electrons" type="number" min="0" step="1" value={atom.nonbondingElectrons} onChange={(event) => updateAtom(atom.id, { nonbondingElectrons: Number(event.target.value) })} /><b>q {formatCharge(formalChargeForAtom(atom, bondOrderSum(molecule, atom.id)))}</b><button aria-label="Remove atom" onClick={() => { const ids = new Set(molecule.atoms.filter((item) => item.id !== atom.id).map((item) => item.id)); onChange({ atoms: molecule.atoms.filter((item) => item.id !== atom.id), resonanceForms: molecule.resonanceForms.map((form) => ({ ...form, bonds: form.bonds.filter((bond) => ids.has(bond.from) && ids.has(bond.to)) })) } as Partial<ScientificObject>); }}>Ã—</button></div>)}<button className="button-soft" onClick={addAtom}>Add atom</button>
     <h4>Bonds</h4>{active.bonds.map((bond) => <div className="molecule-row bond-row" key={bond.id}><select aria-label="Bond start atom" value={bond.from} onChange={(event) => updateBond(bond.id, { from: event.target.value })}>{molecule.atoms.map((atom) => <option key={atom.id} value={atom.id}>{atom.element} Â· {atom.id.slice(0, 4)}</option>)}</select><span>â†’</span><select aria-label="Bond end atom" value={bond.to} onChange={(event) => updateBond(bond.id, { to: event.target.value })}>{molecule.atoms.map((atom) => <option key={atom.id} value={atom.id}>{atom.element} Â· {atom.id.slice(0, 4)}</option>)}</select><select aria-label="Bond order" value={bond.order} onChange={(event) => updateBond(bond.id, { order: Number(event.target.value) as BondOrder })}>{valenceOrder.map((order) => <option key={order} value={order}>{order}</option>)}</select><button aria-label="Remove bond" onClick={() => onChange({ resonanceForms: molecule.resonanceForms.map((form) => form.id === active.id ? { ...form, bonds: form.bonds.filter((item) => item.id !== bond.id) } : form) } as Partial<ScientificObject>)}>Ã—</button></div>)}<button className="button-soft" onClick={addBond}>Add bond</button><button className="button-soft resonance-button" onClick={addResonance}>Duplicate as resonance form</button><button className="button-soft ocl-button" disabled={checkingChemistry} onClick={async () => { setCheckingChemistry(true); setChemistryStatus(""); try { const { validateWithOpenChemLib } = await import("./chemistry"); const result = validateWithOpenChemLib(molecule); setChemistryStatus(`OpenChemLib SMILES: ${result.smiles}`); } catch (error) { setChemistryStatus(error instanceof Error ? `OpenChemLib: ${error.message}` : "OpenChemLib could not convert this structure."); } finally { setCheckingChemistry(false); } }}>{checkingChemistry ? "Checking structureâ€¦" : "Convert with OpenChemLib"}</button>{chemistryStatus && <p className="chemistry-status">{chemistryStatus}</p>}
   </>;
+}
+
+function ForceVectorEditor({
+  object,
+  objects,
+  onChange,
+  patch,
+  textInput,
+  numberInput,
+}: {
+  object: Extract<ScientificObject, { kind: "vector" | "force" }>;
+  objects: ScientificObject[];
+  onChange: (update: Partial<ScientificObject>) => void;
+  patch: (key: string, value: unknown) => void;
+  textInput: (label: string, value: string, update: (value: string) => void) => React.ReactNode;
+  numberInput: (label: string, value: number, update: (value: number) => void, step?: number) => React.ReactNode;
+}) {
+  const geometry = arrowGeometry(object);
+  const currentAngle = Math.round(directionAngleDegrees(geometry.tail, geometry.tip));
+  const mag = vectorMagnitude(...object.components);
+  const fbdAnalysis = analyzePhysicsFreeBodyDiagram({ objects });
+  const issueForObject = fbdAnalysis.issues.find((i) => i.targetId === object.id);
+  const correction = fbdAnalysis.suggestedCorrections.find((c) => c.targetId === object.id);
+
+  const updateAngle = (newAngleDeg: number) => {
+    const rad = (newAngleDeg * Math.PI) / 180;
+    const scale = geometry.unitsPerCanvasUnit ?? 1;
+    const newComponents: [number, number, number] = [
+      Math.round(mag * Math.cos(rad) * 100) / 100,
+      Math.round(mag * Math.sin(rad) * 100) / 100,
+      object.components[2],
+    ];
+    const newTip = {
+      x: geometry.tail.x + newComponents[0] / scale,
+      y: geometry.tail.y - newComponents[1] / scale,
+    };
+    onChange(withArrowEndpoints({ ...object, components: newComponents }, geometry.tail, newTip));
+  };
+
+  const updateMagnitude = (newMag: number) => {
+    if (newMag <= 0) return;
+    const rad = (currentAngle * Math.PI) / 180;
+    const scale = geometry.unitsPerCanvasUnit ?? 1;
+    const newComponents: [number, number, number] = [
+      Math.round(newMag * Math.cos(rad) * 100) / 100,
+      Math.round(newMag * Math.sin(rad) * 100) / 100,
+      object.components[2],
+    ];
+    const newTip = {
+      x: geometry.tail.x + newComponents[0] / scale,
+      y: geometry.tail.y - newComponents[1] / scale,
+    };
+    onChange(withArrowEndpoints({ ...object, components: newComponents }, geometry.tail, newTip));
+  };
+
+  return (
+    <>
+      {textInput("Label", object.label, (label) => patch("label", label))}
+      <div className="vector-input-grid">
+        {object.components.map((value, index) =>
+          numberInput(
+            ["x", "y", "z"][index],
+            value,
+            (next) =>
+              patch(
+                "components",
+                object.components.map((component, i) => (i === index ? next : component)) as [number, number, number]
+              ),
+            0.1
+          )
+        )}
+      </div>
+      <label>
+        Direction angle: {currentAngle}°
+        <input
+          data-testid="force-angle-slider"
+          aria-label="Force direction angle"
+          type="range"
+          min="-180"
+          max="180"
+          value={currentAngle}
+          onChange={(e) => updateAngle(Number(e.target.value))}
+        />
+      </label>
+      <label>
+        Magnitude slider: {mag.toFixed(1)} {object.units}
+        <input
+          data-testid="force-magnitude-slider"
+          aria-label="Force magnitude slider"
+          type="range"
+          min="1"
+          max="500"
+          value={Math.min(500, Math.max(1, Math.round(mag)))}
+          onChange={(e) => updateMagnitude(Number(e.target.value))}
+        />
+      </label>
+      {issueForObject && (
+        <div
+          data-testid="physics-diagnostic-alert"
+          className="physics-alert"
+          style={{
+            background: "#fef3c7",
+            border: "1px solid #f59e0b",
+            padding: "8px 12px",
+            borderRadius: "6px",
+            margin: "8px 0",
+            fontSize: "12px",
+            color: "#92400e",
+          }}
+        >
+          <p>⚠️ <strong>Physics diagnostic:</strong> {issueForObject.message}</p>
+          {correction && (
+            <button
+              data-testid="apply-physics-correction"
+              className="button-soft"
+              style={{ marginTop: "6px" }}
+              onClick={() => updateAngle(correction.correctedAngleDeg)}
+            >
+              Align to {correction.correctedAngleDeg}°
+            </button>
+          )}
+        </div>
+      )}
+      {textInput("Units", object.units, (units) => patch("units", units))}
+      <label>
+        Units per canvas unit
+        <input
+          aria-label="Units per canvas unit"
+          type="number"
+          min="0.000001"
+          step="any"
+          placeholder="Uncalibrated"
+          value={object.geometry?.unitsPerCanvasUnit ?? ""}
+          onChange={(event) => {
+            const scale = event.target.value === "" ? undefined : Number(event.target.value);
+            if (scale !== undefined && (!Number.isFinite(scale) || scale <= 0)) return;
+            onChange(withArrowEndpoints({ ...object, geometry: { ...geometry, unitsPerCanvasUnit: scale } }, geometry.tail, geometry.tip));
+          }}
+        />
+      </label>
+      <p>
+        {object.geometry?.unitsPerCanvasUnit === undefined
+          ? "Uncalibrated: x/y components use canvas units; upward is positive y."
+          : "Scale supplied by you. The arrow shows x/y; z remains part of the magnitude."}
+      </p>
+      <div className="editor-calculation">
+        Magnitude <b>{mag.toFixed(3)} {object.geometry?.unitsPerCanvasUnit === undefined ? "canvas units" : object.units}</b>
+      </div>
+    </>
+  );
 }
 
 function labelSelect(label: string, value: string, objects: ScientificObject[], update: (value: string) => void) { return <label>{label}<select value={value} onChange={(event) => update(event.target.value)}><option value="">Choose object</option>{objects.map((object) => <option key={object.id} value={object.id}>{objectTitle(object)}</option>)}</select></label>; }
