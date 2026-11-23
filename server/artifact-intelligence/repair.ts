@@ -1,4 +1,5 @@
-import { buildRepairResult, type RepairResult } from "../../src/artifacts/repair-message";
+import { buildRepairResult, computePreserveList, type RepairResult } from "../../src/artifacts/repair-message";
+import { enforcePreserveList } from "../../src/artifacts/preserve";
 import type { ValidationReport } from "../../src/artifacts/contracts";
 import type { ArtifactPackage } from "../../src/artifacts/package";
 import { getTutorProviderSettings } from "../tutor-provider";
@@ -44,4 +45,26 @@ export async function runBoundedRepair(input: BoundedRepairInput): Promise<Repai
     maxCalls,
     reason: "The single allowed repair call still failed validation. No package was applied.",
   };
+}
+
+/** Apply path: a repaired package never escapes if it changed a preserved component or citation. */
+export async function applyBoundedRepair(input: BoundedRepairInput): Promise<RepairOutcome> {
+  const outcome = await runBoundedRepair(input);
+  if (outcome.status !== "accepted") return outcome;
+  const preserve = computePreserveList(input.pkg, input.report);
+  const check = enforcePreserveList(input.pkg, outcome.pkg, preserve);
+  if (check.ok) return outcome;
+  const report: ValidationReport = {
+    ok: false,
+    problems: [
+      ...input.report.problems,
+      {
+        componentId: check.changed[0] ?? "composition",
+        validator: "preserve-list",
+        message: `The repair changed preserved content: ${check.changed.join(", ")}.`,
+        requestedCorrection: "Restore the preserved question text and citations before applying the repair.",
+      },
+    ],
+  };
+  return { status: "rejected", report, calls: outcome.calls };
 }
