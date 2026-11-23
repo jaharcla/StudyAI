@@ -1,5 +1,5 @@
 {
-  "reviewStatus": "pending-human-review",
+  "reviewStatus": "reviewed",
   "qualificationCycle": 2,
   "previousCycle": {
     "cycle": 1,
@@ -25,11 +25,40 @@
     "determinismRepeats": 5,
     "compositeDiagnosticOnly": true
   },
+  "review": {
+    "reviewer": "owner, with Claude-assisted analysis",
+    "reviewedAt": "2026-11-23",
+    "basis": "JSON packages only; no rendered output and no source chunks were visible to the reviewer",
+    "lowConfidenceDimensions": ["visual", "interaction"],
+    "notes": [
+      "Course grounding rewards citation presence and consistency, not verified chunk text.",
+      "Insufficient-source scored 0 on interaction as N/A, consistent with cycle 1.",
+      "The honest-refusal case earns high factual-accuracy and grounding scores under the current rubric; a dedicated refusal rule may be needed.",
+      "Torque relation directions are questionable but not penalised, since the relation vocabulary is schema-level.",
+      "Course ID chem-120 is a harness constant and was not penalised; provenance remains empty in every package."
+    ]
+  },
   "scenarios": [
-    { "name": "documented request", "generationId": "documented-request", "labels": {} },
-    { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },
-    { "name": "multi-component torque package", "generationId": "multi-component-torque", "labels": {} },
-    { "name": "insufficient source", "generationId": "insufficient-source", "labels": {} }
+    {
+      "name": "documented request",
+      "generationId": "documented-request",
+      "labels": { "intent": 4, "accuracy": 4, "grounding": 4, "pedagogy": 3, "visual": 2, "interaction": 1 }
+    },
+    {
+      "name": "ambiguous request",
+      "generationId": "ambiguous-request",
+      "labels": { "intent": 4, "accuracy": 5, "grounding": 3, "pedagogy": 4, "visual": 3, "interaction": 1 }
+    },
+    {
+      "name": "multi-component torque package",
+      "generationId": "multi-component-torque",
+      "labels": { "intent": 4, "accuracy": 3, "grounding": 4, "pedagogy": 3, "visual": 1, "interaction": 3 }
+    },
+    {
+      "name": "insufficient source",
+      "generationId": "insufficient-source",
+      "labels": { "intent": 4, "accuracy": 4, "grounding": 5, "pedagogy": 2, "visual": 1, "interaction": 0 }
+    }
   ],
-  "note": "Cycle 1 scores are preserved in the gate result record; thresholds are unchanged and were frozen before any scores were seen. Model identity is withheld in the review sheet and stored only in the cycle-2 meta file."
+  "note": "Thresholds are unchanged from cycle 1 and were frozen before any scores were seen. Composite is diagnostic only. Model identity is withheld in the review sheet and stored only in the cycle-2 meta file."
 }
