@@ -12,6 +12,7 @@ Workspace snapshot: integrated canvas branch `work/canvas-integration-2026-11-22
 - Canvas reliability (Phase 5, 2026-11-22): spatial grid backfill so boards above 256 nodes keep every node in rect queries; diagram OCR reads stacked fraction labels (`F/N`); cloud OCR aborts at `CANVAS_OCR_TIMEOUT_MS` (default 30 s) and falls back.
 - Learning activities with validated specifications and deterministic capability checks.
 - Mind map scientific object: branch nodes and labeled edges as one placed, draggable, scene-indexed board object, authorable by the tutor through the existing approval-gated proposal path (2026-11-22). Coursework practice generation is being unified with the concurrent `author_board` design (ADR `docs/decisions/ADR-2026-11-22-mindmap-kind.md`).
+- Lab-notebook canvas (2026-11-23, branch `work/lab-notebook-canvas`): dotted-paper viewport, transparent graph plot and borderless atoms, a Lewis second sidebar with literal bond-order line glyphs and a scrollable element list, icon-first radial atom actions, notebook-styled object editors preserving all existing controls.
 
 ## Limits
 
