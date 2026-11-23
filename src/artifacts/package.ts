@@ -13,7 +13,11 @@ export const artifactComponentSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("worked-example"), ...componentBase, prompt: z.string().min(1).max(2000), steps: z.array(z.string().min(1).max(1000)).min(1).max(20), answer: z.string().min(1).max(2000) }).strict(),
   z.object({
     kind: z.literal("diagram"), ...componentBase, title: z.string().min(1).max(120), surfaceAngleDeg: z.number().min(-180).max(180).optional(),
-    forces: z.array(z.object({ label: z.string().min(1).max(60), components: z.tuple([finite, finite]) }).strict()).min(1).max(8).optional(),
+    forces: z.array(z.object({
+      label: z.string().min(1).max(60),
+      components: z.tuple([finite, finite]),
+      position: z.object({ x: finite, y: finite }).strict().optional(),
+    }).strict()).min(1).max(8).optional(),
   }).strict(),
   z.object({ kind: z.literal("equation"), ...componentBase, expression: z.string().min(1).max(500), variables: z.record(z.string().min(1).max(40), finite).default({}) }).strict(),
   z.object({
@@ -53,11 +57,20 @@ export const artifactPackageSchema = z.object({
   objective: z.string().min(1).max(280),
   courseId: z.string().min(1).max(200),
   lessonId: z.string().min(1).max(200),
-  components: z.array(artifactComponentSchema).min(1).max(20),
+  components: z.array(artifactComponentSchema).max(20),
+  outcome: z.object({
+    status: z.literal("insufficient-source"),
+    missing: z.array(z.string().min(1).max(200)).min(1).max(8),
+    nextStep: z.string().min(1).max(1000),
+  }).strict().optional(),
   relations: z.array(componentRelationSchema).max(40).default([]),
   provenance: z.object({ generatedAt: z.string().optional(), claims: z.array(claimProvenanceSchema).max(20).optional() }).strict().default({}),
   acceptance: z.object({ decision: z.enum(["pending", "accept", "correct", "decline"]).default("pending") }).strict().default({ decision: "pending" }),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if (!value.components.length && !value.outcome) {
+    context.addIssue({ code: "custom", message: "A package needs at least one component unless it declares an insufficient-source outcome.", path: ["components"] });
+  }
+});
 
 export type ArtifactComponent = z.infer<typeof artifactComponentSchema>;
 export type ComponentRelation = z.infer<typeof componentRelationSchema>;

@@ -23,6 +23,7 @@ export type CompiledPackage = {
   canvas?: CompiledArtifact;
   studio?: StudioArtifact;
   learning?: ActivitySpec;
+  outcome?: ArtifactPackage["outcome"];
   report: ValidationReport;
 };
 
@@ -39,7 +40,12 @@ function deriveBrief(pkg: ArtifactPackage, ctx: CompilePackageContext): Artifact
   let figure: ArtifactBrief["artifact"]["figure"];
   if (diagram) {
     figure = {
-      kind: "freebody", title: diagram.title, forces: diagram.forces,
+      kind: "freebody", title: diagram.title,
+      forces: diagram.forces?.map((force) => ({
+        label: force.label,
+        components: force.components,
+        ...(force.position ? { position: force.position } : {}),
+      })),
       ...(diagram.surfaceAngleDeg === undefined ? {} : { context: { surfaceAngleDeg: diagram.surfaceAngleDeg } }),
     };
   } else if (graph) figure = { kind: "graph", title: pkg.objective, expression: graph.expression, xRange: graph.xRange };
@@ -176,6 +182,10 @@ function buildLearning(pkg: ArtifactPackage, ctx: CompilePackageContext): Activi
 
 /** Compile one package into the components each renderer owns. No board reads, no persistence. */
 export function compilePackage(pkg: ArtifactPackage, ctx: CompilePackageContext): CompiledPackage {
+  if (pkg.outcome) {
+    // A first-class refusal compiles to no artifact at all; nothing is proposed for review.
+    return { outcome: pkg.outcome, report: { ok: true, problems: [] } };
+  }
   const projection = projectPackage(pkg);
   const viewport = ctx.viewport ?? DEFAULT_VIEWPORT;
   let canvas: CompiledArtifact | undefined;

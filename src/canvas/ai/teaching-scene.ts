@@ -145,6 +145,7 @@ export const artifactBriefSchema = z.object({
       forces: z.array(z.object({
         label: z.string().min(1).max(60),
         components: z.tuple([z.number(), z.number()]),
+        position: z.object({ x: z.number(), y: z.number() }).strict().optional(),
       })).min(1).max(8).optional(),
       expression: z.string().min(1).max(500).optional(),
       xRange: z.tuple([z.number(), z.number()]).optional(),
@@ -298,6 +299,7 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
           x: centreX + Math.cos(angle) * radius, y: centreY + Math.sin(angle) * radius,
           width: 24, height: 24, components: [force.components[0], force.components[1], 0],
           units: "N", label: force.label,
+          ...(force.position ? { pointOfApplication: force.position } : {}),
           provenance: tagged(ctx),
         });
       });

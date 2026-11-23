@@ -51,6 +51,36 @@ describe("projectPackage", () => {
   });
 });
 
+describe("cycle 4 schema integration", () => {
+  it("compiles a first-class refusal to no artifact", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1, id: "refusal", objective: "Exam topics", courseId: "c1", lessonId: "l1",
+      components: [],
+      outcome: { status: "insufficient-source", missing: ["final exam announcement"], nextStep: "Upload the announcement." },
+    }, []);
+    const result = compilePackage(pkg, ctx);
+    expect(result.outcome?.status).toBe("insufficient-source");
+    expect(result.canvas).toBeUndefined();
+    expect(result.studio).toBeUndefined();
+    expect(result.learning).toBeUndefined();
+    expect(result.report).toEqual({ ok: true, problems: [] });
+  });
+
+  it("carries a force application point into the compiled object", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1, id: "torque-pos", objective: "Torque", courseId: "c1", lessonId: "l1",
+      components: [{
+        id: "d1", kind: "diagram", title: "Beam", sourceRefs: [REF],
+        forces: [{ label: "applied", components: [0, -10], position: { x: 20, y: 100 } }],
+      }],
+    }, [REF]);
+    const result = compilePackage(pkg, ctx);
+    expect(result.canvas?.objects.find((object) => object.kind === "force")).toMatchObject({
+      pointOfApplication: { x: 20, y: 100 },
+    });
+  });
+});
+
 describe("compilePackage", () => {
   it("reports a canvas component that cannot fit in the single revision instead of dropping it silently", () => {
     const pkg = parseArtifactPackage({

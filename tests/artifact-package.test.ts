@@ -35,6 +35,43 @@ const makePackage = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+describe("cycle 4 additive schema", () => {
+  it("accepts a first-class insufficient-source outcome with no components", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1,
+      id: "refusal",
+      objective: "Exam topics",
+      courseId: "c1",
+      lessonId: "l1",
+      components: [],
+      outcome: {
+        status: "insufficient-source",
+        missing: ["final exam announcement"],
+        nextStep: "Upload the announcement or course outline.",
+      },
+    }, []);
+    expect(pkg.outcome?.status).toBe("insufficient-source");
+    expect(pkg.components).toEqual([]);
+  });
+
+  it("rejects an empty package with no outcome", () => {
+    expect(() => parseArtifactPackage({
+      schemaVersion: 1, id: "empty", objective: "Nothing", courseId: "c1", lessonId: "l1", components: [],
+    }, [])).toThrow(/component/i);
+  });
+
+  it("accepts an application point on a diagram force", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1, id: "torque", objective: "Torque", courseId: "c1", lessonId: "l1",
+      components: [{
+        id: "d1", kind: "diagram", title: "Beam", sourceRefs: [REF],
+        forces: [{ label: "applied", components: [0, -10], position: { x: 20, y: 100 } }],
+      }],
+    }, [REF]);
+    expect(pkg.components[0]).toMatchObject({ forces: [{ position: { x: 20, y: 100 } }] });
+  });
+});
+
 describe("parseArtifactPackage", () => {
   it("round-trips one component of every advertised kind", () => {
     const pkg = parseArtifactPackage(makePackage(), retrievedRefs);
