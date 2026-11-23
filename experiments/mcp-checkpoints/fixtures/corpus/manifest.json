@@ -1,0 +1,50 @@
+{
+  "note": "No student data is fabricated. Items marked locally-generated are synthetic fixtures created for this campaign; user-provided items require consent and are not present.",
+  "categories": [
+    {
+      "category": "handwritten-notes",
+      "source": "user-provided",
+      "status": "not supplied",
+      "items": []
+    },
+    {
+      "category": "typed-lecture-slides",
+      "source": "locally-generated",
+      "status": "planned",
+      "items": []
+    },
+    {
+      "category": "mathematical-equations",
+      "source": "locally-generated",
+      "status": "planned",
+      "items": []
+    },
+    {
+      "category": "chemistry-structures-and-notation",
+      "source": "locally-generated",
+      "status": "planned",
+      "items": []
+    },
+    {
+      "category": "diagrams-with-labels-and-arrows",
+      "source": "locally-generated",
+      "status": "planned",
+      "items": []
+    },
+    {
+      "category": "mixed-handwriting-text-drawings",
+      "source": "user-provided",
+      "status": "not supplied",
+      "items": []
+    }
+  ],
+  "fixture_schema": {
+    "id": "string",
+    "category": "string",
+    "goldText": "string",
+    "goldSymbols": "string[] optional",
+    "goldBBox": "{x,y,w,h} optional",
+    "goldAssociation": "string optional",
+    "source": "locally-generated | user-provided"
+  }
+}
