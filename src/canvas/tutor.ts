@@ -4,9 +4,8 @@ import { synchronizeObject } from "./geometry";
 import { assertCanvasRevision, requireCanvasRevision } from "./proposal-revision";
 import { verifyMathOperation } from "./math-workspace";
 import type { MathStepOperation } from "./model";
-import { artifactBriefSchema, compileArtifactBrief, type ArtifactBrief } from "./ai/teaching-scene";
+import { artifactBriefSchema, compileArtifactBrief, DEFAULT_VIEWPORT, type ArtifactBrief } from "./ai/teaching-scene";
 import { objectOccupancy, type LayoutRect } from "./ai/layout";
-import { DEFAULT_VIEWPORT } from "./ai/teaching-scene";
 import { validateCompiled } from "../artifacts/validate";
 import { ArtifactValidationError } from "../artifacts/contracts";
 

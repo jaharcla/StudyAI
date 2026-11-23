@@ -58,7 +58,7 @@ All commands ran from the worktree at base `d0b4398`, before any product edit. F
 | `node node_modules/typescript/bin/tsc -b` | exit 0 |
 | `node node_modules/vitest/vitest.mjs run` | 89 files / 576 tests passed |
 | `node node_modules/@playwright/test/cli.js test tests/e2e/canvas*.spec.ts` (9 canvas specs, dataset spec excluded by config) | **12 passed, 1 skipped** (`CANVAS_SPECS_EXIT=0`), 56.1 s |
-| `npm run benchmark:canvas` | **failed in this environment** — `boardCount 7`, `hardFailures 7`, `mathExactCount 0`, `mathAverageF1 0`, `physAlignStructureCoverage 0`, `totalCostUsd 0`; every board reports `ERROR Cannot check Ollama models at http://127.0.0.1:11434: fetch failed`. `benchmark regression: hard failures 7 > 0; math exact 0 < 3; math F1 0 < 0.810; PhysAlign coverage 0 regressed`. |
+| `npm run benchmark:canvas` | **failed in this environment** — first run: `boardCount 7`, `hardFailures 7`, `mathExactCount 0`, `mathAverageF1 0`, `physAlignStructureCoverage 0`, `totalCostUsd 0`; every board reported `ERROR Cannot check Ollama models at http://127.0.0.1:11434: fetch failed`. A later post-change run with intermittent provider availability produced `hardFailures 4`, `mathAverageF1 0.317`, still failing the gate. Both runs: no prompt/model/provider change; baseline untouched. |
 
 The benchmark could not reproduce a meaningful gate because the local Ollama service is down and no cloud provider keys are present in this worktree (the OpenRouter credit check reported exhausted credits). Per the plan's no-cloud-spend constraint, no keys were copied. **The tracked baseline was not updated.** Its four gate numbers remain **0 hard failures, 4/6 math exact, math F1 0.91, PhysAlign coverage 0.75**.
 
