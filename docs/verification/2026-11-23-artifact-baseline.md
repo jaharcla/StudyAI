@@ -39,7 +39,7 @@ Ruling: Phase 1's fully-specified tasks cover graph and vector stubs; anatomy an
 
 ## Verification gates (Step 2)
 
-All commands ran from the worktree at base `d0b4398`, before any product edit. Full logs are in `.superpowers/sdd/2026-11-23-artifact-intelligence-system/`.
+All commands ran from the worktree at base `d0b4398`, before any product edit. Output is quoted below; raw logs were kept in the git-ignored plan workspace during execution. Final-tree results are in `2026-11-23-artifact-phase1-gates.md`.
 
 ### `npm run verify` (`tsc -b && vitest run && playwright test`)
 
