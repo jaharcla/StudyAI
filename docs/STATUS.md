@@ -27,7 +27,7 @@ Measured 2026-11-22 on `main` (commits `3fb4c6f..d380c9c`):
 
 - `npx tsc -b`: pass.
 - `npx vitest run`: 505 passed in 77 files.
-- `npx playwright test`: 37 of 46 passed; the 4 persistent failures (`direct-vector`, `quickdraw-ai`, `tutor-math`, `workspace`) are live-provider or uncommitted-UI-port issues proven present on 2026-11-19 (`pw-full.log`); all canvas scene, recognition, analysis, learning, and integration specs pass. Full attribution: `docs/verification/2026-11-22-canvas-reliability.md`.
+- `npx playwright test` (full run, 46 tests, 13.8 m): 37 passed, 6 failed, 3 skipped; the disclosed re-run of the six flipped two to pass (`adaptive-learning`, `math-workspace` — parallel-load flake), leaving **4 persistent failures** (`direct-vector`, `tutor-math` — proven pre-existing in the 2026-11-19 `pw-full.log`; `workspace`, `quickdraw-ai` — disabled model-`select` in the uncommitted canvas-first UI port). All canvas scene, recognition, analysis, learning, credits, and integration specs pass. Full attribution: `docs/verification/2026-11-22-canvas-reliability.md`.
 - `npm run benchmark:canvas`: 0 hard failures, 4/6 math boards exact, math F1 0.951, PhysAlign coverage 0.875–1.000, $0 provider cost, against the tracked `docs/verification/canvas-benchmark-baseline.json` (not updated).
 
 CI (`.github/workflows/canvas.yml`) runs build and unit tests on every push. The provider-dependent benchmark and browser tests stay local behind `/canvas-verify`, because they need keys and a gitignored dataset.

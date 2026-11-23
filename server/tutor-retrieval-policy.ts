@@ -1,7 +1,21 @@
+/**
+ * Tutor retrieval intent policy.
+ *
+ * This module no longer decides whether a question *needs* coursework. It only declines prefetching
+ * course excerpts for messages that contain no question at all. Judging relevance — including for a
+ * question about something the student drew — belongs to the model, which sees both the board and
+ * the course, and to the retrieval tool that is now bound whenever a course is active.
+ *
+ * The keyword wall and the canvas veto that used to live here failed four of seven canvas-grounded
+ * questions in `scripts/benchmark-canvas-grounding.ts`; see
+ * docs/superpowers/specs/2026-11-22-canvas-course-grounding-design.md.
+ */
+
+/** Requests that carry no question, so there is nothing to ground in course material. */
 export function shouldRetrieveCourseDocuments(query: string): boolean {
   const text = query.trim();
-  if (!text || isExactOutputRequest(text) || greetingOnly(text) || canvasDescriptionOnly(text) || canvasFirstWithoutSource(text)) return false;
-  return /\b(?:according to|based on|from (?:the |my )?(?:course|lecture|textbook|notes|document|pdf|slides)|course|lecture|textbook|study guide|explain|define|calculate|solve|derive|prove|compare|summari[sz]e|analy[sz]e|evaluate|interpret|practice|teach me|show (?:your )?work|work through|what is|what are|why|how|which|whether)\b/i.test(text);
+  if (!text || exactOutputRequest(text) || greetingOnly(text)) return false;
+  return true;
 }
 
 export function isExactOutputRequest(query: string): boolean {
@@ -14,7 +28,7 @@ export function requestsCanvasAction(query: string): boolean {
   const questionStart = /^(?:what|which|why|how|when|where|who|is|are|does|do|can|could|would|should)\b/i.test(text);
   const requestPhrase = /\b(?:can you|could you|would you|please|i want you to|i need you to|help me|go ahead|let's)\b/i.test(text);
   if (questionStart && !requestPhrase) return false;
-  const canvasNoun = /\b(?:canvas|board|shape|shapes|arrow|arrows|line|lines|text|label|labels|note|notes|diagram|selection)\b/i;
+  const canvasNoun = /\b(?:canvas|board|shape|shapes|arrow|arrows|line|lines|text|label|labels|note|notes|diagram|drawing|sketch)\b/i;
   for (const match of text.matchAll(/\b(?:draw|create|add|edit|change|move|delete|highlight|annotate|select|correct|fix|show me where)\b/gi)) {
     const index = match.index ?? 0;
     const before = text.slice(Math.max(0, index - 48), index);
@@ -82,16 +96,4 @@ function exactOutputRequest(query: string): boolean {
 function greetingOnly(query: string): boolean {
   const normalized = query.trim().toLocaleLowerCase().replace(/[.!?,;:]+$/g, "").replace(/\s+/g, " ");
   return /^(?:hi|hello|hey|good morning|good afternoon|good evening|how are you)(?: there| tutor| studyai)?$/.test(normalized);
-}
-
-function canvasDescriptionOnly(query: string): boolean {
-  const hasCanvas = /\b(?:board|canvas|diagram|drawing|sketch)\b/i.test(query);
-  const describesCanvas = /\b(?:what(?:'s| is) (?:on|in)|tell me what (?:is|you can see) (?:on|in)|what do you see (?:on|in)|what can you see (?:on|in)|describe|read)\b/i.test(query);
-  const asksForAcademicInterpretation = /\b(?:explain|interpret|calculate|solve|derive|why|how|according to|based on|from the lecture)\b/i.test(query);
-  return hasCanvas && describesCanvas && !asksForAcademicInterpretation;
-}
-
-function canvasFirstWithoutSource(query: string): boolean {
-  return /\b(?:canvas|board|diagram|drawing|sketch)\b/i.test(query)
-    && !/\b(?:according to|based on|from (?:the |my )?(?:course|lecture|textbook|notes|document|pdf|slides)|course|lecture|textbook|study guide)\b/i.test(query);
 }

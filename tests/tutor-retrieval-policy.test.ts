@@ -10,9 +10,13 @@ describe("Tutor retrieval intent", () => {
     expect(shouldRetrieveCourseDocuments("Reply with exactly: STUDYAI-GROQ-CONNECTED")).toBe(false);
   });
 
-  it("skips simple canvas descriptions", () => {
-    expect(shouldRetrieveCourseDocuments("Can you tell me what is on the board?")).toBe(false);
-    expect(shouldRetrieveCourseDocuments("Explain this canvas.")).toBe(false);
+  it("keeps retrieval for a question about something drawn on the board", () => {
+    // Regression pin: a rule used to veto retrieval whenever the sentence mentioned the board,
+    // which silenced course grounding for exactly the questions that need it most.
+    expect(shouldRetrieveCourseDocuments("why does the spring in my diagram overshoot the equilibrium position")).toBe(true);
+    expect(shouldRetrieveCourseDocuments("is the upward arrow I drew a real force or just a reaction")).toBe(true);
+    expect(shouldRetrieveCourseDocuments("does the curve I drew fall to zero after five of these")).toBe(true);
+    expect(shouldRetrieveCourseDocuments("Explain this canvas.")).toBe(true);
   });
 
   it("keeps retrieval for source-grounded academic questions", () => {
@@ -21,8 +25,9 @@ describe("Tutor retrieval intent", () => {
     expect(shouldRetrieveCourseDocuments("Calculate the net force on the object.")).toBe(true);
   });
 
-  it("skips casual nonacademic requests", () => {
-    expect(shouldRetrieveCourseDocuments("Tell me a joke.")).toBe(false);
+  it("declines only messages that ask nothing", () => {
+    expect(shouldRetrieveCourseDocuments("Tell me a joke.")).toBe(true);
+    expect(shouldRetrieveCourseDocuments("")).toBe(false);
   });
 });
 

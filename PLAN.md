@@ -15,7 +15,7 @@
 - [x] 13. `npm run verify` run 2026-11-22: tsc pass, Vitest 77 files/505 tests pass, Playwright 37/46 pass with 4 persistent failures proven pre-existing (2026-11-19 `pw-full.log`) or belonging to the uncommitted canvas-first UI port; all canvas specs pass. See `docs/verification/2026-11-22-canvas-reliability.md`
 - [x] 14. `docs/STATUS.md`, `docs/CANVAS_INTELLIGENCE_HANDOFF_2026-11-18.md`, and Phase 5 status updated with the measured numbers and remaining limits
 
-Plus, from the 2026-11-22 reliability plan: spatial-index backfill on threshold crossing (`7c29d78`, fixes the 256-node recall bug from item 5) and bounded cloud-OCR timeout `CANVAS_OCR_TIMEOUT_MS` (`d380c9c`, deep p95 106.7 s → 15.3–17.8 s; 15 s target recorded as an accepted external-provider limit, ADR `docs/decisions/2026-11-22-canvas-deep-latency.md`).
+Plus, from the 2026-11-22 reliability plan: spatial-index backfill on threshold crossing (`7c29d78`, fixes the 256-node recall bug from item 5) and bounded cloud-OCR timeout `CANVAS_OCR_TIMEOUT_MS` (`d380c9c`, caps the timeout-dominated worst case at 30 s per request; deep p95 measured 15.3–17.8 s on the same day, with the improvement confounded by provider variance — ADR `docs/decisions/2026-11-22-canvas-deep-latency.md`).
 
 
 Source: `docs/CANVAS_INTELLIGENCE_HANDOFF_2026-11-18.md` — phases 0–4 are complete in the working tree; only Phase 5 remains, plus the known accuracy gaps.

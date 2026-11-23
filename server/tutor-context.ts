@@ -63,7 +63,12 @@ export function budgetTutorContext(input: {
   let contexts = protectedContexts;
   let conversation = requiredConversation;
   const canvasBudget = Math.min(8_000, Math.max(1_500, Math.floor(input.budgetTokens * 0.45)));
-  const base = measure(input.systemInstructions, contexts, input.evidence, conversation);
+  // Course excerpts are the only context the model can fetch again itself, now that the retrieval
+  // tool is bound on every turn with a course active. They are therefore the first thing to drop
+  // when the frame is tight, not a reason to refuse the request.
+  let evidence: unknown = input.evidence;
+  const measureWith = (contextList: ContextItem[], conversationTurns: any[]) => measure(input.systemInstructions, contextList, evidence, conversationTurns);
+  const base = measureWith(contexts, conversation);
   const canvasAnalysis = contexts.find((item) => item.description === "StudyAI canvas analysis result");
   if (canvasAnalysis && (base > input.budgetTokens || serializedCharacters(canvasAnalysis.value) > canvasBudget)) {
     contexts = contexts.map((item) => item === canvasAnalysis
@@ -78,18 +83,22 @@ export function budgetTutorContext(input: {
       ? { ...item, value: String(serializedValue(item.value)).slice(0, REASONING_STATE_MAX_CHARS) }
       : item);
   }
-  const compactedBase = measure(input.systemInstructions, contexts, input.evidence, conversation);
+  let compactedBase = measureWith(contexts, conversation);
+  if (compactedBase > input.budgetTokens && evidence !== null && evidence !== undefined) {
+    evidence = null;
+    compactedBase = measureWith(contexts, conversation);
+  }
   if (compactedBase > input.budgetTokens) throw new TutorContextBudgetError(compactedBase, input.budgetTokens, diagnoseTutorContext(input, contexts, conversation, "protected_context_preflight"));
 
   for (const item of optionalContexts) {
     const candidate = [...contexts, item];
-    if (measure(input.systemInstructions, candidate, input.evidence, conversation) <= input.budgetTokens) contexts = candidate;
+    if (measureWith(candidate, conversation) <= input.budgetTokens) contexts = candidate;
   }
 
   let includedTurns = 1;
   for (let index = turns.length - 2; index >= 0; index--) {
     const candidate = [...turns[index], ...conversation];
-    if (measure(input.systemInstructions, contexts, input.evidence, candidate) > input.budgetTokens) break;
+    if (measureWith(contexts, candidate) > input.budgetTokens) break;
     conversation = candidate;
     includedTurns++;
   }
@@ -98,8 +107,9 @@ export function budgetTutorContext(input: {
     contexts,
     conversation,
     canvasJson: JSON.stringify(contexts),
-    evidenceJson: JSON.stringify(input.evidence),
-    estimatedTokens: measure(input.systemInstructions, contexts, input.evidence, conversation),
+    evidenceJson: JSON.stringify(evidence),
+    courseEvidenceDropped: evidence === null && input.evidence !== null && input.evidence !== undefined,
+    estimatedTokens: measureWith(contexts, conversation),
     omittedContextCount: input.contexts.length - contexts.length,
     omittedTurnCount: Math.max(0, turns.length - includedTurns),
   };

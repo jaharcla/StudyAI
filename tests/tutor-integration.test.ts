@@ -135,7 +135,8 @@ it("projects ordinary canvas descriptions into observations without retrieval me
   expect(prompt).toContain('"direction":"right"');
   expect(prompt).not.toContain("shape-arrow-9");
   expect(prompt).not.toContain('"x":10');
-  expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("search_course_documents");
+  // The course tool is available on every turn with a course active; whether to use it is the model's call.
+  expect(boundToolNames(mocks.bindTools.mock.calls)).toContain("search_course_documents");
   expect(tutorMetadata(result).canvas.rawMetadataIncluded).toBe(false);
 });
 
@@ -151,8 +152,9 @@ it("executes deterministic tutor calculations and returns the result to the mode
 });
 
 it("makes context omitted under the token budget visible in the tutor answer", async () => {
-  // Keep enough room for the richer geometry context; the long conversation still forces omission.
-  process.env.TUTOR_CONTEXT_BUDGET = "2800";
+  // Keep enough room for the richer geometry context plus the tutor's own instruction text; the
+  // long conversation still forces omission. The frame is deliberately tight but not impossible.
+  process.env.TUTOR_CONTEXT_BUDGET = "2900";
   process.env.TUTOR_MAX_COMPLETION_TOKENS = "256";
   mocks.invoke.mockResolvedValue(new AIMessage("Answer based on current context."));
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
@@ -363,7 +365,12 @@ it("does not bind canvas tools from another course or retrieve another course's 
   mocks.invoke.mockResolvedValue(new AIMessage("No course excerpts found."));
   await graph.invoke({ copilotkit: { context: [{ ...context[0], value: { courseId: "biol-130", lessonId: "lesson-03" } }, context[1]], actions: [{ name: "propose_canvas_edit" }] }, messages: [new HumanMessage("According to my lecture, what is TUTOR-771?")] });
   expect(boundToolNames(mocks.bindTools.mock.calls)).not.toContain("propose_canvas_edit");
-  expect(JSON.stringify(mocks.invoke.mock.calls[0][0][0].content)).toContain('no_evidence');
+  // Course isolation: another course's retrieval found nothing, so nothing is supplied, and no
+  // excerpt from the other course reaches the prompt. An empty result is omitted rather than
+  // serialized, so the absence of the marker is the assertion that matters.
+  const systemPrompt = String(mocks.invoke.mock.calls[0][0][0].content);
+  expect(systemPrompt).toContain("Course evidence from the server: null");
+  expect(systemPrompt).not.toContain("TUTOR-771");
 });
 
 it("keeps previous course and lesson conversation out of the current model prompt", async () => {
