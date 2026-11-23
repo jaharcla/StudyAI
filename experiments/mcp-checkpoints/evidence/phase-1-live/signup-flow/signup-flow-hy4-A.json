@@ -1,0 +1,179 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "ellipse",
+      "text": "Start",
+      "x": 300,
+      "y": 40,
+      "width": 240,
+      "height": 70
+    },
+    {
+      "id": "signup_page",
+      "type": "rectangle",
+      "text": "Open signup page",
+      "x": 300,
+      "y": 170,
+      "width": 240,
+      "height": 70
+    },
+    {
+      "id": "login",
+      "type": "ellipse",
+      "text": "Log in",
+      "x": 620,
+      "y": 170,
+      "width": 200,
+      "height": 70
+    },
+    {
+      "id": "enter_credentials",
+      "type": "rectangle",
+      "text": "Enter email and password",
+      "x": 300,
+      "y": 300,
+      "width": 240,
+      "height": 70
+    },
+    {
+      "id": "validate",
+      "type": "diamond",
+      "text": "Input valid?",
+      "x": 300,
+      "y": 430,
+      "width": 240,
+      "height": 90
+    },
+    {
+      "id": "show_error",
+      "type": "rectangle",
+      "text": "Show error message",
+      "x": 20,
+      "y": 430,
+      "width": 200,
+      "height": 70
+    },
+    {
+      "id": "send_verification",
+      "type": "rectangle",
+      "text": "Send verification email",
+      "x": 300,
+      "y": 590,
+      "width": 240,
+      "height": 70
+    },
+    {
+      "id": "verified",
+      "type": "diamond",
+      "text": "Email verified?",
+      "x": 300,
+      "y": 720,
+      "width": 240,
+      "height": 90
+    },
+    {
+      "id": "resend",
+      "type": "rectangle",
+      "text": "Resend verification email",
+      "x": 620,
+      "y": 720,
+      "width": 220,
+      "height": 70
+    },
+    {
+      "id": "profile",
+      "type": "rectangle",
+      "text": "Complete user profile",
+      "x": 300,
+      "y": 880,
+      "width": 240,
+      "height": 70
+    },
+    {
+      "id": "create_account",
+      "type": "rectangle",
+      "text": "Create account",
+      "x": 300,
+      "y": 1010,
+      "width": 240,
+      "height": 70
+    },
+    {
+      "id": "success",
+      "type": "ellipse",
+      "text": "Signup complete",
+      "x": 300,
+      "y": 1140,
+      "width": 240,
+      "height": 70
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "signup_page",
+      "label": "Begin"
+    },
+    {
+      "from": "signup_page",
+      "to": "login",
+      "label": "Already registered"
+    },
+    {
+      "from": "signup_page",
+      "to": "enter_credentials",
+      "label": "New user"
+    },
+    {
+      "from": "enter_credentials",
+      "to": "validate",
+      "label": "Submit"
+    },
+    {
+      "from": "validate",
+      "to": "show_error",
+      "label": "Invalid"
+    },
+    {
+      "from": "show_error",
+      "to": "enter_credentials",
+      "label": "Try again"
+    },
+    {
+      "from": "validate",
+      "to": "send_verification",
+      "label": "Valid"
+    },
+    {
+      "from": "send_verification",
+      "to": "verified",
+      "label": "Check inbox"
+    },
+    {
+      "from": "verified",
+      "to": "resend",
+      "label": "Not yet"
+    },
+    {
+      "from": "resend",
+      "to": "send_verification",
+      "label": "Resend link"
+    },
+    {
+      "from": "verified",
+      "to": "profile",
+      "label": "Confirmed"
+    },
+    {
+      "from": "profile",
+      "to": "create_account",
+      "label": "Continue"
+    },
+    {
+      "from": "create_account",
+      "to": "success",
+      "label": "Done"
+    }
+  ]
+}

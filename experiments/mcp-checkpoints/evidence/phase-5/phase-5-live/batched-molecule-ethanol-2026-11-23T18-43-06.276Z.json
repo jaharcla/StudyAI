@@ -1,0 +1,132 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "batched-molecule-ethanol",
+  "payload": {
+    "surface": "batched",
+    "taskId": "molecule-ethanol",
+    "calls": 6,
+    "invalidCalls": 0,
+    "retries": 1,
+    "promptTokens": 3702,
+    "completionTokens": 1874,
+    "durationMs": 66032,
+    "attempts": 6,
+    "objects": 0,
+    "relationships": 0,
+    "completed": false,
+    "quality": 0,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "read_scene",
+            "arguments": {
+              "boardId": "live-molecule-ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "read_scene",
+            "arguments": {
+              "boardId": "live-molecule-ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "title": "Ethanol Structure",
+              "nodes": [
+                {
+                  "id": "C1",
+                  "text": "CH3-",
+                  "type": "C"
+                },
+                {
+                  "id": "H1",
+                  "text": "H",
+                  "type": "H"
+                },
+                {
+                  "id": "C2",
+                  "text": "CH2-",
+                  "type": "C"
+                },
+                {
+                  "id": "H2",
+                  "text": "H",
+                  "type": "H"
+                },
+                {
+                  "id": "O2",
+                  "text": "OH",
+                  "type": "O"
+                },
+                {
+                  "id": "C3",
+                  "text": "CHO-1",
+                  "type": "C"
+                }
+              ],
+              "edges": []
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "title": "Ethanol Structure with all atoms, bonds, and bond orders"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "title": "Ethanol Molecule - Complete Structural Analysis",
+              "nodes": "[{\"id\": \"C2\", \"text\": \"$\\\\ce{CH_3-CO-OH}$\", \"type\": \"Atom\", \"x\": 0, \"y\": 0}, {\"id\": \"C1\", \"text\": \"$\\\\ce{CH_3}$\", \"type\": \"Atom\", \"x\": 2.0, \"y\": 0}, {\"id\": \"C3\", \"text\": \"$\\\\ce{C=O}$\", \"type\": \"Atom\", \"x\": 4.0, \"y\": 2.0}, {\"id\": \"C2a\", \"text\": \"$\\\\ce{O-H}$\", \"type\": \"Bond\", \"to\": \"O\", \"label\": \"$\\ce{-OH}$\", \"x1\": 2.83, \"y1\": 0, \"x2\": 2.83, \"y2\": 2.67}], {\"id\": \"O2\", \"text\": \"$\\\\ce{OH}$\", \"type\": \"Atom\", \"x\": 2.45, \"y\": 2.67}, {\"id\": \"O1\", \"text\": \"$\\\\ce{C=O}$\", \"type\": \"Bond\", \"to\": \"C3\", \"label\": \"$\\ce{-C=O}$\", \"x1\": 2.83, \"y1\": 0, \"x2\": 4.0, \"y2\": 2.0}, {\"id\": \"B1\", \"text\": \"$\\ce{-CH_3}$\", \"type\": \"Bond\", \"to\": \"C1\", \"label\": \"$\\ce{-CH_3}$\", \"x1\": 2.83, \"y1\": 0, \"x2\": 4.67, \"y2\": 2.0}, {\"id\": \"B2\", \"text\": \"$\\ce{-C=O}$\", \"type\": \"Bond\", \"to\": \"O1\", \"label\": \"$\\ce{-C=O}$\", \"x1\": 2.83, \"y1\": 0, \"x2\": 4.67, \"y2\": 2.0}], {\"id\": \"O3\", \"text\": \"$\\ce{OH}$\", \"type\": \"Atom\", \"x\": 2.45, \"y\": 2.67}, {\"id\": \"H1\", \"text\": \"$\\ce{H}$\", \"type\": \"Bond\", \"to\": \"B1\", \"label\": \"$\\ce{-C-H}$\", \"x1\": 4.0, \"y1\": 0, \"x2\": 5.38, \"y2\": 2.67}], {\"id\": \"H2\", \"text\": \"$\\ce{H}$\", \"type\": \"Atom\", \"x\": 3.83, \"y\": 0}, {\"id\": \"H3\", \"text\": \"$\\ce{H}$\", \"type\": \"Atom\", \"x\": 2.45, \"y\": 0}, {\"id\": \"H4\", \"text\": \"$\\ce{H}$\", \"type\": \"Bond\", \"to\": \"C1\", \"label\": \"$\\ce{-CH_3-H}$\", \"x1\": 2.83, \"y1\": 0, \"x2\": 5.38, \"y2\": 0}, {\"id\": \"H5\", \"text\": \"$\\ce{H}$\", \"type\": \"Bond\", \"to\": \"O2\", \"label\": \"$\\ce{-CH_2-O-H}$\", \"x1\": 4.67, \"y1\": 0, \"x2\": 2.45, \"y2\": 2.67}, {\"id\": \"H6\", \"text\": \"$\\ce{H}$\", \"type\": \"Atom\", \"x\": 3.83, \"y\": 0}]"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-molecule-ethanol"
+            }
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:43:06.276Z"
+}

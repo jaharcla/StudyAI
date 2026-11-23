@@ -1,3 +1,4 @@
+import { parse as parseNumber } from "mathjs/number";
 import type { MathNode } from "mathjs";
 import type { ScientificObject } from "./model";
 
@@ -5,11 +6,14 @@ const functions = new Set(["sin", "cos", "tan", "asin", "acos", "atan", "sqrt", 
 const constants = new Set(["pi", "e", "tau"]);
 let engine: Promise<typeof import("mathjs/number")> | undefined;
 
-export async function compileExpression(expression: string) {
+type Parse = (expression: string) => MathNode;
+export type BoundedExpression = { variables: string[]; evaluate(values: Record<string, number>): number };
+
+/** One bounded grammar for both the async tutor path and the synchronous authoring compiler. */
+function compileBounded(expression: string, parse: Parse): BoundedExpression {
   const normalized = expression.trim().replace(/^y\s*=\s*/, "").replaceAll("²", "^2").replaceAll("³", "^3");
   if (!normalized || normalized.length > 500) throw new Error("Enter an expression of 1–500 characters.");
-  const math = await (engine ??= import("mathjs/number"));
-  const node = math.parse(normalized);
+  const node = parse(normalized);
   const variables = new Set<string>();
   let count = 0;
   node.traverse((child: MathNode, _path: string, parent: MathNode) => {
@@ -35,6 +39,16 @@ export async function compileExpression(expression: string) {
     if (typeof result !== "number" || !Number.isFinite(result)) throw new Error("The expression has no finite real result here.");
     return result;
   } };
+}
+
+export async function compileExpression(expression: string): Promise<BoundedExpression> {
+  const math = await (engine ??= import("mathjs/number"));
+  return compileBounded(expression, math.parse);
+}
+
+/** Synchronous entry point for the authoring compiler, which cannot await the dynamic import. */
+export function compileExpressionSync(expression: string): BoundedExpression {
+  return compileBounded(expression, parseNumber);
 }
 
 export async function evaluateScientificObject(object: ScientificObject): Promise<ScientificObject> {

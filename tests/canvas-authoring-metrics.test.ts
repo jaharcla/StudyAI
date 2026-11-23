@@ -32,6 +32,10 @@ describe("author_board composition metrics", () => {
 
       // Task completion, grounding, verification labelling, one review transaction.
       expect(compiled.objects.map((object) => object.kind)).toEqual(task.expected.kinds);
+      if (task.id === "problem-set-eight") {
+        const prompts = compiled.objects.map((object) => (object as { prompt?: string }).prompt);
+        expect(new Set(prompts).size).toBe(8);
+      }
       expect(compiled.sourceRefs).toEqual(task.expected.sourceRefs);
       expect(compiled.objects.every((object) => object.provenance?.status === "generated-unverified")).toBe(true);
       const context = { boardId: brief.boardId, courseId: "c", lessonId: "l", revision: 1, objects: [] as ScientificObject[] };

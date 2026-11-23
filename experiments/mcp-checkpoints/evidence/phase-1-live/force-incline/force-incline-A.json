@@ -1,0 +1,80 @@
+{
+  "nodes": [
+    {
+      "id": "plane",
+      "type": "rectangle",
+      "text": "Inclined Plane",
+      "x": 50,
+      "y": 380,
+      "width": 400,
+      "height": 60
+    },
+    {
+      "id": "block",
+      "type": "rectangle",
+      "text": "Block (mass m)",
+      "x": 200,
+      "y": 270,
+      "width": 120,
+      "height": 60
+    },
+    {
+      "id": "weight",
+      "type": "ellipse",
+      "text": "Weight mg",
+      "x": 200,
+      "y": 150,
+      "width": 120,
+      "height": 50
+    },
+    {
+      "id": "normal",
+      "type": "ellipse",
+      "text": "Normal N",
+      "x": 360,
+      "y": 180,
+      "width": 120,
+      "height": 50
+    },
+    {
+      "id": "friction",
+      "type": "ellipse",
+      "text": "Friction f",
+      "x": 30,
+      "y": 250,
+      "width": 120,
+      "height": 50
+    },
+    {
+      "id": "angle",
+      "type": "diamond",
+      "text": "θ",
+      "x": 520,
+      "y": 270,
+      "width": 90,
+      "height": 70
+    }
+  ],
+  "edges": [
+    {
+      "from": "block",
+      "to": "weight",
+      "label": "mg (down)"
+    },
+    {
+      "from": "block",
+      "to": "normal",
+      "label": "N (⊥ to plane)"
+    },
+    {
+      "from": "block",
+      "to": "friction",
+      "label": "f (∥ to plane)"
+    },
+    {
+      "from": "plane",
+      "to": "angle",
+      "label": "incline angle"
+    }
+  ]
+}

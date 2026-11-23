@@ -4,8 +4,10 @@ import { synchronizeObject } from "./geometry";
 import { assertCanvasRevision, requireCanvasRevision } from "./proposal-revision";
 import { verifyMathOperation } from "./math-workspace";
 import type { MathStepOperation } from "./model";
-import { artifactBriefSchema, compileArtifactBrief, type ArtifactBrief } from "./ai/teaching-scene";
+import { artifactBriefSchema, compileArtifactBrief, DEFAULT_VIEWPORT, type ArtifactBrief } from "./ai/teaching-scene";
 import { objectOccupancy, type LayoutRect } from "./ai/layout";
+import { validateCompiled } from "../artifacts/validate";
+import { ArtifactValidationError } from "../artifacts/contracts";
 
 const mathOperationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.enum(["add-constant", "subtract-constant", "multiply-constant", "divide-constant"]), value: z.number().finite() }),
@@ -181,11 +183,11 @@ export function proposeArtifactBrief(context: ArtifactBriefContext, value: unkno
   requireCanvasRevision(baseRevision);
   const brief = artifactBriefSchema.parse(value);
   if (context.boardId !== brief.boardId) throw new Error("The active board changed. Read its current context again.");
-  const compiled = compileArtifactBrief(brief, {
-    occupancy: context.occupancy ?? objectOccupancy(context.objects),
-    viewport: context.viewport,
-    anchors: context.anchors,
-  });
+  const occupancy = context.occupancy ?? objectOccupancy(context.objects);
+  const viewport = context.viewport ?? DEFAULT_VIEWPORT;
+  const compiled = compileArtifactBrief(brief, { occupancy, viewport, anchors: context.anchors });
+  const report = validateCompiled({ objects: compiled.objects, brief, occupancy, viewport });
+  if (!report.ok) throw new ArtifactValidationError(report);
   const existing = new Set(context.objects.map((object) => object.id));
   if (compiled.objects.some((object) => existing.has(object.id))) throw new Error("A generated object id collided with an existing object.");
   parseCanvasDocument({ ...emptyCanvasDocument(), objects: [...context.objects, ...compiled.objects] });

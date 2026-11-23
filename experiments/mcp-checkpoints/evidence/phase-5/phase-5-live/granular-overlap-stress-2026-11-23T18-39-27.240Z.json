@@ -1,0 +1,156 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "granular-overlap-stress",
+  "payload": {
+    "surface": "granular",
+    "taskId": "overlap-stress",
+    "calls": 10,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 7416,
+    "completionTokens": 2884,
+    "durationMs": 66302,
+    "attempts": 6,
+    "objects": 10,
+    "relationships": 1,
+    "completed": false,
+    "quality": 0.73,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "type": "box",
+              "x": 100,
+              "y": 150,
+              "width": 200,
+              "height": 200,
+              "label": "Box_1"
+            }
+          },
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "type": "box",
+              "x": 300,
+              "y": 150,
+              "width": 200,
+              "height": 200,
+              "label": "Box_2"
+            }
+          },
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "type": "box",
+              "x": 500,
+              "y": 150,
+              "width": 200,
+              "height": 200,
+              "label": "Box_3"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "label": "Box 1"
+            }
+          },
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "label": "Box 2"
+            }
+          },
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "label": "Box 3"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "x": 200,
+              "y": 150,
+              "width": 150,
+              "height": 150,
+              "label": "Large Box Left 1"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "create_arrow",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "fromX": 105,
+              "fromY": 45,
+              "toX": 110,
+              "toY": 50,
+              "label": "L-BOX-CV"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "create_text",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "x": 100,
+              "y": 50,
+              "text": "Defect Detection"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "create_text",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "x": 200,
+              "y": 200,
+              "text": "LONG LABELS ARE THE KEY TO SUCCESSFUL DEFECT DETECTION!"
+            }
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:39:27.240Z"
+}

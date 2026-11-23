@@ -1,0 +1,114 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "granular-molecule-ethanol",
+  "payload": {
+    "surface": "granular",
+    "taskId": "molecule-ethanol",
+    "calls": 6,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 7164,
+    "completionTokens": 1964,
+    "durationMs": 10562,
+    "attempts": 6,
+    "objects": 4,
+    "relationships": 1,
+    "completed": false,
+    "quality": 0.32,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "type": "Ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "type": "carbon_methyl",
+              "x": 0.5,
+              "y": 0.75,
+              "width": 1,
+              "height": 1,
+              "label": "C1 (methyl group)"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "read_scene",
+            "arguments": {
+              "boardId": "live-molecule-ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "select_shapes",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "ids": [
+                "shape-0",
+                "shape-1"
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "create_text",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "x": 1,
+              "y": 250,
+              "text": "Ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "create_arrow",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "fromX": 4,
+              "fromY": 2,
+              "toX": 3,
+              "toY": 2,
+              "label": "H-O-H"
+            }
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:38:20.924Z"
+}

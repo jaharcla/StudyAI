@@ -86,3 +86,126 @@ test("one friction authoring turn: one review, one revision, cited and labelled 
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect.poll(async () => (await readSaved()).revision).toBe(before.revision + 1);
 });
+
+test("an invalid brief is reported structurally and leaves the saved board byte-identical", async ({ page }) => {
+  const { course, lesson } = await createCourseWithLesson(page.request, `Author board invalid ${Date.now()}`, "Friction lesson");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await selectCourseOnPage(page, course.title);
+  const scrim = page.locator(".sidebar-scrim");
+  if (await scrim.isVisible()) await scrim.click();
+
+  const url = `/api/canvases?course=${course.id}&lesson=${lesson.id}`;
+  await expect.poll(async () => (await page.request.get(url)).ok()).toBe(true);
+  const boards = await (await page.request.get(url)).json() as Array<{ id: string }>;
+  const boardId = boards[0].id;
+  const boardUrl = `/api/canvases/${boardId}?course=${course.id}&lesson=${lesson.id}`;
+  const readSaved = async (): Promise<SavedBoard> => (await (await page.request.get(boardUrl)).json()) as SavedBoard;
+  const before = await readSaved();
+
+  await page.waitForFunction(() => typeof (window as TestWindow).__studyaiAuthorBoard === "function", null, { timeout: 30_000 });
+  const invalid = {
+    boardId,
+    topic: "friction from module 1",
+    artifact: {
+      kind: "figure",
+      count: 1,
+      prompt: "Draw the three forces on the block and name them.",
+      concepts: ["friction", "free-body diagram"],
+      figure: {
+        kind: "freebody",
+        title: "Forces on the block",
+        context: { surfaceAngleDeg: 0 },
+        forces: [
+          { label: "normal", components: [100, 0] },
+          { label: "friction", components: [0, 100] },
+        ],
+      },
+    },
+    placement: { relation: "clear-area" },
+    sourceRefs: ["studyai://document/module-1/text/4?chunk=0"],
+    reason: "Deliberately invalid force geometry for validation testing.",
+  };
+  const result = await page.evaluate(async (payload) => (window as TestWindow).__studyaiAuthorBoard!(payload), invalid) as { status: string; error?: string };
+  expect(result.status).toBe("rejected");
+  expect(result.error).toContain("force-diagram");
+  expect(result.error).toContain("requestedCorrection");
+
+  const problem = page.getByTestId("board-artifact-problem");
+  await expect(problem).toBeVisible();
+  await expect(problem).toContainText("force-diagram:");
+  await expect(problem).not.toContainText(/componentId|force-[0-9a-f]{8}-/i);
+  await expect(page.getByTestId("board-artifact-proposal")).toHaveCount(0);
+
+  const after = await readSaved();
+  expect(after.revision).toBe(before.revision);
+  expect(after.document).toBe(before.document);
+});
+
+type RepairResponse = {
+  status: string;
+  error?: string;
+  repair?: { attempt: number; maxAttempts: number; preserve: { componentIds: string[]; sourceRefs: string[] } };
+};
+
+test("a failed authoring turn gets one preserve-aware repair attempt", async ({ page }) => {
+  const { course, lesson } = await createCourseWithLesson(page.request, `Author board repair ${Date.now()}`, "Friction lesson");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await selectCourseOnPage(page, course.title);
+  const scrim = page.locator(".sidebar-scrim");
+  if (await scrim.isVisible()) await scrim.click();
+
+  const url = `/api/canvases?course=${course.id}&lesson=${lesson.id}`;
+  await expect.poll(async () => (await page.request.get(url)).ok()).toBe(true);
+  const boards = await (await page.request.get(url)).json() as Array<{ id: string }>;
+  const boardId = boards[0].id;
+  const boardUrl = `/api/canvases/${boardId}?course=${course.id}&lesson=${lesson.id}`;
+  const readSaved = async (): Promise<SavedBoard> => (await (await page.request.get(boardUrl)).json()) as SavedBoard;
+  const before = await readSaved();
+
+  await page.waitForFunction(() => typeof (window as TestWindow).__studyaiAuthorBoard === "function", null, { timeout: 30_000 });
+  const turn = (prompt: string, normal: number[], friction: number[]) => ({
+    boardId,
+    topic: "friction from module 1",
+    artifact: {
+      kind: "question",
+      count: 1,
+      prompt,
+      answer: "Friction opposes the motion down the slope.",
+      concepts: ["friction", "free-body diagram"],
+      figure: {
+        kind: "freebody",
+        title: "Forces on the block",
+        context: { surfaceAngleDeg: 0 },
+        forces: [
+          { label: "normal", components: normal },
+          { label: "friction", components: friction },
+        ],
+      },
+    },
+    placement: { relation: "clear-area" },
+    sourceRefs: ["studyai://document/module-1/text/4?chunk=0"],
+    reason: "Deliberately invalid force geometry for repair testing.",
+  });
+  const send = async (payload: unknown) => await page.evaluate(
+    (value) => (window as TestWindow).__studyaiAuthorBoard!(value), payload,
+  ) as Promise<RepairResponse>;
+
+  const first = await send(turn("Which way does friction act?", [100, 0], [0, 100]));
+  expect(first.status).toBe("rejected");
+  expect(first.repair?.attempt).toBe(1);
+  expect(first.repair?.maxAttempts).toBe(2);
+  expect(first.repair?.preserve.componentIds).toContain("question");
+  expect(first.error).toContain("requestedCorrection");
+  await expect(page.getByTestId("board-artifact-problem")).toContainText("force-diagram:");
+
+  const second = await send(turn("Which way does friction act?", [200, 0], [0, 200]));
+  expect(second.status).toBe("provider_call_limit");
+
+  const third = await send(turn("A different question?", [100, 0], [0, 100]));
+  expect(third.status).toBe("rejected");
+  expect(third.error).toContain("preserve-list");
+
+  const after = await readSaved();
+  expect(after.revision).toBe(before.revision);
+  expect(after.document).toBe(before.document);
+});

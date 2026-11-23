@@ -28,6 +28,17 @@ const friction = {
   reason: "Scored friction authoring task.",
 };
 
+const problemPrompts = [
+  "State the friction direction for a block on a slope.",
+  "Name the force perpendicular to the slope.",
+  "Which force points vertically downward?",
+  "If the block slides down, which way does friction act?",
+  "What happens to the normal force when the slope steepens?",
+  "Which component of gravity pulls the block downhill?",
+  "Draw the three forces acting on the block.",
+  "How would the forces change on a frictionless slope?",
+];
+
 export const canvasAuthoringTasks: CanvasAuthoringTask[] = [
   { id: "friction-empty", brief: friction, occupancy: [], expected: { kinds: ["question", "force", "force", "force"], sourceRefs: friction.sourceRefs } },
   {
@@ -38,9 +49,28 @@ export const canvasAuthoringTasks: CanvasAuthoringTask[] = [
   {
     id: "problem-set-eight", brief: {
       ...friction,
-      artifact: { ...friction.artifact, kind: "problem-set", count: 8, prompt: "State the friction direction.", figure: undefined },
+      artifact: {
+        ...friction.artifact, kind: "problem-set", count: 8, prompt: problemPrompts[0], figure: undefined,
+        items: problemPrompts.map((prompt) => ({ prompt, sourceRef: friction.sourceRefs[0] })),
+      },
     },
     occupancy: [{ x: 100, y: 100, width: 500, height: 300 }],
     expected: { kinds: Array(8).fill("question"), sourceRefs: friction.sourceRefs },
+  },
+  {
+    id: "graph-figure", brief: {
+      ...friction,
+      artifact: { ...friction.artifact, kind: "figure", figure: { kind: "graph", title: "y = x^2", expression: "x^2", xRange: [-2, 2] } },
+    },
+    occupancy: [],
+    expected: { kinds: ["graph"], sourceRefs: friction.sourceRefs },
+  },
+  {
+    id: "vector-figure", brief: {
+      ...friction,
+      artifact: { ...friction.artifact, kind: "figure", figure: { kind: "vector", title: "Applied force", vector: { components: [3, 4, 0], units: "N" } } },
+    },
+    occupancy: [],
+    expected: { kinds: ["vector"], sourceRefs: friction.sourceRefs },
   },
 ];

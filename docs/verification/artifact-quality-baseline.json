@@ -1,0 +1,18 @@
+{
+  "reviewStatus": "pending-human-review",
+  "weights": {
+    "intent": 20,
+    "accuracy": 25,
+    "grounding": 20,
+    "pedagogy": 20,
+    "visual": 10,
+    "interaction": 5
+  },
+  "scenarios": [
+    { "name": "documented request", "labels": {} },
+    { "name": "ambiguous request", "labels": {} },
+    { "name": "multi-component torque package", "labels": {} },
+    { "name": "insufficient source", "labels": {} }
+  ],
+  "note": "Labels 0-5 must come from human-reviewed blind comparisons of recorded generations. This baseline intentionally has no scores or overall. No cloud run or model-on-model rating was used."
+}

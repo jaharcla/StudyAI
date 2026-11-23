@@ -1,0 +1,94 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "granular-force-incline",
+  "payload": {
+    "surface": "granular",
+    "taskId": "force-incline",
+    "calls": 4,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 5890,
+    "completionTokens": 2007,
+    "durationMs": 10725,
+    "attempts": 5,
+    "objects": 4,
+    "relationships": 1,
+    "completed": false,
+    "quality": 0.4,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-force-incline",
+              "type": "BLOCK",
+              "x": 100,
+              "y": 50,
+              "width": 200,
+              "height": 150
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "create_arrow",
+            "arguments": {
+              "boardId": "live-force-incline",
+              "fromX": 10,
+              "fromY": 5,
+              "toX": 8,
+              "toY": 8,
+              "label": "Gravity (G)"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-force-incline",
+              "type": "block",
+              "x": 100,
+              "y": 50,
+              "width": 20,
+              "height": 30
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "create_text",
+            "arguments": {
+              "boardId": "live-force-incline",
+              "x": 0.5,
+              "y": 0.3,
+              "text": "Gravity"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:35:32.968Z"
+}

@@ -1,0 +1,55 @@
+{
+  "note": "Deterministic routing baseline for recommendedToolsForQuery and shouldRetrieveCourseDocuments. No provider calls. Purpose: pin route correctness so advisory hints can be measured before any hint is deleted.",
+  "availableTools": [
+    "search_course_documents",
+    "propose_scientific_object",
+    "get_canvas_state",
+    "get_canvas_scene",
+    "read_canvas_ink",
+    "search_canvas_evidence",
+    "describe_canvas",
+    "propose_canvas_edit",
+    "propose_canvas_action",
+    "propose_molecule",
+    "search_fact_checks",
+    "author_board",
+    "get_artifact_capabilities"
+  ],
+  "cases": [
+    {
+      "query": "Explain cardiac output versus stroke volume",
+      "retrieve": true,
+      "expectedRoutes": []
+    },
+    {
+      "query": "According to my lecture notes, why does stroke volume increase?",
+      "retrieve": true,
+      "expectedRoutes": ["search_course_documents"]
+    },
+    {
+      "query": "transcribe the handwritten text",
+      "retrieve": true,
+      "expectedRoutes": ["read_canvas_ink", "propose_canvas_action"]
+    },
+    {
+      "query": "what is near the arrow?",
+      "retrieve": true,
+      "expectedRoutes": ["get_canvas_scene", "get_canvas_state", "propose_canvas_action"]
+    },
+    {
+      "query": "find the label across my boards",
+      "retrieve": true,
+      "expectedRoutes": ["search_canvas_evidence", "describe_canvas"]
+    },
+    {
+      "query": "verify this claim with a fact check",
+      "retrieve": true,
+      "expectedRoutes": ["search_fact_checks"]
+    },
+    {
+      "query": "I need more course context before I answer",
+      "retrieve": true,
+      "expectedRoutes": []
+    }
+  ]
+}

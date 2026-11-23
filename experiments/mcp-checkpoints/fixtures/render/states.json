@@ -1,0 +1,27 @@
+{
+  "states": [
+    {
+      "id": "signup-flow-B3",
+      "source": "Task 1 upstream artifact after third correction",
+      "expectedObjects": 8,
+      "note": "Used for the real repeat/render/export/snapshot loop recorded in phase-6-render.md"
+    },
+    {
+      "id": "molecule-ethanol",
+      "source": "fixtures/artifacts/tasks.json",
+      "expectedObjects": 9,
+      "status": "not rendered in this campaign"
+    },
+    {
+      "id": "overlap-stress",
+      "source": "fixtures/artifacts/tasks.json",
+      "expectedObjects": 6,
+      "status": "not rendered in this campaign"
+    }
+  ],
+  "tolerance": {
+    "geometryPx": 1,
+    "byteIdenticalPngRequired": false,
+    "rationale": "StudyAI and Excalidraw use different canvas engines; this harness checks object identity, geometry drift within 1px and export/render differences as separate fields."
+  }
+}

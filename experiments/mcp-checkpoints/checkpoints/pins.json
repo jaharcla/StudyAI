@@ -1,0 +1,45 @@
+{
+  "pinnedAt": "2026-11-23",
+  "checkpoints": [
+    {
+      "name": "mcp_excalidraw",
+      "url": "https://github.com/yctimlin/mcp_excalidraw",
+      "commit": "81720ac819d2325177cd6137c6ad41d52d0f5374",
+      "version": "mcp-excalidraw-server 2.2.0",
+      "license": "MIT",
+      "verifiedBy": "research: README, package.json and GitHub tree at pinned commit"
+    },
+    {
+      "name": "excalidraw-mcp",
+      "url": "https://github.com/excalidraw/excalidraw-mcp",
+      "commit": "157aa23ceb1976008aadc89eb05e3444060f09d6",
+      "version": "0.3.2",
+      "license": "MIT",
+      "verifiedBy": "research: package.json and GitHub tree at pinned commit"
+    },
+    {
+      "name": "handwriting-ocr-mcp-server",
+      "url": "https://github.com/Handwriting-OCR/handwriting-ocr-mcp-server",
+      "commit": "1afb28df399d2758f14fc93d0d95c6f440af7541",
+      "version": "0.1.0",
+      "license": "no LICENSE file in repository tree",
+      "verifiedBy": "research: package.json and GitHub tree at pinned commit"
+    },
+    {
+      "name": "PaddleOCR",
+      "url": "https://github.com/PaddlePaddle/PaddleOCR",
+      "commit": "dab3fe35379033fdcb2d0e9572fac0b36c9a9ebf",
+      "version": "mcp_server/paddleocr_mcp 0.8.5",
+      "license": "Apache-2.0 (source file headers)",
+      "verifiedBy": "research: mcp_server/pyproject.toml and GitHub tree at pinned commit"
+    },
+    {
+      "name": "dim0",
+      "url": "https://github.com/vcmf/dim0",
+      "commit": "1bf00bae37bf06234271b6e16e014f2395b3d335",
+      "version": "0.3.103",
+      "license": "MIT",
+      "verifiedBy": "research: VERSION file, README and GitHub tree at pinned commit"
+    }
+  ]
+}

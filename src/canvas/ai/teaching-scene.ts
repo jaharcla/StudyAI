@@ -2,6 +2,7 @@ import { z } from "zod";
 import { newId, type ScientificObject } from "../model";
 import { canvasActionSchema, type CanvasActionBatch } from "./canvas-actions";
 import { planLayout, type LayoutRect, type LayoutRequest } from "./layout";
+import { compileExpressionSync } from "../expressions";
 
 const nodeId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
 
@@ -46,7 +47,7 @@ const GAP_Y = 90;
 const CAPTION_WIDTH = 600;
 const CAPTION_HEIGHT = 40;
 /** Same working frame the tutor's canvas context uses, so placement and description agree. */
-const DEFAULT_VIEWPORT = { x: 0, y: 0, width: 4_000, height: 3_000 };
+export const DEFAULT_VIEWPORT = { x: 0, y: 0, width: 4_000, height: 3_000 };
 
 /**
  * Compiles a semantic teaching scene into the existing, review-gated shape action batch.
@@ -131,6 +132,12 @@ export const artifactBriefSchema = z.object({
     prompt: z.string().min(1).max(2000),
     answer: z.string().max(2000).optional(),
     citationLabel: z.string().max(200).optional(),
+    items: z.array(z.object({
+      prompt: z.string().min(1).max(2000),
+      answer: z.string().max(2000).optional(),
+      citationLabel: z.string().max(200).optional(),
+      sourceRef: z.string().min(1).max(400).optional(),
+    }).strict()).max(8).optional(),
     concepts: z.array(z.string().min(1).max(80)).max(8).default([]),
     figure: z.object({
       kind: z.enum(["freebody", "vector", "graph", "anatomy", "equation", "mindmap"]),
@@ -139,6 +146,17 @@ export const artifactBriefSchema = z.object({
         label: z.string().min(1).max(60),
         components: z.tuple([z.number(), z.number()]),
       })).min(1).max(8).optional(),
+      expression: z.string().min(1).max(500).optional(),
+      xRange: z.tuple([z.number(), z.number()]).optional(),
+      vector: z.object({
+        components: z.tuple([z.number(), z.number(), z.number()]),
+        units: z.string().min(1).max(40).optional(),
+        label: z.string().max(120).optional(),
+      }).optional(),
+      context: z.object({
+        surfaceAngleDeg: z.number().min(-180).max(180).optional(),
+        motionDirectionDeg: z.number().min(-180).max(180).optional(),
+      }).strict().optional(),
     }).optional(),
   }).strict(),
   placement: z.object({
@@ -149,6 +167,27 @@ export const artifactBriefSchema = z.object({
   reason: z.string().min(1).max(1000),
 }).strict().superRefine((value, context) => {
   if (new Set(value.sourceRefs).size !== value.sourceRefs.length) context.addIssue({ code: "custom", message: "sourceRefs must be unique." });
+  if (value.artifact.kind === "problem-set") {
+    if (!value.artifact.items) {
+      context.addIssue({ code: "custom", message: "A problem-set requires items with distinct prompts.", path: ["artifact", "items"] });
+    } else {
+      if (value.artifact.items.length !== value.artifact.count) context.addIssue({ code: "custom", message: "items.length must equal count; it is never clamped.", path: ["artifact", "items"] });
+      const prompts = value.artifact.items.map((item) => item.prompt);
+      if (new Set(prompts).size !== prompts.length) context.addIssue({ code: "custom", message: "Item prompts must be unique.", path: ["artifact", "items"] });
+    }
+  }
+  for (const item of value.artifact.items ?? []) {
+    if (item.sourceRef && !value.sourceRefs.includes(item.sourceRef)) {
+      context.addIssue({ code: "custom", message: `Item sourceRef "${item.sourceRef}" was not retrieved.`, path: ["artifact", "items"] });
+    }
+  }
+  const figure = value.artifact.figure;
+  if (figure?.kind === "graph") {
+    if (!figure.expression) context.addIssue({ code: "custom", message: "A graph figure requires an expression.", path: ["artifact", "figure", "expression"] });
+    if (!figure.xRange || figure.xRange[1] <= figure.xRange[0]) context.addIssue({ code: "custom", message: "A graph figure requires an xRange with maximum greater than minimum.", path: ["artifact", "figure", "xRange"] });
+  }
+  if (figure?.kind === "vector" && !figure.vector) context.addIssue({ code: "custom", message: "A vector figure requires components.", path: ["artifact", "figure", "vector"] });
+  if (figure?.kind === "equation" && !figure.expression) context.addIssue({ code: "custom", message: "An equation figure requires an expression.", path: ["artifact", "figure", "expression"] });
 });
 
 export type ArtifactBrief = z.infer<typeof artifactBriefSchema>;
@@ -192,7 +231,8 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
 
   const requests: LayoutRequest[] = [];
   if (input.artifact.figure) requests.push({ id: "figure", width: FIGURE_WIDTH, height: FIGURE_HEIGHT });
-  for (let index = 0; index < input.artifact.count; index++) requests.push({ id: `question-${index}`, width: QUESTION_WIDTH, height: QUESTION_HEIGHT });
+  const contentCount = input.artifact.kind === "figure" ? 0 : input.artifact.count;
+  for (let index = 0; index < contentCount; index++) requests.push({ id: `question-${index}`, width: QUESTION_WIDTH, height: QUESTION_HEIGHT });
 
   const plan = planLayout(requests, occupancy, viewport, { anchor });
   if (plan.status === "conflict") {
@@ -200,16 +240,49 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   }
   const rectangles = new Map(plan.placements.map((placement) => [placement.id, placement.rect]));
 
-  const objects: ScientificObject[] = [];
-  for (let index = 0; index < input.artifact.count; index++) {
-    const rect = rectangles.get(`question-${index}`)!;
-    objects.push({
+  type CompileContext = {
+    input: ArtifactBrief;
+    rectangles: Map<string, LayoutRect>;
+    provenance: { status: "generated-unverified"; sourceRefs: string[] };
+  };
+  const indices = (count: number) => Array.from({ length: count }, (_, index) => index);
+  const tagged = (ctx: CompileContext) => ({ ...ctx.provenance, sourceRefs: [...ctx.provenance.sourceRefs] });
+  const itemAt = (ctx: CompileContext, index: number) => ctx.input.artifact.items?.[index] ?? { prompt: ctx.input.artifact.prompt, ...(ctx.input.artifact.answer ? { answer: ctx.input.artifact.answer } : {}) };
+  const provenanceAt = (ctx: CompileContext, index: number) => {
+    const sourceRef = ctx.input.artifact.items?.[index]?.sourceRef;
+    return sourceRef ? { ...tagged(ctx), sourceRefs: [sourceRef] } : tagged(ctx);
+  };
+  const questionAt = (ctx: CompileContext, index: number, forcedAnswer?: string): ScientificObject => {
+    const rect = ctx.rectangles.get(`question-${index}`)!;
+    const item = itemAt(ctx, index);
+    const answer = forcedAnswer ?? item.answer;
+    return {
       id: newId("question"), kind: "question", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-      prompt: input.artifact.prompt,
-      ...(index === 0 && input.artifact.answer ? { answer: input.artifact.answer } : {}),
-      provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
-    });
-  }
+      prompt: item.prompt,
+      ...(answer ? { answer } : {}),
+      provenance: provenanceAt(ctx, index),
+    };
+  };
+
+  /** The advertised kind decides what is compiled. No kind silently falls through to another. */
+  const compileByKind: Record<ArtifactBrief["artifact"]["kind"], (ctx: CompileContext) => ScientificObject[]> = {
+    question: (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index)),
+    "problem-set": (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index)),
+    "worked-example": (ctx) => [questionAt(ctx, 0, ctx.input.artifact.answer ?? ctx.input.artifact.prompt)],
+    deck: (ctx) => indices(ctx.input.artifact.count).map((index) => {
+      const rect = ctx.rectangles.get(`question-${index}`)!;
+      const item = itemAt(ctx, index);
+      return {
+        id: newId("flashcard"), kind: "flashcard", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+        front: item.prompt, back: item.answer ?? "",
+        provenance: provenanceAt(ctx, index),
+      };
+    }),
+    figure: () => [],
+  };
+
+  const ctx: CompileContext = { input, rectangles, provenance };
+  const objects: ScientificObject[] = [...compileByKind[input.artifact.kind](ctx)];
 
   const figure = input.artifact.figure;
   const figureRect = rectangles.get("figure");
@@ -225,7 +298,7 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
           x: centreX + Math.cos(angle) * radius, y: centreY + Math.sin(angle) * radius,
           width: 24, height: 24, components: [force.components[0], force.components[1], 0],
           units: "N", label: force.label,
-          provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+          provenance: tagged(ctx),
         });
       });
     } else if (figure.kind === "mindmap") {
@@ -238,37 +311,74 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
           { id: "root", label: figure.title, x: centreX, y: centreY },
           ...input.artifact.concepts.slice(0, 6).map((concept, index) => ({ id: `c${index}`, label: concept, x: centreX + (index % 2 ? 100 : -100), y: centreY + (index - 1) * 44 })),
         ],
-        edges: [],
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        edges: input.artifact.concepts.slice(0, 6).map((_, index) => ({ from: "root", to: `c${index}` })),
+        provenance: tagged(ctx),
+      });
+    } else if (figure.kind === "graph") {
+      const expression = figure.expression;
+      const range = figure.xRange;
+      if (!expression || !range || range[1] <= range[0]) throw new Error("A graph figure requires an expression and an xRange with maximum greater than minimum.");
+      const evaluator = compileExpressionSync(expression);
+      if (evaluator.variables.some((name) => name !== "x")) throw new Error("A graph expression may only use x.");
+      const points: Array<[number, number]> = [];
+      try {
+        for (let index = 0; index <= 120; index++) {
+          const x = range[0] + (range[1] - range[0]) * index / 120;
+          points.push([x, evaluator.evaluate({ x })]);
+        }
+      } catch (error) {
+        throw new Error(`Graph expression produced a non-finite sample: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+      objects.push({
+        id: newId("graph"), kind: "graph", x: figureRect.x, y: figureRect.y,
+        width: figureRect.width, height: figureRect.height, expression,
+        xRange: [range[0], range[1]], points, xLabel: "x", yLabel: "y",
+        provenance: tagged(ctx),
       });
     } else if (figure.kind === "vector") {
+      const spec = figure.vector;
+      if (!spec) throw new Error("A vector figure requires components.");
+      const [cx, cy, cz] = spec.components;
+      if (![cx, cy, cz].every(Number.isFinite) || Math.hypot(cx, cy, cz) === 0) throw new Error("A vector figure requires finite components with non-zero magnitude.");
       objects.push({
         id: newId("vector"), kind: "vector", x: figureRect.x, y: figureRect.y,
-        width: figureRect.width, height: figureRect.height, components: [1, 0, 0], units: "N", label: figure.title,
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        width: figureRect.width, height: figureRect.height, components: [cx, cy, cz],
+        units: spec.units ?? "N", label: spec.label ?? figure.title,
+        provenance: tagged(ctx),
       });
     } else if (figure.kind === "anatomy") {
       objects.push({
         id: newId("anatomy"), kind: "anatomy", x: figureRect.x, y: figureRect.y,
         width: figureRect.width, height: figureRect.height, structureId: figure.title, system: "",
         labels: input.artifact.concepts.slice(0, 8),
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        provenance: tagged(ctx),
       });
-    } else {
+    } else if (figure.kind === "equation") {
+      const expression = figure.expression;
+      if (!expression) throw new Error("An equation figure requires an expression.");
+      compileExpressionSync(expression);
       objects.push({
         id: newId("equation"), kind: "equation", x: figureRect.x, y: figureRect.y,
-        width: figureRect.width, height: figureRect.height, expression: figure.title, variables: {},
-        provenance: { ...provenance, sourceRefs: [...provenance.sourceRefs] },
+        width: figureRect.width, height: figureRect.height, expression, variables: {},
+        provenance: tagged(ctx),
       });
+    } else {
+      throw new Error(`Unsupported figure kind: ${figure.kind}`);
     }
   }
 
   const forceLabels = figure?.forces?.map((force) => force.label) ?? [];
   const citation = input.artifact.citationLabel ?? input.sourceRefs.join(", ") ?? "no cited source";
   const where = input.placement.relation === "clear-area" ? "the clear area" : `${input.placement.relation} your sketch`;
-  const figureText = figure ? ` and 1 ${figure.kind} diagram${forceLabels.length ? ` (${forceLabels.join(", ")})` : ""}` : "";
-  const countText = `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`;
-  const description = `adds ${countText}${figureText} in ${where}, citing ${citation} — generated, not verified`;
+  const figureText = figure ? `1 ${figure.kind} diagram${forceLabels.length ? ` (${forceLabels.join(", ")})` : ""}` : "";
+  const countText: Record<ArtifactBrief["artifact"]["kind"], string> = {
+    question: `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`,
+    "problem-set": `${input.artifact.count} question${input.artifact.count === 1 ? "" : "s"}`,
+    "worked-example": "1 worked example",
+    deck: `${input.artifact.count} flashcard${input.artifact.count === 1 ? "" : "s"}`,
+    figure: "",
+  };
+  const description = `adds ${[countText[input.artifact.kind], figureText].filter(Boolean).join(" and ")} in ${where}, citing ${citation} — generated, not verified`;
 
   return { objects, description, sourceRefs: [...input.sourceRefs], verification: "generated-unverified" };
 }

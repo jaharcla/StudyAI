@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "id": "block",
+      "type": "rectangle",
+      "text": "Block (mass m)",
+      "x": 260,
+      "y": 180,
+      "width": 100,
+      "height": 50
+    },
+    {
+      "id": "W",
+      "type": "ellipse",
+      "text": "W",
+      "x": 280,
+      "y": 270,
+      "width": 60,
+      "height": 40
+    },
+    {
+      "id": "f",
+      "type": "ellipse",
+      "text": "f",
+      "x": 160,
+      "y": 100,
+      "width": 60,
+      "height": 40
+    },
+    {
+      "id": "N",
+      "type": "ellipse",
+      "text": "N",
+      "x": 410,
+      "y": 100,
+      "width": 60,
+      "height": 40
+    },
+    {
+      "id": "mg",
+      "type": "ellipse",
+      "text": "mg",
+      "x": 410,
+      "y": 270,
+      "width": 60,
+      "height": 40
+    },
+    {
+      "id": "plane",
+      "type": "rectangle",
+      "text": "Inclined Plane",
+      "x": 100,
+      "y": 360,
+      "width": 400,
+      "height": 50
+    },
+    {
+      "id": "angle",
+      "type": "diamond",
+      "text": "θ",
+      "x": 540,
+      "y": 230,
+      "width": 80,
+      "height": 70
+    }
+  ],
+  "edges": [
+    {
+      "from": "block",
+      "to": "W",
+      "label": ""
+    },
+    {
+      "from": "block",
+      "to": "f",
+      "label": ""
+    },
+    {
+      "from": "block",
+      "to": "N",
+      "label": ""
+    },
+    {
+      "from": "block",
+      "to": "mg",
+      "label": ""
+    },
+    {
+      "from": "plane",
+      "to": "angle",
+      "label": ""
+    }
+  ]
+}

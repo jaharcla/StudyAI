@@ -1,0 +1,110 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "granular-signup-flow",
+  "payload": {
+    "surface": "granular",
+    "taskId": "signup-flow",
+    "calls": 6,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 7158,
+    "completionTokens": 2517,
+    "durationMs": 43090,
+    "attempts": 6,
+    "objects": 5,
+    "relationships": 1,
+    "completed": false,
+    "quality": 0.51,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "type": "title",
+              "x": 300,
+              "y": 50,
+              "width": 200,
+              "height": 40,
+              "label": "Sign Up Flow"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "create_text",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "text": "Sign Up Flow"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "create_text",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "text": "FREE TRIAL"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "create_shape",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "type": "title",
+              "label": "Sign Up Now"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "read_scene",
+            "arguments": {
+              "boardId": "live-signup-flow"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "create_arrow",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "fromX": 125,
+              "fromY": 260,
+              "toX": 80,
+              "toY": 240,
+              "label": "Step 1: Input Form Submission"
+            }
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:38:10.351Z"
+}

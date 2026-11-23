@@ -1,0 +1,278 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "current-vector-addition",
+  "payload": {
+    "surface": "current",
+    "taskId": "vector-addition",
+    "calls": 6,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 8265,
+    "completionTokens": 4165,
+    "durationMs": 87976,
+    "attempts": 6,
+    "objects": 10,
+    "relationships": 4,
+    "completed": true,
+    "quality": 1,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "vector_A_origin",
+                  "kind": "createArrow",
+                  "text": "A",
+                  "to": {
+                    "x": 10,
+                    "y": 5
+                  },
+                  "type": "arrow"
+                }
+              ],
+              "boardId": "live-vector-addition"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "actions": [
+                {
+                  "from": {
+                    "x": 100,
+                    "y": 200
+                  },
+                  "id": "vectorA",
+                  "kind": "createText",
+                  "text": "Vector A",
+                  "to": {
+                    "x": 50,
+                    "y": 400
+                  },
+                  "type": "vector"
+                },
+                {
+                  "from": {
+                    "x": 100,
+                    "y": 400
+                  },
+                  "id": "vectorB",
+                  "kind": "createText",
+                  "text": "Vector B",
+                  "to": {
+                    "x": 250,
+                    "y": 300
+                  },
+                  "type": "vector"
+                },
+                {
+                  "from": {
+                    "x": 250,
+                    "y": 150
+                  },
+                  "id": "resR",
+                  "kind": "createArrow",
+                  "label": "Vector A + Vector B",
+                  "text": "Resultant R",
+                  "to": {
+                    "x": 100,
+                    "y": 400
+                  },
+                  "type": "vector"
+                },
+                {
+                  "from": {
+                    "x": 300,
+                    "y": 600
+                  },
+                  "id": "resR_label",
+                  "kind": "createArrow",
+                  "label": "+ Vector A + Vector B",
+                  "text": "Resultant R Direction",
+                  "to": {
+                    "x": 50,
+                    "y": 100
+                  },
+                  "type": "vector"
+                }
+              ],
+              "boardId": "live-vector-addition"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "a",
+                  "text": "A",
+                  "to": {
+                    "x": 1,
+                    "y": 0
+                  },
+                  "type": "createVector"
+                },
+                {
+                  "from": {
+                    "x": 1,
+                    "y": 0
+                  },
+                  "id": "b",
+                  "text": "B",
+                  "to": {
+                    "x": 3,
+                    "y": 1
+                  },
+                  "type": "createVector"
+                },
+                {
+                  "from": {
+                    "x": 3,
+                    "y": 1
+                  },
+                  "id": "r",
+                  "text": "R",
+                  "to": {
+                    "x": 1,
+                    "y": 0
+                  },
+                  "type": "createVector"
+                }
+              ],
+              "boardId": "live-vector-addition"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-vector-addition",
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "vecA",
+                  "kind": "createArrow",
+                  "text": "vector A"
+                }
+              ],
+              "top": ""
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-vector-addition",
+              "actions": [
+                {
+                  "from": {
+                    "x": 5,
+                    "y": 5
+                  },
+                  "id": "Vector-A",
+                  "kind": "createShape",
+                  "to": {
+                    "x": 10,
+                    "y": 5
+                  },
+                  "type": "vector"
+                },
+                {
+                  "from": {
+                    "x": 5,
+                    "y": 5
+                  },
+                  "id": "Vector-B",
+                  "kind": "createShape",
+                  "to": {
+                    "x": 20,
+                    "y": 5
+                  },
+                  "type": "vector"
+                },
+                {
+                  "from": {
+                    "x": 20,
+                    "y": 5
+                  },
+                  "id": "Resultant-R",
+                  "kind": "createText",
+                  "text": "Vector Addition Result:",
+                  "type": "text"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-vector-addition",
+              "actions": [
+                {
+                  "from": {
+                    "x": 10,
+                    "y": 2
+                  },
+                  "id": "vector_a_start",
+                  "kind": "createShape",
+                  "text": "vectors A start at (10, 2)",
+                  "to": {
+                    "x": 15,
+                    "y": 6
+                  },
+                  "type": "vector"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:33:51.259Z"
+}

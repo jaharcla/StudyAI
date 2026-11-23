@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { artifactBriefSchema, compileArtifactBrief } from "../src/canvas/ai/teaching-scene";
+import { compileExpression } from "../src/canvas/expressions";
 import { applyArtifactBriefProposal, proposeArtifactBrief } from "../src/canvas/tutor";
 import { emptyCanvasDocument, parseCanvasDocument, type ScientificObject } from "../src/canvas/model";
 import type { LayoutRect } from "../src/canvas/ai/layout";
@@ -110,6 +111,172 @@ describe("compileArtifactBrief", () => {
   });
 });
 
+describe("artifact.kind dispatch", () => {
+  const briefFor = (kind: string) => artifactBriefSchema.parse({
+    ...frictionBrief,
+    artifact: { ...frictionBrief.artifact, kind },
+  });
+
+  it("question compiles to a question plus its figure", () => {
+    const compiled = compileArtifactBrief(briefFor("question"), { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "force", "force", "force"]);
+  });
+
+  it("figure compiles to figure objects only, with no question", () => {
+    const compiled = compileArtifactBrief(briefFor("figure"), { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["force", "force", "force"]);
+    expect(compiled.objects.some((object) => object.kind === "question")).toBe(false);
+  });
+
+  it("worked-example compiles to a worked question carrying steps plus its figure", () => {
+    const compiled = compileArtifactBrief(briefFor("worked-example"), { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "force", "force", "force"]);
+    const worked = compiled.objects.find((object) => object.kind === "question") as Extract<ScientificObject, { kind: "question" }>;
+    expect(worked.answer).toContain("Friction opposes");
+  });
+
+  it("deck compiles to one flashcard per count rather than questions", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "deck", count: 3, figure: undefined },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["flashcard", "flashcard", "flashcard"]);
+    const cards = compiled.objects as Array<Extract<ScientificObject, { kind: "flashcard" }>>;
+    expect(cards.every((card) => card.front.length > 0 && card.back.length > 0)).toBe(true);
+  });
+
+  it("problem-set compiles to count question objects", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "problem-set", count: 2, figure: undefined,
+        items: [{ prompt: "First problem." }, { prompt: "Second problem." }],
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "question"]);
+  });
+});
+
+describe("problem-set items", () => {
+  const problemItems = [
+    { prompt: "State the friction direction.", answer: "Uphill.", sourceRef: "module-1#p4" },
+    { prompt: "Name the normal force.", answer: "Perpendicular to the surface.", sourceRef: "module-1#p4" },
+    { prompt: "What does gravity do here?", answer: "Acts downward.", sourceRef: "module-1#p4" },
+  ];
+  const briefWithItems = (items: Array<{ prompt: string; answer?: string; sourceRef?: string }>, count = items.length) => ({
+    ...frictionBrief,
+    artifact: { ...frictionBrief.artifact, kind: "problem-set", count, figure: undefined, items },
+  });
+
+  it("compiles distinct prompts in order, each with its own citation", () => {
+    const compiled = compileArtifactBrief(artifactBriefSchema.parse(briefWithItems(problemItems)), { viewport });
+    const questions = compiled.objects as Array<Extract<ScientificObject, { kind: "question" }>>;
+    expect(questions.map((question) => question.prompt)).toEqual(problemItems.map((item) => item.prompt));
+    expect(questions.map((question) => question.answer)).toEqual(problemItems.map((item) => item.answer));
+    expect(questions.map((question) => question.provenance?.sourceRefs)).toEqual(problemItems.map(() => ["module-1#p4"]));
+  });
+
+  it("rejects two items sharing a prompt", () => {
+    expect(() => artifactBriefSchema.parse(briefWithItems([
+      problemItems[0], { ...problemItems[1], prompt: problemItems[0].prompt },
+    ]))).toThrow(/unique|distinct/i);
+  });
+
+  it("rejects a count/items.length disagreement instead of clamping", () => {
+    expect(() => artifactBriefSchema.parse(briefWithItems(problemItems, 2))).toThrow(/count|match|length/i);
+  });
+
+  it("rejects a problem-set without items so silent duplication is impossible", () => {
+    expect(() => artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "problem-set", figure: undefined },
+    })).toThrow(/items/i);
+  });
+
+  it("rejects an item sourceRef that was not retrieved", () => {
+    expect(() => artifactBriefSchema.parse(briefWithItems([
+      { ...problemItems[0], sourceRef: "invented#p99" }, ...problemItems.slice(1),
+    ]))).toThrow(/sourceRef/i);
+  });
+});
+
+describe("real graph and vector figures", () => {
+  it("compiles a graph figure into sampled points that match the expression evaluator", async () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "graph", title: "y = x^2", expression: "x^2", xRange: [-2, 2] },
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    const graph = compiled.objects.find((object) => object.kind === "graph") as Extract<ScientificObject, { kind: "graph" }> | undefined;
+    expect(graph).toBeDefined();
+    expect(graph!.points.length).toBeGreaterThan(1);
+    expect(graph!.xRange).toEqual([-2, 2]);
+    const evaluator = await compileExpression(graph!.expression);
+    for (const [x, y] of graph!.points) expect(y).toBeCloseTo(evaluator.evaluate({ x }), 6);
+  });
+
+  it("compiles a vector figure with the supplied components and units, not a hardcoded arrow", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "vector", title: "Applied force", vector: { components: [3, 4, 0], units: "N" } },
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    const vector = compiled.objects.find((object) => object.kind === "vector") as Extract<ScientificObject, { kind: "vector" }> | undefined;
+    expect(vector).toBeDefined();
+    expect(vector!.components).toEqual([3, 4, 0]);
+    expect(vector!.units).toBe("N");
+    expect(vector!.components).not.toEqual([1, 0, 0]);
+  });
+
+  it("rejects a graph with no expression or an inverted range instead of emitting an equation", () => {
+    const base = {
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "figure" },
+    };
+    expect(() => artifactBriefSchema.parse({
+      ...base, artifact: { ...base.artifact, figure: { kind: "graph", title: "No expression", xRange: [-1, 1] } },
+    })).toThrow(/expression/i);
+    expect(() => artifactBriefSchema.parse({
+      ...base, artifact: { ...base.artifact, figure: { kind: "graph", title: "Inverted", expression: "x^2", xRange: [2, -2] } },
+    })).toThrow(/range/i);
+  });
+
+  it("rejects a zero-magnitude vector", () => {
+    const brief = {
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "vector", title: "Zero", vector: { components: [0, 0, 0], units: "N" } },
+      },
+    };
+    expect(() => compileArtifactBrief(artifactBriefSchema.parse(brief), { viewport })).toThrow(/magnitude/i);
+  });
+});
+
+describe("artifact descriptions", () => {
+  it("describes a figure brief without a dangling 'and'", () => {
+    const brief = artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: {
+        ...frictionBrief.artifact, kind: "figure",
+        figure: { kind: "graph", title: "y = x^2", expression: "x^2", xRange: [-2, 2] },
+      },
+    });
+    const compiled = compileArtifactBrief(brief, { viewport });
+    expect(compiled.description).toMatch(/^adds 1 graph diagram in /);
+    expect(compiled.description).not.toMatch(/adds\s+and /i);
+    expect(compiled.description).toContain("Module 1 · p. 4");
+  });
+});
+
 describe("ArtifactBrief proposal", () => {
   const context = { boardId: "board-a", courseId: "chem-120", lessonId: "lesson-03", revision: 7, objects: [] as ScientificObject[] };
 
@@ -120,6 +287,34 @@ describe("ArtifactBrief proposal", () => {
     const applied = applyArtifactBriefProposal(context, proposal);
     expect(applied).toHaveLength(4);
     expect(() => parseCanvasDocument({ ...emptyCanvasDocument(), objects: applied })).not.toThrow();
+  });
+
+  it("applies each advertised kind as exactly its compiled bundle and stays parseable", () => {
+    const cases: Array<{ kind: string; count: number; expected: string[]; items?: Array<{ prompt: string }> }> = [
+      { kind: "question", count: 1, expected: ["question", "force", "force", "force"] },
+      { kind: "problem-set", count: 2, expected: ["question", "question"], items: [{ prompt: "First." }, { prompt: "Second." }] },
+      { kind: "figure", count: 1, expected: ["force", "force", "force"] },
+      { kind: "worked-example", count: 1, expected: ["question", "force", "force", "force"] },
+      { kind: "deck", count: 2, expected: ["flashcard", "flashcard"] },
+    ];
+    for (const testCase of cases) {
+      const brief = artifactBriefSchema.parse({
+        ...frictionBrief,
+        artifact: {
+          ...frictionBrief.artifact,
+          kind: testCase.kind,
+          count: testCase.count,
+          figure: testCase.kind === "problem-set" || testCase.kind === "deck" ? undefined : frictionBrief.artifact.figure,
+          ...(testCase.items ? { items: testCase.items } : {}),
+        },
+      });
+      const proposal = proposeArtifactBrief(context, brief, 7);
+      const applied = applyArtifactBriefProposal(context, proposal);
+      expect(applied.map((object) => object.kind)).toEqual(testCase.expected);
+      expect(applied.map((object) => object.id)).toEqual(proposal.objects.map((object) => object.id));
+      expect(applied.every((object) => object.provenance?.status === "generated-unverified")).toBe(true);
+      expect(() => parseCanvasDocument({ ...emptyCanvasDocument(), objects: applied })).not.toThrow();
+    }
   });
 
   it("refuses a stale revision and a changed board", () => {

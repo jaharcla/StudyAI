@@ -1,0 +1,155 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "batched-overlap-stress",
+  "payload": {
+    "surface": "batched",
+    "taskId": "overlap-stress",
+    "calls": 5,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 3702,
+    "completionTokens": 1591,
+    "durationMs": 40346,
+    "attempts": 6,
+    "objects": 4,
+    "relationships": 2,
+    "completed": false,
+    "quality": 0.67,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "read_scene",
+            "arguments": {
+              "boardId": "live-overlap-stress"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "title": "Three overlapping boxes - Stress Defect Detection",
+              "nodes": "[{\"id\": \"box1\", \"text\": \"Large red box with text \\\"DEFECT DETECTION\\\"\", \"type\": \"box\", \"x\": 0, \"y\": 0}, {\"id\": \"box2\", \"text\": \"Medium red box with text \\\"DETECTED: PASS\\\"\", \"type\": \"box\", \"x\": 150, \"y\": 150}, {\"id\": \"box3\", \"text\": \"Small yellow box with text \\\"WARNING: DETECTED\\\"\", \"type\": \"box\", \"x\": 300, \"y\": 300}], \"edges\": [{\"from\": \"box1\", \"label\": \"defect detection\", \"to\": \"box2\"}, {\"from\": \"box2\", \"label\": \"cross connector\", \"to\": \"box3\"}, {\"from\": \"box1\", \"label\": \"cross connector\", \"to\": \"box2\"}]}"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "title": "Crossing Connections and Defects in Overlapping Boxes",
+              "nodes": "[{\"id\": \"cross\", \"text\": \"Line segments connect corners of overlapping boxes.\", \"type\": \"connector\", \"x\": 0.5, \"y\": 0.8}, {\"id\": \"overlap\", \"text\": \"Multiple box vertices represent overlapping regions.\", \"type\": \"object\", \"x\": 1.2, \"y\": 0.5}, {\"id\": \"label1\", \"text\": \"Label: 'Defect', color:red\", \"type\": \"text\", \"x\": 3.5, \"y\": 0.9}, {\"id\": \"label2\", \"text\": \"Label: 'Good'\", color:green\", \"type\": \"text\", \"x\": 1.5, \"y\": 0.7}, {\"id\": \"label3\", \"text\": \"Label: 'Critical', color:red\", \"type\": \"text\", \"x\": 2.8, \"y\": 0.9}]",
+              "edges": [
+                {
+                  "from": "cross",
+                  "to": "overlap"
+                },
+                {
+                  "from": "overlap",
+                  "to": "label1"
+                },
+                {
+                  "from": "overlap",
+                  "to": "label2"
+                },
+                {
+                  "from": "overlap",
+                  "to": "label3"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "title": "Overlapping Defect Detection Boxes",
+              "nodes": "[{\"id\": \"B01\", \"text\": \"Defect Detection\", \"type\": \"box\", \"x\": 150, \"y\": 200}, {\"id\": \"B02\", \"text\": \"Stress Points (A)\", \"type\": \"box\", \"x\": 350, \"y\": 200}, {\"id\": \"B03\", \"text\": \"Defect Detection Points (B)\", \"type\": \"box\", \"x\": 180, \"y\": 400}], \"edges\": [{\"from\": \"B01\", \"label\": \"defect_detection_node\", \"to\": \"B02\"}, {\"from\": \"B01\", \"label\": \"crossing_connector\", \"to\": \"B03\"}, {\"from\": \"B02\", \"label\": \"overlap_indicator\", \"to\": \"B03\"}]}"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "author_board",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "title": "Defect Detection Overlap Box",
+              "nodes": [
+                {
+                  "id": "box1",
+                  "text": "Defect Box A",
+                  "type": "Box",
+                  "x": 50,
+                  "y": 200
+                },
+                {
+                  "id": "box2",
+                  "text": "Defect Box B",
+                  "type": "Box",
+                  "x": 80,
+                  "y": 200
+                },
+                {
+                  "from": "box1",
+                  "id": "connector_1",
+                  "text": "",
+                  "to": "box2",
+                  "type": "Connector"
+                },
+                {
+                  "from": "box2",
+                  "id": "connector_2",
+                  "text": "",
+                  "to": "box1",
+                  "type": "Connector"
+                }
+              ],
+              "edges": [
+                {
+                  "from": "box1",
+                  "label": "Box 1",
+                  "to": "box2"
+                },
+                {
+                  "from": "box2",
+                  "label": "Box 2",
+                  "to": "box1"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [],
+        "content": "The following objects were created successfully.\n\n**Tools Used:** `read_scene`, `author_board`\n\n**Board Details:** Created the board with 0 objects initially and 4 additional objects after creating the artifact for stress detection."
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:43:46.639Z"
+}

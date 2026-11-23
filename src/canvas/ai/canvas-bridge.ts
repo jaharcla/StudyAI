@@ -10,6 +10,7 @@ import { compileTeachingScene, teachingSceneSchema } from "./teaching-scene";
 import { objectOccupancy } from "./layout";
 import { buildTutorCanvasContext } from "./tutor-canvas-context";
 import { boardOccupancy, buildCanvasAIContext, type CanvasScope } from "./canvas-context";
+import { getArtifactCapabilities } from "../../../server/artifact-intelligence/capabilities";
 
 export type QuickdrawAIBridgeOptions = {
   store: Store | null;
@@ -130,6 +131,12 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     description: "Read-only. Returns the canonical layout and annotation guide for the scientific canvas. Read it before proposing a diagram so shapes, arrows, and captions follow the same conventions.",
     parameters: z.object({}).strict(),
     handler: async () => ({ guide: CANVAS_DESIGN_GUIDE }),
+  }, []);
+  useFrontendTool({
+    name: "get_artifact_capabilities",
+    description: "Read-only and advisory. Lists the artifact kinds each renderer owns, the deterministic validators, and the item limit. It cannot read a board or apply an artifact; author_board remains the only apply verb. Use it to judge what a request can produce. If course evidence is insufficient, call search_course_documents again rather than inventing content.",
+    parameters: z.object({}).strict(),
+    handler: async () => ({ capabilities: getArtifactCapabilities() }),
   }, []);
   useFrontendTool({
     name: "propose_teaching_scene",

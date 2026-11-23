@@ -1,0 +1,46 @@
+{
+  "artifacts": [
+    {
+      "id": "force-incline",
+      "kind": "force-diagram",
+      "prompt": "Draw a block on an inclined plane with labelled gravity, normal and friction force arrows.",
+      "expectedObjects": 8,
+      "expectedRelationships": 4
+    },
+    {
+      "id": "vector-addition",
+      "kind": "vector-diagram",
+      "prompt": "Draw two vectors A and B tip-to-tail and their resultant R with direction labels.",
+      "expectedObjects": 6,
+      "expectedRelationships": 4
+    },
+    {
+      "id": "cell-anatomy",
+      "kind": "labelled-anatomy",
+      "prompt": "Draw a simplified animal cell with membrane, nucleus and mitochondria, each correctly labelled.",
+      "expectedObjects": 9,
+      "expectedRelationships": 5
+    },
+    {
+      "id": "signup-flow",
+      "kind": "flowchart",
+      "prompt": "Draw a four-step signup flowchart with a decision branch and a title.",
+      "expectedObjects": 8,
+      "expectedRelationships": 3
+    },
+    {
+      "id": "molecule-ethanol",
+      "kind": "molecular-structure",
+      "prompt": "Draw ethanol with all atoms, single bonds and correctly labelled bond orders.",
+      "expectedObjects": 9,
+      "expectedRelationships": 8
+    },
+    {
+      "id": "overlap-stress",
+      "kind": "mispositioned-diagram",
+      "prompt": "Draw three overlapping boxes with long labels and crossing connectors to stress defect detection.",
+      "expectedObjects": 6,
+      "expectedRelationships": 3
+    }
+  ]
+}
