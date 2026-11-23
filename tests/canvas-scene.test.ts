@@ -44,6 +44,20 @@ describe("canvas scene graph", () => {
     expect(index.nearest({ x: 20, y: 20 }, 2).map((item) => item.node.id)).toContain("q:d1");
   });
 
+  it("finds early nodes after the index crosses the linear threshold", () => {
+    const index = createCanvasSpatialIndex({ linearThreshold: 8 });
+    for (let i = 0; i < 20; i++) {
+      index.insert({
+        id: `n${i}`, kind: "stroke", ref: { scope: "quickdraw", id: `n${i}` },
+        bounds: { x: i * 10, y: 0, width: 5, height: 5 }, boundsBasis: "source",
+        text: `n${i}`, recordType: "stroke", origin: "quickdraw", verificationStatus: "source",
+        confidence: 1, sourceRefs: [], geometry: null, uncertaintyReasons: [],
+      });
+    }
+    const ids = index.query({ x: 0, y: 0, width: 200, height: 20 }).map((node) => node.id);
+    expect(ids).toEqual(expect.arrayContaining(["n0", "n1", "n7", "n19"]));
+  });
+
   it("adds recognition candidates and analysis evidence as unconfirmed nodes", async () => {
     const recognition = await recognizeCanvasStrokes(input(), { mode: "baseline" });
     const analysis = {

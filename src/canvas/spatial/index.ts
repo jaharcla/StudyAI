@@ -33,9 +33,14 @@ export class CanvasGridSpatialIndex implements CanvasSpatialIndex {
   }
 
   insert(node: CanvasSceneNode): void {
+    const wasLinear = this.nodes.size <= this.linearThreshold;
     this.nodes.set(node.id, node);
     if (this.nodes.size <= this.linearThreshold) return;
-    this.insertGrid(node);
+    if (wasLinear) {
+      for (const existing of this.nodes.values()) this.insertGrid(existing);
+    } else {
+      this.insertGrid(node);
+    }
   }
 
   private insertGrid(node: CanvasSceneNode) {
