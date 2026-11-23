@@ -40,6 +40,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Root tests import hosted/src modules, which need hosted's own pinned deps.
+      - name: Install hosted Worker deps
+        run: npm ci --prefix hosted
+
       - name: Lint
         run: npm run lint
 
