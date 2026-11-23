@@ -1,0 +1,27 @@
+{
+  "artifactTasks": "see ../artifacts/tasks.json (six artifact kinds)",
+  "surfaces": {
+    "current": {
+      "description": "StudyAI's registered CopilotKit frontend tools, unchanged",
+      "tools": [
+        "propose_canvas_action",
+        "get_canvas_state",
+        "get_canvas_scene",
+        "read_canvas_ink",
+        "search_canvas_evidence",
+        "describe_canvas",
+        "read_design_guide",
+        "get_artifact_capabilities",
+        "propose_teaching_scene",
+        "propose_scientific_object"
+      ]
+    },
+    "granular": {
+      "description": "One tool per primitive (create_shape, move_shape, set_text, bind_arrow, set_viewport, etc.); defined as a hypothesis only, not implemented"
+    },
+    "batched": {
+      "description": "One composite author_board tool taking a typed scene description; defined as a hypothesis only, not implemented"
+    }
+  },
+  "status": "surfaces defined; identical-task runs require a model and have not been executed"
+}
