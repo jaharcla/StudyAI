@@ -12,16 +12,22 @@ Per the pre-registered protocol, the refusal case and the two held-out cases are
 
 | Scenario | Pedagogy | Composite (diagnostic) |
 |---|---:|---:|
-| documented request | 3 | 0.78 |
+| documented request | 2.00 (mean of 3 and 1) | 0.78 |
 | ambiguous request | 4 | 0.75 |
 | multi-component torque package | 4 | 0.88 |
 
-- Overall pedagogy mean: **3.67 / 5** (required ≥ 4.0) — **fail**.
-- Per-scenario floor: documented request 3.0 below 3.5 — **fail**.
+- Overall pedagogy mean: **3.33 / 5** (required ≥ 4.0) — **fail**.
+- Per-scenario floor: documented request 2.00 below 3.5 — **fail**.
 - Critical-failure veto: none observed.
 - Determinism: five packages passed five legality repeats each; the refusal outcome is exempt — **pass**.
 
-**Result: NOT QUALIFIED.** If documented-request pedagogy were 4 instead of 3, the mean would be exactly 4.0 and the floor would pass. The verdict therefore rests on one integer from one reviewer on one generation.
+**Result: NOT QUALIFIED.**
+
+### Second reviewer
+
+An independent reviewer scored documented-request pedagogy **1/5** from a single-case blind sheet with no case name, cycle, model or prior score. Their reasoning: the renamed angle and nouns are cosmetic; the answer restates the explanation with one symbol swapped; the question supplies the sliding direction, so no reasoning from motion to friction direction is required; and the package objective's "new ramp angle" is only a renamed variable.
+
+The aggregation rule in `docs/decisions/ADR-2026-11-23-second-reviewer-rule.md` was committed before the score was seen. It takes the arithmetic mean of independent scores, so 3 and 1 become 2.00. Both scores are preserved in the baseline. The original reviewer had already flagged their own earlier 4 on the same question as generous; the second review supports that caveat. No further rubric or threshold change was made after seeing the score.
 
 ## Reported but not gated
 
@@ -46,4 +52,4 @@ One reviewer who saw cycles 1–3 in order. Sheet order was shuffled and model i
 
 ## Decision
 
-No Phase 4. The reviewer's recommendation stands: obtain an independent second score for documented-request pedagogy before treating this single integer as decisive. Thresholds were fixed before cycle 1 and remain unchanged.
+No Phase 4. The independent second score has now been obtained and applied under the pre-registered rule, and the failure is no longer marginal: both the mean and the per-case floor fail clearly. Thresholds were fixed before cycle 1 and remain unchanged. A future cycle must fix the transfer-question defect at the composer level rather than seek a more favourable reviewer.

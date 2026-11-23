@@ -91,8 +91,17 @@ describe("committed baseline", () => {
   it("binds four recorded generations and keeps identity out of the review sheet", () => {
     const baseline = JSON.parse(readFileSync("docs/verification/artifact-quality-baseline.json", "utf8")) as {
       generations: string; meta: string; reviewSheet: string; legalityRepeats: string; gate: QualityGate;
-      scenarios: Array<{ name: string; generationId: string; labels: Record<string, number>; refusalRubric?: boolean }>;
+      scenarios: Array<{
+        name: string;
+        generationId: string;
+        labels: Record<string, number>;
+        refusalRubric?: boolean;
+        reviewerScores?: { pedagogy: number[] };
+      }>;
     };
+    const disputed = baseline.scenarios.find((scenario) => scenario.reviewerScores);
+    expect(disputed?.reviewerScores?.pedagogy).toEqual([3, 1]);
+    expect(disputed?.labels.pedagogy).toBe(2);
     const records = JSON.parse(readFileSync(baseline.generations, "utf8")) as {
       generations: Array<{ id: string; status: string }>;
     };

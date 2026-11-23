@@ -52,8 +52,16 @@
       "The reviewer declined to assign numeric refusal scores without seeing the rubric; the refusal case has no numeric labels.",
       "Held-out cases are labelled as such in the sheet and are excluded from the gate by the pre-registered protocol."
     ],
+    "secondReview": {
+      "scope": "documented-request pedagogy only",
+      "score": 1,
+      "sheet": "docs/verification/independent-pedagogy-review-generation-A.md",
+      "rule": "docs/decisions/ADR-2026-11-23-second-reviewer-rule.md",
+      "rationale": "The renamed angle and nouns are cosmetic; the answer restates the explanation with one symbol swapped. The question supplies the sliding direction, so no reasoning from motion to friction direction is required."
+    },
     "notes": [
-      "Documented-request pedagogy 3 is a cosmetic variable swap; the reviewer notes part of the 82 to 78 drop is recalibration, not regression.",
+      "Documented-request pedagogy has two independent scores, 3 and 1; the gate input is their pre-registered mean of 2.00.",
+      "The second reviewer's reasoning agrees with the first reviewer's own caveat that the earlier 4 was generous.",
       "Torque improved from 70 to 88 through force positions and a transfer question, supporting the schema/composer diagnosis.",
       "Held-out cases scored 80 and 81, in line with fixed cases, as generalisation evidence.",
       "Model-supplied provenance timestamps were invalid and are not credited; the generator now stamps time on the record instead.",
@@ -65,7 +73,8 @@
     {
       "name": "documented request",
       "generationId": "documented-request",
-      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 3, "visual": 2, "interaction": 1 }
+      "reviewerScores": { "pedagogy": [3, 1] },
+      "labels": { "intent": 5, "accuracy": 5, "grounding": 4, "pedagogy": 2, "visual": 2, "interaction": 1 }
     },
     {
       "name": "ambiguous request",
@@ -102,5 +111,5 @@
       "heldOut": true
     }
   ],
-  "note": "The frozen gate averages pedagogy over the three non-refusal, non-held-out scenarios: documented 3, ambiguous 4, torque 4. Thresholds were fixed before cycle 1 and were not changed."
+  "note": "The frozen gate averages pedagogy over the three non-refusal, non-held-out scenarios: documented 2.00 (mean of two independent scores), ambiguous 4, torque 4. Thresholds were fixed before cycle 1 and were not changed."
 }
