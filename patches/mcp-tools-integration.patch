@@ -1,6 +1,6 @@
 diff --git a/docs/INTEGRATION_PROTOTYPE_HANDOFF.md b/docs/INTEGRATION_PROTOTYPE_HANDOFF.md
 new file mode 100644
-index 0000000..fbc06c1
+index 0000000..3d97369
 --- /dev/null
 +++ b/docs/INTEGRATION_PROTOTYPE_HANDOFF.md
 @@ -0,0 +1,64 @@
@@ -53,7 +53,7 @@ index 0000000..fbc06c1
 +- `vitest`: 7 passed.
 +- Playwright: 1 passed; the chart renders a real `<svg>` with `<path>` marks and no error alert.
 +- Smoke: `wolfram_compute` returned `1 + 3*x + 3*x^2 + x^3`; `wolfram_alpha` returned `18.015 g/mol`; `show_vegalite_chart` returned `status:"ok"` with the spec and data.
-+- Agent tool selection with local `qwen3.5:0.8b` (real LangGraph graph, real Ollama call): 4/4 cases selected correctly — symbolic calculus → `wolfram_compute`, molar mass → `wolfram_alpha`, chart → `show_vegalite_chart`, greeting → no tool. Run it with `npx tsx scripts/agent-tool-selection.ts`. Setting `TEST_MODEL` switches models. The app's `opencode-go` provider can be used instead by setting `TUTOR_PROVIDER=opencode-go` and `OPENCODE_GO_API_KEY`; I did not extract that key from local config.
++- Agent tool selection (real LangGraph graph, real provider calls): 4/4 cases selected correctly with each of local `qwen3.5:0.8b`, `hy4-flash-free`, and `beam-free`. Cases: symbolic calculus → `wolfram_compute`, molar mass → `wolfram_alpha`, chart → `show_vegalite_chart`, greeting → no tool. Run with `npx tsx scripts/agent-tool-selection.ts`; `TEST_MODEL` switches Ollama models. For the free OpenCode models set `TUTOR_PROVIDER=opencode-go`, `OPENCODE_GO_API_KEY` (injected from the local auth entry, never printed), and `CANVAS_OPENCODE_GO_MODEL=hy4-flash-free` or `beam-free`.
 +- Full `npm run verify` in this worktree: TypeScript clean; 583/583 unit tests passed; Playwright 44 passed, 8 failed, 3 skipped. The 8 failures are the existing live-model e2e cases (`workspace`, `tutor-*`, `document-intelligence`, `integration`, `quickdraw-ai`, `canvas-analysis`, `direct-vector`) which need a real CopilotKit Intelligence key and the default model stack; this worktree had only a dummy key. The prototype's own Playwright spec passes in isolation.
 +
 +## Pre-edit impact record
@@ -70,7 +70,7 @@ index 0000000..fbc06c1
 +4. Consider `wolfram_context` only after measuring its ~17 s latency on a warm connection.
 diff --git a/docs/decisions/ADR-2026-11-23-mcp-tools-integration-prototype.md b/docs/decisions/ADR-2026-11-23-mcp-tools-integration-prototype.md
 new file mode 100644
-index 0000000..445e4c0
+index 0000000..5612a3c
 --- /dev/null
 +++ b/docs/decisions/ADR-2026-11-23-mcp-tools-integration-prototype.md
 @@ -0,0 +1,55 @@
@@ -121,7 +121,7 @@ index 0000000..445e4c0
 +- `npx vitest run tests/mcp-tools.test.ts` — 7 passed.
 +- `npx playwright test --config playwright.spike.config.ts` — 1 passed; asserts a real SVG renders in the chat DOM.
 +- `npx tsx scripts/smoke-mcp-tools.ts` — live calls to both Wolfram tools and the Vega tool succeeded.
-+- `npx tsx scripts/agent-tool-selection.ts` with local `qwen3.5:0.8b` — 4/4 cases selected the expected tool (or none for a greeting); the chart call produced a valid compiled spec after field resolution. The tiny model called the chart tool three times for one request; that repetition is a model behaviour, not a server constraint.
++- `npx tsx scripts/agent-tool-selection.ts` — 4/4 cases selected the expected tool (or none for a greeting) with all three tested models: local `qwen3.5:0.8b`, and the free OpenCode models `hy4-flash-free` and `beam-free` via the app's `opencode-go` provider using the local auth entry. The tiny local model called the chart tool three times for one request; the two free models called it once. All chart calls produced a valid compiled spec after field resolution. No credential was printed.
 +- GitNexus `detect_changes` before commit — 0 changed symbols, no partial/truncated. The index is 96 commits behind HEAD; that staleness is recorded rather than ignored.
 +
 +## What is deliberately not done
@@ -943,10 +943,10 @@ index 0000000..6344366
 +});
 diff --git a/scripts/agent-tool-selection.ts b/scripts/agent-tool-selection.ts
 new file mode 100644
-index 0000000..55c8e7e
+index 0000000..722bde5
 --- /dev/null
 +++ b/scripts/agent-tool-selection.ts
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,73 @@
 +import { join } from "node:path";
 +import { tmpdir } from "node:os";
 +
@@ -957,16 +957,19 @@ index 0000000..55c8e7e
 +process.env.TUTOR_MAX_COMPLETION_TOKENS ??= "800";
 +process.env.TUTOR_MAX_PROVIDER_CALLS ??= "3";
 +process.env.TUTOR_OLLAMA_NUM_CTX ??= "8192";
-+const testModel = process.env.TEST_MODEL ?? "qwen3.5:0.8b";
++const testModel = process.env.TUTOR_PROVIDER === "opencode-go"
++  ? (process.env.CANVAS_OPENCODE_GO_MODEL ?? "opencode-go")
++  : (process.env.TEST_MODEL ?? "qwen3.5:0.8b");
 +
 +// The graph returns only the final assistant turn, so observe the actual
-+// Ollama request payloads to see which tools were called between turns.
++// provider request payloads (Ollama /api/chat or OpenAI /chat/completions)
++// to see which tools were called between turns.
 +const nativeFetch = globalThis.fetch;
 +let observedCalls: string[] = [];
 +let observedResults: string[] = [];
 +globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 +  const url = String(input);
-+  if (url.includes("/api/chat") && init?.body) {
++  if ((url.includes("/api/chat") || url.includes("/chat/completions")) && init?.body) {
 +    const body = JSON.parse(String(init.body)) as {
 +      messages?: Array<{ role: string; content: string; tool_calls?: Array<{ function?: { name?: string; arguments?: unknown } }> }>;
 +    };
