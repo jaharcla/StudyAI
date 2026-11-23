@@ -98,6 +98,18 @@ describe("buildBriefRepairResult", () => {
   });
 });
 
+describe("buildBriefRepairResult without a figure", () => {
+  it("maps a validator failure to an existing brief component", () => {
+    const brief = makeBrief({ artifact: { kind: "question", count: 1, prompt: "Q?", answer: "A." } });
+    const result = buildBriefRepairResult(brief, {
+      ok: false,
+      problems: [{ componentId: "question-9f1c2a3b", validator: "geometry", message: "Outside the board.", requestedCorrection: "Fix the question component: Outside the board." }],
+    });
+    if (result.status !== "needs_repair") throw new Error("expected needs_repair");
+    expect(result.messages[0]?.componentId).toBe("question");
+  });
+});
+
 describe("checkBriefPreserve", () => {
   const preserve = (() => {
     const result = buildBriefRepairResult(makeBrief(), failingReport);

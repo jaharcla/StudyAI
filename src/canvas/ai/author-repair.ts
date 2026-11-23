@@ -41,9 +41,9 @@ export function briefRepairSignature(brief: ArtifactBrief): string {
 }
 
 function mapComponentId(validator: string, components: readonly BriefComponent[]): string {
-  if (FIGURE_VALIDATORS.has(validator)) return "figure";
+  if (FIGURE_VALIDATORS.has(validator) && components.some((component) => component.id === "figure")) return "figure";
   if (validator === "canvas-document") return "bundle";
-  return components.find((component) => component.id !== "figure")?.id ?? "question";
+  return components.find((component) => component.id !== "figure")?.id ?? components[0]?.id ?? "question";
 }
 
 export function buildBriefRepairResult(brief: ArtifactBrief, report: ValidationReport): RepairResult {
