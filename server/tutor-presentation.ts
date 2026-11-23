@@ -262,7 +262,7 @@ function projectScientificObject(value: unknown, labels: Map<string, string>): R
   if (kind === "bond") return { kind, label: object.label, from: labels.get(string(object.from) ?? "") ?? "an atom", to: labels.get(string(object.to) ?? "") ?? "an atom", order: object.order };
   if (kind === "equation") return { kind, expression: object.expression, variables: object.variables, ...(object.units ? { units: object.units } : {}), ...(object.result !== undefined ? { result: object.result } : {}), ...(object.mathWorkspace ? { mathWorkspace: projectMathWorkspace(object.mathWorkspace) } : {}) };
   if (kind === "graph") return pick(object, ["kind", "expression", "xRange", "xLabel", "yLabel", "points", "evaluationError"]);
-  if (kind === "vector" || kind === "force") return pick(object, ["kind", "components", "units", "label"]);
+  if (kind === "vector" || kind === "force") return pick(object, ["kind", "components", "units", "label", "pointOfApplication"]);
   if (kind === "measurement") return pick(object, ["kind", "value", "units", "label"]);
   if (kind === "anatomy") return pick(object, ["kind", "system", "labels"]);
   if (kind === "concept") return pick(object, ["kind", "title", "definition"]);
@@ -350,7 +350,7 @@ function projectQuickdrawContext(value: unknown, labels: Map<string, string>): R
 
 function roundNumbers(value: unknown): unknown {
   if (typeof value === "number") return Number.isFinite(value) ? Math.round(value * 10) / 10 : value;
-  if (Array.isArray(value)) return value.slice(0, 6).map(roundNumbers);
+  if (Array.isArray(value)) return value.slice(0, 24).map(roundNumbers);
   if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, roundNumbers(item)]));
   return value;
 }
@@ -365,10 +365,36 @@ function projectNearbyObjectRaw(value: unknown, labels: Map<string, string>): Re
   const kind = string(item.kind);
   const detail = record(item.detail);
   if (!kind) return null;
-  if (kind === "molecule") return { kind, name: detail.name, atomCount: detail.atomCount };
+  if (kind === "molecule") {
+    // Present atoms with human labels only — raw ids must never reach the model
+    // (or the answer). Mirror projectScientificObject's C1/H1 labelling.
+    const counts = new Map<string, number>();
+    const atomLabels = new Map<string, string>();
+    const atoms = list(detail.atoms).map(record).map((atom) => {
+      const element = string(atom.element) ?? "atom";
+      const index = (counts.get(element) ?? 0) + 1;
+      counts.set(element, index);
+      const label = `${element}${index}`;
+      if (typeof atom.id === "string") atomLabels.set(atom.id, label);
+      return { label, element, nonbondingElectrons: atom.nonbondingElectrons };
+    });
+    const bonds = list(detail.bonds).map(record).map((bond) => ({
+      from: atomLabels.get(string(bond.from) ?? "") ?? "unknown atom",
+      to: atomLabels.get(string(bond.to) ?? "") ?? "unknown atom",
+      order: bond.order,
+    }));
+    return {
+      kind,
+      name: detail.name,
+      atomCount: detail.atomCount,
+      ...(typeof detail.formula === "string" ? { formula: detail.formula } : {}),
+      ...(atoms.length ? { atoms } : {}),
+      ...(bonds.length ? { bonds } : {}),
+    };
+  }
   if (kind === "bond") return { kind, label: detail.label, from: labels.get(string(detail.from) ?? "") ?? "an atom", to: labels.get(string(detail.to) ?? "") ?? "an atom", order: detail.order };
-  if (kind === "equation") return { kind, expression: detail.expression, variables: detail.variables, ...(detail.units ? { units: detail.units } : {}) };
-  if (kind === "graph") return pick({ kind, ...detail }, ["kind", "expression", "xRange", "xLabel", "yLabel", "pointCount"]);
+  if (kind === "equation") return { kind, expression: detail.expression, variables: detail.variables, ...(detail.units ? { units: detail.units } : {}), ...(detail.result !== undefined ? { result: detail.result } : {}), ...(detail.evaluationError ? { evaluationError: detail.evaluationError } : {}) };
+  if (kind === "graph") return { kind, ...pick(detail, ["expression", "xRange", "xLabel", "yLabel", "pointCount", "points", "evaluationError"]) };
   if (kind === "vector" || kind === "force") {
     const components = Array.isArray(detail.components) ? detail.components.filter((value): value is number => typeof value === "number") : [];
     const magnitude = Math.round(Math.hypot(...components) * 10) / 10;
@@ -383,9 +409,9 @@ function projectNearbyObjectRaw(value: unknown, labels: Map<string, string>): Re
     };
   }
   if (kind === "measurement") return pick({ kind, ...detail }, ["kind", "value", "units", "label"]);
-  if (kind === "anatomy") return pick({ kind, ...detail }, ["kind", "system", "labels"]);
+  if (kind === "anatomy") return pick({ kind, ...detail }, ["kind", "structureId", "system", "labels"]);
   if (kind === "concept") return pick({ kind, ...detail }, ["kind", "title", "definition"]);
-  if (kind === "relationship") return { kind, label: detail.label };
+  if (kind === "relationship") return { kind, label: detail.label, from: labels.get(string(detail.fromId) ?? "") ?? "one object", to: labels.get(string(detail.toId) ?? "") ?? "another object" };
   if (kind === "linked-note" || kind === "linked-document") return pick({ kind, ...detail }, ["kind", "title", "excerpt"]);
   if (kind === "question") return pick({ kind, ...detail }, ["kind", "prompt", "answer"]);
   if (kind === "flashcard") return pick({ kind, ...detail }, ["kind", "front", "back"]);

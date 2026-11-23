@@ -103,4 +103,19 @@ describe("adaptive learning subsystem", () => {
     learning = new LearningService(database, () => new Date(time));
     expect(learning.resume("c", "l")).toMatchObject({ phase: "ready", dueCard: expect.any(Object) });
   });
+
+  it("adds flashcard columns, registers a card, and rates it once per idempotency key", () => {
+    const learning = setup();
+    const card = learning.registerCard({ courseId: "c", lessonId: "l", conceptId: "Water", front: "H2O?", back: "Water" });
+    const columns = database.prepare("PRAGMA table_info(learning_cards)").all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toEqual(expect.arrayContaining(["front", "back"]));
+    expect(database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='flashcard_review_logs'").get()).toBeTruthy();
+    const first = learning.rateCard({ cardId: card.cardId, rating: "Good", idempotencyKey: "card-1" });
+    const second = learning.rateCard({ cardId: card.cardId, rating: "Good", idempotencyKey: "card-1" });
+    expect(second.duplicate).toBe(true);
+    expect(first.dueAt).not.toBe("");
+    expect(database.prepare("SELECT count(*) total FROM review_logs").get()).toMatchObject({ total: 0 });
+    expect(database.prepare("SELECT count(*) total FROM flashcard_review_logs").get()).toMatchObject({ total: 1 });
+    expect(learning.dueCards("c", "l")).toEqual([]);
+  });
 });

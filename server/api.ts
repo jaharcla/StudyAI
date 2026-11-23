@@ -11,6 +11,7 @@ import { migrateLegacyDocuments } from "./document-intelligence/legacy.js";
 import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
 import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
+import { getCourseProgress } from "./progress.js";
 import { createLearningHandler } from "./learning/http.js";
 import { LearningActivityService } from "./learning/activities/service.js";
 import { createLearningActivityHandler } from "./learning/activities/http.js";
@@ -202,6 +203,11 @@ const server = createServer(async (req, res) => {
     const failure = indexed.failures.find((item) => item.id === id);
     if (failure) return json(res, 201, { id, status: "saved_unindexed", error: failure.error, pages: null });
     return json(res, 201, { id, status: "indexed", pages: null });
+  }
+  if (req.method === "GET" && url.pathname === "/api/progress") {
+    const course = url.searchParams.get("course") ?? "";
+    if (!course) return json(res, 400, { error: "course is required." });
+    return json(res, 200, getCourseProgress(db, course));
   }
   if (req.method === "GET" && url.pathname === "/api/search") {
     const query = url.searchParams.get("q") ?? "";

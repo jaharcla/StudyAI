@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { ZodError } from "zod";
-import { ReviewedQuestionSchema } from "./contracts.js";
+import { CardInputSchema, RateCardSchema, ReviewedQuestionSchema } from "./contracts.js";
 import { LearningService } from "./service.js";
 
 export function createLearningHandler(service: LearningService, origin = "http://127.0.0.1:5173") {
@@ -20,6 +20,20 @@ export function createLearningHandler(service: LearningService, origin = "http:/
         const course = url.searchParams.get("course") ?? "", lesson = url.searchParams.get("lesson") ?? "";
         if (!course || !lesson) { send(400, { error: "course and lesson are required." }); return true; }
         send(200, service.resume(course, lesson));
+        return true;
+      }
+      if (req.method === "POST" && url.pathname === "/api/study/cards") {
+        send(201, service.registerCard(CardInputSchema.parse(JSON.parse(await readBody(req)))));
+        return true;
+      }
+      if (req.method === "GET" && url.pathname === "/api/study/cards") {
+        const course = url.searchParams.get("course") ?? "", lesson = url.searchParams.get("lesson") ?? "";
+        if (!course || !lesson) { send(400, { error: "course and lesson are required." }); return true; }
+        send(200, service.dueCards(course, lesson));
+        return true;
+      }
+      if (req.method === "POST" && url.pathname === "/api/study/card-reviews") {
+        send(200, service.rateCard(RateCardSchema.parse(JSON.parse(await readBody(req)))));
         return true;
       }
       if (req.method === "POST" && url.pathname === "/api/study/questions") {

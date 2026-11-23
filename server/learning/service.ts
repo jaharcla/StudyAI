@@ -10,6 +10,10 @@ import { LearningEventSchema, type LearningEvent } from "../../src/learning/acti
 type QuestionDraft = { courseId: string; lessonId: string; concept: string; prompt: string; choices: Array<{ id: string; text: string }>; correctChoice: string; explanation: string; sourceDocumentId: string; sourcePage?: number | null; sourceExcerpt: string };
 type ReviewableQuestion = { id: string; version: number; concept_id: string; concept: string; prompt: string; choices: string; source_document_id: string; source_title: string; source_page: number | null; source_excerpt: string };
 
+export type CardInput = { courseId: string; lessonId: string; conceptId: string; front: string; back: string };
+export type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string };
+export type CardReviewInput = { cardId: string; rating: "Again" | "Hard" | "Good" | "Easy"; idempotencyKey: string };
+
 export class LearningService {
   private readonly scheduler = fsrs({ enable_fuzz: false });
   private lastMasteryTimestamp = 0;
@@ -135,6 +139,50 @@ export class LearningService {
     });
     save();
     return { duplicate: false, cardId: card.id, rating: input.rating, reviewedAt: now.toISOString(), dueAt, state: State[next.state] };
+  }
+
+  registerCard(input: CardInput) {
+    const run = this.database.transaction(() => {
+      const concept = this.database.prepare("SELECT id FROM learning_concepts WHERE course_id=? AND lesson_id=? AND name=?").get(input.courseId, input.lessonId, input.conceptId.trim()) as { id: string } | undefined;
+      const conceptId = concept?.id ?? randomUUID();
+      if (!concept) this.database.prepare("INSERT INTO learning_concepts(id,course_id,lesson_id,name) VALUES(?,?,?,?)").run(conceptId, input.courseId, input.lessonId, input.conceptId.trim());
+      const existing = this.database.prepare("SELECT id FROM learning_cards WHERE concept_id=?").get(conceptId) as { id: string } | undefined;
+      const cardId = existing?.id ?? randomUUID();
+      if (existing) this.database.prepare("UPDATE learning_cards SET front=?,back=? WHERE id=?").run(input.front, input.back, cardId);
+      else {
+        const card = createEmptyCard(this.now());
+        this.database.prepare("INSERT INTO learning_cards(id,concept_id,fsrs_state,front,back) VALUES(?,?,?,?,?)").run(cardId, conceptId, JSON.stringify(serializeCard(card)), input.front, input.back);
+      }
+      return { cardId };
+    });
+    return run();
+  }
+
+  dueCards(courseId: string, lessonId: string): DueCard[] {
+    const rows = this.database.prepare(`SELECT c.id card_id,c.concept_id,k.name concept,c.front,c.back,c.fsrs_state FROM learning_cards c
+      JOIN learning_concepts k ON k.id=c.concept_id WHERE k.course_id=? AND k.lesson_id=? AND c.front IS NOT NULL AND c.back IS NOT NULL`).all(courseId, lessonId) as Array<{ card_id: string; concept_id: string; concept: string; front: string; back: string; fsrs_state: string }>;
+    const now = this.now().getTime();
+    return rows
+      .map((row) => ({ cardId: row.card_id, conceptId: row.concept_id, concept: row.concept, front: row.front, back: row.back, dueAt: (JSON.parse(row.fsrs_state) as SerializedCard).due }))
+      .filter((card) => Date.parse(card.dueAt) <= now)
+      .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  }
+
+  rateCard(input: CardReviewInput) {
+    const existing = this.database.prepare("SELECT due_at,state FROM flashcard_review_logs WHERE idempotency_key=?").get(input.idempotencyKey) as { due_at: string; state: string } | undefined;
+    if (existing) return { duplicate: true, cardId: input.cardId, dueAt: existing.due_at, state: existing.state };
+    const card = this.database.prepare("SELECT id,fsrs_state FROM learning_cards WHERE id=?").get(input.cardId) as { id: string; fsrs_state: string } | undefined;
+    if (!card) throw new Error("Card not found.");
+    const now = this.now();
+    const current = hydrateCard(JSON.parse(card.fsrs_state) as SerializedCard);
+    const next = this.scheduler.repeat(current, now)[Rating[input.rating as StudyRating]].card;
+    const dueAt = next.due.toISOString();
+    const save = this.database.transaction(() => {
+      this.database.prepare("UPDATE learning_cards SET fsrs_state=?,updated_at=? WHERE id=?").run(JSON.stringify(serializeCard(next)), now.toISOString(), card.id);
+      this.database.prepare("INSERT INTO flashcard_review_logs(id,card_id,rating,reviewed_at,due_at,state,idempotency_key) VALUES(?,?,?,?,?,?,?)").run(randomUUID(), card.id, input.rating, now.toISOString(), dueAt, State[next.state], input.idempotencyKey);
+    });
+    save();
+    return { duplicate: false, cardId: card.id, dueAt, state: State[next.state] };
   }
 
   private ensureCard(conceptId: string) {

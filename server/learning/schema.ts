@@ -44,17 +44,23 @@ export function initializeLearningSchema(database: Database.Database): void {
     );
     CREATE TABLE IF NOT EXISTS learning_cards (
       id TEXT PRIMARY KEY, concept_id TEXT NOT NULL UNIQUE REFERENCES learning_concepts(id),
-      fsrs_state TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      fsrs_state TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      front TEXT, back TEXT
     );
     CREATE TABLE IF NOT EXISTS review_logs (
       id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES learning_cards(id), rating TEXT NOT NULL CHECK(rating IN ('Again','Hard','Good','Easy')),
       reviewed_at TEXT NOT NULL, due_at TEXT NOT NULL, state TEXT NOT NULL, attempt_id TEXT NOT NULL REFERENCES learning_attempts(id),
       idempotency_key TEXT NOT NULL UNIQUE
     );
+    CREATE TABLE IF NOT EXISTS flashcard_review_logs (
+      id TEXT PRIMARY KEY, card_id TEXT NOT NULL REFERENCES learning_cards(id), rating TEXT NOT NULL CHECK(rating IN ('Again','Hard','Good','Easy')),
+      reviewed_at TEXT NOT NULL, due_at TEXT NOT NULL, state TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE
+    );
     CREATE INDEX IF NOT EXISTS learning_questions_scope_idx ON reviewed_questions(course_id, lesson_id, concept_id, reviewed_at);
     CREATE INDEX IF NOT EXISTS learning_presentations_resume_idx ON question_presentations(course_id, lesson_id, status, created_at);
     CREATE INDEX IF NOT EXISTS learning_cards_due_idx ON learning_cards(updated_at);
     CREATE INDEX IF NOT EXISTS learning_events_concept_idx ON learning_events(course_id, lesson_id, concept_id, occurred_at DESC);
+    CREATE INDEX IF NOT EXISTS flashcard_review_logs_card_idx ON flashcard_review_logs(card_id, reviewed_at);
     CREATE VIEW IF NOT EXISTS learning_mastery_evidence AS
       SELECT concept_id,mastery AS value,created_at AS occurred_at,rowid AS sequence FROM mastery_updates
       UNION ALL
@@ -62,4 +68,7 @@ export function initializeLearningSchema(database: Database.Database): void {
   `);
   const eventColumns = database.prepare("PRAGMA table_info(learning_events)").all() as Array<{ name: string }>;
   if (!eventColumns.some((column) => column.name === "canvas_document_json")) database.exec("ALTER TABLE learning_events ADD COLUMN canvas_document_json TEXT NOT NULL DEFAULT 'null'");
+  const cardColumns = database.prepare("PRAGMA table_info(learning_cards)").all() as Array<{ name: string }>;
+  if (!cardColumns.some((column) => column.name === "front")) database.exec("ALTER TABLE learning_cards ADD COLUMN front TEXT");
+  if (!cardColumns.some((column) => column.name === "back")) database.exec("ALTER TABLE learning_cards ADD COLUMN back TEXT");
 }

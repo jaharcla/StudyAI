@@ -37,7 +37,10 @@ const TOOL_ROUTES: Array<{ test: RegExp; names: string[] }> = [
   { test: /\b(?:near|overlap(?:ping|s)?|spatial|nearby|adjacent|connected to|relationship between)\b/i, names: ["get_canvas_scene"] },
   { test: /\b(?:shape|shapes|arrow|arrows|line|lines|text box|rectangle|ellipse|highlight|select)\b/i, names: ["get_canvas_state", "propose_canvas_action"] },
   { test: /\b(?:edit|change|modify|correct|fix|update|remove|delete|rename|set the|make the)\b/i, names: ["propose_canvas_edit"] },
-  { test: /\b(?:add|create|place|insert|put|draw|make)\b/i, names: ["propose_scientific_object", "propose_canvas_action"] },
+  { test: /\b(?:molecule|lewis|bond|atom|formula|c2h4|ethylene)\b/i, names: ["propose_molecule"] },
+  { test: /\b(?:vector|force|equation|graph|concept|flashcard|measurement|anatomy|linked note|linked document|practice question)\b/i, names: ["propose_scientific_object"] },
+  { test: /\b(?:line|circle|ellipse|arrow|rectangle|triangle|diamond|hexagon|star|shape|text|note|draw|sketch|drawing)\b/i, names: ["propose_canvas_action"] },
+  { test: /\b(?:add|create|place|insert|put|make)\b/i, names: ["propose_scientific_object"] },
   { test: /\b(?:search|find|across (?:my |the )?(?:boards|course)|evidence|label)\b/i, names: ["search_canvas_evidence", "describe_canvas"] },
   { test: /\b(?:according to|based on|from (?:the |my )?(?:lecture|course|notes|document|pdf|slides)|cite|source)\b/i, names: ["search_course_documents"] },
   { test: /\b(?:verify|fact.?check|is it true|claimed)\b/i, names: ["search_fact_checks"] },
@@ -46,6 +49,16 @@ const TOOL_ROUTES: Array<{ test: RegExp; names: string[] }> = [
 export function recommendedToolsForQuery(query: string, available: readonly string[]): string[] {
   const present = new Set(available);
   const found: string[] = [];
+  // A tool named verbatim by the user is a direct instruction. Honor it before
+  // keyword routes that might otherwise suggest a different tool for the same
+  // noun (for example "vector" routing to propose_scientific_object).
+  for (const name of [
+    "propose_canvas_edit", "propose_canvas_action", "propose_scientific_object",
+    "propose_molecule", "get_canvas_state", "get_canvas_scene", "read_canvas_ink",
+    "search_canvas_evidence", "describe_canvas", "search_course_documents",
+  ]) {
+    if (present.has(name) && new RegExp(`\\b${name}\\b`, "i").test(query)) found.push(name);
+  }
   for (const route of TOOL_ROUTES) {
     if (!route.test.test(query)) continue;
     for (const name of route.names) {

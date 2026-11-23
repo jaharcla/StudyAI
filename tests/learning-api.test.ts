@@ -39,4 +39,16 @@ describe("learning HTTP contract", () => {
     expect(await (await fetch(`${origin}/api/study/resume?course=c&lesson=l`)).json()).toMatchObject({ phase: "ready", dueCard: { card_id: card.id } });
     expect(db.prepare("SELECT count(*) total FROM grading_evidence WHERE accepted=1").get()).toMatchObject({ total: 1 });
   });
+
+  it("registers, lists, and rates flashcards over HTTP", async () => {
+    const create = await fetch(`${origin}/api/study/cards`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId: "c", lessonId: "l", conceptId: "Water", front: "H2O?", back: "Water" }) });
+    expect(create.status).toBe(201);
+    const { cardId } = await create.json() as { cardId: string };
+    const due = await (await fetch(`${origin}/api/study/cards?course=c&lesson=l`)).json() as Array<{ cardId: string; front: string; back: string }>;
+    expect(due.some((card) => card.cardId === cardId && card.front === "H2O?" && card.back === "Water")).toBe(true);
+    const review = () => fetch(`${origin}/api/study/card-reviews`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cardId, idempotencyKey: "api-card-review", rating: "Good" }) });
+    expect((await review()).status).toBe(200);
+    expect(await (await review()).json()).toMatchObject({ duplicate: true });
+    expect(await (await fetch(`${origin}/api/study/cards?course=c`)).status).toBe(400);
+  });
 });

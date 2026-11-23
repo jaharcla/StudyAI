@@ -4,7 +4,7 @@ import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { Bounds, Snapshot, Store } from "@quickdrawjs/core";
 import type { ScientificObject } from "../model";
 import type { CanvasSceneGraph } from "../spatial/types";
-import { canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
+import { CANVAS_ACTION_TOOL_DESCRIPTION, canvasActionSchema, canvasReadSchema, proposeCanvasAction, readCanvasState, type CanvasProposal } from "./canvas-actions";
 import { boundedSceneSlice, CANVAS_DESIGN_GUIDE, canvasDescribeSchema, canvasEvidenceSearchSchema, canvasSceneReadSchema, describeCanvas, invalidateCanvasSceneCache, readCanvasInkSchema, requestCanvasInk, requestCanvasScene, searchCanvasEvidence, searchCourseCanvasEvidence } from "./scene-tools";
 import { compileTeachingScene, teachingSceneSchema } from "./teaching-scene";
 import { buildTutorCanvasContext } from "./tutor-canvas-context";
@@ -44,7 +44,7 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
   useAgentContext({ description: "Active canvas scene", value: tutorContext });
   useFrontendTool({
     name: "propose_canvas_action",
-    description: "Consequential: requires user approval. Propose up to 30 native QuickDraw shape actions for review. Supports createShape, createText, createArrow, updateShape, deleteShape, moveShape, highlightShape and selectShapes. groupShapes is unsupported by QuickDraw. Every proposal is scoped to the current board and is not applied until approved.",
+    description: CANVAS_ACTION_TOOL_DESCRIPTION,
     parameters: canvasActionSchema,
     handler: async (action) => {
       try {
