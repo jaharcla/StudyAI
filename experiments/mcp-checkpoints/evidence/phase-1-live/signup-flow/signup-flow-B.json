@@ -1,0 +1,245 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "ellipse",
+      "text": "Start",
+      "x": 320,
+      "y": 0,
+      "width": 160,
+      "height": 50
+    },
+    {
+      "id": "enter_email",
+      "type": "rectangle",
+      "text": "Enter Email",
+      "x": 310,
+      "y": 140,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "email_ok",
+      "type": "diamond",
+      "text": "Email OK?",
+      "x": 300,
+      "y": 280,
+      "width": 200,
+      "height": 120
+    },
+    {
+      "id": "email_error",
+      "type": "rectangle",
+      "text": "Email Error",
+      "x": 620,
+      "y": 310,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "create_password",
+      "type": "rectangle",
+      "text": "Create Password",
+      "x": 310,
+      "y": 490,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "pwd_ok",
+      "type": "diamond",
+      "text": "Pwd OK?",
+      "x": 300,
+      "y": 630,
+      "width": 200,
+      "height": 120
+    },
+    {
+      "id": "pwd_error",
+      "type": "rectangle",
+      "text": "Pwd Error",
+      "x": 620,
+      "y": 660,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "send_verification",
+      "type": "rectangle",
+      "text": "Send Verification Email",
+      "x": 310,
+      "y": 840,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "enter_code",
+      "type": "rectangle",
+      "text": "Enter Verification Code",
+      "x": 310,
+      "y": 980,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "code_ok",
+      "type": "diamond",
+      "text": "Code OK?",
+      "x": 300,
+      "y": 1120,
+      "width": 200,
+      "height": 120
+    },
+    {
+      "id": "code_error",
+      "type": "rectangle",
+      "text": "Code Error",
+      "x": 620,
+      "y": 1150,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "complete_profile",
+      "type": "rectangle",
+      "text": "Complete Profile",
+      "x": 310,
+      "y": 1330,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "terms_ok",
+      "type": "diamond",
+      "text": "Terms OK?",
+      "x": 300,
+      "y": 1470,
+      "width": 200,
+      "height": 120
+    },
+    {
+      "id": "terms_error",
+      "type": "rectangle",
+      "text": "Terms Error",
+      "x": 620,
+      "y": 1500,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "account_created",
+      "type": "rectangle",
+      "text": "Account Created",
+      "x": 310,
+      "y": 1680,
+      "width": 180,
+      "height": 50
+    },
+    {
+      "id": "welcome",
+      "type": "ellipse",
+      "text": "Welcome / Onboarding",
+      "x": 290,
+      "y": 1820,
+      "width": 220,
+      "height": 50
+    }
+  ],
+  "edges": [
+    {
+      "from": "start",
+      "to": "enter_email",
+      "label": ""
+    },
+    {
+      "from": "enter_email",
+      "to": "email_ok",
+      "label": "submit"
+    },
+    {
+      "from": "email_ok",
+      "to": "create_password",
+      "label": "Yes"
+    },
+    {
+      "from": "email_ok",
+      "to": "email_error",
+      "label": "No"
+    },
+    {
+      "from": "email_error",
+      "to": "enter_email",
+      "label": "retry"
+    },
+    {
+      "from": "create_password",
+      "to": "pwd_ok",
+      "label": "submit"
+    },
+    {
+      "from": "pwd_ok",
+      "to": "send_verification",
+      "label": "Yes"
+    },
+    {
+      "from": "pwd_ok",
+      "to": "pwd_error",
+      "label": "No"
+    },
+    {
+      "from": "pwd_error",
+      "to": "create_password",
+      "label": "retry"
+    },
+    {
+      "from": "send_verification",
+      "to": "enter_code",
+      "label": ""
+    },
+    {
+      "from": "enter_code",
+      "to": "code_ok",
+      "label": "submit"
+    },
+    {
+      "from": "code_ok",
+      "to": "complete_profile",
+      "label": "Yes"
+    },
+    {
+      "from": "code_ok",
+      "to": "code_error",
+      "label": "No"
+    },
+    {
+      "from": "code_error",
+      "to": "enter_code",
+      "label": "retry"
+    },
+    {
+      "from": "complete_profile",
+      "to": "terms_ok",
+      "label": ""
+    },
+    {
+      "from": "terms_ok",
+      "to": "account_created",
+      "label": "Yes"
+    },
+    {
+      "from": "terms_ok",
+      "to": "terms_error",
+      "label": "No"
+    },
+    {
+      "from": "terms_error",
+      "to": "complete_profile",
+      "label": "retry"
+    },
+    {
+      "from": "account_created",
+      "to": "welcome",
+      "label": ""
+    }
+  ]
+}
