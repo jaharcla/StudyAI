@@ -167,6 +167,33 @@ describe("ArtifactBrief proposal", () => {
     expect(() => parseCanvasDocument({ ...emptyCanvasDocument(), objects: applied })).not.toThrow();
   });
 
+  it("applies each advertised kind as exactly its compiled bundle and stays parseable", () => {
+    const cases: Array<{ kind: string; count: number; expected: string[] }> = [
+      { kind: "question", count: 1, expected: ["question", "force", "force", "force"] },
+      { kind: "problem-set", count: 2, expected: ["question", "question"] },
+      { kind: "figure", count: 1, expected: ["force", "force", "force"] },
+      { kind: "worked-example", count: 1, expected: ["question", "force", "force", "force"] },
+      { kind: "deck", count: 2, expected: ["flashcard", "flashcard"] },
+    ];
+    for (const testCase of cases) {
+      const brief = artifactBriefSchema.parse({
+        ...frictionBrief,
+        artifact: {
+          ...frictionBrief.artifact,
+          kind: testCase.kind,
+          count: testCase.count,
+          figure: testCase.kind === "problem-set" || testCase.kind === "deck" ? undefined : frictionBrief.artifact.figure,
+        },
+      });
+      const proposal = proposeArtifactBrief(context, brief, 7);
+      const applied = applyArtifactBriefProposal(context, proposal);
+      expect(applied.map((object) => object.kind)).toEqual(testCase.expected);
+      expect(applied.map((object) => object.id)).toEqual(proposal.objects.map((object) => object.id));
+      expect(applied.every((object) => object.provenance?.status === "generated-unverified")).toBe(true);
+      expect(() => parseCanvasDocument({ ...emptyCanvasDocument(), objects: applied })).not.toThrow();
+    }
+  });
+
   it("refuses a stale revision and a changed board", () => {
     const proposal = proposeArtifactBrief(context, frictionBrief, 7);
     expect(() => applyArtifactBriefProposal({ ...context, revision: 8 }, proposal)).toThrow(/stale|revision/i);
