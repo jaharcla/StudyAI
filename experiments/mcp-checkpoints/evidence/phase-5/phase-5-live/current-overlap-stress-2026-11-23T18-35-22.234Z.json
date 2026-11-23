@@ -1,0 +1,184 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "current-overlap-stress",
+  "payload": {
+    "surface": "current",
+    "taskId": "overlap-stress",
+    "calls": 6,
+    "invalidCalls": 0,
+    "retries": 1,
+    "promptTokens": 8251,
+    "completionTokens": 1899,
+    "durationMs": 9341,
+    "attempts": 6,
+    "objects": 6,
+    "relationships": 0,
+    "completed": false,
+    "quality": 0.6,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "get_canvas_state",
+            "arguments": {
+              "boardId": "live-overlap-stress"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "describe_canvas",
+            "arguments": {
+              "boardId": "live-overlap-stress"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "get_canvas_state",
+            "arguments": {
+              "boardId": "live-overlap-stress"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "search_canvas_evidence",
+            "arguments": {
+              "query": "overlapping boxes",
+              "limit": 5
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-overlap-stress",
+              "actions": [
+                {
+                  "from": {
+                    "x": 20,
+                    "y": 40
+                  },
+                  "id": "box1",
+                  "kind": "createShape",
+                  "text": "Box 1",
+                  "to": {
+                    "x": 80,
+                    "y": 60
+                  },
+                  "type": "rectangle"
+                },
+                {
+                  "from": {
+                    "x": 20,
+                    "y": 35
+                  },
+                  "id": "box2",
+                  "kind": "createShape",
+                  "text": "Box 2",
+                  "to": {
+                    "x": 90,
+                    "y": 45
+                  },
+                  "type": "rectangle"
+                },
+                {
+                  "from": {
+                    "x": 10,
+                    "y": 50
+                  },
+                  "id": "box3",
+                  "kind": "createShape",
+                  "text": "Box 3",
+                  "to": {
+                    "x": 80,
+                    "y": 60
+                  },
+                  "type": "rectangle"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "actions": [
+                {
+                  "from": {
+                    "x": 150,
+                    "y": 150
+                  },
+                  "id": "box_1",
+                  "kind": "createShape",
+                  "text": "Defect detection box 1",
+                  "to": {
+                    "x": 300,
+                    "y": 200
+                  },
+                  "type": "rect"
+                },
+                {
+                  "from": {
+                    "x": 50,
+                    "y": 150
+                  },
+                  "id": "box_2",
+                  "kind": "createShape",
+                  "text": "Defect detection box 2",
+                  "to": {
+                    "x": 350,
+                    "y": 250
+                  },
+                  "type": "rect"
+                },
+                {
+                  "from": {
+                    "x": 150,
+                    "y": 200
+                  },
+                  "id": "box_3",
+                  "kind": "createShape",
+                  "text": "Defect detection box 3",
+                  "to": {
+                    "x": 350,
+                    "y": 150
+                  },
+                  "type": "rect"
+                }
+              ],
+              "boardId": "live-overlap-stress"
+            }
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:35:22.234Z"
+}

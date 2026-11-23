@@ -1,0 +1,337 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "current-molecule-ethanol",
+  "payload": {
+    "surface": "current",
+    "taskId": "molecule-ethanol",
+    "calls": 6,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 8264,
+    "completionTokens": 4713,
+    "durationMs": 65114,
+    "attempts": 6,
+    "objects": 20,
+    "relationships": 2,
+    "completed": false,
+    "quality": 0.7,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "get_artifact_capabilities",
+            "arguments": {
+              "topic": "ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "C1",
+                  "kind": "createShape",
+                  "text": "Ethyl Carbon Atom A",
+                  "to": {
+                    "x": -10,
+                    "y": 25
+                  },
+                  "type": "atom",
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "C2",
+                  "kind": "createShape",
+                  "text": "Ethyl Carbon Atom B",
+                  "to": {
+                    "x": 10,
+                    "y": -25
+                  },
+                  "type": "atom",
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "B1",
+                  "kind": "createShape",
+                  "text": "Single Bond C1-C2",
+                  "to": {
+                    "x": -10,
+                    "y": 25
+                  },
+                  "type": "bond",
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "B2",
+                  "kind": "createShape",
+                  "text": "Single Bond C2-C1",
+                  "to": {
+                    "x": 10,
+                    "y": -25
+                  },
+                  "type": "bond",
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "C3",
+                  "kind": "createShape",
+                  "text": "Hydrogen Atom attached to Carbon A",
+                  "to": {
+                    "x": -10,
+                    "y": 25
+                  },
+                  "type": "hydrogen",
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "C4",
+                  "kind": "createShape",
+                  "text": "Hydrogen Atom attached to Carbon B",
+                  "to": {
+                    "x": 10,
+                    "y": -25
+                  },
+                  "type": "hydrogen",
+                  "x": 0,
+                  "y": 0
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-molecule-ethanol",
+              "actions": [
+                {
+                  "from": {
+                    "x": 2,
+                    "y": 1
+                  },
+                  "id": "bond1",
+                  "kind": "createShape",
+                  "text": "C-O single bond",
+                  "type": "BOND_SINGLE"
+                },
+                {
+                  "from": {
+                    "x": 5,
+                    "y": 2
+                  },
+                  "id": "bond2",
+                  "kind": "createShape",
+                  "text": "C-C single bond",
+                  "type": "BOND_SINGLE"
+                },
+                {
+                  "from": {
+                    "x": 2,
+                    "y": 3
+                  },
+                  "id": "bond3",
+                  "kind": "createShape",
+                  "text": "O-H single bond",
+                  "type": "BOND_SINGLE"
+                },
+                {
+                  "from": {
+                    "x": 4,
+                    "y": 5
+                  },
+                  "id": "bond4",
+                  "kind": "createShape",
+                  "text": "C-O single bond",
+                  "type": "BOND_SINGLE"
+                },
+                {
+                  "from": {
+                    "x": 2,
+                    "y": 6
+                  },
+                  "id": "bond5",
+                  "kind": "createShape",
+                  "text": "C-H single bond",
+                  "type": "BOND_SINGLE"
+                },
+                {
+                  "from": {
+                    "x": 3,
+                    "y": 7
+                  },
+                  "id": "bond6",
+                  "kind": "createShape",
+                  "text": "O-C double bond",
+                  "type": "BOND_DOUBLE"
+                },
+                {
+                  "from": {
+                    "x": 4,
+                    "y": 8
+                  },
+                  "id": "bond7",
+                  "kind": "createShape",
+                  "text": "C-O double bond",
+                  "type": "BOND_DOUBLE"
+                },
+                {
+                  "from": {
+                    "x": 3,
+                    "y": 9
+                  },
+                  "id": "bond8",
+                  "kind": "createShape",
+                  "text": "O-H single bond",
+                  "type": "BOND_SINGLE"
+                },
+                {
+                  "from": {
+                    "x": 4,
+                    "y": 10
+                  },
+                  "id": "bond9",
+                  "kind": "createShape",
+                  "text": "C-H double bond",
+                  "type": "BOND_DOUBLE"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 4,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "atom1",
+                  "kind": "createShape",
+                  "text": "C"
+                },
+                {
+                  "id": "bond1",
+                  "kind": "createArrow",
+                  "label": "single",
+                  "to": {
+                    "x": 2,
+                    "y": 2
+                  }
+                }
+              ],
+              "boardId": "live-molecule-ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 5,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 2
+                  },
+                  "id": "atom_1",
+                  "kind": "createShape",
+                  "text": "H"
+                },
+                {
+                  "id": "atom_2",
+                  "kind": "createShape",
+                  "text": "O",
+                  "to": {
+                    "x": 5,
+                    "y": 4
+                  }
+                },
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 4
+                  },
+                  "id": "bond1",
+                  "kind": "createArrow",
+                  "text": "",
+                  "to": {
+                    "x": 0,
+                    "y": 5
+                  },
+                  "type": "hydrogen"
+                }
+              ],
+              "boardId": "live-molecule-ethanol"
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 6,
+        "toolCalls": [
+          {
+            "name": "get_artifact_capabilities",
+            "arguments": {}
+          }
+        ],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:35:12.879Z"
+}

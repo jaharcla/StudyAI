@@ -1,0 +1,148 @@
+{
+  "experiment": "phase-5-live",
+  "phase": 5,
+  "kind": "current-signup-flow",
+  "payload": {
+    "surface": "current",
+    "taskId": "signup-flow",
+    "calls": 2,
+    "invalidCalls": 0,
+    "retries": 0,
+    "promptTokens": 3966,
+    "completionTokens": 1598,
+    "durationMs": 8370,
+    "attempts": 3,
+    "objects": 8,
+    "relationships": 4,
+    "completed": true,
+    "quality": 1,
+    "trace": [
+      {
+        "turn": 1,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "actions": [
+                {
+                  "from": {
+                    "x": 0,
+                    "y": 0
+                  },
+                  "id": "start",
+                  "kind": "createText",
+                  "text": "Signup Process"
+                },
+                {
+                  "from": {
+                    "x": 150,
+                    "y": 30
+                  },
+                  "id": "step_1",
+                  "kind": "createArrow",
+                  "type": "<=>",
+                  "x": 200,
+                  "y": 45
+                },
+                {
+                  "from": {
+                    "x": 150,
+                    "y": 85
+                  },
+                  "id": "step_2",
+                  "kind": "createText",
+                  "text": "Input Details"
+                },
+                {
+                  "from": {
+                    "x": 30,
+                    "y": 120
+                  },
+                  "id": "step_3",
+                  "kind": "createArrow",
+                  "type": "<=",
+                  "x": 65,
+                  "y": 120
+                },
+                {
+                  "from": {
+                    "x": 30,
+                    "y": 165
+                  },
+                  "id": "decision",
+                  "kind": "selectShapes",
+                  "x": 45,
+                  "y": 190
+                },
+                {
+                  "from": {
+                    "x": 45,
+                    "y": 190
+                  },
+                  "id": "next",
+                  "kind": "createArrow",
+                  "type": "<=",
+                  "x": 75,
+                  "y": 190
+                },
+                {
+                  "from": {
+                    "x": 30,
+                    "y": 230
+                  },
+                  "id": "step_4",
+                  "kind": "createText",
+                  "text": "Submit"
+                },
+                {
+                  "from": {
+                    "x": 30,
+                    "y": 265
+                  },
+                  "id": "end",
+                  "kind": "createArrow",
+                  "type": "<=",
+                  "x": 65,
+                  "y": 265
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 2,
+        "toolCalls": [
+          {
+            "name": "propose_canvas_action",
+            "arguments": {
+              "boardId": "live-signup-flow",
+              "actions": [
+                {
+                  "from": "0",
+                  "id": "0-1",
+                  "kind": "createText",
+                  "text": "Welcome to our Sign Up Flow!",
+                  "to": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "type": "title"
+                }
+              ]
+            }
+          }
+        ],
+        "content": ""
+      },
+      {
+        "turn": 3,
+        "toolCalls": [],
+        "content": ""
+      }
+    ]
+  },
+  "createdAt": "2026-11-23T18:34:07.747Z"
+}
