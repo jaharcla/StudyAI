@@ -8,7 +8,24 @@ const component = (kind: string, id: string, extra: Record<string, unknown> = {}
   id, kind, sourceRefs: [REF], ...extra,
 });
 
+const validSlideDeck = () => ({
+  id: "sd1", kind: "slide_deck", sourceRefs: [REF],
+  objective: "Understand friction", templateId: "general-en", language: "en",
+  slides: [
+    {
+      role: "title", title: "Friction", claims: [], notes: "Introduce the topic.",
+    },
+    {
+      role: "mechanism", title: "Friction opposes motion",
+      claims: [{ claim: "Friction opposes motion.", sourceRef: REF, excerpt: "Friction opposes motion.", relationship: "direct" }],
+      visual: { kind: "diagram", altText: "Force arrows on an inclined plane" },
+      notes: "Explain the direction.",
+    },
+  ],
+});
+
 const allKinds = [
+  validSlideDeck(),
   component("explanation", "e1", { text: "Friction opposes motion.", concepts: ["friction"] }),
   component("worked-example", "we1", { prompt: "Find the friction direction.", steps: ["Identify motion", "Oppose it"], answer: "Uphill." }),
   component("diagram", "d1", { title: "Forces", surfaceAngleDeg: 0, forces: [{ label: "gravity", components: [0, -9.8] }] }),
@@ -65,5 +82,31 @@ describe("parseArtifactPackage", () => {
   it("rejects duplicate component ids", () => {
     const components = [...allKinds, { ...allKinds[0] }];
     expect(() => parseArtifactPackage(makePackage({ components }), retrievedRefs)).toThrow(/duplicate/i);
+  });
+});
+
+describe("slide_deck component", () => {
+  const deckPackage = (deck: unknown) => makePackage({ components: [deck], relations: [] });
+
+  it("accepts a semantic deck with claims and visual intent", () => {
+    const pkg = parseArtifactPackage(deckPackage(validSlideDeck()), retrievedRefs);
+    expect(pkg.components[0].kind).toBe("slide_deck");
+  });
+
+  it("rejects a coordinate field on the component", () => {
+    expect(() => parseArtifactPackage(deckPackage({ ...validSlideDeck(), left: 10 }), retrievedRefs)).toThrow();
+  });
+
+  it("rejects a shape id on a slide", () => {
+    const deck = validSlideDeck();
+    expect(() => parseArtifactPackage(deckPackage({
+      ...deck, slides: [{ ...deck.slides[0], shapeId: 4 }, deck.slides[1]],
+    }), retrievedRefs)).toThrow();
+  });
+
+  it("rejects a sourceRef that was not retrieved", () => {
+    expect(() => parseArtifactPackage(deckPackage({
+      ...validSlideDeck(), sourceRefs: ["invented#p9"],
+    }), retrievedRefs)).toThrow(/not retrieved/i);
   });
 });
