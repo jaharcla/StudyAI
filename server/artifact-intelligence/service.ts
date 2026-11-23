@@ -106,6 +106,22 @@ function deriveBrief(pkg: ArtifactPackage, ctx: CompilePackageContext): Artifact
   });
 }
 
+function consumedCanvasIds(pkg: ArtifactPackage, brief: ArtifactBrief): string[] {
+  const consumed = new Set<string>();
+  const explanation = componentsOfKind(pkg, ["explanation"])[0];
+  if (explanation) consumed.add(explanation.id);
+  const questions = componentsOfKind(pkg, ["question"]);
+  const worked = componentsOfKind(pkg, ["worked-example"]);
+  const cards = componentsOfKind(pkg, ["flashcard"]);
+  if (brief.artifact.kind === "question" || brief.artifact.kind === "problem-set") questions.forEach((item) => consumed.add(item.id));
+  else if (brief.artifact.kind === "worked-example") worked.slice(0, 1).forEach((item) => consumed.add(item.id));
+  else if (brief.artifact.kind === "deck") cards.forEach((item) => consumed.add(item.id));
+  if (brief.artifact.figure) {
+    for (const figure of componentsOfKind(pkg, ["diagram", "graph", "equation", "mind-map"]).slice(0, 1)) consumed.add(figure.id);
+  }
+  return [...consumed];
+}
+
 function buildStudio(pkg: ArtifactPackage, ctx: CompilePackageContext): StudioArtifact | undefined {
   const summaries = componentsOfKind(pkg, ["summary"]);
   if (!summaries.length) return undefined;
@@ -168,6 +184,17 @@ export function compilePackage(pkg: ArtifactPackage, ctx: CompilePackageContext)
     const brief = deriveBrief(pkg, ctx);
     canvas = compileArtifactBrief(brief, { occupancy: ctx.occupancy, viewport, anchors: ctx.anchors });
     report = validateCompiled({ objects: canvas.objects, brief, occupancy: ctx.occupancy, viewport });
+    const consumed = new Set(consumedCanvasIds(pkg, brief));
+    const dropped = projection.canvas.filter((id) => !consumed.has(id));
+    if (dropped.length) {
+      report.problems.push({
+        componentId: "composition",
+        validator: "composition",
+        message: `Canvas components not represented in this single revision: ${dropped.join(", ")}.`,
+        requestedCorrection: "Split the package into separate revisions or remove the unconsumed components before applying.",
+      });
+      report = { ok: false, problems: report.problems };
+    }
   }
   const studio = projection.studio.length ? buildStudio(pkg, ctx) : undefined;
   const learning = projection.learning.length ? buildLearning(pkg, ctx) : undefined;

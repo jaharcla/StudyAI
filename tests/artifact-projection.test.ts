@@ -18,7 +18,6 @@ const forcePackage = parseArtifactPackage({
   components: [
     { id: "e1", kind: "explanation", text: "Friction opposes motion.", sourceRefs: [REF], concepts: ["friction"] },
     { id: "d1", kind: "diagram", title: "Forces", surfaceAngleDeg: 0, sourceRefs: [REF], forces: [{ label: "gravity", components: [0, -9.8] }] },
-    { id: "we1", kind: "worked-example", prompt: "Find friction direction.", steps: ["Identify motion", "Oppose it"], answer: "Uphill.", sourceRefs: [REF] },
     { id: "q1", kind: "question", prompt: "Which way does friction act?", answer: "Uphill.", sourceRefs: [REF] },
     { id: "s1", kind: "summary", title: "Forces recap", sections: [{ heading: "Friction", body: "Opposes motion." }], sourceRefs: [REF] },
     { id: "ix1", kind: "interactive-exercise", prompt: "Read the graph.", sourceRefs: [REF], exercise: { mode: "graph-interpretation", slope: 2, intercept: 0, xRange: [-1, 1], atX: 1 } },
@@ -53,6 +52,19 @@ describe("projectPackage", () => {
 });
 
 describe("compilePackage", () => {
+  it("reports a canvas component that cannot fit in the single revision instead of dropping it silently", () => {
+    const pkg = parseArtifactPackage({
+      schemaVersion: 1, id: "dropped-pkg", objective: "Friction", courseId: "c1", lessonId: "l1",
+      components: [
+        { id: "q1", kind: "question", prompt: "Which way?", sourceRefs: [REF] },
+        { id: "we1", kind: "worked-example", prompt: "Work it out.", steps: ["Step one"], answer: "Uphill.", sourceRefs: [REF] },
+      ],
+    }, [REF]);
+    const result = compilePackage(pkg, ctx);
+    expect(result.report.ok).toBe(false);
+    expect(result.report.problems.some((problem) => problem.validator === "composition" && problem.message.includes("we1"))).toBe(true);
+  });
+
   it("compiles one Canvas revision, one Studio guide and one valid ActivitySpec", () => {
     const result = compilePackage(forcePackage, ctx);
     expect(result.canvas?.objects.map((object) => object.kind)).toEqual(["question", "force"]);
