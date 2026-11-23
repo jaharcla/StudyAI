@@ -26,6 +26,7 @@ async function fillForm(page: import("@playwright/test").Page, documentId: strin
   await page.getByRole("textbox", { name: "Choice 2" }).fill("Ribosome");
   await page.getByLabel("Source document").selectOption(documentId);
   await page.getByLabel("Source excerpt").fill(excerpt);
+  await page.getByLabel("Explanation").fill("Custom explanation from the author.");
 }
 
 test("authors a question from a cited excerpt and can answer it", async ({ page, request }) => {
@@ -37,6 +38,9 @@ test("authors a question from a cited excerpt and can answer it", async ({ page,
   await expect(page.getByTestId("question-author")).toBeHidden();
   await page.getByRole("button", { name: "Ask a reviewed question" }).click();
   await expect(page.getByRole("heading", { name: "Where is DNA?" })).toBeVisible();
+  await page.getByRole("button", { name: "Nucleus", exact: true }).click();
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.getByText("Custom explanation from the author.")).toBeVisible();
 });
 
 test("rejects an excerpt that is not in the document", async ({ page, request }) => {

@@ -53,4 +53,10 @@ No new dependency added.
 
 ## Verification
 
-Pending — filled in at close-out with quoted `npm run verify` output and canvas verification result.
+`npm run verify` (with isolated ports `WEB_PORT=5293 RUNTIME_PORT=8220 DATA_PORT=8221 AGENT_PORT=8143` because a dev server in the `real-controls` worktree owns the default ports):
+
+- `tsc -b`: clean.
+- Vitest: 450 passed, 2 failed. `tests/learning-activities.test.ts` timed out under full-suite load but passes in isolation (24/25 tests in the rerun passed). `tests/canvas-analysis-producer.test.ts` fails with `no such table: canvas_analyses` — this file and the canvas-analysis subsystem were not touched by this work; the failure is present at the base commit `4881cf3` and is pre-existing.
+- Playwright: all new specs passed individually (`flashcard-review`, `question-authoring`, `canvas-question-reveal`, `study-stage-modes`, `no-dead-controls`); a combined run of those five is recorded in the SDD ledger.
+
+`/canvas-verify` was not available as a command or script in this worktree; canvas behavior is covered by the Playwright canvas spec and the full suite. No prompt/model/provider/OCR change was made, so no canvas benchmark baseline update was needed.

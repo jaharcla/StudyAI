@@ -1,7 +1,7 @@
 # Design: Finish the learning features in the NEW UI/UX
 
 Date: 2026-11-22
-Status: draft for approval
+Status: implemented (2026-11-22)
 Base branch: `work/real-controls` (4881cf3) — the authoritative new UI/UX
 Spec supersedes: the `main`-based draft of the same filename
 

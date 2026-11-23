@@ -171,19 +171,6 @@ function makeShape(source: Store, data: Extract<CanvasAction, { kind: "createSha
   return { id: data.id ?? newId("shape"), typeName: "shape", type: data.type, x: data.x, y: data.y, rot: data.rot ?? 0, z: source.maxZ() + 1, props };
 }
 
-function shapeCenter(shape: ShapeRecord): { x: number; y: number } {
-  if (shape.type !== "text" && shape.type !== "note") {
-    const bounds = pageBounds(shape);
-    return { x: bounds.x + bounds.w / 2, y: bounds.y + bounds.h / 2 };
-  }
-  const text = String(shape.props.text ?? ""), scale = Number(shape.props.scale || 1);
-  const fontSize = ({ s: 16, m: 22, l: 32, xl: 48 } as Record<string, number>)[String(shape.props.size)] ?? 22;
-  const lines = text.split("\n");
-  const width = shape.type === "note" ? 200 * scale : Math.max(8, ...lines.map((line) => line.length * fontSize * 0.62)) * scale;
-  const height = shape.type === "note" ? Math.max(200, lines.length * fontSize * 1.35 + 40) * scale : Math.max(fontSize * 1.32, lines.length * fontSize * 1.32) * scale;
-  return { x: shape.x + width / 2, y: shape.y + height / 2 };
-}
-
 export function approveCanvasProposal(source: Store, activeBoardId: string, proposal: CanvasProposal, editor?: Editor, currentRevision?: number): { changedId: string } {
   if (!activeBoardId || proposal.boardId !== activeBoardId) throw new Error("Proposal belongs to a different board.");
   assertCanvasRevision(proposal.baseRevision, currentRevision);
