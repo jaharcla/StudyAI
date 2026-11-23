@@ -4,6 +4,8 @@ import { synchronizeObject } from "./geometry";
 import { assertCanvasRevision, requireCanvasRevision } from "./proposal-revision";
 import { verifyMathOperation } from "./math-workspace";
 import type { MathStepOperation } from "./model";
+import { artifactBriefSchema, compileArtifactBrief, type ArtifactBrief } from "./ai/teaching-scene";
+import { objectOccupancy, type LayoutRect } from "./ai/layout";
 
 const mathOperationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.enum(["add-constant", "subtract-constant", "multiply-constant", "divide-constant"]), value: z.number().finite() }),
@@ -152,4 +154,54 @@ export function applyCanvasObjectProposal(context: CanvasContext, proposal: Canv
   if (context.objects.some((object) => object.id === proposal.object.id)) throw new Error("That object already exists on the board.");
   parseCanvasDocument({ ...emptyCanvasDocument(), objects: [...context.objects, proposal.object] });
   return [...context.objects, structuredClone(proposal.object)];
+}
+
+/** One authoring verb produces one reviewable bundle; apply adds the whole bundle in one revision. */
+export type ArtifactBriefContext = CanvasContext & {
+  occupancy?: readonly LayoutRect[];
+  viewport?: LayoutRect;
+  anchors?: ReadonlyMap<string, LayoutRect>;
+};
+export type ArtifactBriefProposal = {
+  id: string;
+  boardId: string;
+  courseId: string;
+  lessonId: string;
+  baseRevision: number;
+  expectedObjects: string;
+  brief: ArtifactBrief;
+  objects: ScientificObject[];
+  description: string;
+  sourceRefs: string[];
+  verification: "generated-unverified";
+};
+
+export function proposeArtifactBrief(context: ArtifactBriefContext, value: unknown, baseRevisionOverride?: number): ArtifactBriefProposal {
+  const baseRevision = baseRevisionOverride ?? context.revision;
+  requireCanvasRevision(baseRevision);
+  const brief = artifactBriefSchema.parse(value);
+  if (context.boardId !== brief.boardId) throw new Error("The active board changed. Read its current context again.");
+  const compiled = compileArtifactBrief(brief, {
+    occupancy: context.occupancy ?? objectOccupancy(context.objects),
+    viewport: context.viewport,
+    anchors: context.anchors,
+  });
+  const existing = new Set(context.objects.map((object) => object.id));
+  if (compiled.objects.some((object) => existing.has(object.id))) throw new Error("A generated object id collided with an existing object.");
+  parseCanvasDocument({ ...emptyCanvasDocument(), objects: [...context.objects, ...compiled.objects] });
+  return {
+    id: newId("artifact-proposal"), boardId: context.boardId, courseId: context.courseId, lessonId: context.lessonId,
+    baseRevision, expectedObjects: JSON.stringify(context.objects), brief,
+    objects: compiled.objects, description: compiled.description,
+    sourceRefs: compiled.sourceRefs, verification: compiled.verification,
+  };
+}
+
+export function applyArtifactBriefProposal(context: CanvasContext, proposal: ArtifactBriefProposal): ScientificObject[] {
+  assertCanvasRevision(proposal.baseRevision, context.revision);
+  if (context.boardId !== proposal.boardId || context.courseId !== proposal.courseId || context.lessonId !== proposal.lessonId || JSON.stringify(context.objects) !== proposal.expectedObjects) throw new Error("This proposal is stale. Ask the tutor to propose it again.");
+  const ids = new Set(proposal.objects.map((object) => object.id));
+  if (ids.size !== proposal.objects.length || context.objects.some((object) => ids.has(object.id))) throw new Error("The artifact bundle has duplicate or already-present objects.");
+  parseCanvasDocument({ ...emptyCanvasDocument(), objects: [...context.objects, ...proposal.objects] });
+  return [...context.objects, ...structuredClone(proposal.objects)];
 }
