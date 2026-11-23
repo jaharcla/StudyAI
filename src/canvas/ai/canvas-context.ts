@@ -77,12 +77,16 @@ function shapes(source: Store | Snapshot): ShapeRecord[] {
 
 /**
  * Rectangles that already claim space on the board, in the form the layout planner consumes.
- * Single source of truth for occupancy: it uses the same record filter and the same
- * rotation-and-text-aware bounds as the tutor's own canvas context.
+ *
+ * Bounds come from the renderer's own `pageBounds`, not from `shapeBounds`: the AI-context helper
+ * deliberately estimates text extent to stay compact and machine-independent (it tags its result
+ * `text-layout-approximation`), and that estimate under-blocks a wrapped note by ~40% (measured 337
+ * against an estimated 200 for one long label). Placement must clear what the student will actually
+ * see, so occupancy takes the accurate authority while the context path keeps its cheaper estimate.
  */
 export function boardOccupancy(source: Store | Snapshot): LayoutRect[] {
   return shapes(source).map((shape) => {
-    const bounds = shapeBounds(shape);
+    const bounds = pageBounds(shape);
     return { x: bounds.x, y: bounds.y, width: bounds.w, height: bounds.h };
   });
 }
