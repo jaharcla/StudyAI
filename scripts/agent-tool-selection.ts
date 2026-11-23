@@ -8,16 +8,19 @@ process.env.TUTOR_CONTEXT_BUDGET ??= "8192";
 process.env.TUTOR_MAX_COMPLETION_TOKENS ??= "800";
 process.env.TUTOR_MAX_PROVIDER_CALLS ??= "3";
 process.env.TUTOR_OLLAMA_NUM_CTX ??= "8192";
-const testModel = process.env.TEST_MODEL ?? "qwen3.5:0.8b";
+const testModel = process.env.TUTOR_PROVIDER === "opencode-go"
+  ? (process.env.CANVAS_OPENCODE_GO_MODEL ?? "opencode-go")
+  : (process.env.TEST_MODEL ?? "qwen3.5:0.8b");
 
 // The graph returns only the final assistant turn, so observe the actual
-// Ollama request payloads to see which tools were called between turns.
+// provider request payloads (Ollama /api/chat or OpenAI /chat/completions)
+// to see which tools were called between turns.
 const nativeFetch = globalThis.fetch;
 let observedCalls: string[] = [];
 let observedResults: string[] = [];
 globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
-  if (url.includes("/api/chat") && init?.body) {
+  if ((url.includes("/api/chat") || url.includes("/chat/completions")) && init?.body) {
     const body = JSON.parse(String(init.body)) as {
       messages?: Array<{ role: string; content: string; tool_calls?: Array<{ function?: { name?: string; arguments?: unknown } }> }>;
     };
