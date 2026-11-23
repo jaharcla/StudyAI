@@ -1,15 +1,18 @@
 import { stableJson } from "../canvas/stable-json";
-import type { PreserveList } from "./repair-message";
-import type { ArtifactPackage } from "./package";
+import type { PreserveList, PreservableComponent, PreservableSource } from "./repair-message";
 
 export type PreserveCheck =
   | { ok: true }
   | { ok: false; reason: "preserve-list-violation"; changed: string[] };
 
-const refsOf = (pkg: ArtifactPackage): string[] => pkg.components.flatMap((component) => component.sourceRefs).sort();
+const refsOf = <T extends PreservableComponent>(source: PreservableSource<T>): string[] => source.components.flatMap((component) => component.sourceRefs).sort();
 
 /** A repair may change only components named in the failure report; citations are immutable across the package. */
-export function enforcePreserveList(original: ArtifactPackage, candidate: ArtifactPackage, preserve: PreserveList): PreserveCheck {
+export function enforcePreserveList<T extends PreservableComponent>(
+  original: PreservableSource<T>,
+  candidate: PreservableSource<T>,
+  preserve: PreserveList,
+): PreserveCheck {
   const changed: string[] = [];
   const before = new Map(original.components.map((component) => [component.id, component]));
   const after = new Map(candidate.components.map((component) => [component.id, component]));

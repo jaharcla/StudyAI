@@ -1,15 +1,18 @@
 import type { ValidationReport } from "./contracts";
-import type { ArtifactPackage } from "./package";
+
+/** The minimum shape a component must have for preserve/repair reporting. */
+export type PreservableComponent = { id: string; sourceRefs: readonly string[] };
+export type PreservableSource<T extends PreservableComponent = PreservableComponent> = { components: readonly T[] };
 
 export type PreserveList = { componentIds: string[]; sourceRefs: string[] };
 
 /** Components with no reported problem, plus every distinct citation, are immutable during repair. */
-export function computePreserveList(pkg: ArtifactPackage, report: ValidationReport): PreserveList {
+export function computePreserveList<T extends PreservableComponent>(source: PreservableSource<T>, report: ValidationReport): PreserveList {
   const failing = new Set(report.problems.map((problem) => problem.componentId));
   const sourceRefs = new Set<string>();
-  for (const component of pkg.components) for (const ref of component.sourceRefs) sourceRefs.add(ref);
+  for (const component of source.components) for (const ref of component.sourceRefs) sourceRefs.add(ref);
   return {
-    componentIds: pkg.components.filter((component) => !failing.has(component.id)).map((component) => component.id),
+    componentIds: source.components.filter((component) => !failing.has(component.id)).map((component) => component.id),
     sourceRefs: [...sourceRefs],
   };
 }
@@ -26,9 +29,9 @@ export type RepairResult =
   | { status: "needs_repair"; messages: RepairMessage[]; preserve: PreserveList; text: string };
 
 /** A model-facing, bounded report. It carries component ids and citation refs, never document/session ids. */
-export function buildRepairResult(pkg: ArtifactPackage, report: ValidationReport): RepairResult {
+export function buildRepairResult<T extends PreservableComponent>(source: PreservableSource<T>, report: ValidationReport): RepairResult {
   if (report.ok) return { status: "ok" };
-  const preserve = computePreserveList(pkg, report);
+  const preserve = computePreserveList(source, report);
   const messages: RepairMessage[] = [];
   const index = new Map<string, RepairMessage>();
   for (const problem of report.problems) {
@@ -47,7 +50,7 @@ export function buildRepairResult(pkg: ArtifactPackage, report: ValidationReport
     message.problems.push(problem.message);
   }
   const lines = messages.map((message) =>
-    `- Component ${message.componentId} (${message.validator}): ${message.problems.join("; ")}. ${message.requestedCorrection}`);
+    `- Component ${message.componentId} (${message.validator}): ${message.problems.join("; ")}. requestedCorrection: ${message.requestedCorrection}`);
   const text = [
     "Deterministic validation found problems. Repair the named components only.",
     ...lines,
