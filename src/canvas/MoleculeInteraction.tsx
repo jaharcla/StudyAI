@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { Editor } from "@quickdrawjs/react";
-import { bondOrderSum, formalChargeForAtom, moleculeBonds, type BondOrder, type Point, type ScientificObject } from "./model";
+import { bondOrderSum, formalChargeForAtom, moleculeBonds, type Point, type ScientificObject, type BondOrder } from "./model";
 import { atomWorldPosition, connectAtoms, moleculeBounds, moveAtom, placeAtom, type ScientificMolecule } from "./molecules";
 import type { Element } from "../science";
+import LewisSidebar from "./LewisSidebar";
 import { translateObject } from "./geometry";
 
 type Props = { objects: ScientificObject[]; editor: Editor; enabled: boolean; interactive: boolean; selectedId?: string; onSelect: (id?: string) => void; onEdit: (id: string) => void; onCommit: (objects: ScientificObject[]) => void; onActivate: () => void; onFinish: () => void };
@@ -69,16 +70,15 @@ export function useMoleculeInteraction({ objects, editor, enabled, interactive, 
     if (action !== "atom") { setAtomId(undefined); setBondId(undefined); setBondFrom(undefined); return; }
     const next = placeAtom(selected, point(event), element); commit(next); setAtomId(undefined); setBondId(undefined); editor.container.focus();
   }} /> : null;
-  const controls = (enabled || selected) && <div className="molecule-drawing-tools" role="toolbar" aria-label="Molecule construction">
-    <button className={enabled && action === "atom" ? "current" : ""} onClick={() => { setAction("atom"); setAtomId(undefined); setBondFrom(undefined); onActivate(); }}>Place atoms</button>
-    <label>Placement element<select aria-label="Placement element" value={element} onChange={(event) => setElement(event.target.value as Element)}>{["H", "C", "N", "O", "F", "P", "S", "Cl", "Br", "I"].map((item) => <option key={item}>{item}</option>)}</select></label>
-    <button className={enabled && action === "bond" ? "current" : ""} onClick={() => { setAction("bond"); setBondFrom(undefined); onActivate(); }}>Connect atoms</button>
-    <label>Bond order<select aria-label="Drawing bond order" value={selectedBond?.order ?? order} onChange={(event) => { const next = Number(event.target.value) as BondOrder; setOrder(next); updateBond(next); }}>{[1, 1.5, 2, 3].map((item) => <option key={item}>{item}</option>)}</select></label>
-    <button onClick={() => { setAction("move"); setBondFrom(undefined); onActivate(); }}>Move molecule</button>
-    {selectedAtom && <><label>Selected element<select aria-label="Selected atom element" value={selectedAtom.element} onChange={(event) => updateAtom({ element: event.target.value as Element })}>{["H", "C", "N", "O", "F", "P", "S", "Cl", "Br", "I"].map((item) => <option key={item}>{item}</option>)}</select></label><button onClick={() => updateAtom({ nonbondingElectrons: selectedAtom.nonbondingElectrons + 2 })}>Add lone pair</button><button disabled={selectedAtom.nonbondingElectrons < 2} onClick={() => updateAtom({ nonbondingElectrons: selectedAtom.nonbondingElectrons - 2 })}>Remove lone pair</button></>}
-    {selected && <button onClick={() => onEdit(selected.id)}>Inspect molecule</button>}
-    {enabled && <button onClick={() => { setBondFrom(undefined); onFinish(); }}>Finish molecule</button>}
-  </div>;
+  const controls = (enabled || selected) && <LewisSidebar
+    element={element}
+    order={selectedBond?.order ?? order}
+    onElement={(next) => { setAction("atom"); setElement(next); setAtomId(undefined); setBondFrom(undefined); onActivate(); }}
+    onBondOrder={(next) => { setOrder(next); setAction("bond"); if (selectedBond) updateBond(next); }}
+    onClose={() => { setBondFrom(undefined); onFinish(); }}
+    onInspect={() => { if (selected) onEdit(selected.id); }}
+    onFinish={() => { setBondFrom(undefined); onFinish(); }}
+  />;
   const render = (molecule: ScientificMolecule) => {
     const box = moleculeBounds(molecule), zoom = editor.camera.z, selected = selectedId === molecule.id;
     const sourceAtom = molecule.atoms.find((atom) => atom.id === bondFrom);
