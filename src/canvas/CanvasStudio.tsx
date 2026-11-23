@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Store } from "@quickdrawjs/core";
+import { pageBounds, Store } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
@@ -10,12 +10,15 @@ import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
 import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { objectTitle } from "./SceneGlyph";
-import { applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema, proposeCanvasEdit, proposeCanvasObject, proposeMolecule, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
+import { applyArtifactBriefProposal, applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema, proposeArtifactBrief, proposeCanvasEdit, proposeCanvasObject, proposeMolecule, type ArtifactBriefProposal, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
 import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
 import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
+import { artifactBriefSchema } from "./ai/teaching-scene";
+import { boardOccupancy } from "./ai/canvas-context";
+import { objectOccupancy, type LayoutRect } from "./ai/layout";
 import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
 import { invalidateCanvasSceneCache, requestCanvasScene } from "./ai/scene-tools";
 import { recognitionSourceKey, submitRecognitionFeedback, teachSelectedDrawing, type RecognitionFeedbackDecision } from "./ai/recognition-feedback";
@@ -73,6 +76,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [nativeTool, setNativeTool] = useState("select");
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [shapeProposal, setShapeProposal] = useState<ShapeProposal>();
+  const [artifactProposal, setArtifactProposal] = useState<ArtifactBriefProposal>();
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -128,6 +132,50 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       }
     },
   }, [courseId, lessonId]);
+
+  /** The single authoring verb: the model states intent, this handler asks the planner for geometry. */
+  const handleAuthorBoard = useCallback(async (input: unknown) => {
+    try {
+      const board = boardRef.current;
+      if (!board) throw new Error("The active board is not ready.");
+      const store = editorRef.current?.store ?? null;
+      const bounds = editorRef.current?.viewportPageBounds() ?? { x: 0, y: 0, w: 4000, h: 3000 };
+      const viewport: LayoutRect = { x: bounds.x, y: bounds.y, width: bounds.w, height: bounds.h };
+      const anchors = new Map<string, LayoutRect>([["#clear-area", viewport]]);
+      if (store) {
+        for (const record of store.all()) {
+          if (record.typeName !== "shape") continue;
+          const shapeBounds = pageBounds(record);
+          anchors.set(`#${record.id}`, { x: shapeBounds.x, y: shapeBounds.y, width: shapeBounds.w, height: shapeBounds.h });
+        }
+      }
+      const proposal = proposeArtifactBrief({
+        boardId: board.id, courseId, lessonId, revision: board.revision,
+        objects: documentRef.current.objects,
+        occupancy: [...(store ? boardOccupancy(store) : []), ...objectOccupancy(documentRef.current.objects)],
+        viewport, anchors,
+      }, input);
+      setArtifactProposal(proposal);
+      return { status: "pending_user_review", proposalId: proposal.id, description: proposal.description, requiresConfirmation: true };
+    } catch (error) {
+      return { status: "rejected", error: error instanceof Error ? error.message : "Invalid board artifact." };
+    }
+  }, [courseId, lessonId]);
+
+  useFrontendTool({
+    name: "author_board",
+    description: "Consequential: requires user approval. ONE verb for composing learning content onto the board: a question with a figure, a problem set (count 1-8), a worked example or a review deck. Describe what the artifact must show and where it belongs relative to the board; never supply x/y. The app resolves geometry against real board occupancy. Citations must be exact sourceRef values you retrieved; invented refs are removed server-side. The whole artifact is applied in one review and is labelled generated, not verified.",
+    parameters: artifactBriefSchema,
+    handler: handleAuthorBoard,
+  }, [handleAuthorBoard]);
+
+  // Dev-only seam for the acceptance spec: the model's schema-shaped tool-call payload is fed to the
+  // exact same registered handler. In production there is no global entry point.
+  useEffect(() => {
+    const host = window as Window & { __studyaiAuthorBoard?: typeof handleAuthorBoard };
+    if (import.meta.env.DEV) host.__studyaiAuthorBoard = handleAuthorBoard;
+    return () => { delete host.__studyaiAuthorBoard; };
+  }, [handleAuthorBoard]);
 
   const filteredTools = useMemo(() => {
     const query = toolSearch.trim().toLowerCase();
@@ -368,6 +416,31 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
     } catch (error) { onStatus(error instanceof Error ? error.message : "Could not add scientific object"); }
     finally { setProposalBusy(false); }
   }, [courseId, currentDocument, lessonId, objectProposal, onStatus, postDocument, proposalBusy, readAuthoritativeBoard, refreshHistory]);
+
+  /** Applies the whole artifact bundle as one document write: one revision bump, one undo step. */
+  const applyArtifactProposal = useCallback(async () => {
+    const board = boardRef.current;
+    const pending = artifactProposal;
+    if (!board || !pending || proposalBusy) return;
+    setProposalBusy(true);
+    try {
+      const sequence = loadSequence.current;
+      const base = structuredClone(currentDocument());
+      const authoritative = await readAuthoritativeBoard(board);
+      if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the artifact was being checked.");
+      const context = { boardId: board.id, courseId, lessonId, objects: base.objects, revision: authoritative.revision };
+      const objects = applyArtifactBriefProposal(context, pending);
+      const next = resolveScene({ ...base, objects });
+      if (stableJson(currentDocument()) !== stableJson(base)) throw new Error("The board changed while the artifact was being checked.");
+      if (!await postDocument({ ...board, revision: authoritative.revision }, next)) return;
+      if (sequence !== loadSequence.current || boardRef.current?.id !== board.id || stableJson(currentDocument()) !== stableJson(base)) throw new Error("The active board changed before the artifact could be shown.");
+      objectHistory.current.undo.push(base); objectHistory.current.redo = [];
+      documentRef.current = next; setDocument(next); setCanvasAnalysis(undefined);
+      setArtifactProposal(undefined); refreshHistory();
+      onStatus("Artifact added to the board");
+    } catch (error) { onStatus(error instanceof Error ? error.message : "Could not add the artifact"); }
+    finally { setProposalBusy(false); }
+  }, [courseId, currentDocument, lessonId, artifactProposal, onStatus, postDocument, proposalBusy, readAuthoritativeBoard, refreshHistory]);
 
   const refreshRecognition = useCallback(async () => {
     const board = activeBoard;
@@ -751,6 +824,16 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
       void applyQuickdrawProposal();
     }}>{proposalBusy ? "Saving approved proposalâ€¦" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
     {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>{objectProposal.reason}</strong><p>Add {objectProposal.object.kind} object</p><pre>{JSON.stringify(objectProposal.object, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved objectâ€¦" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
+    {artifactProposal && <section className="canvas-proposal" role="region" aria-label="Board artifact proposal" data-testid="board-artifact-proposal">
+      <strong>Review board artifact</strong>
+      <p>{artifactProposal.description}</p>
+      <p className="artifact-provenance" data-testid="generated-unverified">generated, not verified</p>
+      {artifactProposal.sourceRefs.length > 0 && <p className="artifact-citations">
+        citing {artifactProposal.sourceRefs.map((ref, index) => <span key={ref}><a href={`#studyai-citation=${encodeURIComponent(ref)}`}>{artifactProposal.brief.artifact.citationLabel ?? ref}</a>{index < artifactProposal.sourceRefs.length - 1 ? ", " : ""}</span>)}
+      </p>}
+      <button className="button-primary" disabled={proposalBusy} data-testid="apply-artifact" onClick={() => void applyArtifactProposal()}>{proposalBusy ? "Saving artifact…" : "Apply to board"}</button>
+      <button className="button-soft" disabled={proposalBusy} data-testid="decline-artifact" onClick={() => setArtifactProposal(undefined)}>Decline</button>
+    </section>}
     {recognitionOpen && <section className="canvas-recognition" role="region" aria-label="Canvas recognition review">
       <header><strong>Canvas labels</strong><span>Teach selected ink, then confirm or correct labels</span><button className="icon-button" aria-label="Close canvas label review" onClick={() => setRecognitionOpen(false)}><X size={14} /></button></header>
       <div className="canvas-recognition-teach">
