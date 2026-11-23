@@ -46,7 +46,7 @@ Quickdraw snapshot + ScientificObject[]
 | 2 — Spatial scene graph | **Complete** | Graph, index, SQLite/FTS, API, tools, recognition candidates, analysis merge, scene context, current-course search, browser e2e |
 | 3 — Interaction and learning loop | **Complete** | Teach UI, accept/correct/reject feedback, prototype updates, scientific-object creation proposals, scene tools bound to the tutor |
 | 4 — Operations, cost, safety | **Complete** | SQLite-persisted budgets/usage, per-analysis telemetry, egress disclosure/opt-out, circuit breaker + backoff metrics, redacted structured logs |
-| 5 — Polish and performance | **Remaining** | CLIP warmup, abstain-threshold calibration, p95 targets; scene caching and math/diagram/teach e2e are already covered |
+| 5 — Polish and performance | **Complete (2026-11-22)** | Spatial-grid backfill above the linear threshold, diagram OCR reads stacked fractions (`F/N`), cloud-OCR timeout bound (`CANVAS_OCR_TIMEOUT_MS`, default 30 s); CLIP warmup flag and abstain-calibration tool shipped; deep p95 bounded 15.3–17.8 s (external, accepted limit) |
 
 ## 4. Completed work
 
@@ -163,17 +163,22 @@ Phase 2 is complete.
 - `AI_DIAGNOSTICS=1` emits `canvas_provider_call` logs with stage, provider, model, latency, status, and a truncated error; base64 images and configured API keys are redacted.
 - Bound by `ADR-2026-11-18-provider-operations.md`.
 
-### Phase 5 — Polish and performance (remaining)
+### Phase 5 — Polish and performance (closed 2026-11-22)
 
-- Optional CLIP warmup and abstain-threshold calibration need live data; keep them explicit. Scene graphs already persist per revision, so repeat queries do not rebuild, and math/diagram/teach browser coverage already exists in `tests/e2e/`.
-- Performance targets (p95 deep <15 s, cached <3 s) still need measurement on the target machine.
+Closed on `main` by the reliability plan (`docs/superpowers/plans/2026-11-22-canvas-reliability.md`); evidence in `docs/verification/2026-11-22-canvas-reliability.md` and `docs/verification/2026-11-22-nested-logistic-ocr.md`.
+
+- Fixed: spatial grid silently dropped the first 256 nodes from rect queries once a board crossed the linear threshold (`7c29d78`, recall test in `tests/canvas-scene.test.ts`).
+- Fixed: diagram OCR now reads stacked fraction labels — `F/N` where it rendered `A E / N`; PhysAlign coverage 0.875 → 1.000 (`fcbc3a1`, `DIAGRAM_OCR_SYSTEM`).
+- Bounded: cloud OCR requests abort at `CANVAS_OCR_TIMEOUT_MS` (default 30 s, clamped 1–60 s) and fall back through the chain (`d380c9c`, ADR `docs/decisions/2026-11-22-canvas-deep-latency.md`). Deep p95 measured 15.3–17.8 s after the bound (was 106.7 s); the 15 s target is recorded as an accepted external-provider limit.
+- CLIP warmup (`CANVAS_CLIP_WARMUP`, off by default) and the abstain-calibration replay script shipped earlier; calibration still awaits real teach/accept/correct/dismiss decisions — defaults 0.18/0.03 stand.
+- Nested-logistic board: 0.875 F1, not exact (prime, `\equiv`, σ subscript). The recorded 0.625 was stale; a targeted prompt rule changed no tokens and was not kept.
 
 ## 7. Known issues and risks
 
 - **Gemini free tier** is 15 RPM / 500 RPD and can return 503 under load. Retries are implemented; occasional partial runs remain possible.
 - **OpenRouter account has 0 credits**; it is not a reliable primary. Gemini is primary when keyed.
-- **Nested logistic OCR** scores 0.625 F1 due to handwritten μ/σ ambiguity; exact for 4/6 math boards.
-- **PhysAlign OCR** reads `F/N` as `A E / N`; concept coverage 0.75, below the 0.8 target. Deep analysis still captures wall, spring, O/A, axes, graph.
+- **Nested logistic OCR** reads 0.875 F1 (the earlier 0.625 μ/σ ambiguity is gone); residual marks: prime, `\equiv`, σ subscript — 2026-11-22.
+- **PhysAlign OCR** `F/N` misread fixed by `DIAGRAM_OCR_SYSTEM`; coverage now 0.875–1.000 run to run — 2026-11-22.
 - **OpenCode Go** vision math OCR is slow and weak; keep it explicit-only.
 - **GitNexus index is stale**; impact results were confirmed with text search where needed.
 - **Supabase MCP** was unauthorized (`Unauthorized`); no Supabase data was read or written, and it is not in the runtime path.
