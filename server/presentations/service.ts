@@ -4,6 +4,7 @@ import { z } from "zod";
 import { findDeckTemplate } from "./templates";
 import { compileSlideDeck, type PresentonGenerateRequest } from "./compile";
 import type { RenderedDeck } from "./renderer";
+import { sanitizeCourseText } from "./sanitize";
 import { validateDeckText } from "./validate";
 import { decideRepair } from "./repair";
 import { initializeStudioSchema } from "../studio/schema";
@@ -66,13 +67,14 @@ function buildComponent(grounding: Grounding, templateId: string, objective: str
   }
   const slides: SlideDeckComponent["slides"] = [{ role: "title", title: grounding.focus, claims: [] }];
   for (const source of grounding.sources.slice(0, 5)) {
+    const excerpt = sanitizeCourseText(source.excerpt).slice(0, 3000);
     slides.push({
       role: "mechanism",
       title: source.title.slice(0, 120) || "Course evidence",
       claims: [{
-        claim: source.excerpt.slice(0, 500),
+        claim: excerpt.slice(0, 500),
         sourceRef: source.ref,
-        excerpt: source.excerpt.slice(0, 3000),
+        excerpt,
         relationship: "direct",
       }],
       notes: source.location,

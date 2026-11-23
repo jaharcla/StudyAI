@@ -45,6 +45,17 @@ describe("generateSlideDeck", () => {
     expect(listSlideDecks(db, "chem-120")).toHaveLength(1);
   });
 
+  it("normalizes symbol-font glyphs from course evidence", async () => {
+    const cleanText = `# Friction\n# Notes\n- For ν ≥ ν₀, electrons were ejected.\n> Source: ${REF}`;
+    const { db, deps } = setup([cleanText]);
+    deps.ground = () => ({
+      ...grounding,
+      sources: [{ ...grounding.sources[0], excerpt: "For    o , electrons were ejected." }],
+    });
+    const artifact = await generateSlideDeck(db, input, deps);
+    expect(artifact.content.slides[1].claims[0].claim).toBe("For ν ≥ ν₀, electrons were ejected.");
+  });
+
   it("refuses to store a deck that fails after the one allowed repair", async () => {
     const { db, deps } = setup([badText, badText]);
     await expect(generateSlideDeck(db, input, deps)).rejects.toThrow(/validation failed/i);
