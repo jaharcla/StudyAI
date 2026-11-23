@@ -8,6 +8,9 @@
  * half-apply, and it is a pure function of its inputs so the same request lands in the same place.
  */
 
+import type { ScientificObject } from "../model";
+import { objectBounds } from "../scene";
+
 export type LayoutRect = { x: number; y: number; width: number; height: number };
 export type LayoutRequest = { id: string; width: number; height: number };
 export type LayoutPlacement = { id: string; rect: LayoutRect };
@@ -33,6 +36,23 @@ const inside = (rect: LayoutRect, viewport: LayoutRect) => rect.x >= viewport.x 
 const compare = (order: "row" | "column") => (a: LayoutRect, b: LayoutRect) => order === "row"
   ? (a.y === b.y ? a.x - b.x : a.y - b.y)
   : (a.x === b.x ? a.y - b.y : a.x - b.x);
+
+/**
+ * Rectangles claimed by scientific objects, which live in the canvas document rather than the
+ * QuickDraw store. Bounds come from `objectBounds`, the same authority the renderer and anchor
+ * resolution use, so a force's real tail-to-tip extent is blocked and not its nominal box.
+ */
+/** A straight vector has zero extent on one axis but still needs clearance, so extents are floored. */
+const MIN_OCCUPANCY_EXTENT = 24;
+
+export function objectOccupancy(objects: readonly ScientificObject[]): LayoutRect[] {
+  return objects
+    .map((object) => {
+      const bounds = objectBounds(object);
+      return { x: bounds.x, y: bounds.y, width: Math.max(bounds.w, MIN_OCCUPANCY_EXTENT), height: Math.max(bounds.h, MIN_OCCUPANCY_EXTENT) };
+    })
+    .filter((rect) => [rect.x, rect.y, rect.width, rect.height].every(Number.isFinite));
+}
 
 /** First positions worth trying, ordered as reading order. Grows as the planner fills the board. */
 function candidateSlots(blocked: LayoutRect[], viewport: LayoutRect, anchor: { x: number; y: number }, gap: number, order: "row" | "column"): LayoutRect[] {

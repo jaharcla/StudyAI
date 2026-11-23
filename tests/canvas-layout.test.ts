@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Store } from "@quickdrawjs/core";
-import { planLayout, type LayoutRect } from "../src/canvas/ai/layout";
+import { planLayout, objectOccupancy, type LayoutRect } from "../src/canvas/ai/layout";
+import { objectBounds } from "../src/canvas/scene";
+import type { ScientificObject } from "../src/canvas/model";
 import { boardOccupancy, shapeBounds } from "../src/canvas/ai/canvas-context";
 import { compileTeachingScene, teachingSceneSchema } from "../src/canvas/ai/teaching-scene";
 
@@ -131,7 +133,24 @@ describe("board-aware layout planning", () => {
     }
   });
 
-  it("reproduces the legacy grid exactly for callers that pass no board state", () => {
+  it("blocks space for a horizontal force even though its extent on one axis is zero", () => {
+    // objectBounds derives a force's area from tail-to-tip, so a flat arrow has height 0.
+    // Without the extent floor, placement would happily drop a box straight across the vector.
+    const force: ScientificObject = {
+      id: "f1", kind: "force", x: 300, y: 400, width: 120, height: 0,
+      label: "F", units: "N", components: [12, 0, 0], pointOfApplication: { x: 240, y: 400 },
+      geometry: { tail: { x: 240, y: 400 }, tip: { x: 360, y: 400 } },
+    };
+    expect(objectBounds(force).h).toBe(0);
+
+    const occupancy = objectOccupancy([force]);
+    expect(occupancy).toHaveLength(1);
+    expect(occupancy[0].height).toBeGreaterThan(0);
+
+    expect(planLayout([{ id: "box", width: 100, height: 40 }], occupancy, { x: 0, y: 300, width: 400, height: 200 }).status).toBe("conflict");
+  });
+
+  it("legacy callers that pass no board state still get the original grid", () => {
     const scene = teachingSceneSchema.parse({ boardId: "board-a", nodes: [{ id: "a", label: "A" }, { id: "b", label: "B" }], edges: [], reason: "test" });
     const actions = compileTeachingScene(scene).actions.filter((action) => action.kind === "createShape");
     expect(actions.map((action) => action.kind === "createShape" ? [action.shape.x, action.shape.y] : null)).toEqual([[100, 100], [340, 100]]);
