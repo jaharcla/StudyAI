@@ -1,0 +1,29 @@
+{
+  "records": [
+    {
+      "id": "documented-request",
+      "provider": "ollama",
+      "model": "qwen3:latest",
+      "attempts": 2
+    },
+    {
+      "id": "ambiguous-request",
+      "provider": "ollama",
+      "model": "qwen3:latest",
+      "attempts": 2
+    },
+    {
+      "id": "multi-component-torque",
+      "provider": "ollama",
+      "model": "qwen3:latest",
+      "attempts": 2
+    },
+    {
+      "id": "insufficient-source",
+      "provider": "ollama",
+      "model": "qwen3:latest",
+      "attempts": 1
+    }
+  ],
+  "note": "Not for reviewers. Reveal only after scores are committed."
+}

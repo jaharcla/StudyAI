@@ -8,11 +8,14 @@
     "visual": 10,
     "interaction": 5
   },
+  "generations": "docs/verification/artifact-generations.json",
+  "meta": "docs/verification/artifact-generation-meta.json",
+  "reviewSheet": "docs/verification/artifact-blind-review-sheet.md",
   "scenarios": [
-    { "name": "documented request", "labels": {} },
-    { "name": "ambiguous request", "labels": {} },
-    { "name": "multi-component torque package", "labels": {} },
-    { "name": "insufficient source", "labels": {} }
+    { "name": "documented request", "generationId": "documented-request", "labels": {} },
+    { "name": "ambiguous request", "generationId": "ambiguous-request", "labels": {} },
+    { "name": "multi-component torque package", "generationId": "multi-component-torque", "labels": {} },
+    { "name": "insufficient source", "generationId": "insufficient-source", "labels": {} }
   ],
-  "note": "Labels 0-5 must come from human-reviewed blind comparisons of recorded generations. This baseline intentionally has no scores or overall. No cloud run or model-on-model rating was used."
+  "note": "Labels 0-5 must come from human-reviewed blind comparisons of the recorded generations. Model identity is withheld in the review sheet and stored only in the meta file, to be revealed after scores are committed. This baseline intentionally has no scores or overall."
 }

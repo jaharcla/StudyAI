@@ -42,4 +42,25 @@ describe("committed baseline", () => {
     expect(baseline).not.toHaveProperty("overall");
     expect(baseline.weights).toEqual(WEIGHTS);
   });
+
+  it("binds four recorded generations and keeps identity out of the review sheet", () => {
+    const baseline = JSON.parse(readFileSync("docs/verification/artifact-quality-baseline.json", "utf8")) as {
+      generations: string; meta: string; reviewSheet: string;
+      scenarios: Array<{ name: string; generationId: string; labels: Record<string, number> }>;
+    };
+    const records = JSON.parse(readFileSync(baseline.generations, "utf8")) as {
+      generations: Array<{ id: string; status: string }>;
+    };
+    for (const scenario of baseline.scenarios) {
+      const record = records.generations.find((item) => item.id === scenario.generationId);
+      expect(record).toBeDefined();
+      expect(["validated", "insufficient-evidence"]).toContain(record?.status);
+      expect(scenario.labels).toEqual({});
+    }
+    expect(records.generations).toHaveLength(4);
+    expect(readFileSync(baseline.meta, "utf8")).toContain("provider");
+    const sheet = readFileSync(baseline.reviewSheet, "utf8");
+    expect(sheet).toContain("Pedagogy");
+    expect(sheet).not.toMatch(/qwen|ollama|opencode|groq/i);
+  });
 });
