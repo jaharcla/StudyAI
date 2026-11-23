@@ -41,7 +41,13 @@
 /* The object inspector docks on the right too — the floating tutor would cover
    its fields and buttons. Give the inspector the space until it closes. */
 .app-shell:has(.canvas-object-editor) .tutor-panel,
-.app-shell:has(.canvas-object-editor) .reopen-tutor{display:none}
+.app-shell:has(.canvas-object-editor) .reopen-tutor,
+.app-shell:has(.molecule-drawing-tools) .tutor-panel,
+.app-shell:has(.molecule-drawing-tools) .reopen-tutor,
+.app-shell:has(.canvas-recognition) .tutor-panel,
+.app-shell:has(.canvas-recognition) .reopen-tutor,
+.app-shell:has(.activity-task-panel) .tutor-panel,
+.app-shell:has(.activity-task-panel) .reopen-tutor{display:none}
 .app-shell .view-switch button,.app-shell .tool-chip{padding:6px 9px;font-size:10px;border-radius:6px}
 .app-shell .view-switch button.current,.app-shell .tool-chip.active{background:#2a2621;color:#f7f2ea}
 

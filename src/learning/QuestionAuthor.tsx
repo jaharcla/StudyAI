@@ -12,6 +12,7 @@ export default function QuestionAuthor({ courseId, lessonId, close, onCreated }:
   const [choices, setChoices] = useState(["", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
   const [excerpt, setExcerpt] = useState("");
+  const [explanation, setExplanation] = useState("The cited source supports the correct choice.");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -39,7 +40,7 @@ export default function QuestionAuthor({ courseId, lessonId, close, onCreated }:
           courseId, lessonId, concept, prompt,
           choices: choices.map((text, index) => ({ id: `c${index + 1}`, text })),
           correctChoice: `c${correctIndex + 1}`,
-          explanation: "The cited source supports the correct choice.",
+          explanation,
           sourceDocumentId: documentId,
           sourceExcerpt: excerpt,
           reviewed: true,
@@ -77,6 +78,7 @@ export default function QuestionAuthor({ courseId, lessonId, close, onCreated }:
           {documents.map((document) => <option key={document.id} value={document.id}>{document.title}</option>)}
         </select></label>
         <label>Source excerpt<textarea aria-label="Source excerpt" value={excerpt} onChange={(event) => setExcerpt(event.target.value)} placeholder="Paste the exact text from the source" /></label>
+        <label>Explanation<textarea aria-label="Explanation" value={explanation} onChange={(event) => setExplanation(event.target.value)} /></label>
         {status && <p role="status">{status}</p>}
         <button className="button-primary" disabled={busy} onClick={() => void save()}>Save question</button>
       </section>

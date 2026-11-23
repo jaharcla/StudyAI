@@ -16,6 +16,7 @@ export function objectTitle(object: ScientificObject): string {
 }
 
 export function SceneGlyph({ object, onOpenNote, onOpenDocument }: { object: ScientificObject; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void }) {
+  const [revealed, setRevealed] = useState(false);
   if (object.kind === "graph") return <GraphPlot object={object} />;
   if (object.kind === "atom") {
     const charge = formalCharge(object.element, object.nonbondingElectrons, object.bondOrderSum);
@@ -25,13 +26,14 @@ export function SceneGlyph({ object, onOpenNote, onOpenDocument }: { object: Sci
   let title = objectTitle(object), body = "";
   if (object.kind === "concept") body = object.definition;
   if (object.kind === "linked-note" || object.kind === "linked-document") body = object.excerpt;
-  if (object.kind === "question") { title = object.prompt; body = object.answer ?? ""; }
+  if (object.kind === "question") { title = object.prompt; body = revealed ? object.answer ?? "" : ""; }
   if (object.kind === "flashcard") { title = object.front; body = object.back; }
   if (object.kind === "anatomy") body = [object.system, ...object.labels].filter(Boolean).join(" · ");
   return <foreignObject x={object.x - object.width / 2} y={object.y - object.height / 2} width={object.width} height={object.height}>
     <div className={`scene-node scene-${object.kind}`}><strong>{title}</strong><span>{body}</span>
       {object.kind === "linked-note" && <button onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onOpenNote(object.noteId); }}>Open note</button>}
       {object.kind === "linked-document" && <button onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onOpenDocument(object.documentId, object.title); }}>Open source</button>}
+      {object.kind === "question" && <button data-testid="reveal-answer" aria-label={revealed ? "Hide answer" : "Reveal answer"} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setRevealed(!revealed); }}>{revealed ? "Hide answer" : "Reveal answer"}</button>}
     </div>
   </foreignObject>;
 }

@@ -11,7 +11,7 @@ test("adaptive study asks, grades, schedules, and resumes from persistent state"
   await page.goto("/");
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("heading", { name: lesson.title, exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Study this lesson" }).click();
+  await page.getByTitle("Open quizzes and flashcards").click();
   await page.getByRole("button", { name: "Ask a reviewed question" }).click();
   await expect(page.getByRole("heading", { name: "Where is DNA located?" })).toBeVisible();
   await expect(page.getByText("Source: cell-biology.txt. A cell contains DNA in its nucleus.")).toBeVisible();
@@ -22,7 +22,7 @@ test("adaptive study asks, grades, schedules, and resumes from persistent state"
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await expect(page.getByText("Review scheduled for", { exact: false })).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Study this lesson" }).click();
+  await page.getByTitle("Open quizzes and flashcards").click();
   await expect(page.getByRole("button", { name: "Ask a reviewed question" })).toBeVisible();
   const attempts = await request.get(`/api/study/resume?course=${course.id}&lesson=${lesson.id}`);
   expect(await attempts.json()).toMatchObject({ phase: "ready", dueCard: { concept: "Cell biology" } });

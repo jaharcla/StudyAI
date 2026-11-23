@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Activity, ArrowLeft, BookOpen, Layers, Sparkles, X } from "lucide-react";
 import { StudyPanel } from "../learning/StudyPanel";
 
@@ -7,11 +8,14 @@ type Props = {
   courseTitle: string;
   lessonTitle: string;
   close: () => void;
+  onOpenActivities: () => void;
+  onOpenSources: () => void;
 };
 
 /** Conversation-first secondary surface. The study content is the real
  *  adaptive StudyPanel (questions, FSRS reviews, real course citations). */
-export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close }: Props) {
+export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenActivities, onOpenSources }: Props) {
+  const [mode, setMode] = useState<"quiz" | "activities" | "sources">("quiz");
   return (
     <div className="study-stage" role="dialog" aria-modal="true" aria-label="Study session">
       <aside className="stage-sidebar">
@@ -20,9 +24,9 @@ export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitl
         <div className="stage-group">THIS LESSON</div>
         <button className="stage-session active">{lessonTitle}<small>{courseTitle}</small></button>
         <div className="stage-group">MODES</div>
-        <button className="stage-session"><Layers size={13} /> Adaptive quiz<small>Reviewed questions + FSRS</small></button>
-        <button className="stage-session"><Activity size={13} /> Activities<small>Guided canvas tasks</small></button>
-        <button className="stage-session"><BookOpen size={13} /> Course sources<small>Pages and slides</small></button>
+        <button className={`stage-session ${mode === "quiz" ? "active" : ""}`} aria-current={mode === "quiz" ? "step" : undefined} onClick={() => setMode("quiz")}><Layers size={13} /> Adaptive quiz<small>Reviewed questions + FSRS</small></button>
+        <button className={`stage-session ${mode === "activities" ? "active" : ""}`} aria-current={mode === "activities" ? "step" : undefined} onClick={() => { setMode("activities"); onOpenActivities(); }}><Activity size={13} /> Activities<small>Guided canvas tasks</small></button>
+        <button className={`stage-session ${mode === "sources" ? "active" : ""}`} aria-current={mode === "sources" ? "step" : undefined} onClick={() => { setMode("sources"); onOpenSources(); }}><BookOpen size={13} /> Course sources<small>Pages and slides</small></button>
       </aside>
 
       <main className="stage-main">

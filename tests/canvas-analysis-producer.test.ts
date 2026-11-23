@@ -10,6 +10,7 @@ import { CANVAS_OCR_DEFAULT_PADDING, canvasOCRRegionTransform, planCanvasOCRCrop
 import { FusionResultSchema, OCRResultSchema, StructureResultSchema } from "../server/canvas-intelligence/types.js";
 import { CanvasAnalysisValidationError, currentCanvasRevision, validateCanvasAnalysisForBoard } from "../server/canvas-analysis/contract.js";
 import { createCanvasAnalysisProducerHandler, produceCanvasAnalysisForPersistedBoard, type CanvasAnalysisRequest } from "../server/canvas-analysis/producer.js";
+import { initializeCanvasAnalysisStorage } from "../server/canvas-analysis/storage.js";
 import type { UnderstandCanvasArgs } from "../server/canvas-intelligence/service.js";
 import { ocrRequestsForPolicy } from "../server/canvas-intelligence/service.js";
 
@@ -23,6 +24,7 @@ const scope = { boardId: board.boardId, courseId: board.courseId, lessonId: boar
 const request = (): CanvasAnalysisRequest => ({ expectedRevision: board.revision, document: structuredClone(document), selectedIds: ["shape-1"], image: { base64: "aW1hZ2U=", mimeType: "image/png" } });
 
 const database = new Database(":memory:");
+initializeCanvasAnalysisStorage(database);
 database.exec("CREATE TABLE lessons(id TEXT,course_id TEXT,PRIMARY KEY(course_id,id)); CREATE TABLE canvases(id TEXT PRIMARY KEY,course_id TEXT,lesson_id TEXT,revision INTEGER,document TEXT);");
 beforeEach(() => {
   database.prepare("INSERT OR REPLACE INTO lessons(id,course_id) VALUES(?,?)").run(board.lessonId, board.courseId);
