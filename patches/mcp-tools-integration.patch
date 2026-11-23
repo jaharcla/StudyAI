@@ -943,7 +943,7 @@ index 0000000..6344366
 +});
 diff --git a/scripts/agent-tool-selection.ts b/scripts/agent-tool-selection.ts
 new file mode 100644
-index 0000000..1c4e819
+index 0000000..55c8e7e
 --- /dev/null
 +++ b/scripts/agent-tool-selection.ts
 @@ -0,0 +1,70 @@
@@ -951,7 +951,7 @@ index 0000000..1c4e819
 +import { tmpdir } from "node:os";
 +
 +process.env.STUDYAI_DB = join(tmpdir(), `mcp-tools-agent-${process.pid}.sqlite`);
-+process.env.TUTOR_PROVIDER = "ollama";
++process.env.TUTOR_PROVIDER ??= "ollama";
 +process.env.STUDYAI_EXTERNAL_MCP_TOOLS = "1";
 +process.env.TUTOR_CONTEXT_BUDGET ??= "8192";
 +process.env.TUTOR_MAX_COMPLETION_TOKENS ??= "800";
