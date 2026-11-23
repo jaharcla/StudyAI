@@ -148,10 +148,56 @@ describe("artifact.kind dispatch", () => {
   it("problem-set compiles to count question objects", () => {
     const brief = artifactBriefSchema.parse({
       ...frictionBrief,
-      artifact: { ...frictionBrief.artifact, kind: "problem-set", count: 2, figure: undefined },
+      artifact: {
+        ...frictionBrief.artifact, kind: "problem-set", count: 2, figure: undefined,
+        items: [{ prompt: "First problem." }, { prompt: "Second problem." }],
+      },
     });
     const compiled = compileArtifactBrief(brief, { viewport });
     expect(compiled.objects.map((object) => object.kind)).toEqual(["question", "question"]);
+  });
+});
+
+describe("problem-set items", () => {
+  const problemItems = [
+    { prompt: "State the friction direction.", answer: "Uphill.", sourceRef: "module-1#p4" },
+    { prompt: "Name the normal force.", answer: "Perpendicular to the surface.", sourceRef: "module-1#p4" },
+    { prompt: "What does gravity do here?", answer: "Acts downward.", sourceRef: "module-1#p4" },
+  ];
+  const briefWithItems = (items: unknown, count = items.length as number) => ({
+    ...frictionBrief,
+    artifact: { ...frictionBrief.artifact, kind: "problem-set", count, figure: undefined, items },
+  });
+
+  it("compiles distinct prompts in order, each with its own citation", () => {
+    const compiled = compileArtifactBrief(artifactBriefSchema.parse(briefWithItems(problemItems)), { viewport });
+    const questions = compiled.objects as Array<Extract<ScientificObject, { kind: "question" }>>;
+    expect(questions.map((question) => question.prompt)).toEqual(problemItems.map((item) => item.prompt));
+    expect(questions.map((question) => question.answer)).toEqual(problemItems.map((item) => item.answer));
+    expect(questions.map((question) => question.provenance?.sourceRefs)).toEqual(problemItems.map(() => ["module-1#p4"]));
+  });
+
+  it("rejects two items sharing a prompt", () => {
+    expect(() => artifactBriefSchema.parse(briefWithItems([
+      problemItems[0], { ...problemItems[1], prompt: problemItems[0].prompt },
+    ]))).toThrow(/unique|distinct/i);
+  });
+
+  it("rejects a count/items.length disagreement instead of clamping", () => {
+    expect(() => artifactBriefSchema.parse(briefWithItems(problemItems, 2))).toThrow(/count|match|length/i);
+  });
+
+  it("rejects a problem-set without items so silent duplication is impossible", () => {
+    expect(() => artifactBriefSchema.parse({
+      ...frictionBrief,
+      artifact: { ...frictionBrief.artifact, kind: "problem-set", figure: undefined },
+    })).toThrow(/items/i);
+  });
+
+  it("rejects an item sourceRef that was not retrieved", () => {
+    expect(() => artifactBriefSchema.parse(briefWithItems([
+      { ...problemItems[0], sourceRef: "invented#p99" }, ...problemItems.slice(1),
+    ]))).toThrow(/sourceRef/i);
   });
 });
 
@@ -168,9 +214,9 @@ describe("ArtifactBrief proposal", () => {
   });
 
   it("applies each advertised kind as exactly its compiled bundle and stays parseable", () => {
-    const cases: Array<{ kind: string; count: number; expected: string[] }> = [
+    const cases: Array<{ kind: string; count: number; expected: string[]; items?: Array<{ prompt: string }> }> = [
       { kind: "question", count: 1, expected: ["question", "force", "force", "force"] },
-      { kind: "problem-set", count: 2, expected: ["question", "question"] },
+      { kind: "problem-set", count: 2, expected: ["question", "question"], items: [{ prompt: "First." }, { prompt: "Second." }] },
       { kind: "figure", count: 1, expected: ["force", "force", "force"] },
       { kind: "worked-example", count: 1, expected: ["question", "force", "force", "force"] },
       { kind: "deck", count: 2, expected: ["flashcard", "flashcard"] },
@@ -183,6 +229,7 @@ describe("ArtifactBrief proposal", () => {
           kind: testCase.kind,
           count: testCase.count,
           figure: testCase.kind === "problem-set" || testCase.kind === "deck" ? undefined : frictionBrief.artifact.figure,
+          ...(testCase.items ? { items: testCase.items } : {}),
         },
       });
       const proposal = proposeArtifactBrief(context, brief, 7);

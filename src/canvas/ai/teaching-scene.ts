@@ -131,6 +131,12 @@ export const artifactBriefSchema = z.object({
     prompt: z.string().min(1).max(2000),
     answer: z.string().max(2000).optional(),
     citationLabel: z.string().max(200).optional(),
+    items: z.array(z.object({
+      prompt: z.string().min(1).max(2000),
+      answer: z.string().max(2000).optional(),
+      citationLabel: z.string().max(200).optional(),
+      sourceRef: z.string().min(1).max(400).optional(),
+    }).strict()).max(8).optional(),
     concepts: z.array(z.string().min(1).max(80)).max(8).default([]),
     figure: z.object({
       kind: z.enum(["freebody", "vector", "graph", "anatomy", "equation", "mindmap"]),
@@ -149,6 +155,20 @@ export const artifactBriefSchema = z.object({
   reason: z.string().min(1).max(1000),
 }).strict().superRefine((value, context) => {
   if (new Set(value.sourceRefs).size !== value.sourceRefs.length) context.addIssue({ code: "custom", message: "sourceRefs must be unique." });
+  if (value.artifact.kind === "problem-set") {
+    if (!value.artifact.items) {
+      context.addIssue({ code: "custom", message: "A problem-set requires items with distinct prompts.", path: ["artifact", "items"] });
+    } else {
+      if (value.artifact.items.length !== value.artifact.count) context.addIssue({ code: "custom", message: "items.length must equal count; it is never clamped.", path: ["artifact", "items"] });
+      const prompts = value.artifact.items.map((item) => item.prompt);
+      if (new Set(prompts).size !== prompts.length) context.addIssue({ code: "custom", message: "Item prompts must be unique.", path: ["artifact", "items"] });
+    }
+  }
+  for (const item of value.artifact.items ?? []) {
+    if (item.sourceRef && !value.sourceRefs.includes(item.sourceRef)) {
+      context.addIssue({ code: "custom", message: `Item sourceRef "${item.sourceRef}" was not retrieved.`, path: ["artifact", "items"] });
+    }
+  }
 });
 
 export type ArtifactBrief = z.infer<typeof artifactBriefSchema>;
@@ -208,27 +228,35 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   };
   const indices = (count: number) => Array.from({ length: count }, (_, index) => index);
   const tagged = (ctx: CompileContext) => ({ ...ctx.provenance, sourceRefs: [...ctx.provenance.sourceRefs] });
-  const questionAt = (ctx: CompileContext, index: number, answer?: string): ScientificObject => {
+  const itemAt = (ctx: CompileContext, index: number) => ctx.input.artifact.items?.[index] ?? { prompt: ctx.input.artifact.prompt, ...(ctx.input.artifact.answer ? { answer: ctx.input.artifact.answer } : {}) };
+  const provenanceAt = (ctx: CompileContext, index: number) => {
+    const sourceRef = ctx.input.artifact.items?.[index]?.sourceRef;
+    return sourceRef ? { ...tagged(ctx), sourceRefs: [sourceRef] } : tagged(ctx);
+  };
+  const questionAt = (ctx: CompileContext, index: number, forcedAnswer?: string): ScientificObject => {
     const rect = ctx.rectangles.get(`question-${index}`)!;
+    const item = itemAt(ctx, index);
+    const answer = forcedAnswer ?? item.answer;
     return {
       id: newId("question"), kind: "question", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-      prompt: ctx.input.artifact.prompt,
+      prompt: item.prompt,
       ...(answer ? { answer } : {}),
-      provenance: tagged(ctx),
+      provenance: provenanceAt(ctx, index),
     };
   };
 
   /** The advertised kind decides what is compiled. No kind silently falls through to another. */
   const compileByKind: Record<ArtifactBrief["artifact"]["kind"], (ctx: CompileContext) => ScientificObject[]> = {
-    question: (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index, index === 0 ? ctx.input.artifact.answer : undefined)),
-    "problem-set": (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index, index === 0 ? ctx.input.artifact.answer : undefined)),
+    question: (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index)),
+    "problem-set": (ctx) => indices(ctx.input.artifact.count).map((index) => questionAt(ctx, index)),
     "worked-example": (ctx) => [questionAt(ctx, 0, ctx.input.artifact.answer ?? ctx.input.artifact.prompt)],
     deck: (ctx) => indices(ctx.input.artifact.count).map((index) => {
       const rect = ctx.rectangles.get(`question-${index}`)!;
+      const item = itemAt(ctx, index);
       return {
         id: newId("flashcard"), kind: "flashcard", x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-        front: ctx.input.artifact.prompt, back: ctx.input.artifact.answer ?? "",
-        provenance: tagged(ctx),
+        front: item.prompt, back: item.answer ?? "",
+        provenance: provenanceAt(ctx, index),
       };
     }),
     figure: () => [],
