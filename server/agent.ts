@@ -45,6 +45,11 @@ function canvasReasoningMode(env: NodeJS.ProcessEnv): CanvasReasoningMode {
   return raw === "off" || raw === "always" ? raw : "auto";
 }
 
+function maxToolCallsPerTurn(env: NodeJS.ProcessEnv): number {
+  const raw = Number(env.TUTOR_MAX_TOOL_CALLS_PER_TURN ?? 3);
+  return Number.isInteger(raw) && raw >= 1 && raw <= 10 ? raw : 3;
+}
+
 function canvasReasoningMaxPasses(env: NodeJS.ProcessEnv): number {
   const raw = env.CANVAS_REASONING_MAX_PASSES;
   const value = raw === undefined || raw.trim() === "" ? 6 : Number(raw);
@@ -362,6 +367,8 @@ async function tutor(state: typeof State.State, config?: unknown) {
     }
   };
   let response: AIMessage;
+  let executedToolCalls = 0;
+  const toolCallBudget = maxToolCallsPerTurn(process.env);
   let canvasToolProposed = false;
   try { response = await invoke(history); }
   catch (error) {
@@ -405,7 +412,16 @@ async function tutor(state: typeof State.State, config?: unknown) {
       return { activeScope, scopeStart, messages: [response] };
     }
     const toolMessages: ToolMessage[] = [];
-    for (const call of response.tool_calls) {
+    const calls = response.tool_calls ?? [];
+    const pendingCalls = calls.slice(0, Math.max(0, toolCallBudget - executedToolCalls));
+    for (const skipped of calls.slice(pendingCalls.length)) {
+      toolMessages.push(new ToolMessage({
+        content: JSON.stringify({ status: "limit_reached", error: `At most ${toolCallBudget} tool calls are executed per tutor turn.` }),
+        tool_call_id: skipped.id || randomUUID(),
+      }));
+    }
+    for (const call of pendingCalls) {
+      executedToolCalls++;
       const callId = call.id || randomUUID();
       call.id = callId;
       const executable = executableTools.get(call.name);

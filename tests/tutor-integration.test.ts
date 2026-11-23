@@ -74,6 +74,7 @@ beforeEach(() => {
   process.env.TUTOR_GROQ_INPUT_USD_PER_1M = "0.15";
   process.env.TUTOR_GROQ_OUTPUT_USD_PER_1M = "0.6";
   delete process.env.AI_DIAGNOSTICS;
+  delete process.env.TUTOR_MAX_TOOL_CALLS_PER_TURN;
   mocks.invoke.mockReset(); mocks.bindTools.mockClear(); mocks.ollamaOptions.length = 0; mocks.groqInvoke.mockReset(); mocks.groqBindTools.mockClear(); mocks.groqBindToolOptions.length = 0; mocks.groqOptions.length = 0;
 });
 
@@ -149,6 +150,20 @@ it("executes deterministic tutor calculations and returns the result to the mode
   expect(mocks.invoke).toHaveBeenCalledTimes(2);
   expect(mocks.invoke.mock.calls[1][0].some((message: { content?: unknown }) => String(message.content).includes('"result":5'))).toBe(true);
   expect(result.messages.at(-1)?.content).toContain("magnitude is 5");
+});
+
+it("caps repeated tool calls within a single tutor turn", async () => {
+  process.env.TUTOR_MAX_TOOL_CALLS_PER_TURN = "1";
+  const duplicated = new AIMessage({ content: "", tool_calls: [
+    { name: "calculate_vector", id: "v1", args: { operation: "magnitude", vectorA: [3, 4, 0] } },
+    { name: "calculate_vector", id: "v2", args: { operation: "magnitude", vectorA: [3, 4, 0] } },
+  ] });
+  mocks.invoke.mockResolvedValueOnce(duplicated).mockResolvedValueOnce(new AIMessage("Done."));
+  await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Compute the vector magnitude twice.")] });
+  const followUp = mocks.invoke.mock.calls[1][0] as Array<{ content?: unknown }>;
+  const contents = followUp.map((message) => String(message.content ?? ""));
+  expect(contents.some((content) => content.includes('"result":5'))).toBe(true);
+  expect(contents.some((content) => content.includes("limit_reached"))).toBe(true);
 });
 
 it("makes context omitted under the token budget visible in the tutor answer", async () => {

@@ -31,6 +31,7 @@ The tools are registered in `server/mcp-tools.ts`, wired into `server/agent.ts`,
 
 - Wolfram is stateless: no definitions carry between calls.
 - `@langchain/ollama@1.0.2` serializes an assistant message with string content as `{role:"assistant", content:""}` and drops its `tool_calls`. The agent now emits a `tool_use` content block before the follow-up invocation so the second Ollama request keeps the call/result pairing. Without this, the model answered from memory despite tools being executed.
+- A hard cap of 3 executed tool calls per tutor turn (`TUTOR_MAX_TOOL_CALLS_PER_TURN`, 1–10) is enforced in the graph, with a `limit_reached` ToolMessage for skipped calls. It bounds runaway repetition regardless of model behaviour and is unit-tested in `tests/tutor-integration.test.ts`.
 - The chart tool deliberately accepts simple chart parameters (mark, field names, row array) rather than a raw Vega-Lite document; a 0.8B local model could not reliably produce nested JSON. The app builds and compiles the spec. Model-supplied field names that are absent from the rows are resolved from the first row's keys.
 - Wolfram output is capped at roughly 10,000 characters by the service; `normalizeWolframText` adds a second 12,000-character guard and discloses the omitted middle.
 - Wolfram failures arrive as message text (`Plot::argrx`) with `isError` unset; `normalizeWolframText` detects that and maps it to `ok:false`.
@@ -45,11 +46,12 @@ The tools are registered in `server/mcp-tools.ts`, wired into `server/agent.ts`,
 - `npx vitest run tests/mcp-tools.test.ts` — 7 passed.
 - `npx playwright test --config playwright.spike.config.ts` — 1 passed; asserts a real SVG renders in the chat DOM.
 - `npx tsx scripts/smoke-mcp-tools.ts` — live calls to both Wolfram tools and the Vega tool succeeded.
-- `npx tsx scripts/agent-tool-selection.ts` — 4/4 cases selected the expected tool (or none for a greeting) with all three tested models: local `qwen3.5:0.8b`, and the free OpenCode models `hy4-flash-free` and `beam-free` via the app's `opencode-go` provider using the local auth entry. The tiny local model called the chart tool three times for one request; the two free models called it once. All chart calls produced a valid compiled spec after field resolution. No credential was printed.
+- `npx tsx scripts/agent-tool-selection.ts` was a 4-case **smoke test only**; its 4/4 result has a ceiling effect and is superseded by the repeated benchmark below. It was still useful for finding the Ollama serialization bug.
+- `npx tsx scripts/agent-tool-benchmark.ts` — 12 cases × 5 repeats × 3 models. Results and limitations are in `docs/verification/tool-selection-benchmark-2026-11-23.md`. The benchmark discriminates: `qwen3.5:0.8b` selected the tool 2/5 on derivative and duplicated chart calls, while the two free models were 5/5 on the positive cases but over-called on two negative cases. No model recommendation is made.
 - GitNexus `detect_changes` before commit — 0 changed symbols, no partial/truncated. The index is 96 commits behind HEAD; that staleness is recorded rather than ignored.
 
 ## What is deliberately not done
 
 - No MCP server discovery or generic MCP host wiring.
-- No tool-selection measurement with a real model: the agent sees the tools, but which questions trigger them has not been benchmarked.
+- No claim that tool selection is solved or that a particular model should be chosen. The benchmark is a first measurement, not a gate. It is a separate track from the Phase 4 pedagogy gate, which remains the blocker. Free-tier cloud models may retain prompts: synthetic probe cases only until that data flow is accepted.
 - No `benchmark:canvas` run (flag off, no prompt change on the default path).
