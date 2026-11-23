@@ -55,13 +55,15 @@ Both independent reviewers scored the documented-request question low because th
 
 ## Reuse-versus-build decision (ADR)
 
-**Decision: do not add any of these as a runtime dependency.** All five are Python or research scripts; adopting them would add a new language runtime and an unmaintained dependency surface to a local-first TypeScript app. Licences are permissive where stated (MIT), so copying *ideas and prompts* is clean.
+**Decision: integrate BloomAssessmentItemGeneration's scenario-first method directly into StudyAI's TypeScript composer; add no runtime dependency.** Reading its source corrected an earlier assumption: SemanticQAGen's leak filter targets source-container phrasing such as "according to the passage", not answer-copying or cosmetic variable swaps. It does not solve our defect and was not adopted.
 
-Adopt three patterns into StudyAI's existing `src/artifacts/` boundary:
+What was integrated:
 
-1. **Scenario-based question tuple** from BloomAssessmentItemGeneration: require a question component to carry an explicit changed condition and expected answer, not just a renamed variable. This is a schema addition with tests, not a new tool.
-2. **Leakage and triviality guard** from SemanticQAGen: deterministic checks that reject a question when its answer is substantially contained in the explanation, or when the only difference between source and question is symbol substitution. This is the direct fix for the two-reviewer finding.
-3. **Question-specific review criteria** from Qworld as an aid to human reviewers only. The frozen gate and thresholds remain untouched.
+1. `src/artifacts/scenario-question.ts` ports the upstream *scenario generation + Application-level eligibility* rules: a neutral scenario with at least two concrete values, an application verb, use of a scenario value, and rejection of answers copied from the explanation or scenarios that merely paraphrase it.
+2. `src/artifacts/package.ts` gained optional `scenario` and `bloomLevel: "application"` fields on question components, so a transfer question is part of the artifact rather than hidden in prose.
+3. `scripts/generate-artifact-records.ts` carries upstream-derived scenario-first instructions and uses the deterministic check inside its bounded retry loop.
+
+Qworld's question-specific criteria remain a future reviewer aid only; the frozen gate and thresholds are untouched. QGEval and llmqg are useful references but were not adopted.
 
 **Alternatives rejected:** fine-tuning a local QG model (no demonstrated capability gap, high cost); using LLM-as-judge scores as the gate (forbidden by the quality ADR); swapping models again (three models produced the same pedagogy ceiling).
 

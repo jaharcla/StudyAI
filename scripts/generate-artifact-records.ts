@@ -2,6 +2,7 @@ import "dotenv/config";
 import { writeFileSync } from "node:fs";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { parseArtifactPackage } from "../src/artifacts/package.js";
+import { checkApplicationQuestion } from "../src/artifacts/scenario-question.js";
 import { getTutorProviderSettings } from "../server/tutor-provider.js";
 import { createTutorChatModel } from "../server/tutor-chat-model.js";
 
@@ -112,6 +113,7 @@ Rules:
 - "provenance" may contain only "generatedAt" and "claims". Do not add sourceRefs or retrievedEvidence there.
 - Every diagram force's "components" must be exactly two finite numbers, for example [0,-9.8], never one or three. Gravity on a level surface is (0,-9.8); the normal force is (0,+9.8) on a level surface and perpendicular to the surface on an incline; friction is parallel to the surface and opposes sliding. Never point friction straight down or use placeholder numbers. Each force "label" must be at most 60 characters; use short labels such as "gravity", "normal", "friction".
 - Never write placeholder prose such as "the diagram should show" or "placeholder"; write the actual content the component claims to provide.
+- SCENARIO-FIRST QUESTIONS (adapted from BloomAssessmentItemGeneration, MIT/BEA 2026): every "question" component MUST include "scenario" (40+ chars) and "bloomLevel":"application". First write a neutral factual scenario with at least two concrete values and a changed condition — never a renamed variable. The scenario must not teach, explain, interpret or hint at the answer. Then write a question that asks the student to compute, determine, predict or apply something using those values. The answer must be derived from the scenario, never copied from the explanation.
 - Questions must test the topic named in the scenario, not an adjacent concept, and must require applying or transferring the idea to a new situation. Do not ask for a definition or a value copied directly from the explanation.
 - An interactive-exercise's prompt must NOT state the equation it uses. It must ask the student to read or infer a value, and it must reuse the numbers from the package's question so the two are connected.
 - For a torque diagram, give each force a "position" {x,y} marking where it acts, so lever arms can be read from the diagram.
@@ -173,7 +175,7 @@ function parseJson(text: string): unknown {
   throw new Error("Model output contained no parseable JSON object.");
 }
 
-type ComposedComponent = { kind?: string; sourceRefs?: string[]; prompt?: string; text?: string; front?: string; title?: string };
+type ComposedComponent = { kind?: string; sourceRefs?: string[]; prompt?: string; answer?: string; text?: string; front?: string; title?: string; scenario?: string };
 
 /** Composer-level constraints from the first cycle's review, checked on the parsed object before scoring. */
 function assertComposerConstraints(value: unknown, scenario: Scenario): void {
@@ -201,6 +203,15 @@ function assertComposerConstraints(value: unknown, scenario: Scenario): void {
   const longLabels = components.flatMap((component) => (component as ComposedComponent & { forces?: Array<{ label?: string }> }).forces ?? [])
     .filter((force) => (force.label ?? "").length > 60);
   if (longLabels.length) problems.push(`Shorten diagram force labels to at most 60 characters (${longLabels.length} too long).`);
+  const explanationText = components.find((component) => component.kind === "explanation")?.text ?? "";
+  for (const question of components.filter((component) => component.kind === "question")) {
+    for (const problem of checkApplicationQuestion({
+      scenario: question.scenario,
+      prompt: question.prompt ?? "",
+      answer: question.answer,
+      explanationText,
+    })) problems.push(problem);
+  }
   if (scenario.forbidPlaceholders && /should show|placeholder|todo/i.test(text)) problems.push("Placeholder prose found.");
   for (const term of scenario.topicTerms ?? []) {
     const mentionsTopic = components.some((component) =>

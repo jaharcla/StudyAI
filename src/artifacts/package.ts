@@ -25,7 +25,13 @@ export const artifactComponentSchema = z.discriminatedUnion("kind", [
     xRange: z.tuple([finite, finite]).refine(([min, max]) => max > min, "xRange maximum must exceed minimum"),
     xLabel: z.string().min(1).max(40).default("x"), yLabel: z.string().min(1).max(40).default("y"),
   }).strict(),
-  z.object({ kind: z.literal("question"), ...componentBase, prompt: z.string().min(1).max(2000), answer: z.string().max(2000).optional() }).strict(),
+  z.object({
+    kind: z.literal("question"), ...componentBase,
+    prompt: z.string().min(1).max(2000),
+    answer: z.string().max(2000).optional(),
+    scenario: z.string().min(40).max(2000).optional(),
+    bloomLevel: z.literal("application").optional(),
+  }).strict(),
   z.object({ kind: z.literal("flashcard"), ...componentBase, front: z.string().min(1).max(2000), back: z.string().min(1).max(2000) }).strict(),
   z.object({
     kind: z.literal("mind-map"), ...componentBase, title: z.string().min(1).max(120),
