@@ -1,0 +1,33 @@
+{
+  "repeatsRequired": 5,
+  "results": [
+    {
+      "id": "documented-request",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "ambiguous-request",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "multi-component-torque",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    },
+    {
+      "id": "insufficient-source",
+      "repeats": 5,
+      "stable": true,
+      "failures": [],
+      "status": "passed"
+    }
+  ]
+}

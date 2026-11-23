@@ -82,7 +82,7 @@ Allowed component kinds and required fields:
 Rules:
 - Every sourceRef must be exactly one of the retrieved refs given in the user message. When evidence refs are supplied, EVERY component must carry at least one of them in sourceRefs. Never leave a component's sourceRefs empty when refs are available.
 - Component ids must be unique and relations must point to existing ids without cycles.
-- Every diagram force's "components" must be exactly two finite numbers, for example [0,-9.8], never one or three. Gravity on a level surface is (0,-9.8); the normal force is (0,+9.8) on a level surface and perpendicular to the surface on an incline; friction is parallel to the surface and opposes sliding. Never point friction straight down or use placeholder numbers.
+- Every diagram force's "components" must be exactly two finite numbers, for example [0,-9.8], never one or three. Gravity on a level surface is (0,-9.8); the normal force is (0,+9.8) on a level surface and perpendicular to the surface on an incline; friction is parallel to the surface and opposes sliding. Never point friction straight down or use placeholder numbers. Each force "label" must be at most 60 characters; use short labels such as "gravity", "normal", "friction".
 - Never write placeholder prose such as "the diagram should show" or "placeholder"; write the actual content the component claims to provide.
 - Questions must test the topic named in the scenario, not an adjacent concept. The question prompt and answer must both be about that topic.
 - If you include an interactive-exercise, its prompt must ask for exactly the quantity its config computes; a graph-interpretation exercise must ask for a value read from the line at atX, not a torque calculation.
@@ -109,19 +109,39 @@ function balanceTruncatedJson(source: string): string {
   return result;
 }
 
+function repairMidKey(source: string): string {
+  const quote = source.lastIndexOf('"');
+  if (quote < 0) return balanceTruncatedJson(source);
+  const cut = Math.max(source.lastIndexOf(",", quote), source.lastIndexOf("{", quote), source.lastIndexOf("[", quote));
+  const base = source.slice(0, cut).replace(/,\s*$/, "");
+  return balanceTruncatedJson(base);
+}
+
 function parseJson(text: string): unknown {
   const fenced = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
-  const start = fenced.indexOf("{");
-  if (start < 0) throw new Error("Model output contained no JSON object.");
-  const candidate = fenced.slice(start);
-  const end = candidate.lastIndexOf("}");
-  const complete = end >= 0 ? candidate.slice(0, end + 1) : balanceTruncatedJson(candidate);
-  try {
-    return JSON.parse(complete) as unknown;
-  } catch (error) {
-    if (end >= 0) throw error;
-    return JSON.parse(balanceTruncatedJson(complete)) as unknown;
+  const positions = (char: string): number[] => [...fenced].flatMap((value, index) => value === char ? [index] : []);
+  const starts = positions("{");
+  const ends = positions("}");
+  const attempts: string[] = [];
+  for (const start of starts) {
+    for (let index = ends.length - 1; index >= 0; index -= 1) {
+      const end = ends[index] ?? 0;
+      if (end > start) attempts.push(fenced.slice(start, end + 1));
+    }
+    attempts.push(balanceTruncatedJson(fenced.slice(start)));
+    attempts.push(repairMidKey(fenced.slice(start)));
   }
+  // Reasoning models often quote a tiny example object before the real package.
+  // Prefer the largest component-bearing candidate so the example cannot win.
+  const ranked = attempts
+    .filter((attempt) => attempt.includes('"components"'))
+    .sort((left, right) => right.length - left.length);
+  for (const attempt of ranked) {
+    const repaired = attempt.replace(/}\s*{/g, "},{").replace(/\]\s*\[/g, "],[");
+    try { return JSON.parse(attempt) as unknown; } catch { /* try next candidate */ }
+    try { return JSON.parse(repaired) as unknown; } catch { /* try next candidate */ }
+  }
+  throw new Error("Model output contained no parseable JSON object.");
 }
 
 type ComposedComponent = { kind?: string; sourceRefs?: string[]; prompt?: string; text?: string; front?: string; title?: string };
@@ -145,6 +165,9 @@ function assertComposerConstraints(value: unknown, scenario: Scenario): void {
   if (primaries.length > 1) problems.push("Only one primary Canvas item (question, worked example or deck) may be composed in a single revision.");
   const figures = components.filter((component) => ["diagram", "graph", "equation", "mind-map"].includes(component.kind ?? ""));
   if (figures.length > 1) problems.push("Only one figure (diagram, graph, equation or mind map) may be composed in a single revision.");
+  const longLabels = components.flatMap((component) => (component as ComposedComponent & { forces?: Array<{ label?: string }> }).forces ?? [])
+    .filter((force) => (force.label ?? "").length > 60);
+  if (longLabels.length) problems.push(`Shorten diagram force labels to at most 60 characters (${longLabels.length} too long).`);
   if (scenario.forbidPlaceholders && /should show|placeholder|todo/i.test(text)) problems.push("Placeholder prose found.");
   for (const term of scenario.topicTerms ?? []) {
     const mentionsTopic = components.some((component) =>
@@ -235,7 +258,7 @@ for (const scenario of scenarios) {
     } catch (error) {
       lastError = error instanceof Error ? error.message : "Invalid package.";
       if (attempt === 1) {
-        records.push({ id: scenario.id, scenario: scenario.name, status: "failed", error: lastError, rawOutput: String(lastRawText ?? "").slice(0, 1200) });
+        records.push({ id: scenario.id, scenario: scenario.name, status: "failed", error: lastError, rawOutput: String(lastRawText ?? "").slice(0, 4000) });
         meta.push({ id: scenario.id, provider: "ollama", model: modelName, attempts: 2 });
         reviewLines.push(`## ${scenario.id}`, "", `**Request:** ${scenario.prompt}`, "", `**Generation failed validation:** ${lastError}`, "");
         console.log(`${scenario.id}: FAILED — ${lastError}`);
