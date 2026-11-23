@@ -8,7 +8,8 @@ test("Cards opens flashcard review and a rated card advances", async ({ page, re
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await selectCourseOnPage(page, course.title);
-  await page.locator(".sidebar-scrim").click();
+  const scrim = page.locator(".sidebar-scrim");
+  if (await scrim.isVisible()) await scrim.click();
   await page.getByRole("button", { name: "Cards", exact: true }).click();
   await expect(page.getByTestId("flashcard-review")).toBeVisible();
   await expect(page.getByText("H2O", { exact: true })).toBeHidden();

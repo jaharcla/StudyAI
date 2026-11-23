@@ -1,6 +1,6 @@
 # StudyAI status
 
-Workspace snapshot: `main` at `d380c9c` (November 22, 2026), canvas intelligence phases 0–5 closed. This page describes the current source. The verification numbers below were measured 2026-11-22 on this tree.
+Workspace snapshot: integrated canvas branch `work/canvas-integration-2026-11-22` (combines `main` — canvas reliability phases 0–5 + review fixes + tutor-retrieval judgement — with `work/studyai-studio`: learning UI completion, Stripe support, free-demo — and the absorbed canvas-first shell/learning-UI port). November 22, 2026.
 
 ## Implemented
 
@@ -11,6 +11,7 @@ Workspace snapshot: `main` at `d380c9c` (November 22, 2026), canvas intelligence
 - Canvas intelligence: deterministic capture, math and diagram OCR with a provider chain and daily budgets, local recognition plus a teach/accept/correct/dismiss feedback loop, revision-bound spatial scene graph with FTS5 search, and `get_canvas_scene` / `search_canvas_evidence` / `propose_scientific_object` tutor tools.
 - Canvas reliability (Phase 5, 2026-11-22): spatial grid backfill so boards above 256 nodes keep every node in rect queries; diagram OCR reads stacked fraction labels (`F/N`); cloud OCR aborts at `CANVAS_OCR_TIMEOUT_MS` (default 30 s) and falls back.
 - Learning activities with validated specifications and deterministic capability checks.
+- Mind map scientific object: branch nodes and labeled edges as one placed, draggable, scene-indexed board object, authorable by the tutor through the existing approval-gated proposal path (2026-11-22). Coursework practice generation is being unified with the concurrent `author_board` design (ADR `docs/decisions/ADR-2026-11-22-mindmap-kind.md`).
 
 ## Limits
 
@@ -23,11 +24,10 @@ Workspace snapshot: `main` at `d380c9c` (November 22, 2026), canvas intelligence
 
 ## Verification
 
-Measured 2026-11-22 on `main` (commits `3fb4c6f..d380c9c`):
+Measured 2026-11-22 on the integrated branch (commits `17448e8..6fadf78` plus docs):
 
-- `npx tsc -b`: pass.
-- `npx vitest run`: 505 passed in 77 files.
-- `npx playwright test` (full run, 46 tests, 13.8 m): 37 passed, 6 failed, 3 skipped; the disclosed re-run of the six flipped two to pass (`adaptive-learning`, `math-workspace` — parallel-load flake), leaving **4 persistent failures** (`direct-vector`, `tutor-math` — proven pre-existing in the 2026-11-19 `pw-full.log`; `workspace`, `quickdraw-ai` — disabled model-`select` in the uncommitted canvas-first UI port). All canvas scene, recognition, analysis, learning, credits, and integration specs pass. Full attribution: `docs/verification/2026-11-22-canvas-reliability.md`.
+- `tsc -b`: pass. Vitest: 79 files / 518 tests pass.
+- Playwright: full 36/47 first pass was triaged to two root causes (shared `.bin` churn, `.env` deployment-URL mismatch) and fixed; the corrected targeted set runs 13/15 with only `document-intelligence:5` and `integration:4` persistent — both in the 2026-11-19 pre-existing failure record. Full chain: `docs/verification/2026-11-22-canvas-frontier.md`.
 - `npm run benchmark:canvas`: 0 hard failures, 4/6 math boards exact, math F1 0.951, PhysAlign coverage 0.875–1.000, $0 provider cost, against the tracked `docs/verification/canvas-benchmark-baseline.json` (not updated).
 
 CI (`.github/workflows/canvas.yml`) runs build and unit tests on every push. The provider-dependent benchmark and browser tests stay local behind `/canvas-verify`, because they need keys and a gitignored dataset.
