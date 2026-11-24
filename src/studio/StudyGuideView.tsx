@@ -3,7 +3,7 @@ import { sourceLabel, type StudyGuideContent } from "./api";
 
 function Citation({ ref, onOpenSource }: { ref: string; onOpenSource: (ref: string) => void }) {
   return (
-    <button type="button" className="studio-cite" data-testid="citation-chip" onClick={() => onOpenSource(ref)}>
+    <button type="button" className="studio-cite surface-provenance" data-testid="citation-chip" onClick={() => onOpenSource(ref)}>
       <Quote size={12} strokeWidth={1.9} aria-hidden="true" />
       <span>{sourceLabel(ref)}</span>
     </button>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDialogFocus } from "../components/useDialogFocus";
+import { Sparkles } from "lucide-react";
 import {
   deleteSlideDeck,
   downloadSlideDeckUrl,
@@ -20,6 +21,7 @@ type Props = {
   lessonTitle: string;
   close: () => void;
   onOpenSource: (sourceRef: string) => void;
+  onOpenStudio: () => void;
 };
 
 type Notice = { tone: "info" | "error" | "success"; text: string };
@@ -41,7 +43,7 @@ function deckFileName(title: string): string {
   return `${slug || "study-deck"}.pptx`;
 }
 
-export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenSource }: Props) {
+export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenSource, onOpenStudio }: Props) {
   const [items, setItems] = useState<SlideDeckArtifact[]>([]);
   const [selected, setSelected] = useState<SlideDeckArtifact | undefined>();
   const [filter, setFilter] = useState("");
@@ -144,7 +146,11 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
           onClose={close}
           closeLabel="Close artifacts"
           className="artifacts-head"
-        />
+        >
+          <button type="button" className="surface-link" data-testid="artifacts-open-studio" onClick={onOpenStudio}>
+            <Sparkles size={15} strokeWidth={1.9} aria-hidden="true" /> Studio
+          </button>
+        </SurfaceHeader>
 
         <section className="artifacts-create" aria-label="Build a slide deck">
           <label htmlFor="deck-focus">What should this deck focus on?</label>
@@ -227,7 +233,7 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
                     {slide.claims.map((claim) => (
                       <div className="slide-claim" key={claim.sourceRef}>
                         <p>{claim.claim}</p>
-                        <button className="slide-citation" data-testid="slide-citation" onClick={() => onOpenSource(claim.sourceRef)}>
+                        <button className="slide-citation surface-provenance" data-testid="slide-citation" onClick={() => onOpenSource(claim.sourceRef)}>
                           Open source · {sourceLabel(claim.sourceRef)}
                         </button>
                       </div>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import "./surface-chrome.css";
 
@@ -14,11 +15,13 @@ type HeaderProps = {
   backClassName?: string;
   closeClassName?: string;
   className?: string;
+  /** Secondary header actions, e.g. a cross-link to a sibling surface. */
+  children?: ReactNode;
 };
 
 /** One header grammar for every secondary surface. Legacy class names are
  *  appended so existing selectors and keyboard tests keep working. */
-export function SurfaceHeader({ eyebrow, title, subtitle, backLabel, onBack, onClose, closeLabel, backClassName = "", closeClassName = "", className = "" }: HeaderProps) {
+export function SurfaceHeader({ eyebrow, title, subtitle, backLabel, onBack, onClose, closeLabel, backClassName = "", closeClassName = "", className = "", children }: HeaderProps) {
   return (
     <header className={`surface-header ${className}`.trim()}>
       <div className="surface-heading">
@@ -27,6 +30,7 @@ export function SurfaceHeader({ eyebrow, title, subtitle, backLabel, onBack, onC
         {subtitle && <p className="surface-subtitle">{subtitle}</p>}
       </div>
       <div className="surface-actions">
+        {children}
         {backLabel && onBack && (
           <button type="button" className={`surface-back ${backClassName}`.trim()} onClick={onBack} aria-label={backLabel}>
             <ArrowLeft size={15} strokeWidth={1.9} aria-hidden="true" />

@@ -61,10 +61,26 @@
   cursor: pointer;
 }
 .surface-close { width: 32px; padding: 0; justify-content: center; }
+.surface-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 8px;
+  background: var(--chrome-bg);
+  color: var(--chrome-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .surface-back:hover,
-.surface-close:hover { border-color: var(--chrome-accent); color: var(--chrome-accent); }
+.surface-close:hover,
+.surface-link:hover { border-color: var(--chrome-accent); color: var(--chrome-accent); }
 .surface-back:focus-visible,
-.surface-close:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 2px; }
+.surface-close:focus-visible,
+.surface-link:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 2px; }
 
 .surface-notice {
   --notice-ink: #4a4032;

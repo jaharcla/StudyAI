@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDialogFocus } from "../components/useDialogFocus";
 import {
   BookOpen, ChartColumn, Check, CircleAlert, CircleCheck, Download,
-  ListTree, LoaderCircle, Sparkles,
+  Layers, ListTree, LoaderCircle, Sparkles,
 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import "./studio.css";
@@ -44,11 +44,12 @@ function studentMessage(error: unknown): string {
 type Props = {
   courseId: string; lessonId: string; courseTitle: string; lessonTitle: string;
   onOpenSource: (sourceRef: string) => void; close: () => void;
+  onOpenDecks: () => void;
   /** Optional material focus prepared by the Coach from a cited source. */
   initialFocus?: string;
 };
 
-export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, initialFocus = "" }: Props) {
+export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, onOpenDecks, initialFocus = "" }: Props) {
   const [kind, setKind] = useState<StudioKind>("mind-map");
   const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
@@ -192,7 +193,11 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           closeLabel="Close Studio"
           backClassName="studio-back"
           closeClassName="studio-close"
-        />
+        >
+          <button type="button" className="surface-link" data-testid="studio-open-decks" onClick={onOpenDecks}>
+            <Layers size={15} strokeWidth={1.9} aria-hidden="true" /> Artifacts
+          </button>
+        </SurfaceHeader>
         <div className="studio-body" aria-busy={busy}>
           {error && (
             <div className="studio-error" role="alert" data-testid="studio-error">

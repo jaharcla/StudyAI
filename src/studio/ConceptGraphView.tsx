@@ -39,7 +39,7 @@ export default function ConceptGraphView({ courseId, courseTitle, onPractice, on
       <aside className="studio-sidebar">
         <div className="studio-brand"><span className="studio-mark"><Network size={16} /></span> studyai <small>concepts</small></div>
         <div className="studio-group">This course</div>
-        <div className="studio-lesson"><strong>{courseTitle}</strong><small>From your learning records</small></div>
+        <div className="studio-lesson"><strong>{courseTitle}</strong><small className="surface-provenance">From your learning records</small></div>
         <div className="studio-group">How to read this</div>
         <p className="studio-sidebar-note">Each node is a concept from your course. Mastery comes from your answers and canvas work. Dashed links are relationships saved on your canvases. Practice opens a reviewed question for a weak concept.</p>
       </aside>

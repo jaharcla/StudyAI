@@ -64,3 +64,38 @@ test("topbar Study and lesson header open the same study stage", async ({ page }
   await expect(stage).toHaveCount(1);
   await expect(stage.locator(".surface-subtitle")).toContainText("Cohesion lesson");
 });
+
+test("Studio and Artifacts open each other without losing the lesson", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Cohesion links ${Date.now()}`, "Cohesion lesson");
+  await openCourse(page, course.title);
+
+  await page.getByTitle("Open StudyAI Studio").click();
+  await expect(page.getByTestId("studio-surface")).toBeVisible();
+  await page.getByTestId("studio-open-decks").click();
+  await expect(page.getByTestId("artifacts-surface")).toBeVisible();
+  await expect(page.getByTestId("studio-surface")).toHaveCount(0);
+
+  await page.getByTestId("artifacts-open-studio").click();
+  await expect(page.getByTestId("studio-surface")).toBeVisible();
+  await expect(page.getByTestId("artifacts-surface")).toHaveCount(0);
+  await expect(page.getByTestId("studio-surface")).toContainText("Cohesion lesson");
+});
+
+test("leaving study for activities offers a return to the study session", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Cohesion return ${Date.now()}`, "Cohesion lesson");
+  await openCourse(page, course.title);
+
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  const stage = page.locator(".study-stage");
+  await expect(stage).toBeVisible();
+  await stage.getByRole("button", { name: /Activities/ }).click();
+  await expect(page.getByRole("heading", { name: "Learning activities" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  const chip = page.getByRole("button", { name: "Back to study session" });
+  await expect(chip).toBeVisible();
+  await chip.click();
+  await expect(stage).toBeVisible();
+  await expect(stage.locator(".surface-subtitle")).toContainText("Cohesion lesson");
+  await expect(chip).toHaveCount(0);
+});

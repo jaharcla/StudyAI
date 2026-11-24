@@ -45,7 +45,7 @@ function ConceptNode({ data }: NodeProps<Node<ConceptData>>) {
         </button>
       )}
       <div className="studio-map-node-foot">
-        {data.sourceRef && <span className="studio-map-source"><Quote size={10} /> {sourceLabel(data.sourceRef, data.sourceLabel)}</span>}
+        {data.sourceRef && <span className="studio-map-source surface-provenance"><Quote size={10} /> {sourceLabel(data.sourceRef, data.sourceLabel)}</span>}
         {data.hasChildren && (
           <button
             type="button"
@@ -181,7 +181,7 @@ export default function MindMapView({ content, onOpenSource, onPractice }: { con
             )}
             {active.detail && <p>{active.detail}</p>}
             {active.sourceRef?.startsWith("studyai://") ? (
-              <button type="button" className="studio-source-button" onClick={() => onOpenSource(active.sourceRef!)}>
+              <button type="button" className="studio-source-button surface-provenance" onClick={() => onOpenSource(active.sourceRef!)}>
                 <Quote size={12} /> Open source · {sourceLabel(active.sourceRef, active.sourceLabel)}
               </button>
             ) : active.sourceRef ? (

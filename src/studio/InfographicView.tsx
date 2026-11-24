@@ -64,7 +64,7 @@ export default function InfographicView({ content, onOpenSource }: { content: In
           <h4 id="studio-infographic-sources">Sources</h4>
           <div className="studio-citations" data-testid="infographic-citations">
             {content.sourceRefs.map((ref) => (
-              <button key={ref} type="button" className="studio-cite" data-testid="citation-chip" onClick={() => onOpenSource(ref)}>
+              <button key={ref} type="button" className="studio-cite surface-provenance" data-testid="citation-chip" onClick={() => onOpenSource(ref)}>
                 <Quote size={12} strokeWidth={1.9} aria-hidden="true" />
                 <span>{sourceLabel(ref)}</span>
               </button>
