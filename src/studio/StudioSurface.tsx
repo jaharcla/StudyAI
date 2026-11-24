@@ -32,11 +32,13 @@ const TABS: Array<{ id: StudioKind; label: string; icon: typeof Sparkles }> = [
 type Props = {
   courseId: string; lessonId: string; courseTitle: string; lessonTitle: string;
   onOpenSource: (sourceRef: string) => void; close: () => void;
+  /** Optional material focus prepared by the Coach from a cited source. */
+  initialFocus?: string;
 };
 
-export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close }: Props) {
+export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, initialFocus = "" }: Props) {
   const [kind, setKind] = useState<StudioKind>("mind-map");
-  const [focus, setFocus] = useState("");
+  const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
   const [count, setCount] = useState(4);
   const [artifact, setArtifact] = useState<StudioArtifact | undefined>();
