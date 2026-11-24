@@ -135,7 +135,7 @@ export function useCoach(context: CoachContext, onPrepare: CoachPreparation): { 
   }
   children.push(h("button", {
     type: "button", className: "coach-icon coach-dismiss", "data-testid": "coach-dismiss",
-    "aria-label": "Dismiss this Coach prompt", disabled: !top,
+    "aria-label": "Dismiss this Coach suggestion", disabled: !top,
     onClick: () => { if (top) rememberDismissed(coachDismissalKey(top, context)); },
   }, h(X, { size: 15, "aria-hidden": true })));
   children.push(h("button", {

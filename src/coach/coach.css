@@ -24,7 +24,16 @@
   box-shadow: 0 10px 28px rgba(23, 32, 45, 0.18), 0 2px 6px rgba(23, 32, 45, 0.08);
   color: var(--coach-ink);
   font: 12px/1.45 'DM Sans', Arial, sans-serif;
+  /* The dock follows the student but must not swallow clicks meant for the workspace. */
+  pointer-events: none;
 }
+
+.coach-continue,
+.coach-more,
+.coach-icon,
+.coach-secondary,
+.coach-secondary-open,
+.coach-enable { pointer-events: auto; }
 
 .coach-mark {
   display: grid;
