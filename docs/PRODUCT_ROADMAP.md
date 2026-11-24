@@ -42,14 +42,14 @@ Based on `docs/usability-vs-product-vision.md` (static audit of the documented `
 - Cross-course review queue, portable courses, simulations, per-node artifact editing.
 
 **Undocumented capabilities the partner named that the repo does not even plan for**
-Podcasts and audio lessons; narrated educational video; study guides as a first-class artifact; infographics; interactive simulations; voice tutoring; learning plans with daily/long-term scheduling. These are gaps in the *specification*, not just the implementation, and must be investigated rather than treated as out of scope.
+Podcasts and audio lessons; narrated educational video; study guides as a first-class artifact; infographics; interactive simulations; voice tutoring; long-term learning-plan scheduling. Daily plans are no longer an unplanned gap: a dated, course-grounded plan that feeds the one Coach now has a [design spec](superpowers/specs/2026-11-24-daily-plans-design.md) and [implementation plan](superpowers/plans/2026-11-24-daily-plans.md). The rest are gaps in the *specification*, not just the implementation, and must be investigated rather than treated as out of scope.
 
 ## Vision coverage matrix (Section 2 of the partner brief)
 
 | Capability | Today | Next | Notes |
 | --- | --- | --- | --- |
 | A. Grounded tutoring, explanations, Socratic, adaptive questions, grading | Strong core; weak canvas description | Human-level canvas description; misconception→BKT | Voice tutoring unplanned |
-| A. Personalized plans and recommendations | Coach shipped: one ranked prompt, prepared targets, truthful Continue, course-change clearing and active provider display | Daily plans and richer mastery labels | Original Critical gap now has a working, honest surface |
+| A. Personalized plans and recommendations | Coach shipped: one ranked prompt, prepared targets, truthful Continue, course-change clearing and active provider display | Daily plans ([spec](superpowers/specs/2026-11-24-daily-plans-design.md)) and richer mastery labels | Original Critical gap now has a working, honest surface |
 | B. Presentations / slides | Implemented: Presenton renderer, artifacts page, editable PPTX, cited decks, human slide titles; export needs a running Presenton service | Service smoke test and export gate | No longer a design draft |
 | B. Podcasts / audio lessons | Canvas narration shipped: grounded walkthrough of the student's board with browser speech and synchronized highlight | Reasoned generator vs deterministic readout | Distinctive first audio experience; generic podcasts still deferred |
 | B. Educational video | Absent | Research → spec | Scene-based explainers |
@@ -60,7 +60,7 @@ Podcasts and audio lessons; narrated educational video; study guides as a first-
 | B. Interactive materials | Steppable worked examples shipped: replay, pause, step, manipulate, take over; force editor and math workspace | Deeper simulations and reaction semantics | Lecture artifacts are now interactive, not static |
 | C. Scientific Canvas | Deepest subsystem | Lewis flow, human descriptions, simulations | Differentiator |
 | D. Course / document intelligence | Text-only | Visual extraction status + recovery | Scanned/visual material invisible |
-| E. Knowledge graph / personalized learning | Mastery, FSRS, a first semantic concept graph and a Coach prompt stream | Daily plans and richer mastery labels | Coherence gap narrowing |
+| E. Knowledge graph / personalized learning | Mastery, FSRS, a first semantic concept graph and a Coach prompt stream | Daily plans ([spec](superpowers/specs/2026-11-24-daily-plans-design.md)) and richer mastery labels | Coherence gap narrowing |
 
 ## Roadmap
 
