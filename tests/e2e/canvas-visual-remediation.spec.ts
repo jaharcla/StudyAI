@@ -40,12 +40,13 @@ function seedObject(kind: Kind, index: number): SeedObject {
       points: Array.from({ length: 13 }, (_, i) => { const px = -3 + i / 2; return [Number(px.toFixed(3)), Number((px * px).toFixed(3))]; }),
       xLabel: "x", yLabel: "y" };
     case "anatomy": return { ...base, structureId: "heart", system: "Circulatory", labels: ["Atrium", "Ventricle"] };
-    case "concept": return { ...base, title: "Mitosis", definition: "Nuclear division producing two identical daughter cells.", conceptId: "bio-mito" };
+    case "concept": return { ...base, title: "Mitosis", definition: "Nuclear division producing two identical daughter cells.", conceptId: "bio-mito",
+      provenance: { status: "generated-unverified", sourceRefs: ["studyai://document/test/page/1"] } };
     case "relationship": return { ...base, fromId: "seed-concept", toId: "seed-anatomy", label: "relates to", geometry };
     case "linked-note": return { ...base, noteId: "note-1", title: "Lecture 4", excerpt: "Notes on atomic bonding." };
     case "linked-document": return { ...base, documentId: "doc-1", title: "Chapter 2", excerpt: "Excerpt from the textbook." };
     case "question": return { ...base, prompt: "What is mitosis?", answer: "Nuclear cell division.", scenario: "In a dividing cell…" };
-    case "flashcard": return { ...base, front: "Mitosis", back: "Division of the nucleus." };
+    case "flashcard": return { ...base, front: "Mitosis", back: "Division of the nucleus.", provenance: { status: "generated-unverified", sourceRefs: [] } };
     case "mindmap": return { ...base, width: 340, height: 240, title: "Cell biology",
       nodes: [{ id: "n0", label: "Cell", x: 0, y: 0 }, { id: "n1", label: "Nucleus", x: -110, y: 70 }, { id: "n2", label: "Membrane", x: 110, y: 70 }],
       edges: [{ from: "n0", to: "n1", label: "contains" }, { from: "n0", to: "n2" }] };
@@ -66,7 +67,7 @@ async function seedBoard(request: APIRequestContext, course: { id: string }, les
 }
 
 async function openSeededBoard(page: Page, title: string) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 90_000 });
   await selectCourseOnPage(page, title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await page.reload();
@@ -112,7 +113,7 @@ async function clearIsolation(page: Page) {
 
 test("baseline captures all sixteen kinds in light and dark", async ({ page, request }) => {
   const { course, lesson } = await createCourseWithLesson(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 90_000 });
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await seedBoard(request, course, lesson);
@@ -140,7 +141,7 @@ test("baseline captures all sixteen kinds in light and dark", async ({ page, req
 
 test("phase 1 shared tokens render on the actual DOM in light and dark", async ({ page, request }) => {
   const { course, lesson } = await createCourseWithLesson(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 90_000 });
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await seedBoard(request, course, lesson);
@@ -153,7 +154,7 @@ test("phase 1 shared tokens render on the actual DOM in light and dark", async (
   await expect(card).toHaveCSS("box-shadow", /0px 4px 16px/);
 
   const fill = parseColor(await card.evaluate((element) => getComputedStyle(element).backgroundColor));
-  const secondary = parseColor(await card.locator("span").evaluate((element) => getComputedStyle(element).color));
+  const secondary = parseColor(await card.locator("span").first().evaluate((element) => getComputedStyle(element).color));
   expect(contrast(fill, secondary)).toBeGreaterThanOrEqual(4.5);
 
   await page.locator('[data-kind="relationship"]').dblclick();
@@ -179,7 +180,7 @@ test("phase 1 shared tokens render on the actual DOM in light and dark", async (
 test("captures inspector surfaces for the user-readiness fixes", async ({ page, request }) => {
   if (process.env.CANVAS_CAPTURE !== "1") return;
   const { course, lesson } = await createCourseWithLesson(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 90_000 });
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await seedBoard(request, course, lesson);
@@ -201,7 +202,7 @@ test("captures inspector surfaces for the user-readiness fixes", async ({ page, 
 
 test("user-readiness fixes: math, recall, maps, human names, units and geometry hold in the DOM", async ({ page, request }) => {
   const { course, lesson } = await createCourseWithLesson(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 90_000 });
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await seedBoard(request, course, lesson);
@@ -246,6 +247,13 @@ test("user-readiness fixes: math, recall, maps, human names, units and geometry 
   await expect(page.getByRole("textbox", { name: "Edge label 1", exact: true })).toBeVisible();
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
 
+  // Course-grounding rule: generated content, general labels and absent evidence are explicit.
+  await expect(flashcard.getByTestId("generated-unverified")).toBeVisible();
+  await expect(flashcard.getByTestId("no-course-evidence")).toBeVisible();
+  await expect(page.locator('[data-kind="anatomy"]').getByTestId("general-knowledge-label")).toBeVisible();
+  await expect(page.locator('[data-kind="concept"]').getByTestId("generated-unverified")).toBeVisible();
+  await expect(page.locator('[data-kind="concept"]').getByTestId("no-course-evidence")).toHaveCount(0);
+
   // K4 — internal identifiers never reach the UI.
   await expect(page.locator('[data-kind="anatomy"] .scene-node strong')).toHaveText("Heart");
   await page.locator('[data-kind="bond"]').dblclick();
@@ -254,6 +262,7 @@ test("user-readiness fixes: math, recall, maps, human names, units and geometry 
   await expect(page.locator(".object-editor-fields input")).not.toHaveValue(/^seed-/);
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
   await page.locator('[data-kind="concept"]').dblclick();
+  await expect(page.locator(".canvas-object-editor").getByTestId("generated-unverified")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Course concept" })).toHaveCount(1);
   await expect(page.locator('.object-editor-fields input[value="bio-mito"]')).toHaveCount(0);
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();

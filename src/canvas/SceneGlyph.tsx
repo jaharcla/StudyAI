@@ -26,6 +26,23 @@ export function objectTitle(object: ScientificObject): string {
   }
 }
 
+/** A conventional anatomy label is general knowledge, not retrieved course evidence. */
+export function isGeneralLabel(object: ScientificObject) {
+  return object.kind === "anatomy" && (Boolean(anatomyNames[object.structureId]) || object.labels.length === 0);
+}
+
+export function GroundingBadges({ object }: { object: ScientificObject }) {
+  const generated = object.provenance?.status === "generated-unverified";
+  const noEvidence = generated && object.provenance!.sourceRefs.length === 0;
+  const general = isGeneralLabel(object);
+  if (!generated && !general) return null;
+  return <span className="grounding-badges">
+    {general && <span className="grounding-badge general" data-testid="general-knowledge-label">General label</span>}
+    {generated && <span className="grounding-badge generated" data-testid="generated-unverified">Generated · not verified</span>}
+    {noEvidence && <span className="grounding-badge missing" data-testid="no-course-evidence">No course evidence</span>}
+  </span>;
+}
+
 function typeset(latex: string) {
   // katex.renderToString is declared at node_modules/katex/types/katex.d.ts:228.
   // output:"html" omits the MathML annotation, so raw `^` never leaks into the DOM.
@@ -86,6 +103,7 @@ export function SceneGlyph({ object, onOpenNote, onOpenDocument, registeredCards
       {object.kind === "linked-document" && <button onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onOpenDocument(object.documentId, object.title); }}>Open source</button>}
       {isFlashcard && <button data-testid="flip-card" aria-label={revealed ? "Hide answer" : "Show answer"} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setRevealed(!revealed); }}>{revealed ? "Hide answer" : "Show answer"}</button>}
       {isQuestion && <button data-testid="reveal-answer" aria-label={revealed ? "Hide answer" : "Reveal answer"} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setRevealed(!revealed); }}>{revealed ? "Hide answer" : "Reveal answer"}</button>}
+      <GroundingBadges object={object} />
     </div>
   </foreignObject>;
 }

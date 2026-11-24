@@ -10,7 +10,7 @@ import { analyzePhysicsFreeBodyDiagram } from "./physics";
 import { lineGeometry, resolveScene, withLineEndpoints } from "./scene";
 import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
-import { objectTitle } from "./SceneGlyph";
+import { GroundingBadges, objectTitle } from "./SceneGlyph";
 import { applyArtifactBriefProposal, applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema, proposeArtifactBrief, proposeCanvasEdit, proposeCanvasObject, proposeMolecule, type ArtifactBriefProposal, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
 import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
@@ -989,7 +989,7 @@ function ObjectEditor({ object, objects, onChange, onClose, onOpenNote, onCreate
   };
   const conceptOptions = objects.flatMap((item) => item.kind === "concept" && item.conceptId ? [{ id: item.conceptId, label: item.title }] : []);
   const updateMindmap = (patchValue: Partial<Extract<ScientificObject, { kind: "mindmap" }>>) => onChange(patchValue as Partial<ScientificObject>);
-  return <div className="canvas-editor-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="canvas-object-editor notebook-editor"><header><div><h3>{objectTitle(object)}</h3></div><button className="icon-button" aria-label="Close object editor" onClick={onClose}><X size={17} /></button></header><div className="object-editor-fields">
+  return <div className="canvas-editor-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="canvas-object-editor notebook-editor"><header><div><h3>{objectTitle(object)}</h3><GroundingBadges object={object} /></div><button className="icon-button" aria-label="Close object editor" onClick={onClose}><X size={17} /></button></header><div className="object-editor-fields">
     {object.kind === "molecule" && <MoleculeEditor molecule={object} onChange={(next) => onChange(next)} />}
     {object.kind === "atom" && <>{textInput("Label", object.label, (label) => patch("label", label))}<label>Element<select value={object.element} onChange={(event) => patch("element", event.target.value as Element)}>{elementOptions}</select></label>{numberInput("Nonbonding electrons", object.nonbondingElectrons, (value) => patch("nonbondingElectrons", value))}{numberInput("Bond order sum", object.bondOrderSum, (value) => patch("bondOrderSum", value), 0.5)}<div className="editor-calculation">Formal charge <b>{formatCharge(formalCharge(object.element, object.nonbondingElectrons, object.bondOrderSum))}</b></div></>}
     {object.kind === "bond" && <>{textInput("Label", object.label, (label) => patch("label", label))}{labelSelect("From atom", object.from, objects.filter((item) => item.kind === "atom" || item.id === object.from), (from) => patch("from", from))}{labelSelect("To atom", object.to, objects.filter((item) => item.kind === "atom" || item.id === object.to), (to) => patch("to", to))}<label>Bond order<select value={object.order} onChange={(event) => patch("order", Number(event.target.value) as BondOrder)}>{bondOrders.map((order) => <option key={order} value={order}>{order}</option>)}</select></label></>}
