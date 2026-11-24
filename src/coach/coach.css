@@ -36,6 +36,7 @@
 /* The panel is narrow, so the mark and copy take one row and the controls wrap beneath. */
 .coach-copy { flex: 1 1 calc(100% - 40px); min-width: 0; }
 .coach-reason { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0; }
+.coach-plan { margin: 0 0 3px; color: var(--coach-muted); font-size: 11px; font-weight: 600; }
 .coach-preview { margin: 3px 0 0; color: var(--coach-muted); }
 .coach-quiet { margin: 0; color: var(--coach-muted); }
 .coach-status { margin: 3px 0 0; font-weight: 600; }

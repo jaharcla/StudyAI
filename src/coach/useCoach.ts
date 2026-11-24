@@ -121,6 +121,7 @@ export function useCoach(context: CoachContext, onPrepare: CoachPreparation): { 
     h("div", { className: "coach-copy" },
       top
         ? h("div", { "aria-live": "polite" },
+            top.plan ? h("p", { className: "coach-plan", "data-testid": "coach-plan" }, `Plan ${top.plan.day}, step ${top.plan.step} of ${top.plan.total}`) : null,
             h("p", { className: "coach-reason", "data-testid": "coach-reason" }, top.reason),
             h("p", { className: "coach-preview", "data-testid": "coach-preview" }, top.preview))
         : h("p", { className: "coach-quiet", "data-testid": "coach-empty" }, "Coach is quiet for this lesson."),
