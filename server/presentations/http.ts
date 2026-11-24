@@ -3,7 +3,7 @@ import { readFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { z } from "zod";
-import { generateSlideDeck, getSlideDeck, listSlideDecks, type SlideDeckDeps } from "./service";
+import { DECK_DOWNLOAD_NOTICE, generateSlideDeck, getSlideDeck, listSlideDecks, type SlideDeckDeps } from "./service";
 
 const UpdateSchema = z.object({
   id: z.string().min(1).max(200),
@@ -65,6 +65,7 @@ export function createSlideDeckHandler(
         if (!safeId || !course || idParam.includes("..")) { send(400, { error: "unsafe id." }); return true; }
         const artifact = getSlideDeck(db, idParam, course);
         if (!artifact) { send(404, { error: "Slide deck not found." }); return true; }
+        if (!artifact.filePath) { send(422, { error: DECK_DOWNLOAD_NOTICE }); return true; }
         const root = path.resolve(dataDir);
         const target = path.resolve(root, artifact.filePath);
         if (!target.startsWith(root + path.sep)) { send(400, { error: "unsafe file path." }); return true; }

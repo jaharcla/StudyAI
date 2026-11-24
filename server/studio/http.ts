@@ -4,7 +4,7 @@ import { z, ZodError } from "zod";
 import { StudioKindSchema } from "./contracts.js";
 import {
   generateStudioArtifact, getStudioArtifact, importStudioArtifact, listStudioArtifacts,
-  saveStudioArtifact, setStudioArtifactAcceptance,
+  saveStudioArtifact, setStudioArtifactAcceptance, StudioGenerationUnavailable,
 } from "./service.js";
 import type { LearningService } from "../learning/service.js";
 import { parseArtifactPackage } from "../../src/artifacts/package.js";
@@ -83,8 +83,9 @@ export function createStudioHandler(db: Database.Database, learning: LearningSer
       return false;
     } catch (error) {
       const status = error instanceof ZodError ? 400
-        : error instanceof Error && /No course sources|No grounded|requires|not found|Only practice|Package validation|no first-class|Infographics are compiled/.test(error.message) ? 422
-          : 502;
+        : error instanceof StudioGenerationUnavailable ? 422
+          : error instanceof Error && /No course sources|No grounded|requires|not found|Only practice|Package validation|no first-class|Infographics are compiled/.test(error.message) ? 422
+            : 502;
       send(status, { error: error instanceof Error ? error.message : "Studio request failed." });
       return true;
     }

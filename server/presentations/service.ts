@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { z } from "zod";
 import { findDeckTemplate } from "./templates";
 import { compileSlideDeck, type PresentonGenerateRequest } from "./compile";
-import type { RenderedDeck } from "./renderer";
+import { PresentationRendererUnavailable, type RenderedDeck } from "./renderer";
 import { sanitizeCourseText } from "./sanitize";
 import { validateDeckText, validateRenderedSlides } from "./validate";
 import { decideRepair } from "./repair";
@@ -31,7 +31,11 @@ export type SlideDeckArtifact = {
   createdAt: string;
   collection: string;
   filePath: string;
+  notice?: string;
 };
+
+export const DECK_RENDER_NOTICE = "Your deck's slides and citations are ready. The .pptx download needs the local presentation service (Presenton), which isn't running. Start it and build again to export.";
+export const DECK_DOWNLOAD_NOTICE = "This deck has no .pptx file because the local presentation service (Presenton) was not running when it was built. Start the service and build the deck again to download.";
 
 export type SlideDeckDeps = {
   renderer: (request: PresentonGenerateRequest) => Promise<RenderedDeck>;
@@ -107,33 +111,41 @@ export async function generateSlideDeck(db: Database.Database, rawInput: unknown
   const template = findDeckTemplate(component.templateId);
   let request = compileSlideDeck(component, template);
   let rendered: RenderedDeck | undefined;
-  for (let generation = 1; generation <= 2; generation++) {
-    rendered = await deps.renderer(request);
-    const text = await deps.readDeckText(rendered.pptxPath);
-    const retrieved = new Map(component.slides.flatMap((slide) => (slide.claims ?? []).map((claim) => [claim.sourceRef, claim.excerpt] as const)));
-    const labels = new Map(component.sourceRefs.map((ref) => [sourceLabel(ref), ref] as const));
-    const report = validateDeckText(text, component, retrieved, labels);
-    if (deps.inspect) {
-      const renderedSlides = await deps.inspect(rendered.presentationId);
-      report.problems.push(...validateRenderedSlides(renderedSlides).problems);
-      report.ok = report.problems.length === 0;
+  let notice: string | undefined;
+  try {
+    for (let generation = 1; generation <= 2; generation++) {
+      rendered = await deps.renderer(request);
+      const text = await deps.readDeckText(rendered.pptxPath);
+      const retrieved = new Map(component.slides.flatMap((slide) => (slide.claims ?? []).map((claim) => [claim.sourceRef, claim.excerpt] as const)));
+      const labels = new Map(component.sourceRefs.map((ref) => [sourceLabel(ref), ref] as const));
+      const report = validateDeckText(text, component, retrieved, labels);
+      if (deps.inspect) {
+        const renderedSlides = await deps.inspect(rendered.presentationId);
+        report.problems.push(...validateRenderedSlides(renderedSlides).problems);
+        report.ok = report.problems.length === 0;
+      }
+      const decision = decideRepair(report, generation);
+      if (report.ok) break;
+      if (!decision.needsRepair) throw new Error("Deck validation failed after repair.");
+      request = {
+        ...request,
+        content: decision.report.problems.map((item) => `${item.validator}: ${item.requestedCorrection}`).join("\n"),
+      };
     }
-    const decision = decideRepair(report, generation);
-    if (report.ok) break;
-    if (!decision.needsRepair) throw new Error("Deck validation failed after repair.");
-    request = {
-      ...request,
-      content: decision.report.problems.map((item) => `${item.validator}: ${item.requestedCorrection}`).join("\n"),
-    };
+  } catch (error) {
+    const missing = error instanceof PresentationRendererUnavailable
+      || error instanceof Error && /fetch failed|ECONNREFUSED|network/i.test(error.message);
+    if (!missing) throw error;
+    notice = DECK_RENDER_NOTICE;
+    rendered = undefined;
   }
-  if (!rendered) throw new Error("Deck generation failed.");
 
   const id = randomUUID();
   db.prepare(`INSERT INTO studio_artifacts (id, course_id, lesson_id, kind, title, content, source_refs, created_at, collection, file_path)
     VALUES (?, ?, ?, 'slide_deck', ?, ?, ?, CURRENT_TIMESTAMP, ?, ?)`)
-    .run(id, input.courseId, input.lessonId, component.objective.slice(0, 200), JSON.stringify(component), JSON.stringify(component.sourceRefs), "", rendered.pptxPath);
+    .run(id, input.courseId, input.lessonId, component.objective.slice(0, 200), JSON.stringify(component), JSON.stringify(component.sourceRefs), "", rendered?.pptxPath ?? "");
   const row = db.prepare("SELECT * FROM studio_artifacts WHERE id = ?").get(id) as Row;
-  return toArtifact(row);
+  return notice ? { ...toArtifact(row), notice } : toArtifact(row);
 }
 
 export function listSlideDecks(db: Database.Database, courseId: string): SlideDeckArtifact[] {

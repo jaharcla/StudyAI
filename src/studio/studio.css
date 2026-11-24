@@ -231,6 +231,14 @@
 }
 .studio-error-retry:hover { color: var(--st-error-wash); background: var(--st-error); }
 
+.studio-notice {
+  display: flex; gap: 12px; max-width: 760px; margin: 0 auto 22px;
+  padding: 14px 17px; border: 1px solid var(--st-line-strong); border-radius: 11px;
+  background: var(--st-surface); color: var(--st-body); box-shadow: var(--st-shadow-sm);
+}
+.studio-notice > svg { flex: none; margin-top: 1px; color: var(--st-accent); }
+.studio-notice p { margin: 0; font-size: 12px; }
+
 .studio-loading {
   position: relative; display: flex; align-items: center; gap: 13px;
   max-width: 760px; margin: 0 auto; padding: 20px 19px 22px;

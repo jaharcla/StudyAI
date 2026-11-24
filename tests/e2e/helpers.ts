@@ -26,6 +26,8 @@ export async function selectCourseOnPage(page: Page, title: string): Promise<voi
   if (await toggle.isVisible() && !(await page.locator(".app-shell").evaluate((el) => el.classList.contains("sidebar-open")))) {
     await toggle.click();
   }
+  const showMore = page.getByRole("button", { name: /Show \d+ more courses/ });
+  while (await showMore.isVisible()) await showMore.click();
   await page.locator(".course-list").getByRole("button", { name: new RegExp(escaped) }).click();
 }
 

@@ -25,12 +25,13 @@ type Notice = { tone: "info" | "error" | "success"; text: string };
 type Busy = "loading" | "generating" | "opening" | "saving" | "deleting" | undefined;
 
 const FALLBACK = "We couldn't finish that. Try again in a moment.";
+const RENDER_MISSING = "The local presentation service (Presenton) isn't running. Slides and citations are ready to review; start the service and build again to download a .pptx.";
 
 function studentMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "";
   if (/No course sources/i.test(raw)) return "This lesson has no course material to build a deck from yet. Add a source or notes first.";
   if (/validation failed|repair/i.test(raw)) return "The deck didn't pass the course-material checks. Try a different focus or source.";
-  if (/Presenton|generation failed|502|503/i.test(raw)) return "The deck service is busy right now. Try again in a moment.";
+  if (/presenton|presentation service|renderer|502|503/i.test(raw)) return RENDER_MISSING;
   return FALLBACK;
 }
 
@@ -70,7 +71,9 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
     setNotice({ tone: "info", text: "Building your deck from this lesson…" });
     void generateSlideDeck({ courseId, lessonId, focus: focus.trim() || "Key concepts and mechanisms" })
       .then((artifact) => {
-        setNotice({ tone: "success", text: "Deck ready. Open it below to review slides and speaker notes." });
+        const degraded = !artifact.filePath;
+        const reason = degraded && "notice" in artifact && typeof artifact.notice === "string" ? artifact.notice : RENDER_MISSING;
+        setNotice({ tone: degraded ? "info" : "success", text: degraded ? reason : "Deck ready. Open it below to review slides and speaker notes." });
         setSelected(artifact);
         setRename(artifact.title);
         setConfirmDelete(false);
@@ -183,13 +186,18 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
             {selected && <>
               <div className="artifacts-detail-head">
                 <div><h3>{selected.title}</h3><small>{selected.content.slides.length} slides · {selected.sourceRefs.length} cited sources</small></div>
-                <a
-                  className="button-soft"
-                  data-testid="artifact-download"
-                  href={downloadSlideDeckUrl(selected.id, selected.courseId)}
-                  download={deckFileName(selected.title)}
-                >Download .pptx</a>
+                {selected.filePath ? (
+                  <a
+                    className="button-soft"
+                    data-testid="artifact-download"
+                    href={downloadSlideDeckUrl(selected.id, selected.courseId)}
+                    download={deckFileName(selected.title)}
+                  >Download .pptx</a>
+                ) : (
+                  <button type="button" className="button-soft" data-testid="artifact-download-unavailable" aria-describedby="artifact-download-note" disabled>Download unavailable</button>
+                )}
               </div>
+              {!selected.filePath && <p id="artifact-download-note" className="artifacts-empty" data-testid="artifact-download-note">{RENDER_MISSING}</p>}
               <div className="artifacts-rename">
                 <label htmlFor="artifact-title">Deck name</label>
                 <input id="artifact-title" data-testid="artifact-rename" aria-label="Artifact title" value={rename} onChange={(event) => setRename(event.target.value)} maxLength={200} />
