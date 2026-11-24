@@ -49,18 +49,18 @@ Podcasts and audio lessons; narrated educational video; study guides as a first-
 | Capability | Today | Next | Notes |
 | --- | --- | --- | --- |
 | A. Grounded tutoring, explanations, Socratic, adaptive questions, grading | Strong core; weak canvas description | Human-level canvas description; misconception→BKT | Voice tutoring unplanned |
-| A. Personalized plans and recommendations | Absent | Define contract + surface | Critical path |
-| B. Presentations / slides | Design draft only (Presenton integration chosen) | Spike, then implement | Editable PPTX, claim provenance |
-| B. Podcasts / audio lessons | Absent | Research → spec | No TTS flow exists |
+| A. Personalized plans and recommendations | Coach shipped: one ranked prompt with prepared targets and Continue; truthfulness fixes in flight | Verify preparation claims and provider display (#25, #26) | Core gap now has a working surface |
+| B. Presentations / slides | Implemented: Presenton renderer, artifacts page, editable PPTX, cited decks, human slide titles; export needs a running Presenton service | Service smoke test and export gate | No longer a design draft |
+| B. Podcasts / audio lessons | Canvas narration shipped: grounded walkthrough of the student's board with browser speech and synchronized highlight | Reasoned generator vs deterministic readout | Distinctive first audio experience; generic podcasts still deferred |
 | B. Educational video | Absent | Research → spec | Scene-based explainers |
 | B. Study guides / summaries | Partial (Studio) | First-class artifact | Reuse grounding |
 | B. Flashcards / quizzes | Implemented, gated | Unified creation entry; eligibility feedback | FSRS + BKT real |
 | B. Diagrams / infographics | Canvas objects only | Semantic spec → artifact | No generator |
-| B. Concept maps | Spatial mind map | Semantic graph with mastery | Two vocabularies never meet |
+| B. Concept maps | Spatial mind map plus first course-level semantic concept graph with BKT mastery and jump-to-practice | Relationship edges from stored learning events and truthful mastery labels | Knowledge and vocabulary are now connected |
 | B. Interactive materials | Force editor only | Per-object interactivity | Math steps, reactions open |
 | C. Scientific Canvas | Deepest subsystem | Lewis flow, human descriptions, simulations | Differentiator |
 | D. Course / document intelligence | Text-only | Visual extraction status + recovery | Scanned/visual material invisible |
-| E. Knowledge graph / personalized learning | Mastery + FSRS; no semantic graph | Concept graph + recommendations | Coherence gap |
+| E. Knowledge graph / personalized learning | Mastery, FSRS, a first semantic concept graph and a Coach prompt stream | Daily plans and richer mastery labels | Coherence gap narrowing |
 
 ## Roadmap
 
