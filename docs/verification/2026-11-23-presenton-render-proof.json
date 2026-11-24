@@ -1,0 +1,1893 @@
+{
+  "request": {
+    "content": "Build a course-grounded study deck. Use only the claims and source lines supplied below; do not add outside facts, examples, definitions or numbers. Keep every \"> Source:\" line verbatim on the slide it belongs to, directly below its claim. Draw an instructional diagram when a visual is described; do not add decorative or stock imagery. Put speaker notes in the notes lines, not on the slide itself. Do not leave placeholder text. Visuals to draw: Free-body diagram of a block on a slope with weight, normal and friction arrows.",
+    "slides_markdown": [
+      "# Forces on an Inclined Plane\n> Notes: Open with the free-body diagram.",
+      "# Equilibrium on the Slope\n- The downhill component of weight is mg sin(theta).\n> Source: page 2\n- The normal force balances mg cos(theta).\n> Source: page 2\n> Notes: Trace each arrow back to the object.",
+      "# Check by Substitution\n- At equilibrium the net force along the plane is zero.\n> Source: page 2\n> Notes: Ask students to verify the result."
+    ],
+    "n_slides": 3,
+    "template": "general",
+    "language": "English",
+    "export_as": "pptx",
+    "include_title_slide": false
+  },
+  "response": {
+    "presentation_id": "cfe099fe-d75a-4acc-aa9f-d9c34a784c0e",
+    "path": "/app_data/exports/users/82ed9ae2-0b72-4930-8094-3c22f7d5c643/Forces-on-an-Inclined-Plane-Notes-Open-with-the-free-body-diagram_4b838cc6-3b5b-4433-b085-15a5d80c36a3.pptx",
+    "edit_path": "/presentation?id=cfe099fe-d75a-4acc-aa9f-d9c34a784c0e"
+  },
+  "details": {
+    "id": "cfe099fe-d75a-4acc-aa9f-d9c34a784c0e",
+    "version": "v2-standard",
+    "content": "Build a course-grounded study deck. Use only the claims and source lines supplied below; do not add outside facts, examples, definitions or numbers. Keep every \"> Source:\" line verbatim on the slide it belongs to, directly below its claim. Draw an instructional diagram when a visual is described; do not add decorative or stock imagery. Put speaker notes in the notes lines, not on the slide itself. Do not leave placeholder text. Visuals to draw: Free-body diagram of a block on a slope with weight, normal and friction arrows.",
+    "n_slides": 3,
+    "language": "English",
+    "title": " Forces on an Inclined Plane > Notes: Open with the free-body diagram.",
+    "created_at": "2026-11-24T03:49:39.946056",
+    "updated_at": "2026-11-24T03:49:39.946073",
+    "tone": "default",
+    "verbosity": "standard",
+    "slides": [
+      {
+        "id": "ca562935-1e45-4ff1-a458-cbf48235ca97",
+        "index": 0,
+        "html_content": null,
+        "speaker_note": "Begin the presentation by emphasizing the importance of the free-body diagram in analyzing inclined plane problems. Highlight the decomposition of gravitational force into parallel and perpendicular components relative to the plane, and explain how normal force and friction interact with these forces.",
+        "presentation": "cfe099fe-d75a-4acc-aa9f-d9c34a784c0e",
+        "layout_group": "general",
+        "layout": "title_description_image",
+        "content": {
+          "left_visual_card": {
+            "main_visual_image": {
+              "image_prompt": "A clear free-body diagram showing an object on an inclined plane, with labeled forces: gravitational force (mg) pointing downward, normal force (N) perpendicular to the plane, and frictional force (f) opposing motion. The angle of inclination (\u03b8) is indicated with a dashed line.",
+              "image_url": "/static/images/placeholder.jpg"
+            }
+          },
+          "right_text_stack": {
+            "primary_heading": "Forces on an Incl'ted Pln",
+            "supporting_paragraph": "This slide introduces the analysis of forces acting on an object placed on an inclined plane. Begin by drawing a free-body diagram to visualize the gravitational force (mg), normal force (N), and frictional force (f). Resolve the gravitational force into components parallel"
+          },
+          "__speaker_note__": "Begin the presentation by emphasizing the importance of the free-body diagram in analyzing inclined plane problems. Highlight the decomposition of gravitational force into parallel and perpendicular components relative to the plane, and explain how normal force and friction interact with these forces."
+        },
+        "properties": null,
+        "ui": {
+          "id": "title_description_image",
+          "description": "A clean split presentation layout with a large rounded visual card on the left and stacked headline copy on the right.",
+          "components": [
+            {
+              "id": "slide_background",
+              "description": "Full-canvas white background that provides a neutral base for the two-column content arrangement.",
+              "position": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "elements": [
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 1280.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 1280.0,
+                      "y": 720.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 720.0
+                    }
+                  ],
+                  "closed": true,
+                  "fill": {
+                    "color": "#FFFFFF",
+                    "opacity": 1.0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "left_visual_card",
+              "description": "Large rounded image panel positioned on the left with subtle shadow treatment for visual emphasis.",
+              "position": {
+                "x": 88.0,
+                "y": 184.0
+              },
+              "elements": [
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 512.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 512.0,
+                      "y": 320.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 320.0
+                    }
+                  ],
+                  "closed": true,
+                  "corner_radii": [
+                    16.0,
+                    16.0,
+                    16.0,
+                    16.0
+                  ],
+                  "fill": {
+                    "color": "#FFFFFF",
+                    "opacity": 1.0
+                  },
+                  "shadow": {
+                    "color": "#000000",
+                    "blur": 15.0,
+                    "opacity": 0.1,
+                    "offset_x": 0.0,
+                    "offset_y": 10.0
+                  }
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 512.0,
+                    "height": 320.0
+                  },
+                  "rotation": 0.0,
+                  "data": "/static/images/placeholder.jpg",
+                  "fit": "cover",
+                  "border_radius": {
+                    "tl": 16.0,
+                    "tr": 16.0,
+                    "bl": 16.0,
+                    "br": 16.0
+                  },
+                  "decorative": false,
+                  "name": "main_visual_image",
+                  "is_icon": false,
+                  "prompt": "A clear free-body diagram showing an object on an inclined plane, with labeled forces: gravitational force (mg) pointing downward, normal force (N) perpendicular to the plane, and frictional force (f) opposing motion. The angle of inclination (\u03b8) is indicated with a dashed line."
+                }
+              ]
+            },
+            {
+              "id": "right_text_stack",
+              "description": "Right-side vertical content stack containing a prominent title, short accent rule, and supporting paragraph.",
+              "position": {
+                "x": 672.0,
+                "y": 199.47
+              },
+              "elements": [
+                {
+                  "type": "text",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 530.0,
+                    "height": 118.79
+                  },
+                  "rotation": 0.0,
+                  "font": {
+                    "size": 60.0,
+                    "family": "Poppins",
+                    "color": "#111827",
+                    "bold": true,
+                    "italic": false,
+                    "line_height": 0.8
+                  },
+                  "alignment": {
+                    "horizontal": "left",
+                    "vertical": "top"
+                  },
+                  "runs": [
+                    {
+                      "text": "Forces on an Incl'ted Pln",
+                      "font": {
+                        "size": 60.0,
+                        "family": "Poppins",
+                        "color": "#111827",
+                        "bold": true,
+                        "italic": false,
+                        "line_height": 0.8
+                      }
+                    }
+                  ],
+                  "decorative": false,
+                  "name": "primary_heading",
+                  "max_length": 25,
+                  "min_length": 8
+                },
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 144.0
+                    },
+                    {
+                      "x": 80.0,
+                      "y": 144.0
+                    },
+                    {
+                      "x": 80.0,
+                      "y": 148.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 148.0
+                    }
+                  ],
+                  "closed": true,
+                  "rotation": 0.0,
+                  "fill": {
+                    "color": "#9333EA",
+                    "opacity": 1.0
+                  }
+                },
+                {
+                  "type": "text",
+                  "position": {
+                    "x": 0.0,
+                    "y": 164.72
+                  },
+                  "size": {
+                    "width": 530.0,
+                    "height": 129.41
+                  },
+                  "rotation": 0.0,
+                  "font": {
+                    "size": 18.0,
+                    "family": "Poppins",
+                    "color": "#4B5563",
+                    "bold": false,
+                    "italic": false,
+                    "line_height": 1.24
+                  },
+                  "alignment": {
+                    "horizontal": "left",
+                    "vertical": "top"
+                  },
+                  "runs": [
+                    {
+                      "text": "This slide introduces the analysis of forces acting on an object placed on an inclined plane. Begin by drawing a free-body diagram to visualize the gravitational force (mg), normal force (N), and frictional force (f). Resolve the gravitational force into components parallel",
+                      "font": {
+                        "size": 18.0,
+                        "family": "Poppins",
+                        "color": "#4B5563",
+                        "bold": false,
+                        "italic": false,
+                        "line_height": 1.24
+                      }
+                    }
+                  ],
+                  "decorative": false,
+                  "name": "supporting_paragraph",
+                  "max_length": 274,
+                  "min_length": 105
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "4680cfeb-aa13-4c51-aeb1-96ae6dd3ed31",
+        "index": 1,
+        "html_content": null,
+        "speaker_note": "This slide explains the equilibrium on an inclined plane. The downhill component of weight is mg sin(theta), and the normal force balances mg cos(theta). Students should trace each arrow back to the object to understand the forces involved. The visual aid reinforces how forces interact to maintain equilibrium, ensuring clarity in physics concepts.",
+        "presentation": "cfe099fe-d75a-4acc-aa9f-d9c34a784c0e",
+        "layout_group": "general",
+        "layout": "title_image_bullet_points_1",
+        "content": {
+          "large_title_area": {
+            "slide_headline": "Equilibrium on the Slope"
+          },
+          "feature_grid_area": {
+            "feature_grid": [
+              {
+                "feature_icon": {
+                  "icon_query": "physics_arrow_down",
+                  "icon_url": "/static/icons/bold/arrow-square-down-bold.svg"
+                },
+                "feature_title": "Downhill Component of",
+                "feature_description": "Weight is mg sin(theta). Source: page 2. Notes: Trace each arrow back to the object."
+              },
+              {
+                "feature_icon": {
+                  "icon_query": "physics_force_balance",
+                  "icon_url": "/static/icons/bold/scales-bold.svg"
+                },
+                "feature_title": "Normal Force Balances",
+                "feature_description": "mg cos(theta). Source: page 2. Notes: Trace each arrow back to the object."
+              },
+              {
+                "feature_icon": {
+                  "icon_query": "arrow_tracing",
+                  "icon_url": "/static/icons/bold/arrow-fat-lines-right-bold.svg"
+                },
+                "feature_title": "Arrow Tracing",
+                "feature_description": "Trace each arrow back to the object to understand force distribution."
+              }
+            ]
+          },
+          "right_image_panel": {
+            "primary_photo": {
+              "image_prompt": "A diagram showing a block on an inclined plane with force vectors, arrows, and labels indicating mg sin(theta), mg cos(theta), and normal force.",
+              "image_url": "/static/images/placeholder.jpg"
+            }
+          },
+          "__speaker_note__": "This slide explains the equilibrium on an inclined plane. The downhill component of weight is mg sin(theta), and the normal force balances mg cos(theta). Students should trace each arrow back to the object to understand the forces involved. The visual aid reinforces how forces interact to maintain equilibrium, ensuring clarity in physics concepts."
+        },
+        "properties": null,
+        "ui": {
+          "id": "title_image_bullet_points_1",
+          "description": "A clean asymmetric slide with a large title, service feature blocks, decorative accents, and a rounded image panel on the right.",
+          "components": [
+            {
+              "id": "background_accents",
+              "description": "Full-slide white background with subtle fixed decorative wave and sparkle accents around the canvas edges.",
+              "position": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "elements": [
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 1280.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 1280.0,
+                      "y": 720.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 720.0
+                    }
+                  ],
+                  "closed": true,
+                  "fill": {
+                    "color": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 128.0,
+                    "height": 720.0
+                  },
+                  "rotation": 0.0,
+                  "data": "/app_data/templates/general/static/image2-ec1c92dee7a3.png",
+                  "fit": "fill",
+                  "decorative": true,
+                  "name": "left_edge_wave",
+                  "is_icon": false
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 0.0,
+                    "y": 592.0
+                  },
+                  "size": {
+                    "width": 192.0,
+                    "height": 128.0
+                  },
+                  "rotation": 0.0,
+                  "data": "/app_data/templates/general/static/image3-82be19a88965.png",
+                  "fit": "fill",
+                  "decorative": true,
+                  "name": "bottom_wave_accent",
+                  "is_icon": false
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 1136.0,
+                    "y": 80.0
+                  },
+                  "size": {
+                    "width": 32.0,
+                    "height": 32.0
+                  },
+                  "rotation": 0.0,
+                  "data": "/app_data/templates/general/static/image8-09632504cf99.png",
+                  "fit": "fill",
+                  "color": "#FFFFFF",
+                  "decorative": true,
+                  "name": "top_sparkle_accent",
+                  "is_icon": true
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 848.0,
+                    "y": 112.0
+                  },
+                  "size": {
+                    "width": 80.0,
+                    "height": 20.0
+                  },
+                  "rotation": 0.0,
+                  "data": "/app_data/templates/general/static/image9-68eb2d8ed47c.png",
+                  "fit": "fill",
+                  "decorative": true,
+                  "name": "top_wave_accent",
+                  "is_icon": false
+                }
+              ]
+            },
+            {
+              "id": "large_title_area",
+              "description": "Prominent headline area aligned to the upper-left with generous whitespace below.",
+              "position": {
+                "x": 80.0,
+                "y": 48.0
+              },
+              "elements": [
+                {
+                  "type": "text",
+                  "position": {
+                    "x": 1.27,
+                    "y": -6.33
+                  },
+                  "size": {
+                    "width": 732.59,
+                    "height": 125.2
+                  },
+                  "rotation": 0.0,
+                  "font": {
+                    "size": 72.0,
+                    "family": "Poppins",
+                    "color": "#111827",
+                    "bold": true,
+                    "italic": false,
+                    "line_height": 0.8
+                  },
+                  "alignment": {
+                    "horizontal": "left",
+                    "vertical": "top"
+                  },
+                  "runs": [
+                    {
+                      "text": "Equilibrium on the Slope",
+                      "font": {
+                        "size": 72.0,
+                        "family": "Poppins",
+                        "color": "#111827",
+                        "bold": true,
+                        "italic": false,
+                        "line_height": 0.8
+                      }
+                    }
+                  ],
+                  "decorative": false,
+                  "name": "slide_headline",
+                  "max_length": 30,
+                  "min_length": 5
+                }
+              ]
+            },
+            {
+              "id": "feature_grid_area",
+              "description": "Two-by-two grid of service feature groups, each pairing a circular icon with title and descriptive text.",
+              "position": {
+                "x": 96.0,
+                "y": 291.75
+              },
+              "elements": [
+                {
+                  "type": "grid",
+                  "position": {
+                    "x": -6.33,
+                    "y": -81.07
+                  },
+                  "size": {
+                    "width": 674.0,
+                    "height": 256.43
+                  },
+                  "rotation": 0.0,
+                  "columns": 2,
+                  "rows": 2,
+                  "column_gap": 54.0,
+                  "row_gap": 56.25,
+                  "align_items": "flex-start",
+                  "justify_items": "flex-start",
+                  "children": [
+                    {
+                      "type": "group",
+                      "size": {
+                        "width": 310.0,
+                        "height": 100.25
+                      },
+                      "children": [
+                        {
+                          "type": "vector",
+                          "shape": "ellipse",
+                          "points": [
+                            {
+                              "x": 24.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 24.0
+                            },
+                            {
+                              "x": 24.0,
+                              "y": 48.0
+                            },
+                            {
+                              "x": 0.0,
+                              "y": 24.0
+                            }
+                          ],
+                          "closed": true,
+                          "fill": {
+                            "color": "#9333EA"
+                          }
+                        },
+                        {
+                          "type": "image",
+                          "position": {
+                            "x": 12.0,
+                            "y": 12.3
+                          },
+                          "size": {
+                            "width": 24.0,
+                            "height": 24.0
+                          },
+                          "rotation": 0.0,
+                          "data": "/static/icons/bold/arrow-square-down-bold.svg",
+                          "fit": "fill",
+                          "color": "#FFFFFF",
+                          "decorative": false,
+                          "name": "feature_icon",
+                          "is_icon": true,
+                          "prompt": "physics_arrow_down"
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 0.0
+                          },
+                          "size": {
+                            "width": 246.0,
+                            "height": 28.0
+                          },
+                          "font": {
+                            "size": 20.0,
+                            "family": "Poppins",
+                            "color": "#111827",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.12
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Downhill Component of",
+                              "font": {
+                                "size": 20.0,
+                                "family": "Poppins",
+                                "color": "#111827",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.12
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_title",
+                          "max_length": 23,
+                          "min_length": 8
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 65.27,
+                            "y": 32.0
+                          },
+                          "size": {
+                            "width": 246.0,
+                            "height": 68.25
+                          },
+                          "font": {
+                            "size": 14.0,
+                            "family": "Poppins",
+                            "color": "#4B5563",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.3
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Weight is mg sin(theta). Source: page 2. Notes: Trace each arrow back to the object.",
+                              "font": {
+                                "size": 14.0,
+                                "family": "Poppins",
+                                "color": "#4B5563",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.3
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_description",
+                          "max_length": 95,
+                          "min_length": 38
+                        }
+                      ],
+                      "name": "feature_item"
+                    },
+                    {
+                      "type": "group",
+                      "size": {
+                        "width": 310.0,
+                        "height": 100.25
+                      },
+                      "children": [
+                        {
+                          "type": "vector",
+                          "shape": "ellipse",
+                          "points": [
+                            {
+                              "x": 24.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 24.0
+                            },
+                            {
+                              "x": 24.0,
+                              "y": 48.0
+                            },
+                            {
+                              "x": 0.0,
+                              "y": 24.0
+                            }
+                          ],
+                          "closed": true,
+                          "fill": {
+                            "color": "#9333EA"
+                          }
+                        },
+                        {
+                          "type": "image",
+                          "position": {
+                            "x": 12.0,
+                            "y": 12.3
+                          },
+                          "size": {
+                            "width": 24.0,
+                            "height": 24.0
+                          },
+                          "rotation": 0.0,
+                          "data": "/static/icons/bold/scales-bold.svg",
+                          "fit": "fill",
+                          "color": "#FFFFFF",
+                          "decorative": false,
+                          "name": "feature_icon",
+                          "is_icon": true,
+                          "prompt": "physics_force_balance"
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 0.0
+                          },
+                          "size": {
+                            "width": 246.0,
+                            "height": 28.0
+                          },
+                          "font": {
+                            "size": 20.0,
+                            "family": "Poppins",
+                            "color": "#111827",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.12
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Normal Force Balances",
+                              "font": {
+                                "size": 20.0,
+                                "family": "Poppins",
+                                "color": "#111827",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.12
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_title",
+                          "max_length": 23,
+                          "min_length": 8
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 62.73,
+                            "y": 29.47
+                          },
+                          "size": {
+                            "width": 246.0,
+                            "height": 68.25
+                          },
+                          "font": {
+                            "size": 14.0,
+                            "family": "Poppins",
+                            "color": "#4B5563",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.3
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "mg cos(theta). Source: page 2. Notes: Trace each arrow back to the object.",
+                              "font": {
+                                "size": 14.0,
+                                "family": "Poppins",
+                                "color": "#4B5563",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.3
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_description",
+                          "max_length": 95,
+                          "min_length": 38
+                        }
+                      ],
+                      "name": "feature_item"
+                    },
+                    {
+                      "type": "group",
+                      "size": {
+                        "width": 310.0,
+                        "height": 100.25
+                      },
+                      "children": [
+                        {
+                          "type": "vector",
+                          "shape": "ellipse",
+                          "points": [
+                            {
+                              "x": 24.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 24.0
+                            },
+                            {
+                              "x": 24.0,
+                              "y": 48.0
+                            },
+                            {
+                              "x": 0.0,
+                              "y": 24.0
+                            }
+                          ],
+                          "closed": true,
+                          "fill": {
+                            "color": "#9333EA"
+                          }
+                        },
+                        {
+                          "type": "image",
+                          "position": {
+                            "x": 12.0,
+                            "y": 12.3
+                          },
+                          "size": {
+                            "width": 24.0,
+                            "height": 24.0
+                          },
+                          "rotation": 0.0,
+                          "data": "/static/icons/bold/arrow-fat-lines-right-bold.svg",
+                          "fit": "fill",
+                          "color": "#FFFFFF",
+                          "decorative": false,
+                          "name": "feature_icon",
+                          "is_icon": true,
+                          "prompt": "arrow_tracing"
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 0.0
+                          },
+                          "size": {
+                            "width": 246.0,
+                            "height": 28.0
+                          },
+                          "font": {
+                            "size": 20.0,
+                            "family": "Poppins",
+                            "color": "#111827",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.12
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Arrow Tracing",
+                              "font": {
+                                "size": 20.0,
+                                "family": "Poppins",
+                                "color": "#111827",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.12
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_title",
+                          "max_length": 23,
+                          "min_length": 8
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 32.0
+                          },
+                          "size": {
+                            "width": 246.0,
+                            "height": 68.25
+                          },
+                          "font": {
+                            "size": 14.0,
+                            "family": "Poppins",
+                            "color": "#4B5563",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.3
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Trace each arrow back to the object to understand force distribution.",
+                              "font": {
+                                "size": 14.0,
+                                "family": "Poppins",
+                                "color": "#4B5563",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.3
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_description",
+                          "max_length": 95,
+                          "min_length": 38
+                        }
+                      ],
+                      "name": "feature_item"
+                    }
+                  ],
+                  "name": "feature_grid",
+                  "max_children": 6,
+                  "min_children": 3
+                }
+              ]
+            },
+            {
+              "id": "right_image_panel",
+              "description": "Rounded rectangular photo panel on the right side with a soft drop shadow behind it.",
+              "position": {
+                "x": 816.0,
+                "y": 208.0
+              },
+              "elements": [
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 384.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 384.0,
+                      "y": 320.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 320.0
+                    }
+                  ],
+                  "closed": true,
+                  "corner_radii": [
+                    16.0,
+                    16.0,
+                    16.0,
+                    16.0
+                  ],
+                  "fill": {
+                    "color": "#FFFFFF"
+                  },
+                  "shadow": {
+                    "color": "#000000",
+                    "blur": 15.0,
+                    "opacity": 0.1,
+                    "offset_x": 0.0,
+                    "offset_y": 10.0
+                  }
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 384.0,
+                    "height": 320.0
+                  },
+                  "rotation": 0.0,
+                  "data": "/static/images/placeholder.jpg",
+                  "fit": "cover",
+                  "border_radius": {
+                    "tl": 16.0,
+                    "tr": 16.0,
+                    "bl": 16.0,
+                    "br": 16.0
+                  },
+                  "decorative": false,
+                  "name": "primary_photo",
+                  "is_icon": false,
+                  "prompt": "A diagram showing a block on an inclined plane with force vectors, arrows, and labels indicating mg sin(theta), mg cos(theta), and normal force."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "bef5eff8-8a59-46da-8fae-d8ddadadaa9c",
+        "index": 2,
+        "html_content": null,
+        "speaker_note": "This slide reinforces equilibrium principles by prompting students to validate force balance. Emphasize the importance of substitution verification in physics problem-solving. Highlight the inclined plane's role in force component analysis. Ask students to demonstrate the calculation steps confirming net force equals zero.",
+        "presentation": "cfe099fe-d75a-4acc-aa9f-d9c34a784c0e",
+        "layout_group": "general",
+        "layout": "title_description_bullet_points",
+        "content": {
+          "headline_area": {
+            "main_heading": "Equilibrium Check"
+          },
+          "left_visual_card": {
+            "primary_photo": {
+              "image_prompt": "A physics diagram illustrating forces on an inclined plane in equilibrium",
+              "image_url": "/static/images/placeholder.jpg"
+            }
+          },
+          "right_content_column": {
+            "intro_paragraph": "Verify equilibrium by ensuring net force along the plane equals zero.",
+            "feature_list": [
+              {
+                "feature_icon": {
+                  "icon_query": "force equilibrium icon",
+                  "icon_url": "/static/icons/bold/caret-circle-up-bold.svg"
+                },
+                "feature_title": "Net Force Zero",
+                "feature_description": "The sum of all forces acting along the plane must balance out to zero."
+              },
+              {
+                "feature_icon": {
+                  "icon_query": "verification icon",
+                  "icon_url": "/static/icons/bold/seal-check-bold.svg"
+                },
+                "feature_title": "Student Verification",
+                "feature_description": "Encourage students to independently confirm the equilibrium condition through calculations."
+              },
+              {
+                "feature_icon": {
+                  "icon_query": "inclined plane icon",
+                  "icon_url": "/static/icons/bold/caret-circle-up-down-bold.svg"
+                },
+                "feature_title": "Inclined Plane Forces",
+                "feature_description": "Analyze force components parallel and perpendicular to the plane for equilibrium."
+              }
+            ]
+          },
+          "__speaker_note__": "This slide reinforces equilibrium principles by prompting students to validate force balance. Emphasize the importance of substitution verification in physics problem-solving. Highlight the inclined plane's role in force component analysis. Ask students to demonstrate the calculation steps confirming net force equals zero."
+        },
+        "properties": null,
+        "ui": {
+          "id": "title_description_bullet_points",
+          "description": "A clean split presentation layout with a large visual panel on the left and explanatory feature blocks on the right.",
+          "components": [
+            {
+              "id": "slide_background",
+              "description": "Full canvas white background with a decorative grid accent behind the visual area.",
+              "position": {
+                "x": 0.0,
+                "y": 0.0
+              },
+              "elements": [
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 1280.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 1280.0,
+                      "y": 720.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 720.0
+                    }
+                  ],
+                  "closed": true,
+                  "fill": {
+                    "color": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 80.0,
+                    "y": 140.0
+                  },
+                  "size": {
+                    "width": 528.0,
+                    "height": 548.0
+                  },
+                  "data": "/app_data/templates/general/static/image11-6ce50168d7ec.png",
+                  "fit": "fill",
+                  "decorative": true,
+                  "name": "grid_accent_image",
+                  "is_icon": false
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 552.0,
+                    "y": 220.0
+                  },
+                  "size": {
+                    "width": 24.0,
+                    "height": 24.0
+                  },
+                  "data": "/app_data/templates/general/static/image12-2ed5eba60707.png",
+                  "fit": "fill",
+                  "decorative": true,
+                  "name": "sparkle_accent_icon",
+                  "is_icon": true
+                }
+              ]
+            },
+            {
+              "id": "headline_area",
+              "description": "Large single-line heading placed in the upper-left corner with generous margin and bold typography.",
+              "position": {
+                "x": 80.0,
+                "y": 48.0
+              },
+              "elements": [
+                {
+                  "type": "text",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 1122.0,
+                    "height": 60.0
+                  },
+                  "font": {
+                    "size": 60.0,
+                    "family": "Poppins",
+                    "color": "#111827",
+                    "bold": true,
+                    "italic": false,
+                    "line_height": 0.8
+                  },
+                  "alignment": {
+                    "horizontal": "left",
+                    "vertical": "top"
+                  },
+                  "runs": [
+                    {
+                      "text": "Equilibrium Check",
+                      "font": {
+                        "size": 60.0,
+                        "family": "Poppins",
+                        "color": "#111827",
+                        "bold": true,
+                        "italic": false,
+                        "line_height": 0.8
+                      }
+                    }
+                  ],
+                  "decorative": false,
+                  "name": "main_heading",
+                  "max_length": 30,
+                  "min_length": 4
+                }
+              ]
+            },
+            {
+              "id": "left_visual_card",
+              "description": "Rounded rectangular photo card layered over the decorative grid on the left side of the slide.",
+              "position": {
+                "x": 120.0,
+                "y": 254.0
+              },
+              "elements": [
+                {
+                  "type": "vector",
+                  "shape": "polygon",
+                  "points": [
+                    {
+                      "x": 0.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 448.0,
+                      "y": 0.0
+                    },
+                    {
+                      "x": 448.0,
+                      "y": 320.0
+                    },
+                    {
+                      "x": 0.0,
+                      "y": 320.0
+                    }
+                  ],
+                  "closed": true,
+                  "corner_radii": [
+                    16.0,
+                    16.0,
+                    16.0,
+                    16.0
+                  ],
+                  "fill": {
+                    "color": "#FFFFFF"
+                  },
+                  "shadow": {
+                    "color": "#000000",
+                    "blur": 15.0,
+                    "opacity": 0.1,
+                    "offset_x": 0.0,
+                    "offset_y": 10.0
+                  }
+                },
+                {
+                  "type": "image",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 448.0,
+                    "height": 320.0
+                  },
+                  "data": "/static/images/placeholder.jpg",
+                  "fit": "cover",
+                  "border_radius": {
+                    "tl": 16.0,
+                    "tr": 16.0,
+                    "bl": 16.0,
+                    "br": 16.0
+                  },
+                  "decorative": false,
+                  "name": "primary_photo",
+                  "is_icon": false,
+                  "prompt": "A physics diagram illustrating forces on an inclined plane in equilibrium"
+                }
+              ]
+            },
+            {
+              "id": "right_content_column",
+              "description": "Right-aligned narrative section containing an introductory paragraph and two repeated icon-led feature descriptions.",
+              "position": {
+                "x": 672.0,
+                "y": 143.72
+              },
+              "elements": [
+                {
+                  "type": "text",
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  "size": {
+                    "width": 530.0,
+                    "height": 88.0
+                  },
+                  "font": {
+                    "size": 18.0,
+                    "family": "Poppins",
+                    "color": "#4B5563",
+                    "bold": false,
+                    "italic": false,
+                    "line_height": 1.3
+                  },
+                  "alignment": {
+                    "horizontal": "left",
+                    "vertical": "top"
+                  },
+                  "runs": [
+                    {
+                      "text": "Verify equilibrium by ensuring net force along the plane equals zero.",
+                      "font": {
+                        "size": 18.0,
+                        "family": "Poppins",
+                        "color": "#4B5563",
+                        "bold": false,
+                        "italic": false,
+                        "line_height": 1.3
+                      }
+                    }
+                  ],
+                  "decorative": false,
+                  "name": "intro_paragraph",
+                  "max_length": 124,
+                  "min_length": 62
+                },
+                {
+                  "type": "flex",
+                  "position": {
+                    "x": 0.0,
+                    "y": 120.0
+                  },
+                  "size": {
+                    "width": 530.0,
+                    "height": 228.0
+                  },
+                  "direction": "column",
+                  "wrap": false,
+                  "align_items": "stretch",
+                  "justify_content": "flex-start",
+                  "gap": 30.0,
+                  "children": [
+                    {
+                      "type": "group",
+                      "size": {
+                        "width": 530.0,
+                        "height": 96.0
+                      },
+                      "children": [
+                        {
+                          "type": "vector",
+                          "shape": "polygon",
+                          "points": [
+                            {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 48.0
+                            },
+                            {
+                              "x": 0.0,
+                              "y": 48.0
+                            }
+                          ],
+                          "closed": true,
+                          "corner_radii": [
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0
+                          ],
+                          "fill": {
+                            "color": "#9333EA"
+                          },
+                          "shadow": {
+                            "color": "#000000",
+                            "blur": 6.0,
+                            "opacity": 0.1,
+                            "offset_x": 0.0,
+                            "offset_y": 4.0
+                          }
+                        },
+                        {
+                          "type": "image",
+                          "position": {
+                            "x": 12.0,
+                            "y": 12.3
+                          },
+                          "size": {
+                            "width": 24.0,
+                            "height": 24.0
+                          },
+                          "data": "/static/icons/bold/caret-circle-up-bold.svg",
+                          "fit": "fill",
+                          "color": "#FFFFFF",
+                          "decorative": false,
+                          "name": "feature_icon",
+                          "is_icon": true,
+                          "prompt": "force equilibrium icon"
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 0.0
+                          },
+                          "size": {
+                            "width": 466.0,
+                            "height": 28.0
+                          },
+                          "font": {
+                            "size": 20.0,
+                            "family": "Poppins",
+                            "color": "#111827",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.12
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Net Force Zero",
+                              "font": {
+                                "size": 20.0,
+                                "family": "Poppins",
+                                "color": "#111827",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.12
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_title",
+                          "max_length": 40,
+                          "min_length": 6
+                        },
+                        {
+                          "type": "vector",
+                          "shape": "polygon",
+                          "points": [
+                            {
+                              "x": 64.0,
+                              "y": 36.0
+                            },
+                            {
+                              "x": 112.0,
+                              "y": 36.0
+                            },
+                            {
+                              "x": 112.0,
+                              "y": 38.0
+                            },
+                            {
+                              "x": 64.0,
+                              "y": 38.0
+                            }
+                          ],
+                          "closed": true,
+                          "fill": {
+                            "color": "#9333EA"
+                          }
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 50.0
+                          },
+                          "size": {
+                            "width": 466.0,
+                            "height": 52.0
+                          },
+                          "font": {
+                            "size": 16.0,
+                            "family": "Poppins",
+                            "color": "#4B5563",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.3
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "The sum of all forces acting along the plane must balance out to zero.",
+                              "font": {
+                                "size": 16.0,
+                                "family": "Poppins",
+                                "color": "#4B5563",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.3
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_description",
+                          "max_length": 100,
+                          "min_length": 48
+                        }
+                      ],
+                      "name": "feature_item"
+                    },
+                    {
+                      "type": "group",
+                      "size": {
+                        "width": 530.0,
+                        "height": 96.0
+                      },
+                      "children": [
+                        {
+                          "type": "vector",
+                          "shape": "polygon",
+                          "points": [
+                            {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 48.0
+                            },
+                            {
+                              "x": 0.0,
+                              "y": 48.0
+                            }
+                          ],
+                          "closed": true,
+                          "corner_radii": [
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0
+                          ],
+                          "fill": {
+                            "color": "#9333EA"
+                          },
+                          "shadow": {
+                            "color": "#000000",
+                            "blur": 6.0,
+                            "opacity": 0.1,
+                            "offset_x": 0.0,
+                            "offset_y": 4.0
+                          }
+                        },
+                        {
+                          "type": "image",
+                          "position": {
+                            "x": 12.0,
+                            "y": 12.3
+                          },
+                          "size": {
+                            "width": 24.0,
+                            "height": 24.0
+                          },
+                          "data": "/static/icons/bold/seal-check-bold.svg",
+                          "fit": "fill",
+                          "color": "#FFFFFF",
+                          "decorative": false,
+                          "name": "feature_icon",
+                          "is_icon": true,
+                          "prompt": "verification icon"
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 0.0
+                          },
+                          "size": {
+                            "width": 466.0,
+                            "height": 28.0
+                          },
+                          "font": {
+                            "size": 20.0,
+                            "family": "Poppins",
+                            "color": "#111827",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.12
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Student Verification",
+                              "font": {
+                                "size": 20.0,
+                                "family": "Poppins",
+                                "color": "#111827",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.12
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_title",
+                          "max_length": 40,
+                          "min_length": 6
+                        },
+                        {
+                          "type": "vector",
+                          "shape": "polygon",
+                          "points": [
+                            {
+                              "x": 64.0,
+                              "y": 36.0
+                            },
+                            {
+                              "x": 112.0,
+                              "y": 36.0
+                            },
+                            {
+                              "x": 112.0,
+                              "y": 38.0
+                            },
+                            {
+                              "x": 64.0,
+                              "y": 38.0
+                            }
+                          ],
+                          "closed": true,
+                          "fill": {
+                            "color": "#9333EA"
+                          }
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 50.0
+                          },
+                          "size": {
+                            "width": 466.0,
+                            "height": 52.0
+                          },
+                          "font": {
+                            "size": 16.0,
+                            "family": "Poppins",
+                            "color": "#4B5563",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.3
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Encourage students to independently confirm the equilibrium condition through calculations.",
+                              "font": {
+                                "size": 16.0,
+                                "family": "Poppins",
+                                "color": "#4B5563",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.3
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_description",
+                          "max_length": 100,
+                          "min_length": 48
+                        }
+                      ],
+                      "name": "feature_item"
+                    },
+                    {
+                      "type": "group",
+                      "size": {
+                        "width": 530.0,
+                        "height": 96.0
+                      },
+                      "children": [
+                        {
+                          "type": "vector",
+                          "shape": "polygon",
+                          "points": [
+                            {
+                              "x": 0.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 0.0
+                            },
+                            {
+                              "x": 48.0,
+                              "y": 48.0
+                            },
+                            {
+                              "x": 0.0,
+                              "y": 48.0
+                            }
+                          ],
+                          "closed": true,
+                          "corner_radii": [
+                            8.0,
+                            8.0,
+                            8.0,
+                            8.0
+                          ],
+                          "fill": {
+                            "color": "#9333EA"
+                          },
+                          "shadow": {
+                            "color": "#000000",
+                            "blur": 6.0,
+                            "opacity": 0.1,
+                            "offset_x": 0.0,
+                            "offset_y": 4.0
+                          }
+                        },
+                        {
+                          "type": "image",
+                          "position": {
+                            "x": 12.0,
+                            "y": 12.3
+                          },
+                          "size": {
+                            "width": 24.0,
+                            "height": 24.0
+                          },
+                          "data": "/static/icons/bold/caret-circle-up-down-bold.svg",
+                          "fit": "fill",
+                          "color": "#FFFFFF",
+                          "decorative": false,
+                          "name": "feature_icon",
+                          "is_icon": true,
+                          "prompt": "inclined plane icon"
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 0.0
+                          },
+                          "size": {
+                            "width": 466.0,
+                            "height": 28.0
+                          },
+                          "font": {
+                            "size": 20.0,
+                            "family": "Poppins",
+                            "color": "#111827",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.12
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Inclined Plane Forces",
+                              "font": {
+                                "size": 20.0,
+                                "family": "Poppins",
+                                "color": "#111827",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.12
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_title",
+                          "max_length": 40,
+                          "min_length": 6
+                        },
+                        {
+                          "type": "vector",
+                          "shape": "polygon",
+                          "points": [
+                            {
+                              "x": 64.0,
+                              "y": 36.0
+                            },
+                            {
+                              "x": 112.0,
+                              "y": 36.0
+                            },
+                            {
+                              "x": 112.0,
+                              "y": 38.0
+                            },
+                            {
+                              "x": 64.0,
+                              "y": 38.0
+                            }
+                          ],
+                          "closed": true,
+                          "fill": {
+                            "color": "#9333EA"
+                          }
+                        },
+                        {
+                          "type": "text",
+                          "position": {
+                            "x": 64.0,
+                            "y": 50.0
+                          },
+                          "size": {
+                            "width": 466.0,
+                            "height": 52.0
+                          },
+                          "font": {
+                            "size": 16.0,
+                            "family": "Poppins",
+                            "color": "#4B5563",
+                            "bold": false,
+                            "italic": false,
+                            "line_height": 1.3
+                          },
+                          "alignment": {
+                            "horizontal": "left",
+                            "vertical": "top"
+                          },
+                          "runs": [
+                            {
+                              "text": "Analyze force components parallel and perpendicular to the plane for equilibrium.",
+                              "font": {
+                                "size": 16.0,
+                                "family": "Poppins",
+                                "color": "#4B5563",
+                                "bold": false,
+                                "italic": false,
+                                "line_height": 1.3
+                              }
+                            }
+                          ],
+                          "decorative": false,
+                          "name": "feature_description",
+                          "max_length": 100,
+                          "min_length": 48
+                        }
+                      ],
+                      "name": "feature_item"
+                    }
+                  ],
+                  "name": "feature_list",
+                  "max_children": 3,
+                  "min_children": 2
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "fonts": {
+      "Poppins": "https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,700;1,400&display=swap"
+    },
+    "theme": {
+      "name": "General Theme",
+      "description": "General template best for simple presentations, great spacing and clean layout.",
+      "data": {
+        "colors": {
+          "primary": "#3B82F6",
+          "background": "#9333EA",
+          "card": "#FFFFFF",
+          "stroke": "#E5E7EB",
+          "primary_text": "#111827",
+          "background_text": "#FFFFFF",
+          "graph_0": "#EF4444",
+          "graph_1": "#3B82F6",
+          "graph_2": "#10B981",
+          "graph_3": "#C084FC",
+          "graph_4": "#A855F7",
+          "graph_5": "#111827",
+          "graph_6": "#F8F9FA",
+          "graph_7": "#F3F4F6",
+          "graph_8": "#4B5563",
+          "graph_9": "#E5E7EB"
+        },
+        "fonts": {
+          "textFont": {
+            "name": "Poppins",
+            "url": "https://fonts.googleapis.com/css2?family=Poppins:wght@100..900&display=swap"
+          }
+        }
+      },
+      "source": "template",
+      "template_id": "general"
+    },
+    "generation_mode": "standard",
+    "type": "standard",
+    "can_regenerate": true,
+    "community_design_ids": null
+  }
+}

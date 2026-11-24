@@ -50,6 +50,29 @@ export const artifactComponentSchema = z.discriminatedUnion("kind", [
     kind: z.literal("summary"), ...componentBase, title: z.string().min(1).max(160),
     sections: z.array(z.object({ heading: z.string().min(1).max(160), body: z.string().min(1).max(4000) }).strict()).min(1).max(8),
   }).strict(),
+  z.object({
+    kind: z.literal("slide_deck"), ...componentBase,
+    objective: z.string().min(1).max(280),
+    templateId: z.string().min(1).max(80),
+    language: z.literal("en"),
+    slides: z.array(z.object({
+      role: z.enum(["title", "overview", "mechanism", "example", "check", "summary"]),
+      title: z.string().min(1).max(120),
+      claims: z.array(claimProvenanceSchema).max(6).default([]),
+      visual: z.object({
+        kind: z.enum(["none", "diagram", "photo", "illustration"]),
+        query: z.string().max(200).optional(),
+        prompt: z.string().max(500).optional(),
+        altText: z.string().min(1).max(300),
+        credit: z.string().max(300).optional(),
+      }).strict().optional(),
+      notes: z.string().max(2000).optional(),
+      math: z.object({
+        equations: z.array(z.string().min(1).max(200)).min(1).max(4),
+        variables: z.array(z.string().min(1).max(2)).min(1).max(4),
+      }).strict().optional(),
+    }).strict()).min(2).max(20),
+  }).strict(),
 ]);
 
 export const componentRelationSchema = z.object({
@@ -84,6 +107,8 @@ export const artifactPackageSchema = z.object({
 export type ArtifactComponent = z.infer<typeof artifactComponentSchema>;
 export type ComponentRelation = z.infer<typeof componentRelationSchema>;
 export type ArtifactPackage = z.infer<typeof artifactPackageSchema>;
+export type SlideDeckComponent = Extract<ArtifactComponent, { kind: "slide_deck" }>;
+export type SlideDeckSlide = SlideDeckComponent["slides"][number];
 
 /**
  * Parse a package against the refs actually retrieved this turn, then enforce the shared

@@ -1,0 +1,118 @@
+import { expect, test, type Page } from "@playwright/test";
+import { createCourseWithLesson, selectCourseOnPage } from "./helpers";
+
+test.use({ viewport: { width: 1440, height: 900 } });
+test.setTimeout(120_000);
+
+const REF = "studyai://document/doc-1/page/1?chunk=0";
+const deck = {
+  id: "deck-1", courseId: "c", lessonId: "l", kind: "slide_deck",
+  title: "Forces study deck", createdAt: new Date().toISOString(), collection: "Revision",
+  filePath: "deck-1/final.pptx", sourceRefs: [REF],
+  content: {
+    id: "sd1", kind: "slide_deck", sourceRefs: [REF], claims: [], objective: "Understand forces",
+    templateId: "general-en", language: "en",
+    slides: [
+      { role: "title", title: "Forces", claims: [], notes: "Introduce forces." },
+      { role: "mechanism", title: "Equilibrium",
+        claims: [{ claim: "Forces cancel at equilibrium.", sourceRef: REF, excerpt: "Forces cancel at equilibrium.", relationship: "direct" }],
+        visual: { kind: "diagram", altText: "Opposing force arrows" }, notes: "Explain the sum." },
+    ],
+  },
+};
+
+async function mockArtifacts(page: Page, generateDelayMs = 0) {
+  let items = [deck];
+  await page.route("**/api/slide-decks/generate", async (route) => {
+    if (generateDelayMs) await new Promise((resolve) => setTimeout(resolve, generateDelayMs));
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(deck) });
+  });
+  await page.route("**/api/slide-decks/download**", (route) => route.fulfill({ status: 200, contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation", body: "pptx-bytes" }));
+  await page.route("**/api/slide-decks/artifact", async (route) => {
+    if (route.request().method() === "PATCH") {
+      const patch = route.request().postDataJSON() as { title: string };
+      items = items.map((item) => ({ ...item, title: patch.title }));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(items[0]) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+  await page.route("**/api/slide-decks/artifact?id=**", async (route) => {
+    if (route.request().method() === "DELETE") {
+      items = [];
+      await route.fulfill({ status: 200, contentType: "application/json", body: '{"deleted":true}' });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(items[0] ?? { error: "not found" }) });
+  });
+  await page.route("**/api/slide-decks?course=**", (route) => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify(items),
+  }));
+  return { getItems: () => items };
+}
+
+test("Artifacts page builds, lists, opens and organizes a slide deck", async ({ page }) => {
+  const state = await mockArtifacts(page, 400);
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await selectCourseOnPage(page, course.title);
+
+  await page.getByTitle("Open Artifacts").click();
+  await expect(page.getByTestId("artifacts-page")).toBeVisible();
+  await expect(page.getByTestId("artifact-row")).toHaveCount(1);
+  await expect(page.getByTestId("artifact-row")).toContainText("Forces study deck");
+
+  await page.getByTestId("deck-focus").fill("Forces and equilibrium");
+  await page.getByTestId("deck-generate").click();
+  await expect(page.getByTestId("artifacts-status")).toContainText("Building your deck");
+  await expect(page.getByTestId("artifacts-status")).toContainText("Deck ready", { timeout: 5000 });
+  await expect(page.getByTestId("slide-card")).toHaveCount(2);
+
+  await page.getByTestId("artifact-filter-collection").fill("REVISION");
+  await expect(page.getByTestId("artifact-row")).toHaveCount(1);
+  await page.getByTestId("artifact-filter-collection").fill("Missing");
+  await expect(page.getByTestId("artifact-row")).toHaveCount(0);
+  await expect(page.getByTestId("artifacts-empty")).toContainText("No decks match that filter.");
+  await page.getByTestId("artifact-filter-collection").fill("");
+
+  await page.getByTestId("artifact-open").click();
+  await expect(page.getByTestId("slide-card")).toHaveCount(2);
+  await expect(page.getByText("Opposing force arrows")).toBeVisible();
+  await expect(page.getByText(/speaker notes/i).first()).toBeVisible();
+  await page.getByTestId("slide-citation").click();
+  await expect(page.getByTestId("artifacts-page")).toHaveCount(0);
+
+  await page.getByTitle("Open Artifacts").click();
+  await page.getByTestId("artifact-open").click();
+  await expect(page.getByTestId("artifact-download")).toHaveAttribute("download", "forces-study-deck.pptx");
+  await expect(page.getByTestId("artifact-download")).toHaveAttribute("href", /api\/slide-decks\/download/);
+
+  await page.getByTestId("artifact-rename").fill("Renamed deck");
+  await page.getByTestId("artifact-save").click();
+  await expect(page.getByTestId("artifact-row")).toContainText("Renamed deck");
+  expect(state.getItems()[0].title).toBe("Renamed deck");
+
+  await page.getByTestId("artifact-delete").click();
+  await expect(page.getByTestId("artifacts-status")).toContainText("Delete this deck?");
+  await expect(page.getByTestId("artifact-row")).toHaveCount(1);
+  await page.getByTestId("artifact-delete").click();
+  await expect(page.getByTestId("artifact-row")).toHaveCount(0);
+  await expect(page.getByTestId("artifacts-status")).toContainText("Deck deleted.");
+});
+
+test("Artifacts page shows a student-safe message when generation fails", async ({ page }) => {
+  await mockArtifacts(page);
+  await page.route("**/api/slide-decks/generate", (route) => route.fulfill({
+    status: 502, contentType: "application/json", body: JSON.stringify({ error: "Presenton generation failed (503)" }),
+  }));
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await selectCourseOnPage(page, course.title);
+
+  await page.getByTitle("Open Artifacts").click();
+  await page.getByTestId("deck-generate").click();
+  const status = page.getByTestId("artifacts-status");
+  await expect(status).toContainText("deck service is busy");
+  await expect(status).not.toContainText("Presenton");
+  await expect(page.getByTestId("deck-generate")).toBeEnabled();
+});
