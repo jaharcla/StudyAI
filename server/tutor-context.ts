@@ -88,6 +88,17 @@ export function budgetTutorContext(input: {
     evidence = null;
     compactedBase = measureWith(contexts, conversation);
   }
+  // A selected scientific object can make the protected canvas contexts larger
+  // than the whole frame. Bound them before refusing the request; the model can
+  // still answer from the compacted shape and ask the student to narrow the
+  // selection. Never turn a large selection into a hard failure (2026-11-24
+  // rerun: selected Equation produced a raw budget error).
+  if (compactedBase > input.budgetTokens) {
+    contexts = contexts.map((item) => item.description === "Active canvas scene" || item.description === "StudyAI active scientific canvas objects"
+      ? { ...item, value: compactCanvasContextForTutor(item.value, canvasBudget) }
+      : item);
+    compactedBase = measureWith(contexts, conversation);
+  }
   if (compactedBase > input.budgetTokens) throw new TutorContextBudgetError(compactedBase, input.budgetTokens, diagnoseTutorContext(input, contexts, conversation, "protected_context_preflight"));
 
   for (const item of optionalContexts) {
@@ -255,6 +266,13 @@ function compactCanvasAnalysisForTutor(value: unknown, maxChars: number): unknow
   }
   compact.tutorContextCompaction = { truncated: true, omitted };
   return compact;
+}
+
+/** Bound a protected canvas context while preserving scope and truncation flags. */
+function compactCanvasContextForTutor(value: unknown, maxChars: number): unknown {
+  const compact = boundedCanvasValue(value, 0, { remaining: maxChars });
+  if (!compact || typeof compact !== "object" || Array.isArray(compact)) return compact;
+  return { ...compact, tutorContextCompaction: { truncated: true } };
 }
 
 function compactFusion(value: unknown): unknown {
