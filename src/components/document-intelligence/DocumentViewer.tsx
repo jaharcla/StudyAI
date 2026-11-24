@@ -81,9 +81,9 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
   const isSlides = document?.mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
   return (
-      <section className="di-viewer" role="dialog" aria-label={document?.title || "Document preview"}>
+      <section className="di-viewer" role="dialog" aria-label={document?.filename || "Document preview"}>
         <header className="di-viewer-header">
-          <div className="di-viewer-heading"><span className="di-file-glyph">▤</span><div><strong>{document?.title || "Loading document…"}</strong><small>{document?.filename}</small></div></div>
+          <div className="di-viewer-heading"><span className="di-file-glyph">▤</span><div><strong>{document?.filename || "Loading document…"}</strong></div></div>
           <button className="di-icon-button" onClick={onClose} aria-label="Close preview"><X size={18} /></button>
         </header>
         <div className="di-viewer-tools">
