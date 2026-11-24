@@ -14,7 +14,7 @@ const grounding: Grounding = {
 };
 
 const input = { courseId: "chem-120", lessonId: "lesson-03", focus: "friction" };
-const goodText = `# Friction\n# Friction opposes motion\nFriction opposes motion.\n> Source: ${REF}`;
+const goodText = `# Friction\n# Friction opposes motion\nFriction opposes motion.\n> Source: text 4`;
 const badText = `# Friction\n# Friction opposes motion\nInvented claim.\n> Source: invented#p9`;
 
 function setup(texts: string[]) {
@@ -47,7 +47,7 @@ describe("generateSlideDeck", () => {
   });
 
   it("normalizes symbol-font glyphs from course evidence", async () => {
-    const cleanText = `# Friction\n# Notes\n- For ν ≥ ν₀, electrons were ejected.\n> Source: ${REF}`;
+    const cleanText = `# Friction\n# Notes\n- For ν ≥ ν₀, electrons were ejected.\n> Source: text 4`;
     const { db, deps } = setup([cleanText]);
     deps.ground = vi.fn(() => ({
       ...grounding,

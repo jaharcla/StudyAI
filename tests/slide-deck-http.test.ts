@@ -26,7 +26,7 @@ beforeAll(async () => {
   dataDir = mkdtempSync(path.join(tmpdir(), "studyai-slide-decks-"));
   const handler = createSlideDeckHandler(db, {
     renderer: async () => ({ presentationId: "p1", pptxPath: "p1/final.pptx", editPath: "/e" }),
-    readDeckText: async () => `# Friction\n# Friction opposes motion\nFriction opposes motion.\n> Source: ${REF}`,
+    readDeckText: async () => `# Friction\n# Friction opposes motion\nFriction opposes motion.\n> Source: text 4`,
     ground: () => grounding,
   }, "http://127.0.0.1", dataDir);
   server = createServer((req, res) => { void handler(req, res).then((handled) => { if (!handled) { res.writeHead(404); res.end(); } }); });

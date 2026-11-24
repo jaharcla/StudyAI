@@ -1,4 +1,5 @@
 import type { SlideDeckComponent, SlideDeckSlide } from "../../src/artifacts/package";
+import { sourceLabel } from "../../src/studio/api";
 import type { DeckTemplate } from "./templates";
 import { chartTable, explainSolution } from "./math";
 
@@ -20,8 +21,21 @@ export type ImageIntent = {
   credit?: string;
 };
 
+const GROUNDING_PROMPT = [
+  "Build a course-grounded study deck.",
+  "Use only the claims and source lines supplied below; do not add outside facts, examples, definitions or numbers.",
+  'Keep every "> Source:" line verbatim on the slide it belongs to, directly below its claim.',
+  "Draw an instructional diagram when a visual is described; do not add decorative or stock imagery.",
+  "Put speaker notes in the notes lines, not on the slide itself.",
+  "Do not leave placeholder text.",
+].join(" ");
+
+function cleanTitle(title: string): string {
+  return title.replace(/[*_`#]+$/g, "").trim();
+}
+
 function slideMarkdown(slide: SlideDeckSlide): string {
-  const lines = [`# ${slide.title}`];
+  const lines = [`# ${cleanTitle(slide.title)}`];
   if (slide.math) {
     const solved = explainSolution(slide.math.equations, slide.math.variables);
     for (const step of solved.steps) lines.push(`- ${step}`);
@@ -34,17 +48,18 @@ function slideMarkdown(slide: SlideDeckSlide): string {
     if (slide.notes) lines.push(`> Notes: ${slide.notes}`);
     return lines.join("\n");
   }
-  for (const claim of slide.claims) {
+  for (const claim of slide.claims ?? []) {
     lines.push(`- ${claim.claim}`);
-    if (claim.relationship === "direct") lines.push(`> Source: ${claim.sourceRef}`);
+    if (claim.relationship === "direct") lines.push(`> Source: ${sourceLabel(claim.sourceRef)}`);
   }
   if (slide.notes) lines.push(`> Notes: ${slide.notes}`);
   return lines.join("\n");
 }
 
 export function compileSlideDeck(component: SlideDeckComponent, template: DeckTemplate): PresentonGenerateRequest {
+  const visuals = imagePlan(component).map((intent) => intent.altText).join("; ");
   return {
-    content: "",
+    content: visuals ? `${GROUNDING_PROMPT} Visuals to draw: ${visuals}.` : GROUNDING_PROMPT,
     slides_markdown: component.slides.map(slideMarkdown),
     n_slides: component.slides.length,
     template: template.presentonTemplate,

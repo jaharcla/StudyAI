@@ -22,25 +22,40 @@
 
 .artifacts-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .artifacts-head h2 { margin: 4px 0; font-size: 26px; }
-.artifacts-head p { margin: 0; opacity: .72; font-size: 13px; }
-.artifacts-status { color: #ffb4b4; font-size: 13px; }
-.artifacts-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; margin-top: 20px; }
-.artifacts-list label { display: block; font-size: 12px; opacity: .8; margin-bottom: 12px; }
+.artifacts-head p { margin: 0; color: #c2c9dd; font-size: 13px; }
+
+.artifacts-shell :is(button, a, input):focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+.artifacts-shell :is(button, a):disabled { opacity: .45; cursor: not-allowed; }
+
+.artifacts-create { margin-top: 22px; padding: 16px 18px; border: 1px solid var(--border, #2b3350); border-radius: 12px; background: var(--surface-2, #1d2340); }
+.artifacts-create label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.artifacts-create-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.artifacts-create input { padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border, #2b3350); background: var(--surface, #151a2b); color: inherit; }
+
+.artifacts-status { min-height: 18px; margin: 14px 0 0; font-size: 13px; color: #c2c9dd; }
+.artifacts-status-error { color: #ffc2c2; }
+.artifacts-status-success { color: #a8e6c5; }
+
+.artifacts-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; margin-top: 12px; }
+.artifacts-list label { display: block; font-size: 12px; font-weight: 600; color: #c2c9dd; margin-bottom: 10px; }
 .artifacts-list input, .artifacts-rename input { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-top: 6px; border-radius: 8px; border: 1px solid var(--border, #2b3350); background: var(--surface-2, #1d2340); color: inherit; }
 .artifact-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border: 1px solid var(--border, #2b3350); border-radius: 10px; margin-bottom: 8px; }
 .artifact-row div { display: flex; flex-direction: column; gap: 3px; }
-.artifact-row small, .artifacts-detail-head small { opacity: .65; font-size: 11px; }
-.artifacts-empty { opacity: .6; font-size: 13px; }
+.artifact-row small, .artifacts-detail-head small { color: #c2c9dd; font-size: 11px; }
+.artifacts-empty { color: #c2c9dd; font-size: 13px; }
 .artifacts-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .artifacts-detail-head h3 { margin: 0; font-size: 20px; }
 .artifacts-rename { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 16px; }
+.artifacts-rename label { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: #c2c9dd; }
 .artifacts-rename input { margin: 0; }
 .slide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .slide-card { border: 1px solid var(--border, #2b3350); border-radius: 10px; padding: 14px; background: var(--surface-2, #1d2340); }
 .slide-card h4 { margin: 4px 0 10px; font-size: 16px; }
 .slide-card > small { text-transform: uppercase; letter-spacing: .08em; opacity: .6; font-size: 10px; }
-.slide-visual { border: 1px dashed var(--border, #2b3350); border-radius: 8px; padding: 10px; font-size: 12px; opacity: .85; margin-bottom: 10px; }
+.slide-visual { border: 1px dashed var(--border, #2b3350); border-radius: 8px; padding: 10px; font-size: 12px; color: #c2c9dd; margin-bottom: 10px; }
+.slide-visual span { display: block; font-weight: 600; color: #eef1f8; margin-bottom: 4px; }
 .slide-claim { border-top: 1px solid var(--border, #2b3350); padding-top: 8px; margin-top: 8px; }
 .slide-claim p { margin: 0 0 8px; font-size: 13px; }
 .slide-citation { border: 0; background: none; color: #8ab4ff; padding: 0; font-size: 12px; cursor: pointer; }
-.slide-notes { opacity: .65; font-size: 12px; margin: 10px 0 0; }
+.slide-notes { color: #c2c9dd; font-size: 12px; margin: 10px 0 0; }
+.slide-notes strong { display: block; color: #eef1f8; font-size: 12px; font-weight: 600; margin-bottom: 3px; }

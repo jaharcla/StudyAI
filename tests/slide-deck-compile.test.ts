@@ -21,7 +21,9 @@ const component: SlideDeckComponent = {
 describe("compileSlideDeck", () => {
   it("produces a Presenton request with no geometry or style fields", () => {
     const request: PresentonGenerateRequest = compileSlideDeck(component, findDeckTemplate("general-en"));
-    expect(request.content).toBe("");
+    expect(request.content).toContain("course-grounded study deck");
+    expect(request.content).toContain("do not add outside facts");
+    expect(request.content).toContain("do not add decorative or stock imagery");
     expect(request.language).toBe("English");
     expect(request.export_as).toBe("pptx");
     expect(request.n_slides).toBe(2);
@@ -29,8 +31,10 @@ describe("compileSlideDeck", () => {
     expect(request.slides_markdown[0]).toContain("# Friction");
     expect(request.slides_markdown[1]).toContain("# Friction opposes motion");
     expect(request.slides_markdown[1]).toContain("Friction opposes motion.");
-    expect(request.slides_markdown[1]).toContain(`> Source: ${REF}`);
+    expect(request.slides_markdown[1]).toContain("> Source: text 4");
+    expect(request.slides_markdown[1]).not.toContain(REF);
     expect(request.slides_markdown[1]).toContain("> Notes: Explain the direction.");
+    expect(request.content).toContain("Force arrows on an inclined plane");
     const serialized = JSON.stringify(request);
     for (const forbidden of ["left", "top", "width", "height", "shapeId", "fontFace", "#FFFFFF"]) {
       expect(serialized).not.toContain(forbidden);
@@ -50,7 +54,7 @@ describe("compileSlideDeck", () => {
       }],
     };
     const markdown = compileSlideDeck(twoClaims, findDeckTemplate("general-en")).slides_markdown[0];
-    expect(markdown).toContain(`- Friction opposes motion.\n> Source: ${REF}\n- Normal force is perpendicular.\n> Source: ${secondRef}`);
+    expect(markdown).toContain("- Friction opposes motion.\n> Source: text 4\n- Normal force is perpendicular.\n> Source: text 5");
   });
 
   it("renders a computed worked example with steps and verification", () => {
@@ -71,6 +75,12 @@ describe("compileSlideDeck", () => {
     expect(markdown).toContain("8*30 + 12*30 = 600");
     expect(markdown).toContain("| 30 | 30 | 30 |");
     expect(markdown).toContain("Plot two lines on an x-y plane");
+  });
+
+  it("compiles a title slide with no claims", () => {
+    const titleOnly: SlideDeckComponent = { ...component, slides: [{ role: "title", title: "Friction", claims: [], notes: "Set the scene." }] };
+    const markdown = compileSlideDeck(titleOnly, findDeckTemplate("general-en")).slides_markdown[0];
+    expect(markdown).toBe("# Friction\n> Notes: Set the scene.");
   });
 
   it("extracts visual intents without a query for diagrams", () => {

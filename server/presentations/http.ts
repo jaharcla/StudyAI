@@ -14,6 +14,11 @@ const UpdateSchema = z.object({
 
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
+function downloadName(title: string, id: string): string {
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  return `attachment; filename="${slug || "study-deck"}-${SAFE_ID.test(id) ? id : "deck"}.pptx"`;
+}
+
 /** Course-scoped HTTP surface for slide deck artifacts. */
 export function createSlideDeckHandler(
   db: Database.Database,
@@ -66,7 +71,7 @@ export function createSlideDeckHandler(
         const bytes = await readFile(target);
         res.writeHead(200, {
           "content-type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-          "content-disposition": `attachment; filename="slide-deck-${idParam}.pptx"`,
+          "content-disposition": downloadName(artifact.title, idParam),
           "access-control-allow-origin": origin,
         });
         res.end(bytes);

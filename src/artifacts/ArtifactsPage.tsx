@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { deleteSlideDeck, downloadSlideDeckUrl, getSlideDeck, listSlideDecks, updateSlideDeck, type SlideDeckArtifact } from "./api";
+import {
+  deleteSlideDeck,
+  downloadSlideDeckUrl,
+  generateSlideDeck,
+  getSlideDeck,
+  listSlideDecks,
+  updateSlideDeck,
+  type SlideDeckArtifact,
+} from "./api";
 import { sourceLabel } from "../studio/api";
 import "./artifacts.css";
 
@@ -13,88 +21,198 @@ type Props = {
   onOpenSource: (sourceRef: string) => void;
 };
 
-export default function ArtifactsPage({ courseId, close, onOpenSource }: Props) {
+type Notice = { tone: "info" | "error" | "success"; text: string };
+type Busy = "loading" | "generating" | "opening" | "saving" | "deleting" | undefined;
+
+const FALLBACK = "We couldn't finish that. Try again in a moment.";
+
+function studentMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (/No course sources/i.test(raw)) return "This lesson has no course material to build a deck from yet. Add a source or notes first.";
+  if (/validation failed|repair/i.test(raw)) return "The deck didn't pass the course-material checks. Try a different focus or source.";
+  if (/Presenton|generation failed|502|503/i.test(raw)) return "The deck service is busy right now. Try again in a moment.";
+  return FALLBACK;
+}
+
+function deckFileName(title: string): string {
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  return `${slug || "study-deck"}.pptx`;
+}
+
+export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenSource }: Props) {
   const [items, setItems] = useState<SlideDeckArtifact[]>([]);
   const [selected, setSelected] = useState<SlideDeckArtifact | undefined>();
-  const [collection, setCollection] = useState("");
+  const [filter, setFilter] = useState("");
+  const [focus, setFocus] = useState("");
   const [rename, setRename] = useState("");
-  const [status, setStatus] = useState("");
+  const [notice, setNotice] = useState<Notice | undefined>();
+  const [busy, setBusy] = useState<Busy>("loading");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const refresh = useCallback(() => {
-    void listSlideDecks(courseId).then(setItems).catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : "Could not load artifacts.");
-    });
+    void listSlideDecks(courseId)
+      .then(setItems)
+      .catch((error: unknown) => setNotice({ tone: "error", text: studentMessage(error) }))
+      .finally(() => setBusy(undefined));
   }, [courseId]);
 
   useEffect(refresh, [refresh]);
 
-  const visible = useMemo(() => items.filter((item) => !collection || item.collection === collection), [items, collection]);
+  const visible = useMemo(() => {
+    const query = filter.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => `${item.collection} ${item.title}`.toLowerCase().includes(query));
+  }, [items, filter]);
+
+  const generate = () => {
+    if (busy) return;
+    setBusy("generating");
+    setNotice({ tone: "info", text: "Building your deck from this lesson…" });
+    void generateSlideDeck({ courseId, lessonId, focus: focus.trim() || "Key concepts and mechanisms" })
+      .then((artifact) => {
+        setNotice({ tone: "success", text: "Deck ready. Open it below to review slides and speaker notes." });
+        setSelected(artifact);
+        setRename(artifact.title);
+        setConfirmDelete(false);
+        return listSlideDecks(courseId).then(setItems);
+      })
+      .catch((error: unknown) => setNotice({ tone: "error", text: studentMessage(error) }))
+      .finally(() => setBusy(undefined));
+  };
 
   const open = (id: string) => {
-    void getSlideDeck(id, courseId).then((artifact) => {
-      setSelected(artifact);
-      setRename(artifact.title);
-    }).catch((error: unknown) => setStatus(error instanceof Error ? error.message : "Could not open artifact."));
+    if (busy) return;
+    setBusy("opening");
+    void getSlideDeck(id, courseId)
+      .then((artifact) => {
+        setSelected(artifact);
+        setRename(artifact.title);
+        setConfirmDelete(false);
+        setNotice(undefined);
+      })
+      .catch((error: unknown) => setNotice({ tone: "error", text: studentMessage(error) }))
+      .finally(() => setBusy(undefined));
   };
 
   const save = () => {
-    if (!selected) return;
-    void updateSlideDeck(selected.id, courseId, { title: rename, collection: selected.collection })
-      .then((updated) => { setSelected(updated); refresh(); })
-      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : "Could not save artifact."));
+    if (!selected || busy || !rename.trim()) return;
+    setBusy("saving");
+    void updateSlideDeck(selected.id, courseId, { title: rename.trim(), collection: selected.collection })
+      .then((updated) => {
+        setSelected(updated);
+        setNotice({ tone: "success", text: "Deck name saved." });
+        return listSlideDecks(courseId).then(setItems);
+      })
+      .catch((error: unknown) => setNotice({ tone: "error", text: studentMessage(error) }))
+      .finally(() => setBusy(undefined));
   };
 
   const remove = () => {
-    if (!selected) return;
+    if (!selected || busy) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setNotice({ tone: "info", text: "Delete this deck? Select Delete again to confirm." });
+      return;
+    }
+    setBusy("deleting");
     void deleteSlideDeck(selected.id, courseId)
-      .then(() => { setSelected(undefined); refresh(); })
-      .catch((error: unknown) => setStatus(error instanceof Error ? error.message : "Could not delete artifact."));
+      .then(() => {
+        setSelected(undefined);
+        setConfirmDelete(false);
+        setNotice({ tone: "success", text: "Deck deleted." });
+        return listSlideDecks(courseId).then(setItems);
+      })
+      .catch((error: unknown) => setNotice({ tone: "error", text: studentMessage(error) }))
+      .finally(() => setBusy(undefined));
   };
 
   return (
     <div className="artifacts-surface" data-testid="artifacts-surface">
-      <div className="artifacts-shell" data-testid="artifacts-page">
+      <div className="artifacts-shell" data-testid="artifacts-page" role="dialog" aria-modal="true" aria-label="Artifacts">
         <header className="artifacts-head">
-          <div><span className="eyebrow">SAVED WORK</span><h2>Artifacts</h2><p>Study decks and other work generated from your course material.</p></div>
+          <div><h2>Artifacts</h2><p>Study decks made from {lessonTitle || courseTitle} material.</p></div>
           <button className="icon-button" onClick={close} aria-label="Close artifacts"><X size={18} /></button>
         </header>
-        {status && <p className="artifacts-status" role="status">{status}</p>}
+
+        <section className="artifacts-create" aria-label="Build a slide deck">
+          <label htmlFor="deck-focus">What should this deck focus on?</label>
+          <div className="artifacts-create-row">
+            <input
+              id="deck-focus"
+              data-testid="deck-focus"
+              value={focus}
+              onChange={(event) => setFocus(event.target.value)}
+              placeholder="Key concepts and mechanisms"
+              maxLength={500}
+            />
+            <button className="button-primary" data-testid="deck-generate" onClick={generate} disabled={!!busy}>
+              {busy === "generating" ? "Building…" : "Build slide deck"}
+            </button>
+          </div>
+        </section>
+
+        <p className={`artifacts-status artifacts-status-${notice?.tone ?? "info"}`} data-testid="artifacts-status" role="status" aria-live="polite">
+          {busy === "loading" ? "Loading your decks…" : notice?.text}
+        </p>
+
         <div className="artifacts-layout">
-          <section className="artifacts-list">
-            <label>Collection<input data-testid="artifact-filter-collection" value={collection} onChange={(event) => setCollection(event.target.value)} placeholder="All collections" /></label>
-            {visible.length === 0 && <p className="artifacts-empty">No artifacts yet.</p>}
+          <section className="artifacts-list" aria-label="Saved decks">
+            <label htmlFor="artifact-filter">Filter decks</label>
+            <input
+              id="artifact-filter"
+              data-testid="artifact-filter-collection"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              placeholder="Collection or title"
+            />
+            {busy !== "loading" && visible.length === 0 && (
+              <p className="artifacts-empty" data-testid="artifacts-empty">
+                {items.length === 0 ? "No decks yet. Set a focus above to build one from this lesson." : "No decks match that filter."}
+              </p>
+            )}
             {visible.map((item) => (
               <article className="artifact-row" data-testid="artifact-row" key={item.id}>
-                <div><b>{item.title}</b><small>{item.kind} · {new Date(item.createdAt).toLocaleDateString()}</small></div>
-                <button className="button-soft" data-testid="artifact-open" onClick={() => open(item.id)}>Open slides</button>
+                <div><b>{item.title}</b><small>{item.kind.replace("_", " ")} · {new Date(item.createdAt).toLocaleDateString()}</small></div>
+                <button className="button-soft" data-testid="artifact-open" onClick={() => open(item.id)} disabled={!!busy}>Open slides</button>
               </article>
             ))}
           </section>
-          <section className="artifacts-detail">
-            {!selected && <p className="artifacts-empty">Choose an artifact to see its slides.</p>}
+
+          <section className="artifacts-detail" aria-label="Deck preview">
+            {!selected && <p className="artifacts-empty">Choose a deck to see its slides and speaker notes.</p>}
             {selected && <>
               <div className="artifacts-detail-head">
-                <div><h3>{selected.title}</h3><small>{selected.content.slides.length} slides · {selected.sourceRefs.length} citations</small></div>
-                <a className="button-soft" data-testid="artifact-download" href={downloadSlideDeckUrl(selected.id, selected.courseId)}>Download .pptx</a>
+                <div><h3>{selected.title}</h3><small>{selected.content.slides.length} slides · {selected.sourceRefs.length} cited sources</small></div>
+                <a
+                  className="button-soft"
+                  data-testid="artifact-download"
+                  href={downloadSlideDeckUrl(selected.id, selected.courseId)}
+                  download={deckFileName(selected.title)}
+                >Download .pptx</a>
               </div>
               <div className="artifacts-rename">
-                <input data-testid="artifact-rename" aria-label="Artifact title" value={rename} onChange={(event) => setRename(event.target.value)} />
-                <button className="button-primary" data-testid="artifact-save" onClick={save}>Save</button>
-                <button className="button-soft" data-testid="artifact-delete" onClick={remove}>Delete</button>
+                <label htmlFor="artifact-title">Deck name</label>
+                <input id="artifact-title" data-testid="artifact-rename" aria-label="Artifact title" value={rename} onChange={(event) => setRename(event.target.value)} maxLength={200} />
+                <button className="button-primary" data-testid="artifact-save" onClick={save} disabled={!!busy || !rename.trim()}>Save</button>
+                <button className="button-soft" data-testid="artifact-delete" onClick={remove} disabled={!!busy}>
+                  {confirmDelete ? "Confirm delete" : "Delete"}
+                </button>
               </div>
               <div className="slide-grid">
                 {selected.content.slides.map((slide, index) => (
                   <article className="slide-card" data-testid="slide-card" key={`${selected.id}-${index}`}>
                     <small>{slide.role}</small>
                     <h4>{slide.title}</h4>
-                    {slide.visual && <div className="slide-visual" aria-label={slide.visual.altText}>{slide.visual.altText}</div>}
+                    {slide.visual && <div className="slide-visual" aria-label={`Visual: ${slide.visual.altText}`}><span>Visual</span>{slide.visual.altText}</div>}
                     {slide.claims.map((claim) => (
                       <div className="slide-claim" key={claim.sourceRef}>
                         <p>{claim.claim}</p>
-                        <button className="slide-citation" data-testid="slide-citation" onClick={() => onOpenSource(claim.sourceRef)}>Open source · {sourceLabel(claim.sourceRef)}</button>
+                        <button className="slide-citation" data-testid="slide-citation" onClick={() => onOpenSource(claim.sourceRef)}>
+                          Open source · {sourceLabel(claim.sourceRef)}
+                        </button>
                       </div>
                     ))}
-                    {slide.notes && <p className="slide-notes">{slide.notes}</p>}
+                    {slide.notes && <p className="slide-notes"><strong>Speaker notes</strong>{slide.notes}</p>}
                   </article>
                 ))}
               </div>

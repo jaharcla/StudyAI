@@ -5,6 +5,7 @@ import type { SlideDeckComponent } from "../src/artifacts/package";
 
 const REF = "studyai://document/module-1/text/4?chunk=0";
 const retrieved = new Map([[REF, "Friction opposes motion. It acts uphill."]]);
+const labels = new Map([["text 4", REF]]);
 const deck: SlideDeckComponent = {
   id: "sd1", kind: "slide_deck", sourceRefs: [REF], claims: [],
   objective: "Understand friction", templateId: "general-en", language: "en",
@@ -20,14 +21,19 @@ const deck: SlideDeckComponent = {
 
 describe("validateDeckText", () => {
   it("accepts a deck whose direct excerpt is contained in the retrieved chunk", () => {
-    const report = validateDeckText("# Friction\n# Friction opposes motion\nFriction opposes motion.\n> Source: " + REF, deck, retrieved);
+    const report = validateDeckText("# Friction\n# Friction opposes motion\nFriction opposes motion.\n> Source: text 4", deck, retrieved, labels);
     expect(report.ok).toBe(true);
     expect(report.problems).toEqual([]);
   });
 
   it("accepts a compiled bullet line before a source citation", () => {
-    const report = validateDeckText("# Friction\n# Friction opposes motion\n- Friction opposes motion.\n> Source: " + REF, deck, retrieved);
+    const report = validateDeckText("# Friction\n# Friction opposes motion\n- Friction opposes motion.\n> Source: text 4", deck, retrieved, labels);
     expect(report.ok).toBe(true);
+  });
+
+  it("rejects a raw course reference ID shown to a student", () => {
+    const report = validateDeckText("> Source: " + REF, deck, retrieved, labels);
+    expect(report.problems.some((p) => p.validator === "raw-reference")).toBe(true);
   });
 
   it("rejects an invented sourceRef", () => {
@@ -36,7 +42,7 @@ describe("validateDeckText", () => {
   });
 
   it("rejects a direct excerpt that is not in the retrieved chunk", () => {
-    const report = validateDeckText("Friction accelerates motion.\n> Source: " + REF, deck, retrieved);
+    const report = validateDeckText("Friction accelerates motion.\n> Source: text 4", deck, retrieved, labels);
     expect(report.problems.some((p) => p.validator === "citation-containment")).toBe(true);
   });
 

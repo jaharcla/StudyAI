@@ -11,6 +11,7 @@ import { initializeStudioSchema } from "../studio/schema";
 import { buildGrounding } from "../studio/grounding";
 import type { Grounding } from "../studio/contracts";
 import type { SlideDeckComponent } from "../../src/artifacts/package";
+import { sourceLabel } from "../../src/studio/api";
 
 export const SlideDeckGenerateSchema = z.object({
   courseId: z.string().min(1).max(512),
@@ -109,7 +110,9 @@ export async function generateSlideDeck(db: Database.Database, rawInput: unknown
   for (let generation = 1; generation <= 2; generation++) {
     rendered = await deps.renderer(request);
     const text = await deps.readDeckText(rendered.pptxPath);
-    const report = validateDeckText(text, component, new Map(component.slides.flatMap((slide) => slide.claims.map((claim) => [claim.sourceRef, claim.excerpt] as const))));
+    const retrieved = new Map(component.slides.flatMap((slide) => (slide.claims ?? []).map((claim) => [claim.sourceRef, claim.excerpt] as const)));
+    const labels = new Map(component.sourceRefs.map((ref) => [sourceLabel(ref), ref] as const));
+    const report = validateDeckText(text, component, retrieved, labels);
     if (deps.inspect) {
       const renderedSlides = await deps.inspect(rendered.presentationId);
       report.problems.push(...validateRenderedSlides(renderedSlides).problems);

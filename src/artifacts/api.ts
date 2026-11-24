@@ -36,6 +36,14 @@ export function listSlideDecks(courseId: string): Promise<SlideDeckArtifact[]> {
   return requestJson<SlideDeckArtifact[]>(`/api/slide-decks?course=${encodeURIComponent(courseId)}`);
 }
 
+export function generateSlideDeck(input: { courseId: string; lessonId: string; focus: string; templateId?: string }): Promise<SlideDeckArtifact> {
+  return requestJson<SlideDeckArtifact>("/api/slide-decks/generate", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export function getSlideDeck(id: string, courseId: string): Promise<SlideDeckArtifact> {
   const query = new URLSearchParams({ id, course: courseId });
   return requestJson<SlideDeckArtifact>(`/api/slide-decks/artifact?${query}`);

@@ -4,7 +4,7 @@ import type { ValidationProblem, ValidationReport } from "../../src/artifacts/co
 export type DeckValidationReport = ValidationReport & { preserve: string[] };
 
 const PLACEHOLDER = /TODO|lorem ipsum|Click to add title/i;
-const SOURCE_LINE = /^>\s*Source:\s*(\S+)\s*$/;
+const SOURCE_LINE = /^>\s*Source:\s*(.+?)\s*$/;
 const DANGLING = new Set(["a", "an", "the", "of", "to", "in", "on", "with", "for", "by", "and", "or", "as", "at", "from", "is", "are", "be"]);
 const BODY_FIELD = /body|copy|description|text|paragraph/i;
 const TYPOS: Record<string, string> = { substituion: "substitution" };
@@ -41,6 +41,7 @@ export function validateDeckText(
   text: string,
   component: SlideDeckComponent,
   retrieved: ReadonlyMap<string, string>,
+  labels: ReadonlyMap<string, string> = new Map(),
 ): DeckValidationReport {
   const problems: ValidationProblem[] = [];
   const seenTitles = new Set<string>();
@@ -68,9 +69,10 @@ export function validateDeckText(
   for (let index = 0; index < lines.length; index++) {
     const match = SOURCE_LINE.exec(lines[index]);
     if (!match) continue;
-    const ref = match[1];
+    const label = match[1];
+    const ref = labels.get(label) ?? label;
     if (!retrieved.has(ref)) {
-      problems.push(problem("bundle", "citation-containment", `Rendered deck cites ${ref}, which was not retrieved.`, `Remove the invented citation from the deck.`));
+      problems.push(problem("bundle", "citation-containment", `Rendered deck cites ${label}, which was not retrieved.`, `Remove the invented citation from the deck.`));
       continue;
     }
     const preceding = [...lines.slice(0, index)].reverse().find((line) => line.trim() && !line.startsWith(">") && !line.startsWith("#"));
@@ -79,6 +81,10 @@ export function validateDeckText(
     if (claimText && !chunk.includes(claimText)) {
       problems.push(problem("bundle", "citation-containment", `A rendered claim above ${ref} is not supported by the retrieved chunk.`, `Restate the claim using only the course evidence, or label it as an interpretation.`));
     }
+  }
+
+  if (/studyai:\/\//.test(text)) {
+    problems.push(problem("bundle", "raw-reference", "The deck shows a course reference ID instead of a course location.", "Replace it with a reader-friendly location such as page 2."));
   }
 
   if (PLACEHOLDER.test(text)) {
