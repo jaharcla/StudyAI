@@ -16,8 +16,7 @@ function Chart({ args }: { args: VegaChartArgs }) {
     // Named data sources are supplied through Vega-Lite's `datasets`, so the
     // renderer never fetches a URL and the spec itself stays clean.
     // vega-embed treats a string spec as a URL, so pass the validated object.
-    // The schema guard above is what makes this assertion safe.
-    const spec = { ...buildChartSpec(args), datasets: { [CHART_DATASET]: args.data } } as unknown as VisualizationSpec;
+    const spec: VisualizationSpec = { ...buildChartSpec(args), datasets: { [CHART_DATASET]: args.data } };
     vegaEmbed(element, spec, { actions: false, renderer: "svg" })
       .then((result) => {
         if (disposed) result.view.finalize();

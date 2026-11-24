@@ -47,7 +47,7 @@ Observed results on this machine:
 - A hard per-turn tool-call cap is enforced in the graph (`TUTOR_MAX_TOOL_CALLS_PER_TURN`, default 3) and unit-tested.
 - Credential handling: the local `opencode-go` auth entry was injected into probe processes and never printed. A full-worktree grep (excluding dependencies) found no occurrence of the token in docs, patch, scripts, tests, or saved artifacts. Interceptors that log request bodies/headers remain a leak path to watch.
 - Free-tier retention: cloud free models may retain or train on prompts. Only synthetic probe cases were sent. Real student content must not go through them until that flow is explicitly accepted.
-- Full `npm run verify` in this worktree: TypeScript clean; 583/583 unit tests passed; Playwright 44 passed, 8 failed, 3 skipped. The 8 failures are the existing live-model e2e cases (`workspace`, `tutor-*`, `document-intelligence`, `integration`, `quickdraw-ai`, `canvas-analysis`, `direct-vector`) which need a real CopilotKit Intelligence key and the default model stack; this worktree had only a dummy key. The prototype's own Playwright spec passes in isolation.
+- Full `npm run verify` on the **source branch** at that time: TypeScript clean; 583/583 unit tests passed; Playwright 44 passed, 8 failed, 3 skipped. The 8 failures were existing live-model e2e cases needing a real CopilotKit Intelligence key; the prototype's own spec passed in isolation. Current-main port results are in `docs/verification/2026-11-24-mcp-tools-integration.md`.
 
 ## Pre-edit impact record
 
