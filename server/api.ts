@@ -12,6 +12,7 @@ import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
 import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { getCourseProgress } from "./progress.js";
+import { getRecommendations } from "./recommendations.js";
 import { createLearningHandler } from "./learning/http.js";
 import { createStudioHandler } from "./studio/http.js";
 import { initializeStudioSchema } from "./studio/schema.js";
@@ -213,6 +214,11 @@ const server = createServer(async (req, res) => {
     const course = url.searchParams.get("course") ?? "";
     if (!course) return json(res, 400, { error: "course is required." });
     return json(res, 200, getCourseProgress(db, course));
+  }
+  if (req.method === "GET" && url.pathname === "/api/recommendations") {
+    const course = url.searchParams.get("course") ?? "";
+    if (!course) return json(res, 400, { error: "course is required." });
+    return json(res, 200, { recommendations: getRecommendations(db, course, url.searchParams.get("lesson") ?? "") });
   }
   if (req.method === "GET" && url.pathname === "/api/search") {
     const query = url.searchParams.get("q") ?? "";
