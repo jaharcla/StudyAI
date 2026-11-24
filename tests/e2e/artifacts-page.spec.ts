@@ -14,7 +14,7 @@ const deck = {
     templateId: "general-en", language: "en",
     slides: [
       { role: "title", title: "Forces", claims: [], notes: "Introduce forces." },
-      { role: "mechanism", title: "Equilibrium",
+      { role: "mechanism", title: "Forces cancel at equilibrium",
         claims: [{ claim: "Forces cancel at equilibrium.", sourceRef: REF, excerpt: "Forces cancel at equilibrium.", relationship: "direct" }],
         visual: { kind: "diagram", altText: "Opposing force arrows" }, notes: "Explain the sum." },
     ],
@@ -77,6 +77,8 @@ test("Artifacts page builds, lists, opens and organizes a slide deck", async ({ 
 
   await page.getByTestId("artifact-open").click();
   await expect(page.getByTestId("slide-card")).toHaveCount(2);
+  await expect(page.getByTestId("slide-card").filter({ hasText: "Forces cancel at equilibrium" })).toBeVisible();
+  await expect(page.getByTestId("slide-citation")).toContainText("Open source · page 1");
   await expect(page.getByText("Opposing force arrows")).toBeVisible();
   await expect(page.getByText(/speaker notes/i).first()).toBeVisible();
   await page.getByTestId("slide-citation").click();

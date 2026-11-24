@@ -9,7 +9,7 @@ import { validateDeckText, validateRenderedSlides } from "./validate";
 import { decideRepair } from "./repair";
 import { initializeStudioSchema } from "../studio/schema";
 import { buildGrounding } from "../studio/grounding";
-import type { Grounding } from "../studio/contracts";
+import type { Grounding, StudioSource } from "../studio/contracts";
 import type { SlideDeckComponent } from "../../src/artifacts/package";
 import { sourceLabel } from "../../src/studio/api";
 
@@ -64,6 +64,21 @@ function toArtifact(row: Row): SlideDeckArtifact {
   };
 }
 
+const FILE_LIKE = /\.[\w]{2,5}$|^[a-z]+\d*[-_][\w-]+$/i;
+
+function humanSlideTitle(source: StudioSource, objective: string, used: Set<string>): string {
+  const firstSentence = source.excerpt.trim().split(/[.!?]/, 1)[0]?.trim() ?? "";
+  const claimText = firstSentence.split(/\s+/).filter(Boolean).slice(0, 12).join(" ");
+  const base = claimText && !FILE_LIKE.test(claimText) ? claimText : objective;
+  const stem = (base || "Course evidence").slice(0, 120);
+  let title = stem;
+  if (used.has(title)) title = `${stem.slice(0, 100)} · ${source.location}`.slice(0, 120);
+  let suffix = 2;
+  while (used.has(title)) title = `${stem.slice(0, 100)} · ${source.location} (${suffix++})`.slice(0, 120);
+  used.add(title);
+  return title;
+}
+
 function buildComponent(grounding: Grounding, templateId: string, objective: string): SlideDeckComponent {
   const refs: string[] = [];
   const retrieved = new Map<string, string>();
@@ -71,19 +86,20 @@ function buildComponent(grounding: Grounding, templateId: string, objective: str
     refs.push(source.ref);
     retrieved.set(source.ref, source.excerpt);
   }
+  const usedTitles = new Set<string>([grounding.focus]);
   const slides: SlideDeckComponent["slides"] = [{ role: "title", title: grounding.focus, claims: [] }];
   for (const source of grounding.sources.slice(0, 5)) {
     const excerpt = sanitizeCourseText(source.excerpt).slice(0, 3000);
     slides.push({
       role: "mechanism",
-      title: source.title.slice(0, 120) || "Course evidence",
+      title: humanSlideTitle(source, objective, usedTitles),
       claims: [{
         claim: excerpt.slice(0, 500),
         sourceRef: source.ref,
         excerpt,
         relationship: "direct",
       }],
-      notes: source.location,
+      notes: [source.title, source.location].filter(Boolean).join(" · "),
     });
   }
   if (slides.length < 2) slides.push({ role: "summary", title: "Review", claims: [], notes: "Recall the key idea in your own words." });
