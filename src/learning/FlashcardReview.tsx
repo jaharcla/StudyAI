@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RotateCcw, X } from "lucide-react";
 import { API } from "../api";
+import { useDialogFocus } from "../components/useDialogFocus";
 
 type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string };
 type Rating = "Again" | "Hard" | "Good" | "Easy";
@@ -10,6 +11,8 @@ export default function FlashcardReview({ courseId, lessonId, close }: { courseI
   const [revealed, setRevealed] = useState(false);
   const [status, setStatus] = useState("");
   const [nextDue, setNextDue] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(true, dialogRef);
 
   useEffect(() => {
     let live = true;
@@ -48,7 +51,7 @@ export default function FlashcardReview({ courseId, lessonId, close }: { courseI
 
   return (
     <div className="modal-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-      <section className="settings-modal" role="dialog" aria-label="Flashcard review" aria-modal="true" data-testid="flashcard-review" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} tabIndex={-1} className="settings-modal" role="dialog" aria-label="Flashcard review" aria-modal="true" data-testid="flashcard-review" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <div><span className="eyebrow">SPACED REVIEW</span><h2>Flashcards</h2></div>
           <button className="icon-button" onClick={close} aria-label="Close flashcard review"><X size={18} /></button>

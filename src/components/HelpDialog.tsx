@@ -1,9 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CircleHelp, Settings2, X } from "lucide-react";
+import { useDialogFocus } from "./useDialogFocus";
 
 type Props = { onClose: () => void; onOpenSettings: () => void; onOpenCanvas: () => void };
 
 export default function HelpDialog({ onClose, onOpenSettings, onOpenCanvas }: Props) {
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(true, dialogRef);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -12,7 +16,7 @@ export default function HelpDialog({ onClose, onOpenSettings, onOpenCanvas }: Pr
 
   return (
     <div className="modal-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="settings-modal help-modal" role="dialog" aria-label="StudyAI help" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} tabIndex={-1} className="settings-modal help-modal" role="dialog" aria-label="StudyAI help" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <div><span className="eyebrow">GUIDE</span><h2>StudyAI help</h2></div>
           <button className="icon-button" onClick={onClose} aria-label="Close help"><X size={18} /></button>

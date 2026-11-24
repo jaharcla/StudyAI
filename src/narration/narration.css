@@ -5,6 +5,7 @@
   z-index: 12;
   width: auto;
   height: auto;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -54,18 +55,18 @@
 .narration-panel header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .narration-panel header div { display: flex; flex-direction: column; }
 .narration-panel header strong { font-size: 13px; }
-.narration-panel header span { color: #737b86; font-size: 11px; }
+.narration-panel header span { color: #5f6670; font-size: 11px; }
 .narration-notice { margin: 0; padding: 7px 9px; border-radius: 6px; background: #fff7e6; color: #8a5a15; }
 .narration-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.narration-controls button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+.narration-controls button { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
 .narration-controls .button-primary { border: 1px solid #8a4f31; background: #8a4f31; color: #fff; }
 .narration-controls .button-soft { border: 1px solid #dedfe3; background: #fff; color: #4b515b; }
 .narration-controls button:disabled { opacity: .5; cursor: not-allowed; }
-.narration-controls label { margin-left: auto; color: #737b86; }
+.narration-controls label { margin-left: auto; color: #5f6670; }
 .narration-controls select { margin-left: 4px; padding: 3px 5px; border: 1px solid #dedfe3; border-radius: 5px; background: #fff; font: inherit; }
 .narration-progress { display: flex; gap: 5px; }
-.narration-progress button { flex: 1; height: 4px; padding: 0; border: 0; border-radius: 3px; background: #e6e8eb; cursor: pointer; }
-.narration-progress button.current { background: #d97706; }
+.narration-progress button { --narration-bar: #e6e8eb; flex: 1; height: 44px; padding: 0; border: 0; background: linear-gradient(to bottom, transparent 19px, var(--narration-bar) 19px, var(--narration-bar) 23px, transparent 23px); cursor: pointer; }
+.narration-progress button.current { --narration-bar: #d97706; }
 .narration-caption {
   margin: 0;
   min-height: 62px;
@@ -93,10 +94,10 @@
 }
 .narration-transcript button:hover { background: #f8f6f2; }
 .narration-transcript button[data-active="true"] { border-left-color: #d97706; background: #fff8ed; }
-.narration-cue-index { flex: 0 0 18px; color: #a1a7b0; font-variant-numeric: tabular-nums; }
+.narration-cue-index { flex: 0 0 18px; color: #646b76; font-variant-numeric: tabular-nums; }
 .narration-cue-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .narration-cue-label { font-weight: 700; }
-.narration-cue-text { color: #5f6670; }
+.narration-cue-text { color: #4d5460; }
 .narration-grounding, .narration-source {
   align-self: flex-start;
   padding: 1px 6px;
@@ -108,5 +109,5 @@
 .narration-grounding.general { background: #eaf1fb; color: #355b8e; }
 .narration-grounding.generated { background: #fff1dd; color: #8a5a15; }
 .narration-grounding.no-evidence { background: #fdeaea; color: #9b3030; }
-.narration-source { background: #f0f0f2; color: #5f6670; margin-left: 4px; }
-.narration-panel footer { color: #9a9fa8; font-size: 10px; }
+.narration-source { background: #f0f0f2; color: #4d5460; margin-left: 4px; }
+.narration-panel footer { color: #5f6670; font-size: 10px; }
