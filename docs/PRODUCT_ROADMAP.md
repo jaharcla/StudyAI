@@ -98,11 +98,12 @@ Also entering wave 2 after wave 1 UI work: course/lesson creation dialog and nav
 
 - Cross-course review queue and portable course export/import.
 - Per-node artifact editing, simulations, voice tutoring, learning plans.
+- **Voice/audio transcription candidate:** [FunASR](https://mcpmarket.com/server/funasr-1) (ModelScope, MIT, self-hostable, OpenAI-compatible API, 50+ languages, diarization, streaming). Investigate in the voice-tutoring phase, not now: it needs a reuse ADR, a local model/GPU footprint decision, and a transcript-as-course-source provenance contract before any UI work. No API key or paid service is approved. See also [Magic](https://github.com/21st-dev/magic-mcp) — UI component generation is not a theme authority and stays unused until a visual direction is chosen and `DESIGN.md` exists.
 - Hosted services only with explicit approval; BYOK/local-first stays the architecture.
 
 ## Integration rules (binding)
 
-- One worktree and one branch per worker; never a shared checkout. Main has uncommitted verify work from a separate session — do not touch it.
+- One worktree and one branch per worker; never a shared checkout. Main is clean; merge in the coordinator's order and re-verify after each merge.
 - Workers are native thread agents only. No subagents of any kind, and no Groq-hosted models anywhere in the worker tree. A worker that needs parallel help reports to the coordinator instead.
 - Unique port quad per worktree (see each worker prompt); stagger full Playwright and benchmark runs to avoid shared provider budget flakes.
 - No paid services or API costs without approval. Local Ollama / deterministic mocks are the default.
