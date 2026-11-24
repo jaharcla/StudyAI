@@ -35,6 +35,13 @@ export type CoachPromptKind = "lab-hint" | "due-task" | "recommendation";
  * One item in the ranked stream. `urgency`, `boardMatch` inputs and `staleness` are numeric so
  * ranking stays deterministic and reproducible from the same local data.
  */
+export type CoachPlanBadge = {
+  date: string;
+  day: string;
+  step: number;
+  total: number;
+};
+
 export type CoachPrompt = {
   id: string;
   kind: CoachPromptKind;
@@ -49,6 +56,8 @@ export type CoachPrompt = {
   urgency: number;
   /** Higher means an older underlying signal; used only after urgency and board match. */
   staleness: number;
+  /** Display metadata only; never affects ranking. */
+  plan?: CoachPlanBadge | null;
 };
 
 export type CoachContext = {

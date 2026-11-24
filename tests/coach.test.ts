@@ -5,6 +5,7 @@ import {
   registerCoachProducer, selectCoachPrompt,
 } from "../src/coach/service.js";
 import { mapRecommendation, recommendationProducer } from "../src/coach/recommendationProducer.js";
+import { mapDailyPlanItem, dailyPlanProducer } from "../src/coach/dailyPlanProducer.js";
 import { studyPreparationResult } from "../src/coach/contract.js";
 
 const context: CoachContext = { courseId: "c", lessonId: "l1", boardId: "board1", boardRevision: 2 };
@@ -150,5 +151,47 @@ describe("recommendation producer adapter", () => {
     const second = await recommendationProducer.produce(context);
     expect(second).toEqual(first);
     expect(fetchMock).toHaveBeenCalledWith("/api/recommendations?course=c&lesson=l1");
+  });
+});
+
+describe("daily plan producer adapter", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const item = {
+    id: "review:k1", kind: "review", title: "Review Cell biology",
+    reason: "A review of Cell biology is due.", conceptId: "k1", concept: "Cell biology", lessonId: "l1",
+    source: { documentId: "d1", title: "Cell notes", page: 1, excerpt: "DNA lives in the nucleus." },
+    action: { kind: "study", courseId: "c", lessonId: "l1" },
+    priority: 108,
+    preparation: { cardId: "card1", dueAt: "2020-01-01T00:00:00.000Z", focus: "Cell biology" },
+  };
+  const dailyItem = (grounding: "cited" | "derived") => ({
+    ...item,
+    day: "2026-11-24",
+    grounding,
+  });
+
+  const planResponse = (items: unknown[]) => ({ date: "2026-11-24", courseId: "c", lessonId: "l1", items });
+
+  it("maps a cited item with a plan badge and unchanged citation", () => {
+    const mapped = mapDailyPlanItem(dailyItem("cited") as Parameters<typeof mapDailyPlanItem>[0], planResponse([dailyItem("cited"), { ...dailyItem("derived"), id: "practice:k2" }]) as Parameters<typeof mapDailyPlanItem>[1], context);
+    expect(mapped.id).toBe("daily-plan:2026-11-24:review:k1");
+    expect(mapped.plan).toEqual({ date: "2026-11-24", day: "2026-11-24", step: 1, total: 2 });
+    expect(mapped.source).toMatchObject({ title: "Cell notes", excerpt: "DNA lives in the nucleus." });
+  });
+
+  it("prefixes derived items and keeps source null", () => {
+    const mapped = mapDailyPlanItem({ ...dailyItem("derived"), source: null } as Parameters<typeof mapDailyPlanItem>[0], planResponse([{ ...dailyItem("derived"), source: null, id: "practice:k2" }]) as Parameters<typeof mapDailyPlanItem>[1], context);
+    expect(mapped.preview.startsWith("From your activity — ")).toBe(true);
+    expect(mapped.source).toBeNull();
+  });
+
+  it("fetches the lesson-scoped endpoint and is deterministic", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => planResponse([dailyItem("cited")]) })) as unknown as typeof fetch;
+    vi.stubGlobal("fetch", fetchMock);
+    const first = await dailyPlanProducer.produce(context);
+    const second = await dailyPlanProducer.produce(context);
+    expect(second).toEqual(first);
+    expect(fetchMock).toHaveBeenCalledWith("/api/daily-plans?course=c&lesson=l1");
   });
 });
