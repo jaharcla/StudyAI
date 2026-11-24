@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { Check, Quote } from "lucide-react";
-import { importPractice, sourceLabel, type PracticeContent } from "./api";
+import { Check, Play, Quote } from "lucide-react";
+import { importPractice, sourceLabel, type PracticeContent, type StudioArtifact } from "./api";
+import PracticeTestView from "../learning/PracticeTestView";
 
-export default function PracticeView({ artifactId, content, onOpenSource }: {
-  artifactId: string; content: PracticeContent; onOpenSource: (ref: string) => void;
+export default function PracticeView({ artifact, onOpenSource }: {
+  artifact: StudioArtifact; onOpenSource: (ref: string) => void;
 }) {
+  const content = artifact.content as PracticeContent;
   const [cards, setCards] = useState<Set<number>>(new Set(content.cards.map((_, index) => index)));
   const [questions, setQuestions] = useState<Set<number>>(new Set(content.questions.map((_, index) => index)));
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const toggle = (set: Set<number>, setter: (next: Set<number>) => void, index: number) => {
     const next = new Set(set);
@@ -19,7 +22,7 @@ export default function PracticeView({ artifactId, content, onOpenSource }: {
   const send = async () => {
     setBusy(true); setStatus("");
     try {
-      const result = await importPractice(artifactId, [...cards], [...questions]);
+      const result = await importPractice(artifact.id, [...cards], [...questions]);
       const parts = [`${result.cardsAdded} cards and ${result.questionsAdded} questions added to your review deck.`];
       if (result.errors.length) parts.push(result.errors.join(" "));
       setStatus(parts.join(" "));
@@ -30,13 +33,27 @@ export default function PracticeView({ artifactId, content, onOpenSource }: {
     }
   };
 
+  if (testing) {
+    return <div>
+      <div className="studio-practice-bar">
+        <button type="button" className="studio-toolbar-button" data-testid="back-to-practice" onClick={() => setTesting(false)}>Back to practice set</button>
+      </div>
+      <PracticeTestView artifact={artifact} courseId={artifact.courseId} lessonId={artifact.lessonId} onOpenSource={onOpenSource} />
+    </div>;
+  }
+
   return (
     <div className="studio-practice" data-testid="practice-view">
       <div className="studio-practice-bar">
         <span>{cards.size} cards · {questions.size} questions selected</span>
-        <button type="button" className="studio-primary" data-testid="import-practice" disabled={busy || (!cards.size && !questions.size)} onClick={() => void send()}>
-          <Check size={13} /> Add to study deck
-        </button>
+        <div className="studio-practice-actions">
+          {content.questions.length > 0 && <button type="button" className="studio-toolbar-button" data-testid="take-practice-test" onClick={() => setTesting(true)}>
+            <Play size={13} /> Take practice test
+          </button>}
+          <button type="button" className="studio-primary" data-testid="import-practice" disabled={busy || (!cards.size && !questions.size)} onClick={() => void send()}>
+            <Check size={13} /> Add to study deck
+          </button>
+        </div>
       </div>
       {status && <p className="studio-status" role="status">{status}</p>}
       {!content.cards.length && !content.questions.length && <p className="studio-muted">No practice items were generated.</p>}

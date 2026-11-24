@@ -9,7 +9,7 @@ import "./studio.css";
 import { SurfaceHeader, SurfaceNotice } from "../components/SurfaceChrome";
 import {
   acceptArtifact, generateArtifact, listArtifacts, type AcceptanceDecision, type MindMapContent,
-  type PracticeContent, type PracticeType, type StudioArtifact, type StudioKind, type StudyGuideContent,
+  type PracticeType, type StudioArtifact, type StudioKind, type StudyGuideContent,
   type InfographicContent,
 } from "./api";
 import MindMapView from "./MindMapView";
@@ -274,7 +274,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           {!busy && shown?.kind === "mind-map" && <MindMapView content={shown.content as MindMapContent} onOpenSource={onOpenSource} />}
           {!busy && shown?.kind === "study-guide" && <StudyGuideView content={shown.content as StudyGuideContent} onOpenSource={onOpenSource} />}
           {!busy && shown?.kind === "infographic" && <InfographicView content={shown.content as InfographicContent} onOpenSource={onOpenSource} />}
-          {!busy && shown?.kind === "practice" && <PracticeView artifactId={shown.id} content={shown.content as PracticeContent} onOpenSource={onOpenSource} />}
+          {!busy && shown?.kind === "practice" && <PracticeView artifact={shown} onOpenSource={onOpenSource} />}
         </div>
       </main>
     </div>

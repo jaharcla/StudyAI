@@ -1,4 +1,21 @@
-import { generateArtifact, importPractice, type PracticeType } from "../studio/api";
+import { generateArtifact, importPractice, type PracticeType, type StudioArtifact } from "../studio/api";
+
+/** One click from a lesson: a practice-test artifact with an answer key and a citation per question. */
+export async function makePracticeTest(input: { courseId: string; lessonId: string; focus: string; count?: number }): Promise<StudioArtifact> {
+  try {
+    return await generateArtifact({
+      courseId: input.courseId, lessonId: input.lessonId, kind: "practice",
+      focus: input.focus, practiceType: "quiz", count: input.count ?? 4,
+    });
+  } catch (error) {
+    const status = (error as { status?: number } | null)?.status;
+    const raw = error instanceof Error ? error.message : "";
+    if (status === 429 || /429|rate limit|502|503|fetch failed|network|isn't responding/i.test(raw)) {
+      throw new Error("The study assistant isn't responding right now. Your course material is unchanged. Try again in a moment.");
+    }
+    throw error instanceof Error ? error : new Error("Your practice test couldn't be made. Try again.");
+  }
+}
 
 export type MakePracticeInput = {
   courseId: string;
