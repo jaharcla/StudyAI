@@ -214,11 +214,13 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
   return <div className="modal-shade activity-library-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} tabIndex={-1} className="activity-library" role="dialog" aria-modal="true" aria-label="Learning activities">
       <header className="activity-library-head"><div><span className="eyebrow">THIS LESSON</span><h2>Learning activities</h2><p>Use a course-backed specification to create a structured canvas task.</p></div><div><button className="button-primary" disabled={busy} onClick={() => void startGuidedActivity()}>{busy ? "Working…" : "Start a guided activity"}</button><button className="icon-button" aria-label="Close activities" onClick={onClose}><X size={18} /></button></div></header>
-      <details>
-        <summary>Advanced</summary>
       <div className="activity-library-grid">
         <section className="activity-library-list"><h3>Saved activities</h3>{specs.length ? specs.map((row) => <article className="activity-list-row" key={row.id}><div><b>{row.title}</b><small>Version {row.version}</small></div><button className="button-soft" disabled={busy} onClick={() => void loadSpec(row.id)}>Inspect</button><button className="button-primary" disabled={busy} onClick={() => void start(row.id)}>Start</button></article>) : <p className="activity-muted">No activities for this lesson yet.</p>}
           <h3>Recent attempts</h3>{attempts.length ? attempts.map(({ attempt, activityTitle }) => <article className="activity-list-row" key={attempt.id}><div><b>{activityTitle}</b><small>{attempt.status} · {attempt.responses.length} checked</small></div><button className="button-soft" disabled={busy} onClick={() => void resume(attempt.id)}>Resume</button></article>) : <p className="activity-muted">Attempts appear here after you start an activity.</p>}
+        </section>
+        <details className="activity-advanced">
+          <summary>Advanced</summary>
+          <section>
           <h3>Course source</h3><div className="activity-source-search"><input aria-label="Search course sources" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void searchSource(); }} placeholder="Search indexed course material" /><button className="button-soft" disabled={!sourceQuery.trim()} onClick={() => void searchSource()}>Search</button></div>
           {sourceHits.map((hit) => <button className={`activity-source-hit ${selectedSource?.sourceRef === hit.sourceRef ? "selected" : ""}`} key={hit.sourceRef} onClick={() => void chooseSource(hit)}><b>{hit.title} · {hit.unitType} {hit.unitNumber}</b><span>{hit.excerpt}</span></button>)}
           {selectedSource && <div className="activity-template-actions"><button className="button-soft" onClick={() => insertTemplate("force")}>Use in force template</button><button className="button-soft" onClick={() => insertTemplate("graph")}>Use in graph template</button></div>}
@@ -229,8 +231,8 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
           {notice && <p className="activity-notice" role="status">{notice}</p>}{error && <p className="activity-error" role="alert">{error}</p>}
           {preview && <div className="activity-preview"><b>{preview.spec.title}</b><small>{preview.document.objects.length} generated canvas objects · {preview.spec.objectives.length} objectives · {preview.spec.tasks.length} tasks</small><div className="activity-preview-objects">{preview.document.objects.map((object) => <span key={object.id}>{object.label || object.kind}{object.kind === "measurement" ? ` · ${object.value} ${object.units}` : ` · ${object.kind}`}</span>)}</div><ol>{preview.spec.tasks.map((task) => <li key={task.id}>{task.prompt}</li>)}</ol></div>}
         </section>
+        </details>
       </div>
-      </details>
     </section>
   </div>;
 }
