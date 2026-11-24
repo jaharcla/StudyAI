@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { pageBounds, Store } from "@quickdrawjs/core";
+import { Store, hitShape, pageBounds, type Diff, type DiffSource, type ShapeRecord } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
@@ -32,6 +32,7 @@ import type { CanvasSceneNode } from "./spatial/types";
 import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
 import { captureQuickdrawOCRRegions } from "./ocr-capture.js";
 import { NarrationPanel } from "./NarrationPanel";
+import { readPalmRejection, writePalmRejection, smoothCapturedPressure, smoothPenTrail, isScratchOut, isCircle, type PenPoint2D, type CircleGesture } from "./pen-input.js";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -51,6 +52,79 @@ const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (sou
 // ending an active pointer session; match the set so we can close it first.
 const TOOL_KEYS = new Set(["v", "1", "h", "d", "p", "b", "i", "e", "k", "a", "l", "t", "n", "g", "r", "o"]);
 
+// Smoothing is applied once, at the documented onChange boundary when Quickdraw
+// marks a draw stroke done. The write uses Store.update inside the still-open
+// gesture batch (store.js:99-120,170-182), so undo stays one step and no document
+// is written directly. The guard stops the resulting diff from re-entering.
+function smoothCompletedInk(diff: Diff, editor: Editor, guard: { current: boolean }) {
+  if (guard.current) return;
+  let completed: ShapeRecord | undefined;
+  for (const [, pair] of Object.entries(diff.updated ?? {})) {
+    const next = pair[1];
+    if (next?.typeName === "shape" && next.type === "draw" && next.props?.done === true) { completed = next; break; }
+  }
+  if (!completed) return;
+  const pts = completed.props.pts;
+  if (!Array.isArray(pts) || pts.length < 9 || !pts.every((value) => typeof value === "number" && Number.isFinite(value))) return;
+  const smoothed = smoothCapturedPressure(pts);
+  if (smoothed.every((value, index) => value === pts[index])) return;
+  guard.current = true;
+  try { editor.store.update(completed.id, { props: { pts: smoothed } }); }
+  finally { guard.current = false; }
+}
+
+/**
+ * Apply a recognised pen gesture through Quickdraw's own documented APIs.
+ * `Store.transact`/`remove` and `Editor.setSelection` keep undo, persistence and
+ * selection ownership where they already live; no document is written directly.
+ */
+function topInkId(editor: Editor): string | undefined {
+  return editor.store.shapes().filter((shape) => shape.type === "draw").sort((a, b) => b.z - a.z)[0]?.id;
+}
+
+function applyPenGesture(kind: "scratch" | "circle", points: PenPoint2D[], circle: CircleGesture | null, editor: Editor) {
+  const shapes = editor.store.shapes();
+  // The gesture stroke Quickdraw committed on this pointer-up is the topmost ink.
+  const gestureId = topInkId(editor);
+  if (kind === "scratch") {
+    const ids = new Set<string>();
+    const tolerance = 8 / editor.camera.z;
+    // hitShape (not hitTest): hitTest only returns the topmost shape, which is
+    // the scratch stroke itself; we need every stroke the scribble crosses.
+    for (const shape of shapes) {
+      if (shape.id === gestureId) continue;
+      if (points.some((point) => hitShape(shape, point.x, point.y, tolerance, editor.store))) ids.add(shape.id);
+    }
+    if (gestureId) ids.add(gestureId);
+    if (ids.size) editor.store.transact(() => editor.store.remove([...ids]));
+    return;
+  }
+  if (!circle) return;
+  if (gestureId) editor.store.remove([gestureId]);
+  const enclosed = editor.store.shapes().filter((shape) => {
+    const bounds = pageBounds(shape);
+    return [[bounds.x, bounds.y], [bounds.x + bounds.w, bounds.y], [bounds.x, bounds.y + bounds.h], [bounds.x + bounds.w, bounds.y + bounds.h]]
+      .every(([x, y]) => Math.hypot(x - circle.center.x, y - circle.center.y) <= circle.radius);
+  }).map((shape) => shape.id);
+  editor.setSelection(enclosed);
+}
+
+/** Pull the most likely LaTeX reading out of the existing analysis evidence.
+ * OCR evidence is preferred; an explicit model statement is the fallback. */
+function latexFromAnalysis(analysis: CanvasAnalysisResult): string {
+  const ocr = analysis.observedEvidence.items.find((item) => item.origin === "ocr" && item.text.trim());
+  const statement = analysis.inferredInterpretations.items.find((item) => item.statement.trim())?.statement;
+  let text = (ocr?.text ?? statement ?? "").trim();
+  // Some OCR providers surface a JSON payload as the evidence text.
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text) as { items?: Array<{ text?: string }> };
+      text = parsed.items?.find((item) => typeof item.text === "string")?.text ?? text;
+    } catch { /* keep the raw reading */ }
+  }
+  return text.trim().slice(0, 500) || "\\text{unread handwriting}";
+}
+
 export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, onSelectedObject, preferredBoardId, onBoardState, activityMode = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
@@ -65,6 +139,20 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const revisions = useRef(new Map<string, number>());
   const skipQuickdrawSave = useRef<unknown>(undefined);
+  // Guards the documented Store.update smoothing write so its own diff cannot recurse.
+  const pressureSmoothing = useRef(false);
+  const [palmRejection, setPalmRejection] = useState(readPalmRejection);
+  const palmRejectionRef = useRef(palmRejection);
+  palmRejectionRef.current = palmRejection;
+  const activePenPointer = useRef<number | null>(null);
+  // A cancelled pen ends the session but Quickdraw arms penMode only once, so we
+  // disarm it until the next pen contact instead of leaving touch blocked forever.
+  const rearmPenModeOnNextPen = useRef(false);
+  const gestureTrail = useRef<PenPoint2D[]>([]);
+  const gesturePointerId = useRef<number | null>(null);
+  const [lastPenGesture, setLastPenGesture] = useState<"none" | "scratch" | "circle">("none");
+  const gestureStartedAt = useRef(0);
+  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
   const boardElement = useRef<HTMLDivElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const [boards, setBoards] = useState<Board[]>([]);
@@ -371,7 +459,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     return { revision: row.revision, document: persistedDocument };
   }, [courseId, currentDocument, lessonId]);
 
-  const analyzeBoard = useCallback(async () => {
+  const analyzeBoard = useCallback(async (onResult?: (analysis: CanvasAnalysisResult) => void) => {
     const board = boardRef.current;
     const editor = editorRef.current;
     if (!board || !editor || loading || analysisBusy || proposalBusy) return;
@@ -399,6 +487,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       setCanvasAnalysis(body.analysis);
       setAnalysisTelemetry(body.telemetry);
       onStatus(body.analysis.omittedRegions.length ? `Canvas analysis is partial; ${body.analysis.omittedRegions.length} ink region(s) were omitted.` : body.analysis.analysisStatus === "partial" ? "Canvas analysis is partial; some ink regions may be unprocessed." : "Canvas analysis is ready for the Tutor");
+      onResult?.(body.analysis);
     } catch (error) {
       setCanvasAnalysis(undefined);
       setAnalysisTelemetry(undefined);
@@ -709,13 +798,51 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       setSelectedShapeIds([...editor.selection]);
       if (editor.selection.size) setSelectedId(undefined);
     });
-    editorListeners.current.push(unlistenHistory, unlistenCamera, unlistenTool, unlistenSelection);
+    // Quickdraw auto-arms pen mode on the first stylus contact (editor.js:451-455).
+    // When the user opted out, undo that arm through the same public API — the
+    // documented penmode event is the only place it can be caught without patching.
+    const unlistenPenMode = editor.on("penmode", () => {
+      if (!palmRejectionRef.current && editor.penMode) editor.setPenMode(false);
+    });
+    editorListeners.current.push(unlistenHistory, unlistenCamera, unlistenTool, unlistenSelection, unlistenPenMode);
     setEditorFrame((frame) => frame + 1);
     refreshHistory();
   }, [refreshHistory]);
 
-  const handleQuickdrawChange = useCallback((_diff: unknown, source: string, editor: Editor) => {
+  const togglePalmRejection = useCallback((on: boolean) => {
+    setPalmRejection(on);
+    palmRejectionRef.current = on;
+    writePalmRejection(on);
+    if (!on) editorRef.current?.setPenMode(false);
+  }, []);
+
+  // Double-tap does not touch the document: it runs the same OCR/analysis
+  // request as the Analyze button and turns the result into an approval-gated
+  // object proposal. Declining simply clears the proposal.
+  const requestHandwritingLatex = useCallback((point: PenPoint2D) => {
+    const board = boardRef.current;
+    if (!board || loading || analysisBusy || proposalBusy) return;
+    onStatus("Reading double-tapped handwriting…");
+    void analyzeBoard((analysis) => {
+      try {
+        const latex = latexFromAnalysis(analysis);
+        const context = { boardId: board.id, courseId, lessonId, revision: board.revision, objects: documentRef.current.objects };
+        setObjectProposal(proposeCanvasObject(context, {
+          boardId: board.id,
+          kind: "equation",
+          x: point.x,
+          y: point.y,
+          fieldsJson: JSON.stringify({ expression: latex }),
+          reason: `Double-tapped handwriting read as LaTeX: ${latex}. Review before adding it to the board.`,
+        }));
+        onStatus("LaTeX proposal ready for review");
+      } catch (error) { onStatus(error instanceof Error ? error.message : "Could not build the LaTeX proposal"); }
+    });
+  }, [analyzeBoard, analysisBusy, courseId, lessonId, loading, proposalBusy, onStatus]);
+
+  const handleQuickdrawChange = useCallback((diff: Diff, source: DiffSource, editor: Editor) => {
     if (source !== "user") return;
+    smoothCompletedInk(diff, editor, pressureSmoothing);
     if (skipQuickdrawSave.current) {
       const expected = skipQuickdrawSave.current;
       skipQuickdrawSave.current = undefined;
@@ -963,6 +1090,9 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         <label className="canvas-egress" title="When on, cropped ink images may be sent to the configured cloud OCR providers. When off, ink images stay on this device and text-only analysis continues.">
           <input type="checkbox" checked={allowImageEgress} onChange={(event) => { const next = event.target.checked; setAllowImageEgress(next); try { localStorage.setItem("studyai.canvas.imageEgress", next ? "on" : "off"); } catch { /* storage unavailable */ } }} />Cloud ink OCR
         </label>
+        <label className="canvas-palm" title="Once a stylus is seen, resting palms (touch pointers) stop drawing. Mouse input is never affected.">
+          <input type="checkbox" aria-label="Palm rejection" checked={palmRejection} onChange={(event) => togglePalmRejection(event.target.checked)} />Palm rejection
+        </label>
         {canvasAnalysis && analysisTelemetry && <output className="canvas-analysis-meta" title={analysisTelemetry.usage.length ? analysisTelemetry.usage.map((entry) => `${entry.provider}: ${entry.calls} call(s), ${entry.promptTokens + entry.completionTokens} tokens, $${entry.costUsd.toFixed(6)}`).join("\n") : "No cloud provider calls; deterministic and local stages only."}>
           {(analysisTelemetry.totalMs / 1000).toFixed(1)} s Â· {analysisTelemetry.usage.length ? `$${analysisTelemetry.usage.reduce((sum, entry) => sum + entry.costUsd, 0).toFixed(4)}` : "local only"}
         </output>}
@@ -982,9 +1112,81 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         return tools.length ? <section className="palette-group" key={group}><h2>{group}</h2>{tools.map((tool) => <button key={tool.id} className="palette-tool" title={tool.description} onClick={() => void useTool(tool)}><span className="palette-tool-icon" aria-hidden="true">{tool.group === "Draw" ? <span>{tool.label.slice(0, 1)}</span> : tool.id === "molecule" ? <Atom size={14} /> : tool.id.startsWith("linked-") ? <Link2 size={14} /> : tool.id === "concept" ? <BookOpen size={14} /> : <Plus size={14} />}</span><span>{tool.label}</span></button>)}</section> : null;
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
-      <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} onPointerDownCapture={(event) => {
+      <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} data-selected-shape-ids={selectedShapeIds.join(",")} data-last-pen-gesture={lastPenGesture} onPointerDownCapture={(event) => {
+        if (event.pointerType === "pen") {
+          activePenPointer.current = event.pointerId;
+          if (rearmPenModeOnNextPen.current && palmRejection) {
+            rearmPenModeOnNextPen.current = false;
+            editorRef.current?.setPenMode(true);
+          }
+        }
+        // Explicit pointerType filtering complements Quickdraw's penMode gate:
+        // a palm landing mid-stroke never even reaches the editor's listeners.
+        if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) { event.stopPropagation(); return; }
         if ((event.target as HTMLElement).closest(".quickdraw-native") && !(event.target as HTMLElement).closest("button,input,textarea,select") && event.button === 0) { nativeGesture.current = structuredClone(currentDocument()); setSelectedId(undefined); }
-      }} onPointerUpCapture={finishNativeGesture} onPointerCancelCapture={() => { nativeGesture.current = null; }} onKeyDownCapture={(event) => {
+        const editor = editorRef.current;
+        if (editor && (editor.tool === "draw" || editor.tool === "highlight") && event.button === 0) {
+          const rect = editor.container.getBoundingClientRect();
+          const page = editor.screenToPage(event.clientX - rect.left, event.clientY - rect.top);
+          gestureTrail.current = [{ x: page.x, y: page.y, pointerType: event.pointerType, pressure: event.pressure }];
+          gesturePointerId.current = event.pointerId;
+          gestureStartedAt.current = Date.now();
+        }
+      }} onPointerMoveCapture={(event) => {
+        if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) event.stopPropagation();
+        const editor = editorRef.current;
+        if (!editor || gesturePointerId.current !== event.pointerId) return;
+        const rect = editor.container.getBoundingClientRect();
+        const page = editor.screenToPage(event.clientX - rect.left, event.clientY - rect.top);
+        gestureTrail.current.push({ x: page.x, y: page.y, pointerType: event.pointerType, pressure: event.pressure });
+      }} onPointerUpCapture={(event) => {
+        if (activePenPointer.current === event.pointerId) activePenPointer.current = null;
+        const trail = gestureTrail.current;
+        const pointerId = gesturePointerId.current;
+        gestureTrail.current = [];
+        gesturePointerId.current = null;
+        const editor = editorRef.current;
+        if (editor && pointerId === event.pointerId) {
+          if (trail.length >= 6) {
+            const smoothed = smoothPenTrail(trail);
+            const circle = isCircle(smoothed);
+            const kind = circle ? "circle" : isScratchOut(smoothed) ? "scratch" : null;
+            setLastPenGesture(kind ?? "none");
+            // Quickdraw commits the stroke in its own pointerup handler, which runs
+            // after this capture phase; a microtask lands after that commit but
+            // before finishNativeGesture's timeout closes the history snapshot.
+            if (kind) queueMicrotask(() => applyPenGesture(kind, smoothed, circle, editor));
+          }
+          const travelled = trail.reduce((sum, point, index) => index ? sum + Math.hypot(point.x - trail[index - 1].x, point.y - trail[index - 1].y) : 0, 0);
+          const end = trail[trail.length - 1];
+          if (end && trail.length <= 4 && travelled < 12 && Date.now() - gestureStartedAt.current < 400) {
+            const now = Date.now();
+            const previousTap = lastTap.current;
+            // A tap is a probe, not a mark: remove the dot Quickdraw just drew
+            // so declining the proposal leaves the saved document untouched.
+            const dot = topInkId(editor);
+            if (dot) editor.store.remove([dot]);
+            if (previousTap && now - previousTap.time < 350 && Math.hypot(end.x - previousTap.x, end.y - previousTap.y) < 40) {
+              lastTap.current = null;
+              requestHandwritingLatex(end);
+            } else {
+              lastTap.current = { time: now, x: end.x, y: end.y };
+            }
+          }
+        }
+        finishNativeGesture();
+      }} onPointerCancelCapture={(event) => {
+        if (activePenPointer.current === event.pointerId) {
+          activePenPointer.current = null;
+          if (palmRejection) {
+            rearmPenModeOnNextPen.current = true;
+            editorRef.current?.setPenMode(false);
+          }
+        }
+        nativeGesture.current = null;
+        gestureTrail.current = [];
+        gesturePointerId.current = null;
+      }} onKeyDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
         if (nativeGesture.current && TOOL_KEYS.has(event.key.toLowerCase())) cancelNativeGesture();
         if (event.code === "Space") setSpaceHeld(true);
