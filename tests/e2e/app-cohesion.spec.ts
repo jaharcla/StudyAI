@@ -156,8 +156,9 @@ test("changing lesson closes stale surfaces and clears cached context", async ({
 test("surface entries are disabled without a course or lesson", async ({ page }) => {
   const course = await createCourse(page.request, `Cohesion empty ${Date.now()}`);
   await openCourse(page, course.title);
+  const concepts = page.getByTestId("open-concept-graph");
+  await expect(concepts).toBeEnabled();
   const entries = [
-    page.getByTestId("open-concept-graph"),
     page.getByTitle("Open StudyAI Studio"),
     page.getByTitle("Open Artifacts"),
     page.getByRole("button", { name: "Study", exact: true }),

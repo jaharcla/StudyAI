@@ -475,7 +475,7 @@ function Workspace() {
       <header className="topbar">
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
         <div className="immersive-actions">
-          <button disabled={!course.id || !lessonId} data-testid="open-concept-graph" onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
+          <button disabled={!course.id} data-testid="open-concept-graph" onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
           <button className="primary" disabled={!course.id || !lessonId} onClick={() => setMode("studio")} title="Open StudyAI Studio"><Sparkles size={15} /> Studio</button>
           <button disabled={!course.id || !lessonId} onClick={() => setMode("artifacts")} title="Open Artifacts"><Layers size={15} /> Artifacts</button>
           <button disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
