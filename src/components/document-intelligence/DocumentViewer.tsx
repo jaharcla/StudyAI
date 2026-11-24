@@ -16,6 +16,8 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
   const [document, setDocument] = useState<DocumentData>();
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [citedPassage, setCitedPassage] = useState<string>();
+  const [citationError, setCitationError] = useState("");
   const [currentPage, setCurrentPage] = useState(source?.unitNumber ?? 1);
   const [pageCount, setPageCount] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -35,7 +37,15 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
 
   useEffect(() => {
     if (source) setCurrentPage(source.unitNumber);
-  }, [sourceRef]);
+    setCitedPassage(undefined);
+    setCitationError("");
+    if (!sourceRef || !source) return;
+    let active = true;
+    requestJson<{ content: string }>(`${DOCUMENT_API}/source?course=${encodeURIComponent(courseId)}&ref=${encodeURIComponent(sourceRef)}`)
+      .then((value) => { if (active && value.content) setCitedPassage(value.content); })
+      .catch(() => { if (active) setCitationError("That cited passage is no longer available in this course."); });
+    return () => { active = false; };
+  }, [sourceRef, courseId]);
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -46,8 +56,8 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
   }, []);
 
   const matches = useMemo<Match[]>(() => {
-    return findDocumentMatches(document, query);
-  }, [document, query]);
+    return findDocumentMatches(document, citedPassage ?? query);
+  }, [document, query, citedPassage]);
 
   useEffect(() => setMatchIndex(0), [query]);
   const activeMatch = matches[matchIndex];
@@ -70,7 +80,7 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
     if (matches.length) setMatchIndex((index) => nextMatchIndex(index, direction, matches.length));
   };
   const highlight = (text: string) => {
-    const trimmed = query.trim();
+    const trimmed = (citedPassage ?? query).trim();
     if (!trimmed) return escapeHtml(text);
     const pattern = new RegExp("(" + escapeRegex(trimmed) + ")", "gi");
     return escapeHtml(text).replace(pattern, "<mark>$1</mark>");
@@ -88,13 +98,15 @@ export function DocumentViewer({ documentId, courseId, sourceRef, onClose }: Pro
           <button className="di-icon-button" onClick={onClose} aria-label="Close preview"><X size={18} /></button>
         </header>
         <div className="di-viewer-tools">
-          <label className="di-view-search"><Search size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find in document" /><span>{matches.length ? (matchIndex + 1) + "/" + matches.length : query ? "0 matches" : ""}</span></label>
+          <label className="di-view-search"><Search size={14} /><input value={query} onChange={(event) => { setQuery(event.target.value); setCitedPassage(undefined); setCitationError(""); }} placeholder="Find in document" /><span>{matches.length ? (matchIndex + 1) + "/" + matches.length : query ? "0 matches" : ""}</span></label>
           <button className="di-tool-button" disabled={!matches.length} onClick={() => nextMatch(-1)} aria-label="Previous match"><ChevronLeft size={15} /></button>
           <button className="di-tool-button" disabled={!matches.length} onClick={() => nextMatch(1)} aria-label="Next match"><ChevronRight size={15} /></button>
           {isPdf && <><span className="di-tool-divider" /><button className="di-tool-button" onClick={() => setZoom((value) => Math.max(.55, value - .1))} aria-label="Zoom out"><Minus size={15} /></button><span className="di-zoom-label">{Math.round(zoom * 100)}%</span><button className="di-tool-button" onClick={() => setZoom((value) => Math.min(1.6, value + .1))} aria-label="Zoom in"><Plus size={15} /></button></>}
         </div>
         <div ref={bodyRef} className="di-viewer-body" data-document-viewer-body>
           {error && <div className="di-error">{error}</div>}
+          {citationError && <div className="di-error" data-testid="citation-error">{citationError}</div>}
+          {citedPassage && <div className="di-cited-passage" data-testid="cited-passage"><span>Cited passage</span><blockquote><mark>{citedPassage}</mark></blockquote></div>}
           {!document && !error && <div className="di-loading">Opening document…</div>}
           {document && isPdf && <div className="di-pdf-canvas">
             <PdfDocument file={DOCUMENT_API + "/documents/" + encodeURIComponent(documentId) + "/file?course=" + encodeURIComponent(courseId)} onLoadSuccess={({ numPages }) => { setPageCount(numPages); setCurrentPage((page) => Math.min(page, numPages)); }} onLoadError={(reason) => setError(reason.message)} loading="Loading PDF…" error="Could not render this PDF.">
