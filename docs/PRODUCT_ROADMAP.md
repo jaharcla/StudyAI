@@ -128,4 +128,6 @@ Tracked in the channel; this table is updated when work lands.
 
 **Resolved 2026-11-23 — recommendations UX:** the primary Continue action prepares the target state (board or study session with the next exercise or material already loaded), with a short preview line stating what will be prepared. It is not a bare navigation link. The existing ranked list stays as secondary suggestions; progress numbers and weak-concept / due-review links stay. Hierarchy changes only, no functionality removed.
 
+**Resolved 2026-11-23 — one unified Coach (binding wave-2 requirement):** there is one Coach surface, not three attention surfaces. The recommendation Continue card, lab-partner hints, and due re-draw tasks are inputs to a single ranked prompt stream that emits at most one prompt at a time. The Coach follows the student across surfaces: a prompt carries a target, and activating it prepares the board, study session, or lesson state in the destination, then surfaces the Coach there. No separate hint card, next-action card, or due-task card may be built as a competing surface. Each owning feature keeps its deterministic logic and provenance; only the presentation and activation are unified.
+
 None open yet. A decision will be raised when the artifact-broadening spec needs a choice between self-hosted rendering engines or when a new provider would introduce cost.
