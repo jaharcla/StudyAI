@@ -57,6 +57,39 @@ describe("generateSlideDeck", () => {
     expect(artifact.content.slides[1].claims[0].claim).toBe("For ν ≥ ν₀, electrons were ejected.");
   });
 
+  it("uses a human slide title instead of the imported filename and keeps provenance", async () => {
+    const filename = "c120-module5.pdf";
+    const excerpt = "Quantum theory describes quantized energy levels.";
+    const text = `# Quantum theory\n# Quantum theory describes quantized energy levels\n${excerpt}\n> Source: text 4`;
+    const { db, deps } = setup([text]);
+    deps.ground = vi.fn(() => ({
+      ...grounding,
+      focus: "Quantum theory",
+      sources: [{ ...grounding.sources[0], title: filename, location: "page 5", excerpt }],
+    }));
+    const artifact = await generateSlideDeck(db, { ...input, focus: "Quantum theory" }, deps);
+    const [titleSlide, evidence] = artifact.content.slides;
+    expect(titleSlide.title).toBe("Quantum theory");
+    expect(evidence.title).not.toBe(filename);
+    expect(evidence.title).toBe("Quantum theory describes quantized energy levels");
+    expect(evidence.notes).toBe(`${filename} · page 5`);
+    expect(evidence.claims[0].sourceRef).toBe(REF);
+    expect(evidence.claims[0].excerpt).toBe(excerpt);
+  });
+
+  it("falls back to the lesson objective when the evidence text looks like a filename", async () => {
+    const filename = "c120-module5";
+    const text = `# Quantum theory\n# Quantum theory\n${filename}\n> Source: text 4`;
+    const { db, deps } = setup([text]);
+    deps.ground = vi.fn(() => ({
+      ...grounding,
+      focus: "Quantum theory",
+      sources: [{ ...grounding.sources[0], title: filename, excerpt: filename }],
+    }));
+    const artifact = await generateSlideDeck(db, { ...input, focus: "Quantum theory" }, deps);
+    expect(artifact.content.slides[1].title).toBe("Quantum theory · text 4");
+  });
+
   it("fails generation when the rendered deck contains truncated fields", async () => {
     const { db, deps } = setup([goodText]);
     deps.inspect = vi.fn(async () => [{ title: "Solving Linked Models by", body: "This method is useful in bioenginee" }]);
