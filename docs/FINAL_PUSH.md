@@ -33,7 +33,8 @@ Reliability: PDF worker now loads as a Vite asset (`19f9533`); smoke clicks ever
 
 - Reliability sweep, Today/daily plans, Tutor trust, Shared library: finished and merged or reviewed; threads `1574910108671148052`, `1574910341085794476`, `1574919601777803324`, `1574921923337650296`.
 - Studio parity: stopped after two non-implementations; only doc `cda98ba`, not merged. Thread `1574919600615723039`.
-- Next: Tutor depth (J2) and practice-test/study loop (J3/J5) workers.
+- Tutor depth (J2): `work/tutor-depth-20261124`, thread `1574927116963938467`, ports 5707/8723/8724/8617. Running; Playwright first.
+- Study loop (J3/J5): `work/study-loop-20261124`, thread `1574927166859378699`, ports 5708/8725/8726/8618. Running; holds Playwright until Tutor is clear.
 
 ## Integrations checked
 
