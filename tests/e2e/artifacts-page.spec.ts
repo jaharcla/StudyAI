@@ -100,10 +100,10 @@ test("Artifacts page builds, lists, opens and organizes a slide deck", async ({ 
   await expect(page.getByTestId("artifacts-status")).toContainText("Deck deleted.");
 });
 
-test("Artifacts page shows a student-safe message when generation fails", async ({ page }) => {
+test("Artifacts page names the missing service instead of saying the deck service is busy", async ({ page }) => {
   await mockArtifacts(page);
   await page.route("**/api/slide-decks/generate", (route) => route.fulfill({
-    status: 502, contentType: "application/json", body: JSON.stringify({ error: "Presenton generation failed (503)" }),
+    status: 502, contentType: "application/json", body: JSON.stringify({ error: "The local presentation service (Presenton) is not available." }),
   }));
   const { course } = await createCourseWithLesson(page.request);
   await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -112,7 +112,31 @@ test("Artifacts page shows a student-safe message when generation fails", async 
   await page.getByTitle("Open Artifacts").click();
   await page.getByTestId("deck-generate").click();
   const status = page.getByTestId("artifacts-status");
-  await expect(status).toContainText("deck service is busy");
-  await expect(status).not.toContainText("Presenton");
+  await expect(status).toContainText("presentation service");
+  await expect(status).not.toContainText("busy");
+  await expect(status).not.toContainText("502");
   await expect(page.getByTestId("deck-generate")).toBeEnabled();
+  await page.screenshot({ path: "test-results/shots/artifacts-error-after.png" });
+});
+
+test("Artifacts page keeps a semantic deck usable when the renderer is absent", async ({ page }) => {
+  const semanticDeck = { ...deck, filePath: "", notice: "Your deck's slides and citations are ready. The .pptx download needs the local presentation service (Presenton), which isn't running. Start it and build again to export." };
+  await page.route("**/api/slide-decks/generate", (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(semanticDeck) }));
+  await page.route("**/api/slide-decks?course=**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([semanticDeck]) }));
+  await page.route("**/api/slide-decks/artifact?id=**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(semanticDeck) }));
+
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await selectCourseOnPage(page, course.title);
+
+  await page.getByTitle("Open Artifacts").click();
+  await page.getByTestId("deck-generate").click();
+  const status = page.getByTestId("artifacts-status");
+  await expect(status).toContainText("slides and citations are ready");
+  await expect(page.getByTestId("slide-card")).toHaveCount(2);
+  await expect(page.getByTestId("slide-citation")).toHaveCount(1);
+  await expect(page.getByTestId("artifact-download")).toHaveCount(0);
+  await expect(page.getByTestId("artifact-download-unavailable")).toBeDisabled();
+  await expect(page.getByTestId("artifact-download-note")).toContainText("Presenton");
+  await page.screenshot({ path: "test-results/shots/artifacts-degraded-after.png" });
 });

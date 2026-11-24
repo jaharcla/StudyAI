@@ -40,6 +40,36 @@ async function mockStudio(page: Page) {
   return imports;
 }
 
+test("Studio shows a plain reason and keeps retry available when the model returns no JSON", async ({ page }) => {
+  await page.route("**/api/studio/artifacts**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  let attempts = 0;
+  await page.route("**/api/studio/generate", (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "The model did not return a JSON object." }) });
+    }
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(fixtures["study-guide"]) });
+  });
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/");
+  await selectCourseOnPage(page, course.title);
+
+  await page.getByTitle("Open StudyAI Studio").click();
+  await page.getByTestId("studio-tab-study-guide").click();
+  await page.getByTestId("studio-generate").click();
+
+  const error = page.getByTestId("studio-error");
+  await expect(error).toContainText("couldn't turn this lesson");
+  await expect(error).not.toContainText("did not return a JSON object");
+  await expect(error).toBeVisible();
+  await page.screenshot({ path: "test-results/shots/studio-error-after.png" });
+
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByTestId("studio-error")).toHaveCount(0);
+  await expect(page.getByTestId("study-guide")).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test("Studio generates a grounded mind map, guide and practice in the new UI", async ({ page }) => {
   const imports = await mockStudio(page);
   const { course } = await createCourseWithLesson(page.request);

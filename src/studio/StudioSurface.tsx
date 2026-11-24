@@ -29,6 +29,16 @@ const TABS: Array<{ id: StudioKind; label: string; icon: typeof Sparkles }> = [
   { id: "practice", label: "Practice", icon: Sparkles },
 ];
 
+const FORMAT_ERROR = "The study assistant couldn't turn this lesson's material into an artifact this time. Your course material is unchanged. Try again or choose another artifact type.";
+
+function studentMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : "";
+  if (/did not return a JSON|couldn't format a response|could not format|study assistant couldn't/i.test(raw)) return FORMAT_ERROR;
+  if (/No course sources|No grounded/i.test(raw)) return "This lesson doesn't have enough course material yet. Add a source or notes, then try again.";
+  if (/502|503|fetch failed|network/i.test(raw)) return "The study assistant isn't responding right now. Your course material is unchanged. Try again in a moment.";
+  return "Generation didn't complete. Your course material is unchanged. Try again.";
+}
+
 type Props = {
   courseId: string; lessonId: string; courseTitle: string; lessonTitle: string;
   onOpenSource: (sourceRef: string) => void; close: () => void;
@@ -46,6 +56,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [filter, setFilter] = useState<StudioKind | "all">("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [errorAction, setErrorAction] = useState<"generate" | "accept">("generate");
 
   useEffect(() => {
@@ -55,14 +66,15 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   }, [courseId, lessonId]);
 
   const generate = async () => {
-    setBusy(true); setError(""); setErrorAction("generate");
+    setBusy(true); setError(""); setNotice(""); setErrorAction("generate");
     try {
       const created = await generateArtifact({ courseId, lessonId, kind, focus: focus.trim() || "Key concepts and mechanisms", practiceType, count });
       setArtifact(created);
       setFilter("all");
+      if ("notice" in created && typeof created.notice === "string") setNotice(created.notice);
       setHistory((items) => [created, ...items].slice(0, 20));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Generation failed.");
+      setError(studentMessage(reason));
     } finally {
       setBusy(false);
     }
@@ -181,6 +193,13 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
                 <p>{error}</p>
                 <button type="button" className="studio-error-retry" onClick={retry}>Try again</button>
               </div>
+            </div>
+          )}
+
+          {!busy && notice && (
+            <div className="studio-notice" role="status" aria-live="polite" data-testid="studio-notice">
+              <CircleAlert size={18} strokeWidth={1.9} aria-hidden="true" />
+              <p>{notice}</p>
             </div>
           )}
 
