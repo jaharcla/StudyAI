@@ -73,13 +73,24 @@ Priority is set by user impact, dependency on existing foundations, and independ
 3. **Artifact Intelligence Phase 1** (Major, foundation for all content creation). Make `artifact.kind` determine compiled objects, fix problem-set duplication, generate real graphs/vectors, add deterministic validation. Follow `docs/superpowers/plans/2026-11-23-artifact-intelligence-system.md` Phase 1 exactly. Owner: worker `work/artifact-intelligence-phase1-20261123`.
 4. **Artifact breadth gap analysis and spec** (undocumented vision). Investigate podcast/audio, video, study guides, infographics, interactive materials, and voice tutoring; reuse existing research; produce a phased spec with a shared course-context/citation contract so artifacts are not isolated generators. Owner: worker `work/artifact-broadening-20261123`. Read-only product work.
 
-### Next — wave 2 (after wave 1 lands)
+### Wave 2 selection (2026-11-23, after wave 1 lands)
 
-- Course/lesson creation dialog and navigation consolidation into one lesson workspace (Major UX; touches `src/App.tsx` heavily, so serial after wave 1's UI work).
-- Lewis structure end-to-end repair and chemistry surface consolidation.
-- Misconception → BKT loop and semantic concept graph with mastery overlay (depends on wave 1 recommendation contract).
-- Visual/scanned document extraction status and recovery path.
-- Slide-deck spike (Presenton) if the artifact-broadening spec endorses it.
+Five product-invention specs are now written. Each reuses existing infrastructure; none proposes a second authority.
+
+| Idea | Spec + plan | Reuse found | Wave 2 verdict |
+| --- | --- | --- | --- |
+| Re-draw practice | `2026-11-23-redraw-practice-{design.md,md}` | `server/learning/activities` (versioned specs, revision-bound idempotent attempts, checker registry, BKT events), `src/canvas/physics.ts` semantic grading, FSRS + `FlashcardReview`, `saveCanvasDocument` as sole write path | **Enter wave 2.** Strongest differentiator, smallest new surface: one semantic checker, additive spec metadata, one review log + two endpoints, UI. |
+| Lab partner (opt-in coaching) | `2026-11-23-lab-partner-{design.md,md}` | Six `PhysicsIssueCode`s and `suggestedCorrections` in `src/canvas/physics.ts`; scene authority already emits `p:<code>:<target>` diagnostics; `ai-requests.ts` queue/timeouts/dedupe; existing physics alert in `CanvasStudio.tsx` | **Enter wave 2, deterministic Phase 1 only.** Tutor explanations are gated on the canvas-description fix landing. |
+| Canvas narration | `2026-11-23-canvas-narration-{design.md,md}` | Tutor explanation path, human-readable canvas labels from the description work, object IDs for highlighting, artifact store, browser-native Web Speech `speechSynthesis` as a zero-cost first candidate | **Enter wave 2 as ADRs + contract phase only.** No provider commitment until persistence and TTS ADRs are approved. |
+| Steppable artifacts | `2026-11-23-steppable-artifacts-{design.md,md}` | `worked-example.steps` already exists but is discarded by `deriveBrief`; `replayCanvasEvents` state shape; one transaction/undo/approval; `learning_activity_*` checkpoint storage; single provenance path | **Hold one wave.** Shares `src/artifacts/package.ts` and `teaching-scene.ts` with Artifact Intelligence Phase 2; sequence after Phase 2 to avoid conflicting writes. |
+| Generic podcasts / video | `2026-11-23-artifact-breadth-design.md` | Shared `ArtifactPackage` contract; no TTS/STT infra in the repo | **Defer behind canvas narration.** Own-canvas narration is the sharper first audio experience; provider cost needs approval. |
+
+Also entering wave 2 after wave 1 UI work: course/lesson creation dialog and navigation consolidation (touches `src/App.tsx` heavily). Still waiting: Lewis repair, misconception→BKT loop, visual document extraction, slide-deck spike.
+
+**Partner decisions made by the coordinator (2026-11-23), recorded so workers do not re-litigate them:**
+
+- Redraw: one unified per-concept FSRS schedule; freehand-only redraws not gradable in v1; learner self-rating after deterministic feedback; pinned saved board as the reference source; physics-rules debt deferred, use the `src/canvas/physics.ts` superset.
+- Lab partner: Coach toggle in the canvas toolbar, default off; opt-in persisted per device, dismissed hints per board/code/target until revision changes; 800 ms debounce with a 2 s floor and a 10 s per-target cooldown; Phase 1 physics-only; Explain why posts one prepared question to the existing Tutor chat; explanations use the student's already-configured provider, no new cloud requirement; the canvas-description fix gates Phase 2; corrections stay editor-first through the existing approval path.
 
 ### Later
 
@@ -104,10 +115,14 @@ Tracked in the channel; this table is updated when work lands.
 
 | Worker | Worktree | Scope | Status |
 | --- | --- | --- | --- |
-| Recommendations + next best action | `work/recommendations-20261123` | `server/progress.ts` or new `server/recommendations.ts`, progress UI, lesson home | Starting |
-| Tutor canvas description | `work/tutor-canvas-description-20261123` | `server/tutor-canvas-context.ts`, `server/agent.ts`, tutor presentation | Starting |
-| Artifact Intelligence Phase 1 | `work/artifact-intelligence-phase1-20261123` | `src/canvas/ai/teaching-scene.ts`, tests, per plan | Starting |
-| Artifact breadth research | `work/artifact-broadening-20261123` | Product spec in `docs/superpowers/specs/` | Starting |
+| Recommendations + next best action | `work/recommendations-20261123` | Single prepared Continue action, secondary list kept; progress + lesson home | Running — UX decision sent |
+| Tutor canvas description | `work/tutor-canvas-description-20261123` | `server/tutor-presentation.ts`, human labels for canvas refs | Running — unit tests green, e2e unblocked |
+| Artifact Intelligence Phase 1 | `work/artifact-intelligence-phase1-20261123` | Verified existing five commits; no new code | Verified — tsc, 668 tests, e2e 3/3 |
+| Artifact breadth research | `work/artifact-broadening-20261123` | Product spec in `docs/superpowers/specs/` | Delivered |
+| Re-draw practice spec | `work/redraw-practice-20261123` | Spec + implementation plan | Delivered |
+| Lab partner spec | `work/lab-partner-20261123` | Spec + implementation plan | Delivered |
+| Steppable artifacts spec | `work/steppable-artifacts-20261123` | Spec + implementation plan | Delivered |
+| Canvas narration spec | `work/canvas-narration-20261123` | Spec + implementation plan | Delivered |
 
 ## Decisions requiring the partner
 
