@@ -124,7 +124,9 @@ test("loading, error and success states are real and recoverable", async ({ page
   // Failure names the problem and offers a recovery action.
   await page.getByTestId("studio-generate").click();
   await expect(page.getByTestId("studio-error")).toBeVisible();
-  await expect(page.getByTestId("studio-error")).toContainText("Model service unavailable.");
+  // The UI deliberately hides the raw provider string and shows an honest, recoverable message.
+  await expect(page.getByTestId("studio-error")).toContainText("Generation didn't complete.");
+  await expect(page.getByTestId("studio-error")).not.toContainText("Model service unavailable.");
   await expect(page.getByTestId("studio-error").getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
