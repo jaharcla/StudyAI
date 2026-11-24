@@ -11,6 +11,7 @@ import {
   GenerateSchema, type AcceptanceDecision, type GenerateInput, type Grounding, type ImportInput,
   type StudioArtifact, type StudioContent, type StudioKind, type StudioSource,
 } from "./contracts.js";
+import { isCopyStyleQuestionPrompt } from "../learning/contracts.js";
 import { sanitizeCourseText } from "../presentations/sanitize.js";
 
 export const STUDIO_FALLBACK_NOTICE = "Built from your course material directly: the study assistant couldn't format a response this time, so this artifact uses cited excerpts. Try Generate again for a structured version.";
@@ -97,6 +98,7 @@ export async function generateStudioArtifact(
     "Prefer the student's own concepts and canvas labels where they fit; do not overclaim.",
     "If the material is insufficient for the requested number of items, return fewer honest items.",
     "Keep wording concise and suitable for a university student. Use LaTeX in $...$ for equations.",
+    "Practice questions must require understanding or application; never use 'According to the excerpt...' or similar giveaway phrasing, and the cited excerpt should help check the answer without containing the correct choice verbatim.",
   ].join(" ");
 
   const user = JSON.stringify({
@@ -340,6 +342,7 @@ function validateContent(kind: StudioKind, raw: unknown, sources: StudioSource[]
   const cards = (practiceType === "quiz" ? [] : parsed.cards)
     .map((card) => withSource(card, sources)).filter((card): card is NonNullable<typeof card> => Boolean(card)).slice(0, count);
   const questions = (practiceType === "cards" ? [] : parsed.questions)
+    .filter((question) => !isCopyStyleQuestionPrompt(question.prompt))
     .map((question) => {
       const source = sourceFor(question.sourceRef, sources);
       if (!source || !question.choices.some((choice) => choice.id === question.correctChoice)) return undefined;

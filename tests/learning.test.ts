@@ -119,3 +119,12 @@ describe("adaptive learning subsystem", () => {
     expect(learning.dueCards("c", "l")).toEqual([]);
   });
 });
+
+describe("quiz question quality", () => {
+  it("rejects copy-style questions and accepts a grounded application question", () => {
+    const learning = setup();
+    expect(() => learning.addReviewedQuestion({ courseId: "c", lessonId: "l", concept: "Water composition", prompt: "According to the excerpt, what is water's formula?", choices: [{ id: "a", text: "H2O" }, { id: "b", text: "CO2" }], correctChoice: "a", explanation: "The cited source supports the correct choice.", sourceDocumentId: "d", sourcePage: 4, sourceExcerpt: "Water is H2O, composed of hydrogen and oxygen." })).toThrow(/copy-style|giveaway/i);
+    const q = learning.addReviewedQuestion({ courseId: "c", lessonId: "l", concept: "Water composition", prompt: "What does water's formula imply about its atomic composition?", choices: [{ id: "a", text: "Two hydrogen atoms and one oxygen atom" }, { id: "b", text: "One hydrogen atom and two oxygen atoms" }], correctChoice: "a", explanation: "Water's formula H2O indicates two hydrogen atoms and one oxygen atom.", sourceDocumentId: "d", sourcePage: 4, sourceExcerpt: "Water is H2O, composed of hydrogen and oxygen." });
+    expect(q.version).toBe(1);
+  });
+});
