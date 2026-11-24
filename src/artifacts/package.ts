@@ -9,9 +9,24 @@ const componentBase = {
   claims: z.array(claimProvenanceSchema).max(20).optional(),
 };
 
+/**
+ * One authored step of a replayable worked example. `reveal`, `highlight` and `focus` are
+ * aliases of objects the same artifact compiles — never coordinates. Claims reuse the single
+ * provenance type; a non-direct claim is labelled in review, not rejected by the schema.
+ */
+export const exampleStepSchema = z.object({
+  id: z.string().min(1).max(80),
+  narration: z.string().min(1).max(1000),
+  reveal: z.array(z.string().min(1).max(80)).max(12).default([]),
+  highlight: z.array(z.string().min(1).max(80)).max(4).default([]),
+  focus: z.string().min(1).max(80).optional(),
+  claims: z.array(claimProvenanceSchema).max(10).optional(),
+}).strict();
+export type ExampleStep = z.infer<typeof exampleStepSchema>;
+
 export const artifactComponentSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("explanation"), ...componentBase, text: z.string().min(1).max(4000), concepts: z.array(z.string().min(1).max(80)).max(8).default([]) }).strict(),
-  z.object({ kind: z.literal("worked-example"), ...componentBase, prompt: z.string().min(1).max(2000), steps: z.array(z.string().min(1).max(1000)).min(1).max(20), answer: z.string().min(1).max(2000) }).strict(),
+  z.object({ kind: z.literal("worked-example"), ...componentBase, prompt: z.string().min(1).max(2000), steps: z.array(z.string().min(1).max(1000)).min(1).max(20), answer: z.string().min(1).max(2000), states: z.array(exampleStepSchema).min(1).max(12).optional() }).strict(),
   z.object({
     kind: z.literal("diagram"), ...componentBase, title: z.string().min(1).max(120), surfaceAngleDeg: z.number().min(-180).max(180).optional(),
     forces: z.array(z.object({
