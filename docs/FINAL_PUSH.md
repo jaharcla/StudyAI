@@ -27,6 +27,7 @@ Reliability: PDF worker now loads as a Vite asset (commit `19f9533`); `tests/e2e
 - Gap-fill: no worker active; aborted stale session, scope folded into Tutor/Studio workers.
 - Tutor trust (J2): `work/tutor-trust-20261124`, thread `1574919601777803324`, ports 5704/8717/8718/8614. Running; Playwright first.
 - Studio parity (J3, decks): `work/studio-parity-20261124`, thread `1574919600615723039`. Worker ended twice without implementing the missing capabilities (only a verification doc, commit `cda98ba`), so the worker approach was stopped. Remaining: practice test with answer key and per-question citations, one shared library view, one-click infographic, per-node edit/regenerate. No merge from this branch.
+- Shared library (J3 narrow slice): `work/library-20261124`, thread `1574921923337650296`, ports 5706/8721/8722/8616. Running; holds Playwright until Tutor is clear.
 - Decks, Study loop, Document intelligence, Canvas depth, Cohesion: not yet assigned.
 
 ## Integrations checked
