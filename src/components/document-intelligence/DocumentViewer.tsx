@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Document as PdfDocument, Page, pdfjs } from "react-pdf";
 import { ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import "react-pdf/dist/Page/TextLayer.css";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { DOCUMENT_API, type DocumentData, type UnitType, requestJson, sourceDocumentUrl, parseSourceReference } from "./api.js";
 import { clampUnitNumber, findDocumentMatches, nextMatchIndex } from "./navigation.js";
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 type Props = { documentId: string; courseId: string; sourceRef?: string; onClose: () => void };
 type Match = { unitNumber: number; unitType: UnitType; offset: number };
