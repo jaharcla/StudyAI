@@ -102,7 +102,12 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
       if (!label) return "";
       citations.set(sourceRef, { sourceRef, filename: label, unitType: "canvas", unitNumber: 0 });
       return `[${markdownLabel(label)}](#studyai-citation=${encodeURIComponent(sourceRef)})`;
-    });
+    })
+    // A citation with no label/ref is not a link. Drop the empty slot instead of
+    // shipping a bare "()" (seen in the 2026-11-24 CHEM rerun when the model
+    // emitted a malformed target that the sanitizer above rejected).
+    .replace(/(?:\[[^\]]*\]|【[^】\]]*[】\]])\s*\(\s*\)/g, () => { rejectedCitationCount++; return ""; })
+    .replace(/(?<![\p{L}\p{N}_])\(\s*\)(?![\p{L}\p{N}_])/gu, () => { rejectedCitationCount++; return " "; });
   const redacted = options.redactCanvasIds === false
     ? content
     : content.replace(/\b(?:q|s|g|o|c):[A-Za-z0-9:_-]{3,}/g, "the referenced canvas item");

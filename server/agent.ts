@@ -37,6 +37,9 @@ const State = Annotation.Root({
 const tutorLearning = new LearningService(db);
 const tutorActivities = new LearningActivityService(db, tutorLearning);
 
+/** One plain, actionable message for every context-overflow path. Never expose the budget error itself. */
+const TUTOR_CONTEXT_RECOVERY = "That board selection is too detailed to answer in one go. Deselect the object or zoom to a smaller area, then ask again.";
+
 type CanvasReasoningMode = "auto" | "off" | "always";
 
 function canvasReasoningMode(env: NodeJS.ProcessEnv): CanvasReasoningMode {
@@ -262,7 +265,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
   } catch (error) {
     if (error instanceof TutorContextBudgetError) {
       logTutorContextOverflow(error);
-      return { activeScope, scopeStart, messages: [new AIMessage("The current canvas evidence and question exceed the Tutor context budget. Narrow the active canvas selection or reduce the supplied evidence, then try again.")] };
+      return { activeScope, scopeStart, messages: [new AIMessage(TUTOR_CONTEXT_RECOVERY)] };
     }
     throw error;
   }
@@ -610,7 +613,7 @@ function failureResult(activeScope: string, scopeStart: string, category: ModelF
     cancelled: "The AI request was cancelled. No canvas change was applied.",
     provider_failure: "The AI provider failed to complete this request. No canvas change was applied.",
     queue_full: "The AI tutor is busy. Try again shortly; no canvas change was applied.",
-    context_budget_exceeded: "The current canvas evidence and question exceed the Tutor context budget. Narrow the active canvas selection or reduce the supplied evidence, then try again.",
+    context_budget_exceeded: TUTOR_CONTEXT_RECOVERY,
   };
   const limitMessages: Record<TutorLimitFailure, string> = {
     provider_call_limit: "This Tutor request reached its provider call limit. Try a narrower question or canvas selection.",

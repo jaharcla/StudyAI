@@ -114,6 +114,21 @@ describe("Tutor response hygiene", () => {
     expect(response.answer).not.toContain("the referenced canvas item");
   });
 
+  it("drops empty citation slots but keeps real document and board citations", () => {
+    const answer = `First claim (). Second claim [notes](). Third claim is grounded [label](#studyai-citation=${encodeURIComponent(cited.sourceRef)}). Board claim (canvas: science:obj-42).`;
+    const response = presentTutorResponse(answer, [cited], { canvasRefs: new Map([["science:obj-42", "Force arrow"]]) });
+
+    expect(response.answer).not.toMatch(/\(\s*\)/);
+    expect(response.answer).toContain(`[chemistry.pdf · page 2](#studyai-citation=${encodeURIComponent(cited.sourceRef)})`);
+    expect(response.answer).toContain("[Force arrow](#studyai-citation=science%3Aobj-42)");
+    expect(response.citations.map((entry) => entry.sourceRef)).toEqual([cited.sourceRef, "science:obj-42"]);
+    expect(response.rejectedCitationCount).toBe(2);
+  });
+
+  it("keeps empty parentheses in function notation", () => {
+    expect(presentTutorResponse("The function f() is unchanged.", []).answer).toBe("The function f() is unchanged.");
+  });
+
   it("still redacts raw ids in prose unless explicitly requested", () => {
     expect(presentTutorResponse("near q:shape:mw877vh004pyqs", []).answer).toBe("near the referenced canvas item");
     expect(presentTutorResponse("near q:shape:mw877vh004pyqs", [], { redactCanvasIds: false }).answer).toBe("near q:shape:mw877vh004pyqs");

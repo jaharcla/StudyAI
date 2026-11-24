@@ -1,10 +1,10 @@
 import "dotenv/config";
 import { createServer } from "node:http";
 import { CopilotKitIntelligence, CopilotRuntime, createCopilotRuntimeHandler } from "@copilotkit/runtime/v2";
-import { LangGraphAgent } from "@copilotkit/runtime/langgraph";
 import { createCopilotNodeHandler } from "@copilotkit/runtime/v2/node";
 import type { AbstractAgent } from "@ag-ui/client";
 import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
+import { StudentSafeLangGraphAgent } from "./tutor-event-filter.js";
 
 process.env.COPILOTKIT_TELEMETRY_DISABLED = "true";
 const config = getStudyAIConfig();
@@ -22,7 +22,7 @@ const runtime = new CopilotRuntime({
   // Intelligence platform.
   memory: { access: () => ({ user: "read", project: "read" }) },
   agents: {
-    studyai: new LangGraphAgent({
+    studyai: new StudentSafeLangGraphAgent({
       deploymentUrl: config.langgraphDeploymentUrl,
       graphId: "studyai",
       langsmithApiKey: process.env.LANGSMITH_API_KEY ?? "",

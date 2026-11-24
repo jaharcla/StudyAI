@@ -35,14 +35,20 @@ describe("Tutor context budgeting", () => {
     expect(result.omittedTurnCount).toBe(1);
   });
 
-  it("rejects protected canvas data that cannot fit without pruning", () => {
-    expect(() => budgetTutorContext({
+  it("compacts protected canvas data instead of returning a raw budget error", () => {
+    const result = budgetTutorContext({
       systemInstructions: "Instructions",
-      contexts: [{ description: "StudyAI active scientific canvas objects", value: { observed: "x".repeat(5000) } }],
+      contexts: [{ description: "StudyAI active scientific canvas objects", value: { id: "equation-1", expression: "F=ma", detail: "x".repeat(5000) } }],
       evidence: { sourceRef: "kept" },
-      conversation: [{ type: "human", content: "Question" }],
+      conversation: [{ type: "human", content: "What is the selected equation?" }],
       budgetTokens: 512,
-    })).toThrow(TutorContextBudgetError);
+    });
+    const serialized = JSON.stringify(result.contexts);
+    expect(serialized).toContain("equation-1");
+    expect(serialized).toContain("F=ma");
+    expect(serialized).toContain("tutorContextCompaction");
+    expect(serialized.length).toBeLessThan(5000);
+    expect(result.estimatedTokens).toBeLessThanOrEqual(512);
   });
 
   it("drops course excerpts instead of refusing the request when the frame is tight", () => {
