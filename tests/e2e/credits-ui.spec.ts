@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 
+// Paid rail is dormant by default (PRODUCT_ROADMAP, 2026-11-23).
+test.skip(process.env.VITE_STUDYAI_PAID_ENABLED !== "1", "Set VITE_STUDYAI_PAID_ENABLED=1 to run paid-rail UI tests.");
+
 test("credits provider shows balance, redeems a code, and chats", async ({ page }) => {
   let balanceMicros = 500_000;
   await page.route("**/v1/wallet", async (route) => {
