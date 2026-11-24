@@ -114,6 +114,8 @@ Also entering wave 2 after wave 1 UI work: course/lesson creation dialog and nav
 
 Overnight accessibility pass shipped: 2px focus rings, 44px hit targets, labelled dialogs with focus trap and restore, Escape dismissal across shells, hidden lesson controls removed from Tab order, tinted contrast text in both themes, and narration controls clear of the floating toolbar. `tests/e2e/a11y-polish.spec.ts` passes 5/5 on main. Remaining known limits: third-party CopilotKit buttons stay under 44px; nested dialog Tab order is untested.
 
+Final full `npm run verify` on main (2026-11-24, `opencode-go` / `hy4-flash-free`): **91 passed, 2 failed, 2 flaky, 6 skipped (10.0m)**, exit 1. Both failures are provider-dependent: `quickdraw-ai.spec.ts` and `workspace.spec.ts` still try to select a disabled Ollama `qwen3:latest` model in Settings, so they cannot run under the active provider. The two flaky specs (`canvas-visual-remediation`, `tutor-math`) passed on retry. The unit phase is clean: `tsc -b` with no errors and 127 files / 811 tests passing. Targeted browser specs for every shipped track pass on main. Remaining limits: PPTX export needs a running Presenton service, and the visual theme direction still awaits the owner's choice.
+
 ## Active workers
 
 Tracked in the channel; this table is updated when work lands.
