@@ -21,9 +21,15 @@ const DocumentLibrary = lazy(() => import("./components/document-intelligence").
 
 import { API, CREDITS_API } from "./api";
 import { Streamdown, defaultRemarkPlugins, defaultRehypePlugins } from "streamdown";
+import { useCoach } from "./coach/useCoach";
+import { recommendationProducer } from "./coach/recommendationProducer";
+import { registerCoachProducer } from "./coach/service";
+import type { CoachTarget } from "./coach/contract";
 
 // Paid rail is dormant (PRODUCT_ROADMAP, 2026-11-23). Off unless explicitly enabled.
 const PAID_ENABLED = import.meta.env.VITE_STUDYAI_PAID_ENABLED === "1";
+// Features only register producers; the Coach surface and activation live in src/coach.
+registerCoachProducer(recommendationProducer);
 import "katex/dist/katex.min.css";
 
 type Course = { id: string; title: string; code: string; color: string };
@@ -103,6 +109,7 @@ function Workspace() {
   const [activeActivity, setActiveActivity] = useState<ActivitySession | null>(null);
   const [preferredBoardId, setPreferredBoardId] = useState<string>();
   const [activityCanvasState, setActivityCanvasState] = useState<{ id: string; revision: number; saved: boolean } | null>(null);
+  const [coachFocus, setCoachFocus] = useState("");
   const [tutorContextOpen, setTutorContextOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Connecting to local storageâ€¦");
@@ -136,6 +143,48 @@ function Workspace() {
     setPreferredBoardId(undefined);
     setActivityCanvasState(null);
   }, []);
+
+  // Activation prepares real state in the destination, then the pinned Coach is already there.
+  // A failed preparation reports a plain message; no target is invented or navigated to.
+  const prepareCoachTarget = useCallback(async (target: CoachTarget): Promise<boolean> => {
+    if (!target.courseId || !target.lessonId) return false;
+    if (target.courseId !== course.id) {
+      const next = courses.find((item) => item.id === target.courseId);
+      if (!next) return false;
+      setCourse(next);
+      localStorage.setItem("studyai.course", next.id);
+      localStorage.setItem(lessonPreferenceKey(next.id), target.lessonId);
+      setLessonId(target.lessonId);
+    } else if (target.lessonId !== lessonId) {
+      if (!lessons.some((item) => item.id === target.lessonId)) return false;
+      setLessonId(target.lessonId);
+      localStorage.setItem(lessonPreferenceKey(course.id), target.lessonId);
+    }
+    const scope = `course=${encodeURIComponent(target.courseId)}&lesson=${encodeURIComponent(target.lessonId)}`;
+    if (target.destination === "study") {
+      const response = await fetch(`${API}/study/ask?${scope}`);
+      if (!response.ok) return false;
+      setMode("study");
+      return true;
+    }
+    if (target.destination === "board") {
+      if (!target.boardId) return false;
+      const response = await fetch(`${API}/canvases/${encodeURIComponent(target.boardId)}?${scope}`);
+      if (!response.ok) return false;
+      setPreferredBoardId(target.boardId);
+      setView("Canvas");
+      setMode("canvas");
+      return true;
+    }
+    setCoachFocus(target.focus ?? "");
+    setMode("studio");
+    return true;
+  }, [course.id, courses, lessonId, lessons]);
+
+  const coach = useCoach(
+    { courseId: course.id, lessonId, boardId: preferredBoardId, boardRevision: activityCanvasState?.revision },
+    prepareCoachTarget,
+  );
 
   useEffect(() => {
     let live = true;
@@ -404,7 +453,8 @@ function Workspace() {
     {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
     {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} close={() => setFlashcardReviewOpen(false)} />}
     {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenActivities={() => { setMode("canvas"); setActivityLibraryOpen(true); }} onOpenSources={() => { setMode("canvas"); setView("Lecture"); }} />}
-    {mode === "studio" && course.id && lessonId && <StudioSurface courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
+    {mode === "studio" && course.id && lessonId && <StudioSurface courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} initialFocus={coachFocus} close={() => { setMode("canvas"); setCoachFocus(""); }} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
+    {coach.surface}
   </div></>;
 }
 
