@@ -169,7 +169,7 @@ it("executes deterministic tutor calculations and returns the result to the mode
 it("makes context omitted under the token budget visible in the tutor answer", async () => {
   // Keep enough room for the richer geometry context plus the tutor's own instruction text; the
   // long conversation still forces omission. The frame is deliberately tight but not impossible.
-  process.env.TUTOR_CONTEXT_BUDGET = "2900";
+  process.env.TUTOR_CONTEXT_BUDGET = "3200";
   process.env.TUTOR_MAX_COMPLETION_TOKENS = "256";
   mocks.invoke.mockResolvedValue(new AIMessage("Answer based on current context."));
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
@@ -244,6 +244,39 @@ it("redacts internal canvas node IDs from ordinary answers", async () => {
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("What is the label near?")] });
   expect(result.messages.at(-1)?.content).not.toContain("q:shape:mw877vh004pyqs");
   expect(result.messages.at(-1)?.content).toContain("the referenced canvas item");
+});
+
+it("removes inline reasoning before the student sees the answer", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("<think>Need search docs... selectedCount 0</think>\nThe vector magnitude is 5 units."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("What is the magnitude?")] });
+  const answer = String(result.messages.at(-1)?.content);
+  expect(answer).toBe("The vector magnitude is 5 units.");
+  expect(answer).not.toMatch(/<think>|Need search docs|selectedCount/i);
+});
+
+it("drops placeholder links and ungrounded board citations from the answer", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("The value is 4. See #studyai-citation=URL_ENCODED_SOURCE_REF and (canvas: science:made-up-ref)."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Explain this canvas.")] });
+  const answer = String(result.messages.at(-1)?.content);
+  expect(answer).not.toContain("URL_ENCODED_SOURCE_REF");
+  expect(answer).not.toContain("(canvas:");
+  expect(answer).not.toContain("made-up-ref");
+  expect(answer).toContain("The value is 4.");
+});
+
+it("renders a grounded board citation with the shared citation grammar", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage(`The Force acts on the molecule (canvas: science:${molecule.id}).`));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Describe the board")] });
+  const answer = String(result.messages.at(-1)?.content);
+  expect(answer).not.toContain("(canvas:");
+  expect(answer).toContain(`(#studyai-citation=${encodeURIComponent(`science:${molecule.id}`)})`);
+  expect(decodeURIComponent(answer.match(/studyai-citation=([^)]+)/)![1])).toBe(`science:${molecule.id}`);
+});
+
+it("gives a plain recoverable message when the model returns only reasoning", async () => {
+  mocks.invoke.mockResolvedValue(new AIMessage("<think>Need search docs... Let me cite the exact sourceRef...</think>"));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Explain this canvas.")] });
+  expect(result.messages.at(-1)?.content).toBe("I couldn't produce an answer just now. Please try again with a narrower question.");
 });
 
 it("retries one transient Ollama failure", async () => {
@@ -364,7 +397,7 @@ it("allows a text answer when the user explicitly says not to edit the canvas", 
 it("reports an empty provider answer instead of returning a blank message", async () => {
   mocks.invoke.mockResolvedValue(new AIMessage(""));
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("Explain this canvas.")] });
-  expect(result.messages.at(-1)?.content).toContain("model returned an empty answer");
+  expect(result.messages.at(-1)?.content).toContain("couldn't produce an answer");
 });
 
 it("rejects an invalid canvas analysis before it reaches the inference provider", async () => {
