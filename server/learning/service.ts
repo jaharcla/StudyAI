@@ -3,7 +3,7 @@ import type Database from "better-sqlite3";
 import { createEmptyCard, fsrs, Rating, State, type Card } from "ts-fsrs";
 import { parseCanvasDocument, type CanvasDocument } from "../../src/canvas/model.js";
 import { updateMastery, DEFAULT_BKT, selectWeakest } from "./bkt.js";
-import { RateCardSchema, SubmitAttemptSchema, type Rating as StudyRating } from "./contracts.js";
+import { RateCardSchema, SubmitAttemptSchema, isCopyStyleQuestionPrompt, type Rating as StudyRating } from "./contracts.js";
 import { initializeLearningSchema } from "./schema.js";
 import { indexedSources } from "./sources.js";
 import { LearningEventSchema, type LearningEvent } from "../../src/learning/activities/contracts.js";
@@ -25,6 +25,7 @@ export class LearningService {
     if (!this.database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) throw new Error("Lesson not found in this course.");
     if (!input.sourceDocumentId) throw new Error("Choose a source document from this course.");
     if (!input.concept.trim() || !input.prompt.trim() || choices.length < 2 || new Set(choices.map((item) => item.id)).size !== choices.length || !choices.some((item) => item.id === input.correctChoice)) throw new Error("Question content is invalid.");
+    if (isCopyStyleQuestionPrompt(input.prompt)) throw new Error("Question is copy-style: it must not use 'According to the excerpt...' giveaway phrasing.");
     const chunks = this.database.prepare("SELECT d.title,c.page,c.content FROM documents d JOIN document_chunks c ON c.document_id=d.id WHERE d.id=? AND d.course_id=?").all(input.sourceDocumentId, input.courseId) as Array<{ title: string; page: number | null; content: string }>;
     if (this.database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='di_documents'").get()) {
       const documentIntelligenceChunks = this.database.prepare("SELECT d.title,CASE WHEN c.unit_type='page' THEN c.unit_number ELSE NULL END page,c.content FROM di_documents d JOIN di_chunks c ON c.document_id=d.id WHERE d.id=? AND d.course_id=?").all(input.sourceDocumentId, input.courseId) as Array<{ title: string; page: number | null; content: string }>;
