@@ -48,3 +48,19 @@ test("shared notice uses the status role on artifacts", async ({ page }) => {
   await expect(notice).toHaveAttribute("aria-live", "polite");
   await expect(notice).toHaveAttribute("data-testid", "artifacts-status");
 });
+
+test("topbar Study and lesson header open the same study stage", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Cohesion entry ${Date.now()}`, "Cohesion lesson");
+  await openCourse(page, course.title);
+  const stage = page.locator(".study-stage");
+
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  await expect(stage).toHaveCount(1);
+  await expect(stage.locator(".surface-subtitle")).toContainText("Cohesion lesson");
+  await page.keyboard.press("Escape");
+  await expect(stage).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Study this lesson" }).evaluate((element: HTMLElement) => element.click());
+  await expect(stage).toHaveCount(1);
+  await expect(stage.locator(".surface-subtitle")).toContainText("Cohesion lesson");
+});

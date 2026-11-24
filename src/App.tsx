@@ -129,7 +129,6 @@ function Workspace() {
   const [noteId, setNoteId] = useState<string>();
   const [noteLoadedFor, setNoteLoadedFor] = useState("");
   const [scienceTool, setScienceTool] = useState<"chem" | "kin" | null>(null);
-  const [studyOpen, setStudyOpen] = useState(false);
   const [activityLibraryOpen, setActivityLibraryOpen] = useState(false);
   const [activeActivity, setActiveActivity] = useState<ActivitySession | null>(null);
   const [preferredBoardId, setPreferredBoardId] = useState<string>();
@@ -160,7 +159,6 @@ function Workspace() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen((open) => !open); return; }
       if (event.key !== "Escape") return;
       if (mode !== "canvas") setMode("canvas");
-      else if (studyOpen) setStudyOpen(false);
       else if (activityLibraryOpen) setActivityLibraryOpen(false);
       else if (flashcardReviewOpen) setFlashcardReviewOpen(false);
       else if (helpOpen) setHelpOpen(false);
@@ -174,7 +172,7 @@ function Workspace() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, studyOpen, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, scienceTool, tutorMenuOpen, sidebar]);
+  }, [mode, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, scienceTool, tutorMenuOpen, sidebar]);
 
   const updateActivityCanvas = useCallback((state: { id: string; revision: number; saved: boolean }) => setActivityCanvasState(state), []);
   const launchActivity = useCallback((session: ActivitySession) => {
@@ -484,7 +482,7 @@ function Workspace() {
         </div>
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => setHelpOpen(true)} title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
-      <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" tabIndex={-1} value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{humanizeLessonTitle(item.title)}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" tabIndex={-1} disabled={!course.id || !lessonId} onClick={() => setStudyOpen(true)}><Brain size={15} /> Study this lesson</button></section>
+      <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" tabIndex={-1} value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{humanizeLessonTitle(item.title)}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" tabIndex={-1} disabled={!course.id || !lessonId} onClick={() => setMode("study")}><Brain size={15} /> Study this lesson</button></section>
       <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions"><button className="tool-chip" disabled={!course.id || !lessonId} onClick={() => setActivityLibraryOpen(true)}><Activity size={14} /> Activities</button><button className="tool-chip active" disabled={!course.id || !lessonId} onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
       <div className={`work-area ${view.toLowerCase()}`}>
         {<div className="canvas-pane" hidden={view === "Lecture"}><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div>{course.id && lessonId ? <div className="canvas-workspace"><CanvasStudio key={`${course.id}:${lessonId}`} courseId={course.id} lessonId={lessonId} theme={dark ? "dark" : "light"} onStatus={updateStatus} onOpenNote={openLinkedNote} onOpenDocument={openLinkedDocument} onSummary={updateCanvasSummary} onSelectedObject={updateSelectedObject} preferredBoardId={preferredBoardId} onBoardState={updateActivityCanvas} activityMode={Boolean(activeActivity)} />{activeActivity && <ActivityTaskPanel courseId={course.id} lessonId={lessonId} session={activeActivity} canvas={activityCanvasState} onClose={closeActivity} />}</div> : <div className="canvas-loading">{courseError || lessonError || (course.id ? "Add a lesson to create a canvas." : "Select or create a course to create a canvas.")}</div>}</div>}
@@ -503,7 +501,6 @@ function Workspace() {
     {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div ref={noteDialogRef} tabIndex={-1} className="settings-modal notes-modal" role="dialog" aria-label="Lesson notes" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} Â· {lessonTitle}</span><input ref={noteTitleRef} aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" aria-label="Close notes" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lessonâ€¦" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
-    {studyOpen && course.id && lessonId && <StudyPanel courseId={course.id} lessonId={lessonId} close={() => setStudyOpen(false)} />}
     {tutorMenuOpen && <TutorMenu config={tutorConfig} onToggleContext={() => setTutorContextOpen(!tutorContextOpen)} onClose={() => setTutorMenuOpen(false)} />}
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} onOpenSettings={() => { setHelpOpen(false); setSettings(true); }} onOpenCanvas={() => { setHelpOpen(false); setView("Canvas"); }} />}
     {progressOpen && course.id && <ProgressDialog courseId={course.id} onClose={() => setProgressOpen(false)} />}
