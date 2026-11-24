@@ -12,12 +12,14 @@ const MAX_CHUNK_BYTES = 3 * 1024 * 1024;
 const MAX_UPLOAD_CHUNKS = 64;
 const UPLOAD_ID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 type Handler = (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
+const responseOrigins = new WeakMap<ServerResponse, string>();
 
 export function createDocumentIntelligenceHandler(db: Database.Database, storageRoot?: string): Handler {
   return async (request, response) => {
     const cfg = getStudyAIConfig();
     const requestOriginHeader = request.headers.origin as string | undefined;
     const origin = requestOriginHeader && cfg.allowedOrigins.includes(requestOriginHeader) ? requestOriginHeader : cfg.webOrigin;
+    responseOrigins.set(response, origin);
     const url = new URL(request.url ?? "/", `http://${LOOPBACK_HOST}`);
     if (url.pathname.startsWith("/api/document-intelligence/") && request.method === "OPTIONS") {
       response.writeHead(204, { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
@@ -179,7 +181,7 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
 }
 
 function send(response: ServerResponse, status: number, value: unknown): boolean {
-  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": getStudyAIConfig().webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": responseOrigins.get(response) ?? getStudyAIConfig().webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
   response.end(JSON.stringify(value));
   return true;
 }
