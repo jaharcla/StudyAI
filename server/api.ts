@@ -35,6 +35,7 @@ import { providerBudgetSnapshot, configureProviderBudgetDatabase } from "./canva
 import { configureProviderUsageDatabase, persistedProviderUsageSnapshot, providerCircuitSnapshot } from "./canvas-intelligence/provider-usage.js";
 import { providerChain, resolveCompletionProviders, resolveVisionProviders } from "./canvas-intelligence/providers.js";
 import { isImageEgressAllowed } from "./canvas-intelligence/groq.js";
+import { tutorProviderStatus } from "./tutor-provider.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
@@ -115,6 +116,7 @@ const server = createServer(async (req, res) => {
     const result = await getModelStatus(config.ollamaBaseUrl, config.ollamaModel);
     return json(res, result.status, result.body);
   }
+  if (req.method === "GET" && url.pathname === "/api/tutor-status") return json(res, 200, tutorProviderStatus());
   if (req.method === "GET" && url.pathname === "/api/canvas-providers") {
     return json(res, 200, { chain: providerChain(), completion: resolveCompletionProviders(), vision: resolveVisionProviders(), budgets: providerBudgetSnapshot(), usage: persistedProviderUsageSnapshot(), circuits: providerCircuitSnapshot(), imageEgress: isImageEgressAllowed() });
   }

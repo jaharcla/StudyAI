@@ -6,22 +6,17 @@
  * This file is intentionally .ts: the surface is built with createElement so the named
  * module can own both activation and presentation without a second view file.
  */
-import { createElement as h, useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { createElement as h, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronDown, Sparkles, X } from "lucide-react";
-import { coachDismissalKey, type CoachContext, type CoachPrompt, type CoachTarget } from "./contract.js";
+import { coachDismissalKey, type CoachContext, type CoachPreparationResult, type CoachPrompt, type CoachTarget } from "./contract.js";
 import { collectCoachPrompts } from "./service.js";
 import "./coach.css";
 
 const ENABLED_KEY = "studyai.coach.enabled";
 const DISMISSED_KEY = "studyai.coach.dismissed";
 const FAILURE_MESSAGE = "That step is not available right now. Nothing was changed.";
-const READY_MESSAGE = {
-  study: "Ready in Study. Your next question is loaded.",
-  board: "Ready on the board. The saved activity is open.",
-  studio: "Ready in Studio. Your source focus is set.",
-};
 
-export type CoachPreparation = (target: CoachTarget) => Promise<boolean> | boolean;
+export type CoachPreparation = (target: CoachTarget) => Promise<CoachPreparationResult> | CoachPreparationResult;
 
 function readDismissed(): Set<string> {
   try {
@@ -38,8 +33,19 @@ export function useCoach(context: CoachContext, onPrepare: CoachPreparation): { 
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(readDismissed);
   const [prompts, setPrompts] = useState<CoachPrompt[]>([]);
   const [expanded, setExpanded] = useState(false);
-  const [status, setStatus] = useState<{ text: string; tone: "error" | "success" } | null>(null);
+  const [status, setStatus] = useState<{ text: string; tone: "error" | "success" | "notice" } | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A previous course's success line must never survive into another lesson.
+  const scope = `${context.courseId}:${context.lessonId}`;
+  const scopeRef = useRef(scope);
+  useEffect(() => {
+    if (scopeRef.current === scope) return;
+    scopeRef.current = scope;
+    setStatus(null);
+    setPrompts([]);
+    setExpanded(false);
+  }, [scope]);
 
   const refresh = useCallback(async () => {
     const items = await collectCoachPrompts(context, dismissed);
@@ -74,13 +80,12 @@ export function useCoach(context: CoachContext, onPrepare: CoachPreparation): { 
     setBusy(true);
     setStatus(null);
     try {
-      const prepared = await onPrepare(prompt.target);
-      if (prepared === false) setStatus({ text: FAILURE_MESSAGE, tone: "error" });
-      else {
+      const result = await onPrepare(prompt.target);
+      if (result.prepared) {
         rememberDismissed(coachDismissalKey(prompt, context));
         setExpanded(false);
-        setStatus({ text: READY_MESSAGE[prompt.target.destination], tone: "success" });
       }
+      setStatus({ text: result.message || FAILURE_MESSAGE, tone: result.prepared ? "success" : result.message ? "notice" : "error" });
     } catch {
       setStatus({ text: FAILURE_MESSAGE, tone: "error" });
     } finally {

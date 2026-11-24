@@ -5,6 +5,7 @@ import {
   registerCoachProducer, selectCoachPrompt,
 } from "../src/coach/service.js";
 import { mapRecommendation, recommendationProducer } from "../src/coach/recommendationProducer.js";
+import { studyPreparationResult } from "../src/coach/contract.js";
 
 const context: CoachContext = { courseId: "c", lessonId: "l1", boardId: "board1", boardRevision: 2 };
 
@@ -71,6 +72,30 @@ describe("Coach contract and ranking", () => {
     }
     expect(await collectCoachPrompts(context)).toEqual([]);
     expect(selectCoachPrompt([], context)).toBeNull();
+  });
+});
+
+describe("truthful activation messages", () => {
+  it("claims a loaded question only when the study endpoint returned one", () => {
+    expect(studyPreparationResult({ presentationId: "p1", questionId: "q1" })).toEqual({
+      prepared: true, message: "Ready in Study. Your next question is loaded.",
+    });
+  });
+
+  it("names the real next action when no reviewed question was loaded", () => {
+    const result = studyPreparationResult({
+      status: "no-reviewed-questions",
+      reason: "No reviewed questions for this lesson yet.",
+      nextAction: { kind: "author-question", label: "Create a question from course text" },
+    });
+    expect(result.prepared).toBe(false);
+    expect(result.message).toContain("No reviewed question is ready");
+    expect(result.message).toContain("Create a question from course text");
+    expect(result.message).not.toContain("loaded");
+  });
+
+  it("never invents a question for an unrecognised successful response", () => {
+    expect(studyPreparationResult({}).prepared).toBe(false);
   });
 });
 
