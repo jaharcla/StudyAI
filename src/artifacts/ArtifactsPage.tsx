@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDialogFocus } from "../components/useDialogFocus";
-import { X } from "lucide-react";
 import {
   deleteSlideDeck,
   downloadSlideDeckUrl,
@@ -12,6 +11,7 @@ import {
 } from "./api";
 import { sourceLabel } from "../studio/api";
 import "./artifacts.css";
+import { SurfaceHeader, SurfaceNotice } from "../components/SurfaceChrome";
 
 type Props = {
   courseId: string;
@@ -135,10 +135,16 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
   return (
     <div className="artifacts-surface" data-testid="artifacts-surface">
       <div ref={dialogRef} tabIndex={-1} className="artifacts-shell" data-testid="artifacts-page" role="dialog" aria-modal="true" aria-label="Artifacts">
-        <header className="artifacts-head">
-          <div><h2>Artifacts</h2><p>Study decks made from {lessonTitle || courseTitle} material.</p></div>
-          <button className="icon-button" onClick={close} aria-label="Close artifacts"><X size={18} /></button>
-        </header>
+        <SurfaceHeader
+          eyebrow="Artifacts"
+          title="Artifacts"
+          subtitle={`Study decks made from ${lessonTitle || courseTitle} material.`}
+          backLabel="Back to workspace"
+          onBack={close}
+          onClose={close}
+          closeLabel="Close artifacts"
+          className="artifacts-head"
+        />
 
         <section className="artifacts-create" aria-label="Build a slide deck">
           <label htmlFor="deck-focus">What should this deck focus on?</label>
@@ -157,9 +163,12 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
           </div>
         </section>
 
-        <p className={`artifacts-status artifacts-status-${notice?.tone ?? "info"}`} data-testid="artifacts-status" role="status" aria-live="polite">
-          {busy === "loading" ? "Loading your decks…" : notice?.text}
-        </p>
+        <SurfaceNotice
+          tone={notice?.tone ?? "info"}
+          text={busy === "loading" ? "Loading your decks…" : notice?.text ?? ""}
+          testId="artifacts-status"
+          className={`artifacts-status artifacts-status-${notice?.tone ?? "info"}`}
+        />
 
         <div className="artifacts-layout">
           <section className="artifacts-list" aria-label="Saved decks">

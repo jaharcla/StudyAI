@@ -1,0 +1,106 @@
+/* Direction-agnostic chrome under the active immersive-real scheme.
+   Local tokens are scoped so they stay correct whichever direction is chosen later. */
+.surface-header {
+  --chrome-ink: #2a2621;
+  --chrome-muted: #5f564a;
+  --chrome-line: #ded7c9;
+  --chrome-bg: rgba(255, 253, 248, .96);
+  --chrome-accent: #7c4726;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--chrome-line);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
+}
+.dark .surface-header {
+  --chrome-ink: #f6f1e8;
+  --chrome-muted: #ded3c2;
+  --chrome-line: #4a4438;
+  --chrome-bg: #211e1a;
+  --chrome-accent: #f0b687;
+}
+.surface-heading { min-width: 0; }
+.surface-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--chrome-accent);
+}
+.surface-title {
+  margin: 3px 0 0;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--chrome-ink);
+}
+.surface-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--chrome-muted);
+}
+.surface-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.surface-back,
+.surface-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 8px;
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.surface-close { width: 32px; padding: 0; justify-content: center; }
+.surface-back:hover,
+.surface-close:hover { border-color: var(--chrome-accent); color: var(--chrome-accent); }
+.surface-back:focus-visible,
+.surface-close:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 2px; }
+
+.surface-notice {
+  --notice-ink: #4a4032;
+  --notice-bg: #f6efe2;
+  --notice-line: #d8c9ad;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid var(--notice-line);
+  border-radius: 9px;
+  background: var(--notice-bg);
+  color: var(--notice-ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.surface-notice p { margin: 0; }
+.surface-notice-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--notice-line); }
+.surface-notice-success { --notice-ink: #274a32; --notice-bg: #eaf3ea; --notice-line: #8fae95; }
+.surface-notice-error { --notice-ink: #6a2525; --notice-bg: #f8eaea; --notice-line: #c58b8b; }
+.surface-notice-loading { --notice-ink: #3f4550; --notice-bg: #eef0f4; --notice-line: #aab3c2; }
+.dark .surface-notice { --notice-ink: #f2eadc; --notice-bg: #2d281f; --notice-line: #8a7a5e; }
+.dark .surface-notice-success { --notice-ink: #d9efdc; --notice-bg: #203126; --notice-line: #7fa987; }
+.dark .surface-notice-error { --notice-ink: #f6d9d9; --notice-bg: #342323; --notice-line: #b98080; }
+.dark .surface-notice-loading { --notice-ink: #e2e6ee; --notice-bg: #252933; --notice-line: #8792a5; }
+
+/* Shared provenance vocabulary: citation chips and generated labels read the
+   same everywhere, without changing their text or links. */
+.surface-provenance {
+  border: 1px solid var(--chrome-line, #ded7c9);
+  border-radius: 999px;
+  color: var(--chrome-accent, #7c4726);
+  background: var(--chrome-bg, rgba(255, 253, 248, .96));
+}
+.dark .surface-provenance {
+  --chrome-line: #4a4438;
+  --chrome-accent: #f0b687;
+  --chrome-bg: #211e1a;
+}
