@@ -16,7 +16,7 @@ The plan feeds the one Coach. The Coach still emits one ranked prompt at a time,
 - Keep every item actionable through the existing `CoachTarget` contract (`courseId`, `lessonId`, `destination`, one of `boardId`/`activityId`/`cardId`, `conceptId`, plain `reason`).
 - Make the projection deterministic: same database state and same day produce the same plan, ids and order.
 - Preserve one Coach: one top prompt, secondary suggestions, honest preparation and Continue.
-- Display a small, dated step line inside the existing Coach dock under the current scheme.
+- Display a small, dated step line inside the Coach's next-step block in the Study tutor panel under the current scheme. There is no second dock; closing the tutor hides the Coach until the tutor is reopened.
 
 ## Non-goals
 
@@ -44,7 +44,7 @@ The plan feeds the one Coach. The Coach still emits one ranked prompt at a time,
 | `src/coach/contract.ts` | Shared `CoachPrompt`, `CoachTarget`, `CoachSource`, `mapRecommendation`-compatible shapes and dismissal/dedupe keys. |
 | `src/coach/service.ts` | Producer registry, ranking (urgency → board match → staleness → kind → id), dedupe, dismissal and one-prompt selection. |
 | `src/coach/recommendationProducer.ts` | Existing HTTP adapter and `mapRecommendation`; reused by the new adapter so mapping stays in one place. |
-| `src/coach/useCoach.ts` + `src/coach/coach.css` | The single dock, preview line, secondary list and `data-testid`s the plan badge joins. |
+| `src/coach/useCoach.ts` + `src/coach/coach.css` | The single next-step block inside the tutor panel, preview line, secondary list and `data-testid`s the plan badge joins. |
 | `src/App.tsx` | `registerCoachProducer(recommendationProducer)` and `prepareCoachTarget`: the one registration point and the real preparation path for study, board and studio targets. |
 
 ## Approaches
@@ -169,11 +169,11 @@ export const dailyPlanProducer: CoachProducer; // fetches /api/daily-plans?cours
 - `items.length <= 5`; ids unique; ids and order stable across repeated calls with the same `now`.
 - `mapDailyPlanItem` is the only place that adds the plan badge and derived label; `mapRecommendation` stays unchanged.
 - Registration in `src/App.tsx` swaps `recommendationProducer` for `dailyPlanProducer` rather than adding a second producer, so dedupe cannot hide or duplicate the same action.
-- The Coach surface keeps all current test ids (`coach-surface`, `coach-reason`, `coach-preview`, `coach-continue`, `coach-more`, `coach-secondary`, `coach-status`, `coach-dismiss`, `coach-toggle`). The badge adds one `data-testid="coach-plan"` line inside the dock.
+- The Coach surface keeps all current test ids (`coach-surface`, `coach-reason`, `coach-preview`, `coach-continue`, `coach-more`, `coach-secondary`, `coach-status`, `coach-dismiss`, `coach-toggle`). The badge adds one `data-testid="coach-plan"` line inside the tutor panel's Coach block.
 
 ## What is left to the builder
 
-- Exact badge copy and how the derived label reads in the rendered dock; keep it plain and under the current scheme, and check both light and dark states.
+- Exact badge copy and how the derived label reads in the rendered tutor-panel Coach block; keep it plain and under the current scheme, and check both light and dark states.
 - Confirm from the rendered DOM whether the step line belongs above or below the preview line; no layout or theme decision is made here.
 - Whether a course-wide or multi-day browser view is wanted later. It needs a different scope decision because `collectCoachPrompts` filters by lesson and clears on lesson change.
 - Local-time day handling if "today" must follow the student's timezone; this spec deliberately uses the explicit UTC date instead.

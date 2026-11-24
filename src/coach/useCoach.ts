@@ -1,8 +1,10 @@
 /**
  * React activation and the single Coach surface.
- * The surface follows the student across board, study and studio because it is mounted once
- * in App and pinned above the workspace. It never calls a view setter itself: App supplies
- * `onPrepare`, which prepares the real destination and reports success or failure.
+ * The surface renders inside the Study tutor panel, the app's one assistant surface. It follows
+ * the student across board, study and studio because it is mounted once in App's tutor panel and
+ * needs no floating layer. It never calls a view setter itself: App supplies `onPrepare`, which
+ * prepares the real destination and reports success or failure. Closing the tutor hides the Coach;
+ * reopening it brings the same ranked step back.
  * This file is intentionally .ts: the surface is built with createElement so the named
  * module can own both activation and presentation without a second view file.
  */
