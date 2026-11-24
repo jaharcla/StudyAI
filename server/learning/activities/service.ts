@@ -36,6 +36,14 @@ const SaveActivityCanvasSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   document: z.unknown(),
 }).strict();
+const ReplayPositionSchema = z.object({
+  ...ScopeSchema.shape,
+  attemptId: z.string().trim().min(1).max(200),
+  exampleId: z.string().trim().min(1).max(200),
+  stepIndex: z.number().int().nonnegative(),
+  mode: z.enum(["replay", "editing"]),
+  expectedUpdatedAt: z.string().datetime(),
+}).strict();
 
 type AttemptRow = { id: string; spec_key: string; course_id: string; lesson_id: string; canvas_id: string; state_json: string; artifact_bindings_json: string; initial_document_json: string; source_snapshot_json: string };
 type SpecRow = { spec_key: string; spec_json: string };
@@ -122,6 +130,7 @@ export class LearningActivityService {
       courseId: spec.courseId, lessonId: spec.lessonId, canvasId, canvasRevision: 0,
       status: "active", currentTaskIndex: 0, currentTaskId: spec.tasks[0]?.id ?? null,
       artifactBindings: bindings, responses: [], hintsUsed: [], createdAt, updatedAt: createdAt,
+      ...(spec.replay ? { replay: { exampleId: spec.replay.exampleId, stepIndex: 0, mode: "replay" as const } } : {}),
     });
     const create = this.database.transaction(() => {
       const canvas = saveCanvasDocument(this.database, { id: canvasId, courseId: input.courseId, lessonId: input.lessonId, name: `Activity · ${spec.title}`.slice(0, 120), expectedRevision: 0, document });
@@ -143,6 +152,34 @@ export class LearningActivityService {
     const sourceSnapshot = parseSourceSnapshot(attemptRow.source_snapshot_json);
     const currentTask = current.currentTaskId ? spec.tasks[current.currentTaskIndex] ?? null : null;
     return { spec, attempt: current, canvas, currentTask, sources: sourceSnapshot, latestResult: current.responses.at(-1)?.result ?? null };
+  }
+
+  /** Moves a worked-example cursor in state_json only: no event row, no canvas revision, no new table. */
+  setReplayPosition(raw: unknown) {
+    const input = ReplayPositionSchema.parse(raw);
+    const { attemptRow, spec } = this.scopedAttempt(input.attemptId, input.courseId, input.lessonId);
+    const attempt = ActivityAttemptSchema.parse(JSON.parse(attemptRow.state_json));
+    if (!attempt.replay) throw new ActivityServiceError("This activity has no replayable worked example.", 409, "no_replay");
+    if (attempt.replay.exampleId !== input.exampleId || spec.replay?.exampleId !== input.exampleId) {
+      throw new ActivityServiceError("The replay example does not belong to this attempt.", 409, "example_mismatch");
+    }
+    if (input.stepIndex >= spec.replay!.states.length) throw new ActivityServiceError("The step is outside this worked example.", 400, "invalid_step_index");
+    const next = ActivityAttemptSchema.parse({
+      ...attempt,
+      replay: { ...attempt.replay, stepIndex: input.stepIndex, mode: input.mode },
+      updatedAt: this.nextTimestamp(),
+    });
+    const persist = this.database.transaction(() => {
+      const current = this.database.prepare("SELECT state_json,updated_at FROM learning_activity_attempts WHERE id=? AND course_id=? AND lesson_id=?")
+        .get(attempt.id, input.courseId, input.lessonId) as { state_json: string; updated_at: string } | undefined;
+      if (!current || current.state_json !== attemptRow.state_json || current.updated_at !== input.expectedUpdatedAt) {
+        throw new ActivityServiceError("The replay position changed in another tab; reload before saving.", 409, "stale_attempt");
+      }
+      this.database.prepare("UPDATE learning_activity_attempts SET state_json=?,updated_at=? WHERE id=? AND course_id=? AND lesson_id=?")
+        .run(JSON.stringify(next), next.updatedAt, attempt.id, input.courseId, input.lessonId);
+      return next;
+    });
+    return persist.immediate();
   }
 
   async submit(raw: unknown) {

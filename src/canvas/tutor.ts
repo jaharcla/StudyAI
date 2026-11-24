@@ -4,7 +4,7 @@ import { synchronizeObject } from "./geometry";
 import { assertCanvasRevision, requireCanvasRevision } from "./proposal-revision";
 import { verifyMathOperation } from "./math-workspace";
 import type { MathStepOperation } from "./model";
-import { artifactBriefSchema, compileArtifactBrief, DEFAULT_VIEWPORT, type ArtifactBrief } from "./ai/teaching-scene";
+import { artifactBriefSchema, compileArtifactBrief, DEFAULT_VIEWPORT, type ArtifactBrief, type CompiledExampleState } from "./ai/teaching-scene";
 import { objectOccupancy, type LayoutRect } from "./ai/layout";
 import { validateCompiled } from "../artifacts/validate";
 import { ArtifactValidationError } from "../artifacts/contracts";
@@ -176,6 +176,7 @@ export type ArtifactBriefProposal = {
   description: string;
   sourceRefs: string[];
   verification: "generated-unverified";
+  states?: CompiledExampleState[];
 };
 
 export function proposeArtifactBrief(context: ArtifactBriefContext, value: unknown, baseRevisionOverride?: number): ArtifactBriefProposal {
@@ -196,6 +197,7 @@ export function proposeArtifactBrief(context: ArtifactBriefContext, value: unkno
     baseRevision, expectedObjects: JSON.stringify(context.objects), brief,
     objects: compiled.objects, description: compiled.description,
     sourceRefs: compiled.sourceRefs, verification: compiled.verification,
+    ...(compiled.states ? { states: compiled.states } : {}),
   };
 }
 

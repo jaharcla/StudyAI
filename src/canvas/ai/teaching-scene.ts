@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { newId, type ScientificObject } from "../model";
+import { emptyCanvasDocument, newId, parseCanvasDocument, type ScientificObject } from "../model";
 import { canvasActionSchema, type CanvasActionBatch } from "./canvas-actions";
 import { planLayout, type LayoutRect, type LayoutRequest } from "./layout";
 import { compileExpressionSync } from "../expressions";
+import { exampleStepSchema, type ExampleStep } from "../../artifacts/package";
 
 const nodeId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
 
@@ -141,6 +142,10 @@ export const artifactBriefSchema = z.object({
       sourceRef: z.string().min(1).max(400).optional(),
     }).strict()).max(8).optional(),
     concepts: z.array(z.string().min(1).max(80)).max(8).default([]),
+    /** Ordered semantic steps for a worked-example. Aliases only; no coordinates. */
+    states: z.array(exampleStepSchema).min(1).max(12).optional(),
+    /** Legacy narration steps, mirrored from the package component when no structured states are authored. */
+    steps: z.array(z.string().min(1).max(1000)).min(1).max(20).optional(),
     figure: z.object({
       kind: z.enum(["freebody", "vector", "graph", "anatomy", "equation", "mindmap"]),
       title: z.string().min(1).max(120),
@@ -194,11 +199,22 @@ export const artifactBriefSchema = z.object({
 });
 
 export type ArtifactBrief = z.infer<typeof artifactBriefSchema>;
+export type StepIntent = ExampleStep;
+/** One replayable state over the single planner-placed object set. Positions never change. */
+export type CompiledExampleState = {
+  index: number;
+  id: string;
+  narration: string;
+  objectIds: string[];
+  highlightIds: string[];
+  sourceRefs: string[];
+};
 export type CompiledArtifact = {
   objects: ScientificObject[];
   description: string;
   sourceRefs: string[];
   verification: "generated-unverified";
+  states?: CompiledExampleState[];
 };
 
 const QUESTION_WIDTH = 360;
@@ -376,6 +392,56 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
     }
   }
 
+  // Step intents resolve against the objects this artifact actually created. Aliases are stable
+  // semantic names, never pixels; the rectangles computed above are the only positions.
+  const aliasOf = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-");
+  const aliases = new Map<string, string>();
+  const register = (alias: string, id: string) => { if (alias) aliases.set(aliasOf(alias), id); };
+  const questions = objects.filter((object) => object.kind === "question");
+  questions.forEach((object, index) => { register("question", object.id); if (index === 0) register("prompt", object.id); register(`question-${index}`, object.id); });
+  let forceIndex = 0;
+  for (const object of objects) {
+    if (object.kind === "force") { register(object.label, object.id); register(`force-${forceIndex}`, object.id); forceIndex += 1; }
+  }
+  const figureObject = objects.find((object) => ["graph", "vector", "anatomy", "equation", "mindmap"].includes(object.kind));
+  if (figureObject) register("figure", figureObject.id);
+
+  const resolve = (alias: string): string => {
+    const id = aliases.get(aliasOf(alias)) ?? (objects.some((object) => object.id === alias) ? alias : undefined);
+    if (!id) throw new Error(`Unknown alias "${alias}". It must name an object this worked example compiles.`);
+    return id;
+  };
+  const validateState = (state: CompiledExampleState): CompiledExampleState => {
+    const subset = objects.filter((object) => state.objectIds.includes(object.id));
+    parseCanvasDocument({ ...emptyCanvasDocument(), objects: subset });
+    return state;
+  };
+
+  let states: CompiledExampleState[] | undefined;
+  if (input.artifact.kind === "worked-example") {
+    const authored = input.artifact.states;
+    const orderedIds = objects.map((object) => object.id);
+    if (authored) {
+      const revealed: string[] = [];
+      states = authored.map((step, index) => {
+        for (const alias of step.reveal) { const id = resolve(alias); if (!revealed.includes(id)) revealed.push(id); }
+        const highlightIds = step.highlight.map(resolve);
+        if (step.focus) resolve(step.focus);
+        return validateState({ index, id: step.id, narration: step.narration, objectIds: [...revealed], highlightIds, sourceRefs: [...input.sourceRefs] });
+      });
+    } else {
+      const legacy = input.artifact.steps ?? ["Worked example"];
+      states = legacy.map((narration, index) => {
+        const last = index === legacy.length - 1;
+        const objectIds = last ? [...orderedIds] : orderedIds.slice(0, Math.min(index + 1, orderedIds.length));
+        return validateState({ index, id: `step-${index}`, narration, objectIds, highlightIds: objectIds.length ? [objectIds[Math.min(index, objectIds.length - 1)]] : [], sourceRefs: [...input.sourceRefs] });
+      });
+    }
+    if (states.length && states.at(-1)!.objectIds.length < objects.length) {
+      throw new Error("The final worked-example state must reveal every object in the example.");
+    }
+  }
+
   const forceLabels = figure?.forces?.map((force) => force.label) ?? [];
   const citation = input.artifact.citationLabel ?? input.sourceRefs.join(", ") ?? "no cited source";
   const where = input.placement.relation === "clear-area" ? "the clear area" : `${input.placement.relation} your sketch`;
@@ -389,5 +455,5 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
   };
   const description = `adds ${[countText[input.artifact.kind], figureText].filter(Boolean).join(" and ")} in ${where}, citing ${citation} — generated, not verified`;
 
-  return { objects, description, sourceRefs: [...input.sourceRefs], verification: "generated-unverified" };
+  return { objects, description, sourceRefs: [...input.sourceRefs], verification: "generated-unverified", ...(states ? { states } : {}) };
 }
