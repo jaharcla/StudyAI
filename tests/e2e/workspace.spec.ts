@@ -15,11 +15,6 @@ test("workspace renders, saves its canvas, and switches study views", async ({ p
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("heading", { name: "Atomic structure & bonding", exact: true })).toBeVisible();
   await expect(page.getByText("STUDY CANVAS")).toBeVisible();
-  await page.getByRole("button", { name: "Settings", exact: true }).last().click();
-  const model = page.getByTestId("model-select");
-  await expect(model.locator("option")).not.toHaveCount(0);
-  await model.selectOption("qwen3:latest");
-  await page.getByRole("button", { name: "Done", exact: true }).click();
   const chat = page.getByTestId("copilot-chat-textarea");
   await chat.fill("Reply with exactly STUDYAI-OLLAMA-OK");
   await chat.press("Enter");

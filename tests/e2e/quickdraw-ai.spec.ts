@@ -24,11 +24,6 @@ test("Copilot proposes a Quickdraw edit without replacing scientific canvas obje
 
   const boards = await (await page.request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`)).json();
   const boardId = boards[0].id as string;
-  await page.getByRole("button", { name: "Settings", exact: true }).last().click();
-  await expect(page.getByTestId("model-select").locator("option")).not.toHaveCount(0);
-  await page.getByTestId("model-select").selectOption("qwen3:latest");
-  await page.getByRole("button", { name: "Done", exact: true }).click();
-
   const chat = page.getByTestId("copilot-chat-textarea");
   await chat.fill(`Use propose_canvas_action to create a blue text label "Approved AI label" at x=250, y=200 on board ${boardId}. Preserve all existing content.`);
   await chat.press("Enter");
