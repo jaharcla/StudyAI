@@ -112,6 +112,8 @@ Also entering wave 2 after wave 1 UI work: course/lesson creation dialog and nav
 - Quote `npm run verify` output in every handoff. Canvas prompt/model/provider changes additionally require `benchmark:canvas` four gate numbers.
 - Review every diff before merging; a worker's completion claim is not verification.
 
+Overnight accessibility pass shipped: 2px focus rings, 44px hit targets, labelled dialogs with focus trap and restore, Escape dismissal across shells, hidden lesson controls removed from Tab order, tinted contrast text in both themes, and narration controls clear of the floating toolbar. `tests/e2e/a11y-polish.spec.ts` passes 5/5 on main. Remaining known limits: third-party CopilotKit buttons stay under 44px; nested dialog Tab order is untested.
+
 ## Active workers
 
 Tracked in the channel; this table is updated when work lands.
