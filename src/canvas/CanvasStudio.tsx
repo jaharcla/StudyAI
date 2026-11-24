@@ -29,6 +29,7 @@ import { recognitionSourceKey, submitRecognitionFeedback, teachSelectedDrawing, 
 import type { CanvasSceneNode } from "./spatial/types";
 import { createMathWorkspaceState, tutorMathWorkspace } from "./math-workspace";
 import { captureQuickdrawOCRRegions } from "./ocr-capture.js";
+import { NarrationPanel } from "./NarrationPanel";
 
 type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
@@ -967,6 +968,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         {loading ? <div className="canvas-loading">Loading saved canvasâ€¦</div> : <>
           <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} onSelectionChange={(ids) => setSelectedShapeIds(ids)} />
           {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} registeredCards={registeredCards} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { cancelNativeGesture(); editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
+          <NarrationPanel objects={document.objects} boardRevision={activeBoard?.revision ?? 0} editor={editorRef.current} />
         </>}
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas changeâ€¦</div>}
       </div>
