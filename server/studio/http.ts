@@ -19,12 +19,13 @@ const PackageRequestSchema = z.object({
   evidence: z.array(z.object({ ref: z.string().min(1), text: z.string() }).strict()).min(1).max(20),
 }).strict();
 
-export function createStudioHandler(db: Database.Database, learning: LearningService, origin = "http://127.0.0.1:5173") {
+export function createStudioHandler(db: Database.Database, learning: LearningService, origin: string | ((req: IncomingMessage) => string) = "http://127.0.0.1:5173") {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(req) : origin;
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (!url.pathname.startsWith("/api/studio/")) return false;
     const send = (status: number, value: unknown) => {
-      res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" });
+      res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" });
       res.end(JSON.stringify(value));
     };
     if (req.method === "OPTIONS") { send(204, {}); return true; }

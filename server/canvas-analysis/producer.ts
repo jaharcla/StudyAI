@@ -187,14 +187,15 @@ async function produce(
   return validateCanvasAnalysisAtReceiver(database, result, scope);
 }
 
-export function createCanvasAnalysisProducerHandler(database: Database.Database, origin: string, options: { analyze?: AnalyzeCanvas; now?: () => Date } = {}) {
+export function createCanvasAnalysisProducerHandler(database: Database.Database, origin: string | ((request: IncomingMessage) => string), options: { analyze?: AnalyzeCanvas; now?: () => Date } = {}) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(request) : origin;
     if (request.method !== "POST") return false;
     const url = new URL(request.url ?? "/", "http://localhost");
     const match = /^\/api\/canvases\/([^/]+)\/analysis$/.exec(url.pathname);
     if (!match) return false;
     const send = (status: number, data: unknown) => {
-      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
       response.end(JSON.stringify(data));
     };
     let boardId: string;

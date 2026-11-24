@@ -4,14 +4,15 @@ import { CanvasAnalysisValidationError } from "./contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./receiver.js";
 import { loadCanvasAnalysis } from "./storage.js";
 
-export function createCanvasAnalysisHandler(database: Database.Database, origin: string) {
+export function createCanvasAnalysisHandler(database: Database.Database, origin: string | ((request: IncomingMessage) => string)) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(request) : origin;
     const url = new URL(request.url ?? "/", "http://localhost");
     if (request.method === "GET") {
       const getMatch = /^\/api\/canvases\/([^/]+)\/analysis$/.exec(url.pathname);
       if (!getMatch) return false;
       const send = (status: number, data: unknown) => {
-        response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+        response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
         response.end(JSON.stringify(data));
       };
       let boardId: string;
@@ -35,7 +36,7 @@ export function createCanvasAnalysisHandler(database: Database.Database, origin:
     const match = /^\/api\/canvases\/([^/]+)\/analysis\/validate$/.exec(url.pathname);
     if (!match) return false;
     const send = (status: number, data: unknown) => {
-      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
       response.end(JSON.stringify(data));
     };
     let boardId: string;

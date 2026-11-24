@@ -14,8 +14,10 @@ const UPLOAD_ID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 type Handler = (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
 
 export function createDocumentIntelligenceHandler(db: Database.Database, storageRoot?: string): Handler {
-  const origin = getStudyAIConfig().webOrigin;
   return async (request, response) => {
+    const cfg = getStudyAIConfig();
+    const requestOriginHeader = request.headers.origin as string | undefined;
+    const origin = requestOriginHeader && cfg.allowedOrigins.includes(requestOriginHeader) ? requestOriginHeader : cfg.webOrigin;
     const url = new URL(request.url ?? "/", `http://${LOOPBACK_HOST}`);
     if (url.pathname.startsWith("/api/document-intelligence/") && request.method === "OPTIONS") {
       response.writeHead(204, { "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });

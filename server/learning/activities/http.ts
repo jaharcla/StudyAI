@@ -2,11 +2,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { ZodError } from "zod";
 import { ActivityServiceError, LearningActivityService } from "./service.js";
 
-export function createLearningActivityHandler(service: LearningActivityService, origin = "http://127.0.0.1:5173") {
+export function createLearningActivityHandler(service: LearningActivityService, origin: string | ((request: IncomingMessage) => string) = "http://127.0.0.1:5173") {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(request) : origin;
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     const send = (status: number, value: unknown) => {
-      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" });
+      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" });
       response.end(JSON.stringify(value));
     };
     if (request.method === "OPTIONS") { send(204, {}); return true; }
