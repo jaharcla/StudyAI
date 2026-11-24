@@ -16,7 +16,7 @@ test("Lewis tool opens a sidebar with bond orders and element rows", async ({ pa
   await page.getByTestId("lewis-element-row-N").click();
   const board = page.locator(".canvas-board");
   const box = (await board.boundingBox())!;
-  await page.mouse.click(box.x + 360, box.y + 220);
+  await page.mouse.click(box.x + 560, box.y + 260);
   await expect(page.locator('[data-kind="molecule"]')).toBeVisible();
   await expect(page.locator('[data-kind="molecule"] [data-element="N"]')).toHaveCount(1);
   await page.getByTestId("lewis-bond-row-toggle").click();

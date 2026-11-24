@@ -12,7 +12,7 @@ test("radial actions appear around a selected atom and can add a lone pair", asy
   await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
   await page.getByTestId("lewis-element-row-O").click();
   const box = (await page.locator(".canvas-board").boundingBox())!;
-  await page.mouse.click(box.x + 360, box.y + 220);
+  await page.mouse.click(box.x + 560, box.y + 260);
   await expect(page.getByTestId("radial-actions")).toBeVisible();
   await expect(page.getByTestId("radial-add-pair")).toBeVisible();
   const before = await page.locator('[data-element="O"] .lone-electron').count();
