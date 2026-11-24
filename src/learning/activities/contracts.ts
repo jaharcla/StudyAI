@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { exampleStepSchema } from "../../artifacts/package";
 
 const id = z.string().trim().min(1).max(200);
 const jsonValue: z.ZodType<unknown> = z.lazy(() => z.union([
@@ -43,6 +44,18 @@ export const ActivityTaskSchema = z.object({
   assessment: z.object({ mastery: z.enum(["bkt", "none"]) }).strict(),
 }).strict();
 
+/** Additive checkpoint descriptor for a replayable worked example attached to an activity. */
+export const ActivityReplaySpecSchema = z.object({
+  exampleId: z.string().trim().min(1).max(200),
+  states: z.array(exampleStepSchema).min(1).max(12),
+  sourceRefs: z.array(z.string().min(1).max(400)).max(8),
+}).strict();
+export const ActivityReplayAttemptSchema = z.object({
+  exampleId: z.string().trim().min(1).max(200),
+  stepIndex: z.number().int().nonnegative(),
+  mode: z.enum(["replay", "editing"]),
+}).strict();
+
 export const ActivitySpecSchema = z.object({
   schemaVersion: z.literal(1),
   id,
@@ -57,6 +70,7 @@ export const ActivitySpecSchema = z.object({
   tasks: z.array(ActivityTaskSchema).min(1).max(30),
   interactions: z.object({ allowMove: z.boolean(), allowDrawing: z.boolean() }).strict(),
   transfer: jsonObject.optional(),
+  replay: ActivityReplaySpecSchema.optional(),
 }).strict();
 
 export const CheckerOutcomeSchema = z.enum(["correct", "incorrect", "unknown", "unsupported"]);
@@ -97,6 +111,7 @@ export const ActivityAttemptSchema = z.object({
   hintsUsed: z.array(z.object({ taskId: id, hintIndex: z.number().int().nonnegative() }).strict()).max(150),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
+  replay: ActivityReplayAttemptSchema.optional(),
 }).strict();
 
 export const LearningEventSchema = z.object({

@@ -46,6 +46,7 @@ export function createLearningActivityHandler(service: LearningActivityService, 
         const body = JSON.parse(await readBody(request));
         if (action === "submit") { send(200, await service.submit({ ...body, attemptId })); return true; }
         if (action === "hints") { send(200, service.useHint({ ...body, attemptId })); return true; }
+        if (action === "replay-position") { send(200, service.setReplayPosition({ ...body, attemptId })); return true; }
       }
       return false;
     } catch (error) {
