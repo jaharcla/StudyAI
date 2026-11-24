@@ -33,8 +33,9 @@ Reliability: PDF worker now loads as a Vite asset (`19f9533`); smoke clicks ever
 
 - Reliability sweep, Today/daily plans, Tutor trust, Shared library: finished and merged or reviewed; threads `1574910108671148052`, `1574910341085794476`, `1574919601777803324`, `1574921923337650296`.
 - Studio parity: stopped after two non-implementations; only doc `cda98ba`, not merged. Thread `1574919600615723039`.
-- Tutor depth (J2): `work/tutor-depth-20261124`, thread `1574927116963938467`, ports 5707/8723/8724/8617. Running; Playwright first.
-- Study loop (J3/J5): `work/study-loop-20261124`, thread `1574927166859378699`, ports 5708/8725/8726/8618. Running; holds Playwright until Tutor is clear.
+- Tutor depth (J2): `work/tutor-depth-20261124`, thread `1574927860899119226`, ports 5707/8723/8724/8617. Running on Hy4 Flash Free; Playwright first.
+- Study loop (J3/J5): `work/study-loop-20261124`, thread `1574927907959210014`, ports 5708/8725/8726/8618. Running on Hy4 Flash Free; holds Playwright until Tutor is clear.
+- Partner instruction 2026-11-24: all workers must use `opencode-go/hy4-flash-free`, never beam-free. Two beam-free workers were aborted before they wrote code and relaunched on Hy4.
 
 ## Integrations checked
 
