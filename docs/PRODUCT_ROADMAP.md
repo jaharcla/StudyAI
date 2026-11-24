@@ -116,6 +116,8 @@ Overnight accessibility pass shipped: 2px focus rings, 44px hit targets, labelle
 
 Final full `npm run verify` on main (2026-11-24, `opencode-go` / `hy4-flash-free`): **91 passed, 2 failed, 2 flaky, 6 skipped (10.0m)**, exit 1. Both failures are provider-dependent: `quickdraw-ai.spec.ts` and `workspace.spec.ts` still try to select a disabled Ollama `qwen3:latest` model in Settings, so they cannot run under the active provider. The two flaky specs (`canvas-visual-remediation`, `tutor-math`) passed on retry. The unit phase is clean: `tsc -b` with no errors and 127 files / 811 tests passing. Targeted browser specs for every shipped track pass on main. Remaining limits: PPTX export needs a running Presenton service, and the visual theme direction still awaits the owner's choice.
 
+Integrated on main: the daily-plans spec and plan, and the opt-in Wolfram/Vega tool port from PR #19 without merging that PR. The external flag stays off, the default prompt and tool set are unchanged, and the per-turn tool-call cap now applies to all turns as a safety bound. After dependency install: `tsc -b` clean and 128 files / 822 unit tests pass. Remaining in flight: app cohesion and pen UX ports.
+
 ## Active workers
 
 Tracked in the channel; this table is updated when work lands.
