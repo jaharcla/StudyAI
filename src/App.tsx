@@ -1,5 +1,6 @@
 ﻿import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CopilotChat, CopilotChatConfigurationProvider, CopilotKitProvider, useAgentContext, useCopilotChatConfiguration } from "@copilotkit/react-core/v2";
+import { VegaChartToolRenderer } from "./charts/VegaChartTool";
 import { Activity, Atom, BookOpen, Brain, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Menu, Moon, MoreHorizontal, Network, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
 import { CanvasStudio } from "./canvas/CanvasStudio";
@@ -523,7 +524,7 @@ function Workspace() {
   </div></>;
 }
 
-export default function App() { return <CopilotKitProvider runtimeUrl="/api/copilotkit" agentId="studyai" enableInspector={false}><CopilotChatConfigurationProvider><Workspace /></CopilotChatConfigurationProvider></CopilotKitProvider>; }
+export default function App() { return <CopilotKitProvider runtimeUrl="/api/copilotkit" agentId="studyai" enableInspector={false}><VegaChartToolRenderer /><CopilotChatConfigurationProvider><Workspace /></CopilotChatConfigurationProvider></CopilotKitProvider>; }
 
 function AgentContext({ course, canvas, view, model, lessonId, lessonTitle }: { lessonId: string; lessonTitle: string; course: Course; canvas: { objectCount: number; objectTypes: Record<string, number> }; view: View; model: string }) {
   useAgentContext({ description: "StudyAI current workspace and structured canvas metadata", value: { courseId: course.id, lessonId, course: course.title, courseCode: course.code, lesson: lessonTitle, view, canvas } });
