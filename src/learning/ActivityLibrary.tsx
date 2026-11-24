@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { API } from "../api";
+import { useDialogFocus } from "../components/useDialogFocus";
 import type { ActivityAttempt, ActivitySpec } from "./activities/contracts";
 
 type SourceHit = { sourceRef: string; excerpt: string; title: string; unitType: string; unitNumber: number };
@@ -21,6 +22,8 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(true, dialogRef);
 
   const refresh = useCallback(async () => {
     const response = await fetch(`${API}/activities?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`);
@@ -159,10 +162,10 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
   };
 
   return <div className="modal-shade activity-library-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="activity-library" role="dialog" aria-modal="true" aria-label="Learning activities">
-      <header className="activity-library-head"><div><span className="eyebrow">{courseId} · {lessonId}</span><h2>Learning activities</h2><p>Use a course-backed specification to create a structured canvas task.</p></div><button className="icon-button" aria-label="Close activities" onClick={onClose}><X size={18} /></button></header>
+    <section ref={dialogRef} tabIndex={-1} className="activity-library" role="dialog" aria-modal="true" aria-label="Learning activities">
+      <header className="activity-library-head"><div><span className="eyebrow">THIS LESSON</span><h2>Learning activities</h2><p>Use a course-backed specification to create a structured canvas task.</p></div><button className="icon-button" aria-label="Close activities" onClick={onClose}><X size={18} /></button></header>
       <div className="activity-library-grid">
-        <section className="activity-library-list"><h3>Saved activities</h3>{specs.length ? specs.map((row) => <article className="activity-list-row" key={row.id}><div><b>{row.title}</b><small>{row.id} · v{row.version}</small></div><button className="button-soft" disabled={busy} onClick={() => void loadSpec(row.id)}>Inspect</button><button className="button-primary" disabled={busy} onClick={() => void start(row.id)}>Start</button></article>) : <p className="activity-muted">No activities for this lesson yet.</p>}
+        <section className="activity-library-list"><h3>Saved activities</h3>{specs.length ? specs.map((row) => <article className="activity-list-row" key={row.id}><div><b>{row.title}</b><small>Version {row.version}</small></div><button className="button-soft" disabled={busy} onClick={() => void loadSpec(row.id)}>Inspect</button><button className="button-primary" disabled={busy} onClick={() => void start(row.id)}>Start</button></article>) : <p className="activity-muted">No activities for this lesson yet.</p>}
           <h3>Recent attempts</h3>{attempts.length ? attempts.map(({ attempt, activityTitle }) => <article className="activity-list-row" key={attempt.id}><div><b>{activityTitle}</b><small>{attempt.status} · {attempt.responses.length} checked</small></div><button className="button-soft" disabled={busy} onClick={() => void resume(attempt.id)}>Resume</button></article>) : <p className="activity-muted">Attempts appear here after you start an activity.</p>}
           <h3>Course source</h3><div className="activity-source-search"><input aria-label="Search course sources" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void searchSource(); }} placeholder="Search indexed course material" /><button className="button-soft" disabled={!sourceQuery.trim()} onClick={() => void searchSource()}>Search</button></div>
           {sourceHits.map((hit) => <button className={`activity-source-hit ${selectedSource?.sourceRef === hit.sourceRef ? "selected" : ""}`} key={hit.sourceRef} onClick={() => void chooseSource(hit)}><b>{hit.title} · {hit.unitType} {hit.unitNumber}</b><span>{hit.excerpt}</span></button>)}

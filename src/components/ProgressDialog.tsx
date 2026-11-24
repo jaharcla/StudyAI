@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Brain, X } from "lucide-react";
 import { API } from "../api";
+import { useDialogFocus } from "./useDialogFocus";
 import type { CourseProgress } from "../../server/progress.js";
 
 export default function ProgressDialog({ courseId, onClose }: { courseId: string; onClose: () => void }) {
   const [progress, setProgress] = useState<CourseProgress | null>(null);
   const [error, setError] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  useDialogFocus(true, dialogRef);
 
   useEffect(() => {
     let live = true;
@@ -30,7 +33,7 @@ export default function ProgressDialog({ courseId, onClose }: { courseId: string
 
   return (
     <div className="modal-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="settings-modal progress-modal" role="dialog" aria-label="Learning progress" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} tabIndex={-1} className="settings-modal progress-modal" role="dialog" aria-label="Learning progress" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <div><span className="eyebrow">LOCAL STUDY DATA</span><h2>Learning progress</h2></div>
           <button className="icon-button" onClick={onClose} aria-label="Close progress"><X size={18} /></button>
@@ -64,12 +67,12 @@ export default function ProgressDialog({ courseId, onClose }: { courseId: string
         .progress-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}
         .progress-stats div{display:grid;gap:3px;padding:12px;border:1px solid #e8e2d8;border-radius:9px;background:#fbf9f4}
         .progress-stats b{font:600 20px Georgia,serif}
-        .progress-stats span{color:#8a8072;font-size:9px}
-        .progress-heading{margin:18px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9c9386}
+        .progress-stats span{color:#645b4e;font-size:9px}
+        .progress-heading{margin:18px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6b6256}
         .progress-lessons{display:grid;gap:8px;max-height:38vh;overflow:auto}
         .progress-lesson{display:grid;gap:5px}
         .progress-lesson>div:first-child{display:flex;justify-content:space-between;font-size:11px}
-        .progress-lesson small{color:#9c9386;font-size:9px}
+        .progress-lesson small{color:#6b6256;font-size:9px}
         .progress-bar{height:5px;border-radius:99px;background:#ece6dc;overflow:hidden}
         .progress-bar i{display:block;height:100%;background:#7a452e}
         .progress-note{display:flex;align-items:center;gap:6px;margin:14px 2px 0;color:#8a8072;font-size:10px}

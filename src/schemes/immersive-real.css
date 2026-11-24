@@ -83,20 +83,20 @@
 .study-stage .stage-brand{display:flex;align-items:center;gap:9px;padding:2px 6px 16px;font:600 18px Georgia,serif}
 .study-stage .stage-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#2c2a27;color:#fff}
 .study-stage .stage-back{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #ddd7cc;border-radius:8px;background:#fffdf8;color:#4a453e;font-size:11px;font-weight:600;cursor:pointer}
-.study-stage .stage-group{margin:14px 8px 3px;color:#9c9386;font-size:9px;font-weight:700;letter-spacing:.13em}
+.study-stage .stage-group{margin:14px 8px 3px;color:#6b6256;font-size:9px;font-weight:700;letter-spacing:.13em}
 .study-stage .stage-session{display:grid;gap:2px;text-align:left;padding:9px 10px;border:0;border-radius:8px;background:transparent;color:#544e46;font-size:11px;cursor:pointer}
 .study-stage .stage-session.active{background:#fffdf8;box-shadow:0 1px 2px rgba(50,40,25,.08);font-weight:600}
-.study-stage .stage-session small{color:#9c9386;font-size:9px;font-weight:400}
+.study-stage .stage-session small{color:#6b6256;font-size:9px;font-weight:400}
 .study-stage .stage-main{flex:1;display:flex;flex-direction:column;min-width:0}
 .study-stage .stage-head{display:flex;align-items:center;justify-content:space-between;height:54px;padding:0 22px;border-bottom:1px solid #eae6de;background:#fffdf8}
 .study-stage .stage-head strong{display:block;font:600 14px Georgia,serif}
-.study-stage .stage-head span{display:block;margin-top:2px;color:#9c9386;font-size:10px}
+.study-stage .stage-head span{display:block;margin-top:2px;color:#6b6256;font-size:10px}
 .study-stage .stage-head button{border:0;background:transparent;color:#8b8377;cursor:pointer}
 .study-stage .stage-body{flex:1;display:grid;place-items:center;padding:24px;overflow:auto}
 .study-stage .study-shade{position:static;display:block;background:transparent;padding:0}
 .study-stage .study-panel{position:static;width:min(660px,100%);max-height:none;border:1px solid #ded7ca;border-radius:14px;background:#fffdf8;box-shadow:0 14px 44px rgba(50,36,20,.10);font-family:'DM Sans',sans-serif}
 .study-stage .study-panel header{border-radius:14px 14px 0 0}
-.study-stage .stage-tip{max-width:660px;margin:14px auto 0;color:#9c9386;font-size:10px;text-align:center}
+.study-stage .stage-tip{max-width:660px;margin:14px auto 0;color:#6b6256;font-size:10px;text-align:center}
 
 /* Quickdraw dock matches the paper stage */
 .app-shell .qd-root{background:#f4f2ec}
@@ -116,4 +116,38 @@
   .app-shell.tutor-open .work-area{padding-right:0;padding-bottom:62vh}
   .study-stage .stage-sidebar{display:none}
   .study-stage .study-panel{border-radius:10px}
+}
+
+/* Accessibility pass: tinted secondary text, real hit targets, keyboard focus. */
+.app-shell .topbar .breadcrumbs{color:#695f52}
+.app-shell .topbar .breadcrumbs b{color:#2a2621}
+.app-shell .topbar button,.app-shell .workspace-toolbar button,.app-shell .workspace-toolbar select{min-height:44px}
+.app-shell .topbar button,.app-shell .topbar .immersive-actions button,.app-shell .topbar .top-actions button,.app-shell .tutor-header button,.app-shell .tutor-context button,.app-shell .modal-shade button.icon-button{min-width:44px;min-height:44px}
+.app-shell .di-tool-button,.app-shell .di-icon-button,.app-shell .di-delete-button{width:44px;height:44px}
+.app-shell .canvas-tools-bar button,.app-shell .canvas-actions button{min-width:44px;min-height:44px}
+.app-shell .narration-controls button,.app-shell .steppable-rail button{min-height:44px}
+.app-shell .palette-tool-icon>span{color:#865438}
+.app-shell .science-tabs button.current,.app-shell .science-result b{color:#8d583e}
+.app-shell .tree-sub{color:#626a76}
+.app-shell .button-primary{background:#8d583e;color:#fff}
+.app-shell .workspace-toolbar{left:calc(50% - 70px)}
+.app-shell.view-split .workspace-toolbar{left:calc(25vw + 24px)}
+.app-shell .canvas-board>.narration-open{z-index:22}
+.app-shell .narration-progress button{--narration-bar:#dcd6ca}
+.app-shell .narration-progress button.current{--narration-bar:#b45f12}
+.app-shell.dark .topbar .breadcrumbs{color:#c9c1b5}
+.app-shell.dark .topbar .breadcrumbs b{color:#f0ece4}
+.app-shell.dark .palette-heading span,.app-shell.dark .palette-group h2,.app-shell.dark .tutor-title small,.app-shell.dark .context-label span,.app-shell.dark .context-card small,.app-shell.dark .tutor-context p,.app-shell.dark .tutor-disclaimer,.app-shell.dark .canvas-egress,.app-shell.dark .canvas-analysis-meta,.app-shell.dark .copilot-slot h1{color:#c6ced9}
+.app-shell.dark .canvas-tool-palette{background:#232932;border-color:#3a4350}
+.app-shell.dark .palette-tool{background:#2a3039;color:#e7effa}
+.app-shell.dark .palette-tool:hover{background:#343c47}
+.app-shell.dark .palette-tool-icon{background:#39424e}
+.app-shell.dark .palette-tool-icon>span{color:#f0c09b}
+.app-shell.dark .qd-watermark{color:#6b6256}
+.app-shell.dark .narration-progress button{--narration-bar:#59616c}
+.app-shell.dark .narration-progress button.current{--narration-bar:#e5952c}
+.app-shell.dark .narration-panel header span,.app-shell.dark .narration-cue-index,.app-shell.dark .narration-panel footer{color:#c6ced9}
+@media(prefers-reduced-motion:reduce){
+  .app-shell .sidebar,.app-shell .sidebar-scrim,.app-shell .workspace-toolbar,.app-shell .coach-dock{transition:none!important;animation:none!important}
+  .app-shell .narration-progress button,.app-shell .steppable-tick{transition:none!important}
 }

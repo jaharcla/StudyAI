@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useDialogFocus } from "../components/useDialogFocus";
 import {
   ArrowLeft, BookOpen, ChartColumn, Check, CircleAlert, CircleCheck, Download,
   ListTree, LoaderCircle, Sparkles, X,
@@ -58,6 +59,8 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [errorAction, setErrorAction] = useState<"generate" | "accept">("generate");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef);
 
   useEffect(() => {
     let live = true;
@@ -111,7 +114,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const retry = () => { if (errorAction === "accept") void accept(); else void generate(); };
 
   return (
-    <div className="studio-surface" role="dialog" aria-modal="true" aria-label="StudyAI Studio" data-testid="studio-surface">
+    <div ref={dialogRef} tabIndex={-1} className="studio-surface" role="dialog" aria-modal="true" aria-label="StudyAI Studio" data-testid="studio-surface">
       <aside className="studio-sidebar">
         <div className="studio-brand"><span className="studio-mark"><Sparkles size={16} /></span> studyai <small>studio</small></div>
         <button className="studio-back" onClick={close}><ArrowLeft size={15} /> Back to workspace</button>

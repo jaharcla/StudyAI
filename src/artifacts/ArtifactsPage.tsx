@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDialogFocus } from "../components/useDialogFocus";
 import { X } from "lucide-react";
 import {
   deleteSlideDeck,
@@ -49,6 +50,8 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
   const [notice, setNotice] = useState<Notice | undefined>();
   const [busy, setBusy] = useState<Busy>("loading");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef);
 
   const refresh = useCallback(() => {
     void listSlideDecks(courseId)
@@ -131,7 +134,7 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
 
   return (
     <div className="artifacts-surface" data-testid="artifacts-surface">
-      <div className="artifacts-shell" data-testid="artifacts-page" role="dialog" aria-modal="true" aria-label="Artifacts">
+      <div ref={dialogRef} tabIndex={-1} className="artifacts-shell" data-testid="artifacts-page" role="dialog" aria-modal="true" aria-label="Artifacts">
         <header className="artifacts-head">
           <div><h2>Artifacts</h2><p>Study decks made from {lessonTitle || courseTitle} material.</p></div>
           <button className="icon-button" onClick={close} aria-label="Close artifacts"><X size={18} /></button>

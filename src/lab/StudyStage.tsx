@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Activity, ArrowLeft, BookOpen, Layers, Sparkles, X } from "lucide-react";
 import { StudyPanel } from "../learning/StudyPanel";
+import { useDialogFocus } from "../components/useDialogFocus";
 
 type Props = {
   courseId: string;
@@ -16,8 +17,10 @@ type Props = {
  *  adaptive StudyPanel (questions, FSRS reviews, real course citations). */
 export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenActivities, onOpenSources }: Props) {
   const [mode, setMode] = useState<"quiz" | "activities" | "sources">("quiz");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(true, dialogRef);
   return (
-    <div className="study-stage" role="dialog" aria-modal="true" aria-label="Study session">
+    <div ref={dialogRef} tabIndex={-1} className="study-stage" role="dialog" aria-modal="true" aria-label="Study session">
       <aside className="stage-sidebar">
         <div className="stage-brand"><span className="stage-mark"><Sparkles size={16} /></span> studyai</div>
         <button className="stage-back" onClick={close}><ArrowLeft size={15} /> Back to canvas</button>

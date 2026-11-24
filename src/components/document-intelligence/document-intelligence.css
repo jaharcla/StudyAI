@@ -1,6 +1,6 @@
 .di-library {
   --di-ink: #263333;
-  --di-muted: #7b8985;
+  --di-muted: #5b6b63;
   --di-line: #e4e9e4;
   --di-soft: #f6f8f5;
   --di-accent: #6c907a;
@@ -55,10 +55,10 @@
 .di-icon-button:hover, .di-tool-button:hover { background: #edf2ed; color: var(--di-ink); }
 .di-library-toolbar { margin: 29px 0 13px; }
 .di-library-count { display: flex; align-items: center; gap: 8px; }
-.di-library-count > span { min-width: 22px; padding: 3px 7px; border-radius: 20px; background: #eef2ed; color: #708078; text-align: center; font-size: 10px; }
-.di-library-search, .di-view-search { display: flex; align-items: center; gap: 8px; min-width: min(340px, 50vw); padding: 8px 10px; border: 1px solid var(--di-line); border-radius: 9px; color: #82908a; background: #fff; }
+.di-library-count > span { min-width: 22px; padding: 3px 7px; border-radius: 20px; background: #eef2ed; color: #526157; text-align: center; font-size: 10px; }
+.di-library-search, .di-view-search { display: flex; align-items: center; gap: 8px; min-width: min(340px, 50vw); padding: 8px 10px; border: 1px solid var(--di-line); border-radius: 9px; color: #5f6f66; background: #fff; }
 .di-library-search input, .di-view-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--di-ink); background: transparent; font-size: 11px; }
-.di-library-search kbd { padding: 2px 5px; border: 1px solid #e8ece7; border-radius: 4px; color: #9aa49e; font-size: 9px; }
+.di-library-search kbd { padding: 2px 5px; border: 1px solid #e8ece7; border-radius: 4px; color: #626f68; font-size: 9px; }
 .di-search-results { display: grid; gap: 8px; margin: 0 0 17px; padding: 14px; border: 1px solid var(--di-line); border-radius: 11px; background: #fbfcfa; }
 .di-search-hit { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid #edf0ec; border-radius: 8px; background: white; }
 .di-search-hit:hover { border-color: #bfcec1; }
@@ -76,12 +76,12 @@
 .di-document-main strong { color: var(--di-ink); font-size: 12px; }
 .di-document-main small { color: var(--di-muted); font-size: 10px; }
 .di-document-chevron { color: #9aa69f; }
-.di-document-meta { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-top: 1px solid #f0f2ef; color: #8c9992; font-size: 9px; }
+.di-document-meta { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-top: 1px solid #f0f2ef; color: #5f6f66; font-size: 9px; }
 .di-document-meta > span:first-child { padding: 3px 6px; border-radius: 4px; background: #f3f5f2; color: #64766b; font-weight: 700; }
 .di-document-meta time { margin-left: auto; white-space: nowrap; }
 .di-delete-button { display: grid; width: 24px; height: 24px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: #a2aaa5; cursor: pointer; }
 .di-delete-button:hover { background: #fff0ed; color: #b25642; }
-.di-library-state { display: grid; justify-items: center; gap: 8px; min-height: 190px; align-content: center; color: #84918b; text-align: center; }
+.di-library-state { display: grid; justify-items: center; gap: 8px; min-height: 190px; align-content: center; color: #5f6f66; text-align: center; }
 .di-library-state strong { color: #45574c; font-size: 13px; }
 .di-library-state span { font-size: 11px; }
 .di-citation { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; border: 1px solid #e3ebe3; border-radius: 6px; padding: 5px 7px; background: #f7faf6; color: #527360; font-size: 10px !important; cursor: pointer; }
