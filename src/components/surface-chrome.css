@@ -44,6 +44,10 @@
   line-height: 1.45;
   color: var(--chrome-muted);
 }
+/* Legacy per-surface rules can land after this file; keep the chrome token in charge. */
+.artifacts-head .surface-title { font-size: 18px; }
+.artifacts-head .surface-subtitle { color: var(--chrome-muted); }
+.artifacts-status.surface-notice { color: var(--notice-ink); }
 .surface-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 .surface-back,
 .surface-close {
