@@ -2,11 +2,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type Database from "better-sqlite3";
 import { CanvasPersistenceInputError, saveCanvasDocument, type SaveCanvasInput } from "./service.js";
 
-export function createCanvasPersistenceHandler(database: Database.Database, origin: string, validateSave?: (value: SaveCanvasInput) => void) {
+export function createCanvasPersistenceHandler(database: Database.Database, origin: string | ((request: IncomingMessage) => string), validateSave?: (value: SaveCanvasInput) => void) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(request) : origin;
     if (request.method !== "POST" || new URL(request.url ?? "/", "http://localhost").pathname !== "/api/canvases") return false;
     const send = (status: number, value: unknown) => {
-      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
+      response.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" });
       response.end(JSON.stringify(value));
     };
     try {

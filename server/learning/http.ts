@@ -16,10 +16,11 @@ function validationMessage(error: ZodError): string {
   return labels.length ? `Check ${labels.join(", ")} and try again.` : "Check the form and try again.";
 }
 
-export function createLearningHandler(service: LearningService, origin = "http://127.0.0.1:5173") {
+export function createLearningHandler(service: LearningService, origin: string | ((req: IncomingMessage) => string) = "http://127.0.0.1:5173") {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(req) : origin;
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    const send = (status: number, value: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": origin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" }); res.end(JSON.stringify(value)); };
+    const send = (status: number, value: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" }); res.end(JSON.stringify(value)); };
     if (req.method === "OPTIONS") { send(204, {}); return true; }
     try {
       if (req.method === "GET" && url.pathname === "/api/study/ask") {

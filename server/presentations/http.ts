@@ -23,15 +23,16 @@ function downloadName(title: string, id: string): string {
 export function createSlideDeckHandler(
   db: Database.Database,
   deps: SlideDeckDeps,
-  origin = "http://127.0.0.1:5173",
+  origin: string | ((req: IncomingMessage) => string) = "http://127.0.0.1:5173",
   dataDir = path.join(process.cwd(), "data", "artifacts"),
 ) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(req) : origin;
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (!url.pathname.startsWith("/api/slide-decks")) return false;
     const headers = {
       "content-type": "application/json",
-      "access-control-allow-origin": origin,
+      "access-control-allow-origin": requestOrigin,
       "access-control-allow-headers": "content-type",
       "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
     };
@@ -73,7 +74,7 @@ export function createSlideDeckHandler(
         res.writeHead(200, {
           "content-type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
           "content-disposition": downloadName(artifact.title, idParam),
-          "access-control-allow-origin": origin,
+          "access-control-allow-origin": requestOrigin,
         });
         res.end(bytes);
         return true;

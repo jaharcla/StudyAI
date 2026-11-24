@@ -8,7 +8,8 @@ import { createDocumentIntelligenceHandler } from "./document-intelligence/http.
 import { parseCanvasDocument } from "../src/canvas/model.js";
 import { initializeDocumentIntelligenceSchema } from "./document-intelligence/schema.js";
 import { migrateLegacyDocuments } from "./document-intelligence/legacy.js";
-import { getStudyAIConfig, LOOPBACK_HOST } from "./config.js";
+import { getStudyAIConfig, LOOPBACK_HOST, rejectUntrustedRequest } from "./config.js";
+export { rejectUntrustedRequest } from "./config.js";
 import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { getCourseProgress } from "./progress.js";
@@ -40,13 +41,14 @@ import { tutorProviderStatus } from "./tutor-provider.js";
 const config = getStudyAIConfig();
 const port = config.dataPort;
 const allowedHosts = new Set([`${LOOPBACK_HOST}:${port}`, `localhost:${port}`]);
+const allowedOrigins = new Set(config.allowedOrigins);
 const readOnlyMethods = new Set(["GET", "HEAD", "OPTIONS"]);
-function rejectUntrustedRequest(req: import("node:http").IncomingMessage): string | null {
-  if (!allowedHosts.has(req.headers.host ?? "")) return "Request host is not allowed.";
-  const origin = req.headers.origin;
-  if (!readOnlyMethods.has(req.method ?? "GET") && origin !== undefined && origin !== config.webOrigin) return "Request origin is not allowed.";
-  return null;
+export function resolveAllowedOrigin(reqOrOrigin: import("node:http").IncomingMessage | string | undefined): string {
+  const candidate = typeof reqOrOrigin === "string" ? reqOrOrigin : reqOrOrigin?.headers?.origin;
+  if (candidate && allowedOrigins.has(candidate)) return candidate;
+  return config.webOrigin;
 }
+// rejectUntrustedRequest imported from ./config.js
 configureProviderBudgetDatabase(db);
 configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
@@ -54,11 +56,12 @@ initializeStudioSchema(db);
 initializeCanvasAnalysisStorage(db);
 const legacyDocuments = await migrateLegacyDocuments(db);
 if (legacyDocuments.failures.length) console.warn("Legacy document indexing failures:", legacyDocuments.failures);
-const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": config.webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
+let currentRequestOrigin = config.webOrigin;
+const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": currentRequestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
 const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYAI_DOCUMENTS);
 const learningService = new LearningService(db);
-const learningHandler = createLearningHandler(learningService, config.webOrigin);
-const studioHandler = createStudioHandler(db, learningService, config.webOrigin);
+const learningHandler = createLearningHandler(learningService, resolveAllowedOrigin);
+const studioHandler = createStudioHandler(db, learningService, resolveAllowedOrigin);
 const artifactsDir = artifactDataDir();
 const presentonBase = process.env.PRESENTON_URL ?? "http://127.0.0.1:5001";
 const presentonKey = process.env.PRESENTON_API_KEY ?? "";
@@ -87,17 +90,18 @@ const slideDeckHandler = createSlideDeckHandler(db, {
     const document = await extractDocument("deck.pptx", new Uint8Array(bytes));
     return document.units.map((unit) => unit.text).join("\n");
   },
-}, config.webOrigin, artifactsDir);
+}, resolveAllowedOrigin, artifactsDir);
 const activityService = new LearningActivityService(db, learningService);
-const activityHandler = createLearningActivityHandler(activityService, config.webOrigin);
-const canvasAnalysisHandler = createCanvasAnalysisHandler(db, config.webOrigin);
-const canvasAnalysisProducerHandler = createCanvasAnalysisProducerHandler(db, config.webOrigin);
-const canvasPersistenceHandler = createCanvasPersistenceHandler(db, config.webOrigin, (value) => activityService.validateCanvasSave(value));
-const canvasSceneHandler = createCanvasSceneHandler(db, config.webOrigin);
-const canvasRecognitionHandler = createCanvasRecognitionHandler(db, config.webOrigin);
+const activityHandler = createLearningActivityHandler(activityService, resolveAllowedOrigin);
+const canvasAnalysisHandler = createCanvasAnalysisHandler(db, resolveAllowedOrigin);
+const canvasAnalysisProducerHandler = createCanvasAnalysisProducerHandler(db, resolveAllowedOrigin);
+const canvasPersistenceHandler = createCanvasPersistenceHandler(db, resolveAllowedOrigin, (value) => activityService.validateCanvasSave(value));
+const canvasSceneHandler = createCanvasSceneHandler(db, resolveAllowedOrigin);
+const canvasRecognitionHandler = createCanvasRecognitionHandler(db, resolveAllowedOrigin);
 
 const server = createServer(async (req, res) => {
   try {
+  currentRequestOrigin = resolveAllowedOrigin(req.headers.origin as string | undefined);
   const untrusted = rejectUntrustedRequest(req);
   if (untrusted) return json(res, 403, { error: untrusted });
   if (await activityHandler(req, res)) return;

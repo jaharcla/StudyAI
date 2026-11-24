@@ -25,8 +25,9 @@ function loadBoard(database: Database.Database, boardId: string, courseId: strin
   return database.prepare("SELECT id AS boardId,course_id AS courseId,lesson_id AS lessonId,document FROM canvases WHERE id=? AND course_id=? AND lesson_id=?").get(boardId, courseId, lessonId) as BoardRow | undefined;
 }
 
-export function createCanvasRecognitionHandler(database: Database.Database, origin: string) {
+export function createCanvasRecognitionHandler(database: Database.Database, origin: string | ((request: IncomingMessage) => string)) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(request) : origin;
     if (request.method !== "POST") return false;
     const url = new URL(request.url ?? "/", "http://localhost");
     const match = url.pathname.match(/^\/api\/canvases\/([^/]+)\/recognition\/(teach|feedback)$/);
@@ -37,13 +38,13 @@ export function createCanvasRecognitionHandler(database: Database.Database, orig
       const input = JSON.parse(await body(request)) as Record<string, unknown>;
       const courseId = typeof input.courseId === "string" ? input.courseId.trim() : "";
       const lessonId = typeof input.lessonId === "string" ? input.lessonId.trim() : "";
-      if (!courseId || !lessonId) return json(response, 400, { error: "courseId and lessonId are required.", code: "invalid_request" }, origin);
+      if (!courseId || !lessonId) return json(response, 400, { error: "courseId and lessonId are required.", code: "invalid_request" }, requestOrigin);
       const board = loadBoard(database, boardId, courseId, lessonId);
-      if (!board) return json(response, 404, { error: "No canvas exists for this board, course, and lesson.", code: "scope_mismatch" }, origin);
+      if (!board) return json(response, 404, { error: "No canvas exists for this board, course, and lesson.", code: "scope_mismatch" }, requestOrigin);
       if (mode === "teach") {
         const strokeIds = Array.isArray(input.strokeIds) ? input.strokeIds.filter((id): id is string => typeof id === "string") : [];
         const result = await teachCanvasRecognitionFromStrokes({ db: database, board, strokeIds, label: input.label });
-        return json(response, 201, result, origin);
+        return json(response, 201, result, requestOrigin);
       }
 
       const feedback = parseRecognitionFeedbackInput({ ...input, courseId, boardId });
@@ -60,11 +61,11 @@ export function createCanvasRecognitionHandler(database: Database.Database, orig
       }
       initializeCanvasRecognitionFeedbackSchema(database);
       const saved = saveCanvasRecognitionFeedback(database, feedback);
-      return json(response, 200, { status: "saved", decision: saved.decision, groupKey: saved.groupKey, prototype, warnings }, origin);
+      return json(response, 200, { status: "saved", decision: saved.decision, groupKey: saved.groupKey, prototype, warnings }, requestOrigin);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Invalid recognition request.";
       const unavailable = /clip|embedding|model/i.test(message);
-      return json(response, unavailable ? 503 : 400, { error: message, code: "invalid_request" }, origin);
+      return json(response, unavailable ? 503 : 400, { error: message, code: "invalid_request" }, requestOrigin);
     }
   };
 }

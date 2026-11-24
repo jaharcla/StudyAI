@@ -18,19 +18,20 @@ async function body(request: IncomingMessage, limit = 2_000_000): Promise<string
   });
 }
 
-export function createCanvasSceneHandler(database: Database.Database, origin: string) {
+export function createCanvasSceneHandler(database: Database.Database, origin: string | ((request: IncomingMessage) => string)) {
   return async (request: IncomingMessage, response: ServerResponse): Promise<boolean> => {
+    const requestOrigin = typeof origin === "function" ? origin(request) : origin;
     if (request.method !== "POST") return false;
     const url = new URL(request.url ?? "/", "http://localhost");
     const courseMatch = url.pathname.match(/^\/api\/courses\/([^/]+)\/canvas-scene\/query$/);
     if (courseMatch) {
       try {
         const result = queryCourseCanvasScene(database, decodeURIComponent(courseMatch[1]), JSON.parse(await body(request)));
-        json(response, 200, result, origin);
+        json(response, 200, result, requestOrigin);
       } catch (error) {
-        if (error instanceof CanvasSceneError) json(response, error.status, { error: error.message, code: error.code }, origin);
-        else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON.", code: "invalid_request" }, origin);
-        else json(response, 400, { error: error instanceof Error ? error.message : "Invalid scene request.", code: "invalid_request" }, origin);
+        if (error instanceof CanvasSceneError) json(response, error.status, { error: error.message, code: error.code }, requestOrigin);
+        else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON.", code: "invalid_request" }, requestOrigin);
+        else json(response, 400, { error: error instanceof Error ? error.message : "Invalid scene request.", code: "invalid_request" }, requestOrigin);
       }
       return true;
     }
@@ -40,11 +41,11 @@ export function createCanvasSceneHandler(database: Database.Database, origin: st
       const boardId = decodeURIComponent(inkMatch[1]);
       try {
         const result = await readCanvasInk(database, boardId, JSON.parse(await body(request)));
-        json(response, 200, result, origin);
+        json(response, 200, result, requestOrigin);
       } catch (error) {
-        if (error instanceof CanvasSceneError) json(response, error.status, { error: error.message, code: error.code }, origin);
-        else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON.", code: "invalid_request" }, origin);
-        else json(response, 400, { error: error instanceof Error ? error.message : "Invalid ink request.", code: "invalid_request" }, origin);
+        if (error instanceof CanvasSceneError) json(response, error.status, { error: error.message, code: error.code }, requestOrigin);
+        else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON.", code: "invalid_request" }, requestOrigin);
+        else json(response, 400, { error: error instanceof Error ? error.message : "Invalid ink request.", code: "invalid_request" }, requestOrigin);
       }
       return true;
     }
@@ -55,15 +56,15 @@ export function createCanvasSceneHandler(database: Database.Database, origin: st
       const input: unknown = JSON.parse(await body(request));
       if (isQuery) {
         const result = queryCanvasScene(database, boardId, input);
-        json(response, 200, result, origin);
+        json(response, 200, result, requestOrigin);
       } else {
         const result = await buildCanvasScene(database, boardId, input);
-        json(response, 200, result, origin);
+        json(response, 200, result, requestOrigin);
       }
     } catch (error) {
-      if (error instanceof CanvasSceneError) json(response, error.status, { error: error.message, code: error.code }, origin);
-      else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON.", code: "invalid_request" }, origin);
-      else json(response, 400, { error: error instanceof Error ? error.message : "Invalid scene request.", code: "invalid_request" }, origin);
+      if (error instanceof CanvasSceneError) json(response, error.status, { error: error.message, code: error.code }, requestOrigin);
+      else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON.", code: "invalid_request" }, requestOrigin);
+      else json(response, 400, { error: error instanceof Error ? error.message : "Invalid scene request.", code: "invalid_request" }, requestOrigin);
     }
     return true;
   };
