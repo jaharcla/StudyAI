@@ -71,4 +71,7 @@ export function initializeLearningSchema(database: Database.Database): void {
   const cardColumns = database.prepare("PRAGMA table_info(learning_cards)").all() as Array<{ name: string }>;
   if (!cardColumns.some((column) => column.name === "front")) database.exec("ALTER TABLE learning_cards ADD COLUMN front TEXT");
   if (!cardColumns.some((column) => column.name === "back")) database.exec("ALTER TABLE learning_cards ADD COLUMN back TEXT");
+  if (!cardColumns.some((column) => column.name === "source_document_id")) database.exec("ALTER TABLE learning_cards ADD COLUMN source_document_id TEXT");
+  if (!cardColumns.some((column) => column.name === "source_page")) database.exec("ALTER TABLE learning_cards ADD COLUMN source_page INTEGER");
+  if (!cardColumns.some((column) => column.name === "source_excerpt")) database.exec("ALTER TABLE learning_cards ADD COLUMN source_excerpt TEXT");
 }

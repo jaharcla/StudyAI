@@ -11,8 +11,8 @@ import { LearningEventSchema, type LearningEvent } from "../../src/learning/acti
 type QuestionDraft = { courseId: string; lessonId: string; concept: string; prompt: string; choices: Array<{ id: string; text: string }>; correctChoice: string; explanation: string; sourceDocumentId: string; sourcePage?: number | null; sourceExcerpt: string };
 type ReviewableQuestion = { id: string; version: number; concept_id: string; concept: string; prompt: string; choices: string; source_document_id: string; source_title: string; source_page: number | null; source_excerpt: string };
 
-export type CardInput = { courseId: string; lessonId: string; conceptId: string; front: string; back: string };
-export type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string };
+export type CardInput = { courseId: string; lessonId: string; conceptId: string; front: string; back: string; sourceDocumentId?: string; sourcePage?: number | null; sourceExcerpt?: string };
+export type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string; sourceDocumentId?: string | null; sourcePage?: number | null; sourceExcerpt?: string; sourceTitle?: string };
 export type CardReviewInput = { cardId: string; rating: "Again" | "Hard" | "Good" | "Easy"; idempotencyKey: string };
 
 export class LearningService {
@@ -156,10 +156,10 @@ export class LearningService {
       if (!concept) this.database.prepare("INSERT INTO learning_concepts(id,course_id,lesson_id,name) VALUES(?,?,?,?)").run(conceptId, input.courseId, input.lessonId, input.conceptId.trim());
       const existing = this.database.prepare("SELECT id FROM learning_cards WHERE concept_id=?").get(conceptId) as { id: string } | undefined;
       const cardId = existing?.id ?? randomUUID();
-      if (existing) this.database.prepare("UPDATE learning_cards SET front=?,back=? WHERE id=?").run(input.front, input.back, cardId);
+      if (existing) this.database.prepare("UPDATE learning_cards SET front=?,back=?,source_document_id=?,source_page=?,source_excerpt=? WHERE id=?").run(input.front, input.back, input.sourceDocumentId ?? null, input.sourcePage ?? null, input.sourceExcerpt ?? null, cardId);
       else {
         const card = createEmptyCard(this.now());
-        this.database.prepare("INSERT INTO learning_cards(id,concept_id,fsrs_state,front,back) VALUES(?,?,?,?,?)").run(cardId, conceptId, JSON.stringify(serializeCard(card)), input.front, input.back);
+        this.database.prepare("INSERT INTO learning_cards(id,concept_id,fsrs_state,front,back,source_document_id,source_page,source_excerpt) VALUES(?,?,?,?,?,?,?,?)").run(cardId, conceptId, JSON.stringify(serializeCard(card)), input.front, input.back, input.sourceDocumentId ?? null, input.sourcePage ?? null, input.sourceExcerpt ?? null);
       }
       return { cardId };
     });
@@ -167,11 +167,11 @@ export class LearningService {
   }
 
   dueCards(courseId: string, lessonId: string): DueCard[] {
-    const rows = this.database.prepare(`SELECT c.id card_id,c.concept_id,k.name concept,c.front,c.back,c.fsrs_state FROM learning_cards c
-      JOIN learning_concepts k ON k.id=c.concept_id WHERE k.course_id=? AND k.lesson_id=? AND c.front IS NOT NULL AND c.back IS NOT NULL`).all(courseId, lessonId) as Array<{ card_id: string; concept_id: string; concept: string; front: string; back: string; fsrs_state: string }>;
+    const rows = this.database.prepare(`SELECT c.id card_id,c.concept_id,k.name concept,c.front,c.back,c.fsrs_state,c.source_document_id,c.source_page,c.source_excerpt,d.title source_title FROM learning_cards c
+      JOIN learning_concepts k ON k.id=c.concept_id LEFT JOIN documents d ON d.id=c.source_document_id WHERE k.course_id=? AND k.lesson_id=? AND c.front IS NOT NULL AND c.back IS NOT NULL`).all(courseId, lessonId) as Array<{ card_id: string; concept_id: string; concept: string; front: string; back: string; fsrs_state: string; source_document_id: string | null; source_page: number | null; source_excerpt: string | null; source_title: string | null }>;
     const now = this.now().getTime();
     return rows
-      .map((row) => ({ cardId: row.card_id, conceptId: row.concept_id, concept: row.concept, front: row.front, back: row.back, dueAt: (JSON.parse(row.fsrs_state) as SerializedCard).due }))
+      .map((row) => ({ cardId: row.card_id, conceptId: row.concept_id, concept: row.concept, front: row.front, back: row.back, dueAt: (JSON.parse(row.fsrs_state) as SerializedCard).due, sourceDocumentId: row.source_document_id, sourcePage: row.source_page, sourceExcerpt: row.source_excerpt ?? "", sourceTitle: row.source_title ?? undefined }))
       .filter((card) => Date.parse(card.dueAt) <= now)
       .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
   }

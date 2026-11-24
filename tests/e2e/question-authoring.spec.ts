@@ -15,7 +15,8 @@ async function openAuthorForm(page: import("@playwright/test").Page, courseTitle
   const scrim = page.locator(".sidebar-scrim");
   if (await scrim.isVisible()) await scrim.click();
   await page.getByRole("button", { name: "Study", exact: true }).click();
-  await page.getByRole("button", { name: "Add a question" }).click();
+  await page.getByText("Advanced").click();
+  await page.getByRole("button", { name: "Add a question by hand" }).click();
   await expect(page.getByTestId("question-author")).toBeVisible();
 }
 

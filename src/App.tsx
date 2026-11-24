@@ -507,7 +507,7 @@ function Workspace() {
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} onOpenSettings={() => { setHelpOpen(false); setSettings(true); }} onOpenCanvas={() => { setHelpOpen(false); setView("Canvas"); }} />}
     {progressOpen && course.id && <ProgressDialog courseId={course.id} onClose={() => setProgressOpen(false)} />}
     {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
-    {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} close={() => setFlashcardReviewOpen(false)} />}
+    {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} lessonTitle={lessonTitle} close={() => setFlashcardReviewOpen(false)} />}
     {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenActivities={() => { setStudyReturn(true); setMode("canvas"); setActivityLibraryOpen(true); }} onOpenSources={() => { setStudyReturn(true); setMode("canvas"); setView("Lecture"); }} />}
     {mode === "concepts" && course.id && <ConceptGraphView courseId={course.id} courseTitle={course.title}
       close={() => setMode("canvas")}

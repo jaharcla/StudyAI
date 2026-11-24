@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { API } from "../api";
 import { useDialogFocus } from "../components/useDialogFocus";
+import { chooseActivityDomain } from "./activities/domain";
 import type { ActivityAttempt, ActivitySpec } from "./activities/contracts";
 
 type SourceHit = { sourceRef: string; excerpt: string; title: string; unitType: string; unitNumber: number };
@@ -55,9 +56,8 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
     } catch (reason) { setError(reason instanceof Error ? reason.message : "The exact course excerpt could not be loaded."); }
   };
 
-  const insertTemplate = (domain: "force" | "graph") => {
-    if (!selectedSource) { setError("Search this course and select a source excerpt first."); return; }
-    const refs = [{ sourceRef: selectedSource.sourceRef, excerpt: selectedSource.excerpt }];
+  const makeTemplate = (domain: "force" | "graph", source: { sourceRef: string; excerpt: string }) => {
+    const refs = [{ sourceRef: source.sourceRef, excerpt: source.excerpt }];
     const base = { schemaVersion: 1, version: 1, courseId, lessonId, objectives: [{ id: domain === "force" ? "motion-model" : "linear-graphs", concept: domain === "force" ? "net force, acceleration, and velocity-time graphs" : "linear graph interpretation", text: domain === "force" ? "Relate signed horizontal forces and mass to acceleration, velocity, and a velocity-time graph." : "Interpret the slope, intercept, or predicted value of a linear graph.", sourceRefs: refs }] };
     const spec = domain === "force" ? {
       ...base, id: "force-motion", title: "Force and motion", description: "Adjust the one-dimensional model, predict its motion, and read the linked velocity-time graph.",
@@ -87,7 +87,57 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
       tasks: [{ id: "read-slope", objectiveId: "linear-graphs", prompt: "What is the slope of the current linked graph?", checkerId: "interpretation", artifactIds: ["line"], hints: ["Use the linked equation or compare rise with run."], assessment: { mastery: "bkt" } }],
       interactions: { allowMove: true, allowDrawing: false },
     };
+    return spec as ActivitySpec;
+  };
+
+  const insertTemplate = (domain: "force" | "graph") => {
+    if (!selectedSource) { setError("Search this course and select a source excerpt first."); return; }
+    const spec = makeTemplate(domain, selectedSource);
     setJson(JSON.stringify(spec, null, 2)); setPreview(undefined); setError(""); setNotice("Template loaded. Edit the JSON, then preview or save it.");
+  };
+
+  const startGuidedActivity = async () => {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const srcRes = await fetch(`${API}/study/sources?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`);
+      const srcValue = await srcRes.json();
+      if (!srcRes.ok) throw new Error(srcValue.error || "Course sources could not be loaded.");
+      const sources = (srcValue as { sources: Array<{ documentId: string; title: string; page: number | null; excerpt: string }> }).sources ?? [];
+      const first = sources[0];
+      if (!first) { setError("This lesson needs a source before a guided activity can start."); setBusy(false); return; }
+      const domain = chooseActivityDomain(first.excerpt);
+      if (!domain) { setError("This lesson's source doesn't match a guided activity template yet. Add a force or graph source, or use Advanced."); setBusy(false); return; }
+      const searchRes = await fetch(`${API}/document-intelligence/search?course=${encodeURIComponent(courseId)}&q=${encodeURIComponent(first.excerpt.slice(0, 120))}`);
+      const searchValue = await searchRes.json();
+      const hits = (searchValue as { results: Array<{ sourceRef: string; title: string; excerpt: string }> }).results ?? [];
+      const hit = hits[0];
+      if (!hit) { setError("This lesson's source doesn't match a guided activity template yet. Add a force or graph source, or use Advanced."); setBusy(false); return; }
+      const contentRes = await fetch(`${API}/document-intelligence/source?course=${encodeURIComponent(courseId)}&ref=${encodeURIComponent(hit.sourceRef)}`);
+      const contentValue = await contentRes.json();
+      if (!contentRes.ok || typeof contentValue.content !== "string") throw new Error(contentValue.error || "The exact course excerpt could not be loaded.");
+      const source = { sourceRef: hit.sourceRef, excerpt: String(contentValue.content).trim().slice(0, 900) };
+      setSelectedSource({ sourceRef: hit.sourceRef, excerpt: source.excerpt, title: hit.title, unitType: "", unitNumber: 0 } as any);
+      const spec = makeTemplate(domain, source);
+      setJson(JSON.stringify(spec, null, 2));
+      // preview
+      const previewRes = await fetch(`${API}/activities/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId, lessonId, spec }) });
+      const previewValue = await previewRes.json();
+      if (!previewRes.ok) throw new Error(previewValue.error || "Activity preview failed.");
+      setPreview({ spec: previewValue.spec, document: previewValue.document });
+      // save
+      const saveRes = await fetch(`${API}/activities/specs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId, lessonId, spec }) });
+      const saveValue = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveValue.error || "Activity could not be saved.");
+      // start
+      const startRes = await fetch(`${API}/activities/start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId, lessonId, activityId: saveValue.id }) });
+      const startValue = await startRes.json();
+      if (!startRes.ok) throw new Error(startValue.error || "Activity could not be started.");
+      onStart(startValue);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Activity could not be started.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const parseEditor = () => {
@@ -163,10 +213,14 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
 
   return <div className="modal-shade activity-library-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} tabIndex={-1} className="activity-library" role="dialog" aria-modal="true" aria-label="Learning activities">
-      <header className="activity-library-head"><div><span className="eyebrow">THIS LESSON</span><h2>Learning activities</h2><p>Use a course-backed specification to create a structured canvas task.</p></div><button className="icon-button" aria-label="Close activities" onClick={onClose}><X size={18} /></button></header>
+      <header className="activity-library-head"><div><span className="eyebrow">THIS LESSON</span><h2>Learning activities</h2><p>Use a course-backed specification to create a structured canvas task.</p></div><div><button className="button-primary" disabled={busy} onClick={() => void startGuidedActivity()}>{busy ? "Working…" : "Start a guided activity"}</button><button className="icon-button" aria-label="Close activities" onClick={onClose}><X size={18} /></button></div></header>
       <div className="activity-library-grid">
         <section className="activity-library-list"><h3>Saved activities</h3>{specs.length ? specs.map((row) => <article className="activity-list-row" key={row.id}><div><b>{row.title}</b><small>Version {row.version}</small></div><button className="button-soft" disabled={busy} onClick={() => void loadSpec(row.id)}>Inspect</button><button className="button-primary" disabled={busy} onClick={() => void start(row.id)}>Start</button></article>) : <p className="activity-muted">No activities for this lesson yet.</p>}
           <h3>Recent attempts</h3>{attempts.length ? attempts.map(({ attempt, activityTitle }) => <article className="activity-list-row" key={attempt.id}><div><b>{activityTitle}</b><small>{attempt.status} · {attempt.responses.length} checked</small></div><button className="button-soft" disabled={busy} onClick={() => void resume(attempt.id)}>Resume</button></article>) : <p className="activity-muted">Attempts appear here after you start an activity.</p>}
+        </section>
+        <details className="activity-advanced">
+          <summary>Advanced</summary>
+          <section>
           <h3>Course source</h3><div className="activity-source-search"><input aria-label="Search course sources" value={sourceQuery} onChange={(event) => setSourceQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void searchSource(); }} placeholder="Search indexed course material" /><button className="button-soft" disabled={!sourceQuery.trim()} onClick={() => void searchSource()}>Search</button></div>
           {sourceHits.map((hit) => <button className={`activity-source-hit ${selectedSource?.sourceRef === hit.sourceRef ? "selected" : ""}`} key={hit.sourceRef} onClick={() => void chooseSource(hit)}><b>{hit.title} · {hit.unitType} {hit.unitNumber}</b><span>{hit.excerpt}</span></button>)}
           {selectedSource && <div className="activity-template-actions"><button className="button-soft" onClick={() => insertTemplate("force")}>Use in force template</button><button className="button-soft" onClick={() => insertTemplate("graph")}>Use in graph template</button></div>}
@@ -177,6 +231,7 @@ export function ActivityLibrary({ courseId, lessonId, onClose, onStart }: Props)
           {notice && <p className="activity-notice" role="status">{notice}</p>}{error && <p className="activity-error" role="alert">{error}</p>}
           {preview && <div className="activity-preview"><b>{preview.spec.title}</b><small>{preview.document.objects.length} generated canvas objects · {preview.spec.objectives.length} objectives · {preview.spec.tasks.length} tasks</small><div className="activity-preview-objects">{preview.document.objects.map((object) => <span key={object.id}>{object.label || object.kind}{object.kind === "measurement" ? ` · ${object.value} ${object.units}` : ` · ${object.kind}`}</span>)}</div><ol>{preview.spec.tasks.map((task) => <li key={task.id}>{task.prompt}</li>)}</ol></div>}
         </section>
+        </details>
       </div>
     </section>
   </div>;

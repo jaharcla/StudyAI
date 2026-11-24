@@ -74,7 +74,7 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
     if (busy) return;
     setBusy("generating");
     setNotice({ tone: "info", text: "Building your deck from this lesson…" });
-    void generateSlideDeck({ courseId, lessonId, focus: focus.trim() || "Key concepts and mechanisms" })
+    void generateSlideDeck({ courseId, lessonId, focus: focus.trim() || lessonTitle || "Key concepts and mechanisms" })
       .then((artifact) => {
         const degraded = !artifact.filePath;
         const reason = degraded && "notice" in artifact && typeof artifact.notice === "string" ? artifact.notice : RENDER_MISSING;
@@ -153,20 +153,23 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
         </SurfaceHeader>
 
         <section className="artifacts-create" aria-label="Build a slide deck">
-          <label htmlFor="deck-focus">What should this deck focus on?</label>
-          <div className="artifacts-create-row">
-            <input
-              id="deck-focus"
-              data-testid="deck-focus"
-              value={focus}
-              onChange={(event) => setFocus(event.target.value)}
-              placeholder="Key concepts and mechanisms"
-              maxLength={500}
-            />
-            <button className="button-primary" data-testid="deck-generate" onClick={generate} disabled={!!busy}>
-              {busy === "generating" ? "Building…" : "Build slide deck"}
-            </button>
-          </div>
+          <details>
+            <summary>Advanced</summary>
+            <label htmlFor="deck-focus">What should this deck focus on?</label>
+            <div className="artifacts-create-row">
+              <input
+                id="deck-focus"
+                data-testid="deck-focus"
+                value={focus}
+                onChange={(event) => setFocus(event.target.value)}
+                placeholder="Key concepts and mechanisms"
+                maxLength={500}
+              />
+            </div>
+          </details>
+          <button className="button-primary" data-testid="deck-generate" onClick={generate} disabled={!!busy}>
+            {busy === "generating" ? "Building…" : "Build slide deck"}
+          </button>
         </section>
 
         <SurfaceNotice

@@ -41,7 +41,11 @@ export type GenerateRequest = {
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   const value = await response.json().catch(() => ({})) as T & { error?: string };
-  if (!response.ok) throw new Error(value.error || "Studio request failed.");
+  if (!response.ok) {
+    const err = new Error(value.error || "Studio request failed.");
+    (err as Error & { status?: number }).status = response.status;
+    throw err;
+  }
   return value;
 }
 

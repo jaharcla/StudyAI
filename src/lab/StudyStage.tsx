@@ -45,7 +45,7 @@ export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitl
         />
         <div className="stage-body">
           <div style={{ width: "100%", maxWidth: 660, margin: "0 auto" }}>
-            <StudyPanel courseId={courseId} lessonId={lessonId} close={close} />
+            <StudyPanel courseId={courseId} lessonId={lessonId} lessonTitle={lessonTitle} close={close} />
             <p className="stage-tip">Questions and reviews come from your course sources. Ratings schedule the next review locally.</p>
           </div>
         </div>

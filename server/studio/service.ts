@@ -212,7 +212,7 @@ export function importStudioArtifact(db: Database.Database, learning: LearningSe
     const card = content.cards?.[index];
     if (!card) continue;
     try {
-      learning.registerCard({ courseId: row.courseId, lessonId: row.lessonId, conceptId: card.concept, front: card.front, back: card.back });
+      learning.registerCard({ courseId: row.courseId, lessonId: row.lessonId, conceptId: card.concept, front: card.front, back: card.back, sourceDocumentId: card.sourceDocumentId, sourcePage: card.sourcePage, sourceExcerpt: card.sourceExcerpt });
       cardsAdded += 1;
     } catch (error) {
       errors.push(`Card ${index + 1}: ${error instanceof Error ? error.message : "could not be added"}`);

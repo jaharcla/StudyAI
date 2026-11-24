@@ -2,17 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import { RotateCcw, X } from "lucide-react";
 import { API } from "../api";
 import { useDialogFocus } from "../components/useDialogFocus";
+import { makePractice } from "./make-practice";
 
-type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string };
+type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string; sourceTitle?: string; sourcePage?: number | null; sourceExcerpt?: string };
 type Rating = "Again" | "Hard" | "Good" | "Easy";
 
-export default function FlashcardReview({ courseId, lessonId, close }: { courseId: string; lessonId: string; close: () => void }) {
+export default function FlashcardReview({ courseId, lessonId, lessonTitle, close }: { courseId: string; lessonId: string; lessonTitle: string; close: () => void }) {
   const [cards, setCards] = useState<DueCard[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [status, setStatus] = useState("");
   const [nextDue, setNextDue] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
   useDialogFocus(true, dialogRef);
+
+  const loadCards = async () => {
+    try {
+      const response = await fetch(`${API}/study/cards?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`);
+      const value = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(value.error || "Flashcards could not be loaded.");
+      setCards(value as DueCard[]);
+    } catch (reason) {
+      setStatus(reason instanceof Error ? reason.message : "Flashcards could not be loaded.");
+    }
+  };
 
   useEffect(() => {
     let live = true;
@@ -26,6 +38,16 @@ export default function FlashcardReview({ courseId, lessonId, close }: { courseI
       .catch((reason) => { if (live) setStatus(reason instanceof Error ? reason.message : "Flashcards could not be loaded."); });
     return () => { live = false; };
   }, [courseId, lessonId]);
+
+  const makeCards = async () => {
+    setStatus("");
+    try {
+      await makePractice({ courseId, lessonId, focus: lessonTitle, practiceType: "cards" });
+      await loadCards();
+    } catch (reason) {
+      setStatus(reason instanceof Error ? reason.message : "Cards could not be generated.");
+    }
+  };
 
   const rate = async (rating: Rating) => {
     const card = cards[0];
@@ -59,9 +81,11 @@ export default function FlashcardReview({ courseId, lessonId, close }: { courseI
         {status && <p role="status">{status}</p>}
         {nextDue && <p role="status">Next review {nextDue}</p>}
         {!card && !status && <p role="status">No flashcards are due</p>}
+        {!card && !status && <button className="button-primary" onClick={() => void makeCards()}>Make cards from this lesson</button>}
         {card && (
           <>
             <p className="study-concept">{card.concept}</p>
+            {(card.sourceTitle || card.sourceExcerpt) && <p className="study-citation">Source: {card.sourceTitle}{card.sourcePage ? `, p. ${card.sourcePage}` : ""}. {card.sourceExcerpt}</p>}
             <div className="stage-body">
               <button className="cv-flashcard" aria-label={revealed ? "Show question" : "Reveal card"} onClick={() => setRevealed(!revealed)}>
                 <span className="cv-flashcard-label">{revealed ? "ANSWER" : "QUESTION"}</span>
