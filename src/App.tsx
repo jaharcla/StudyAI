@@ -79,6 +79,7 @@ function Workspace() {
   const lessonTitle = humanizeLessonTitle(lessons.find((item) => item.id === lessonId)?.title ?? "");
   const [view, setView] = useState<View>("Canvas");
   const [mode, setMode] = useState<"canvas" | "study" | "studio" | "artifacts" | "concepts">("canvas");
+  const [studyReturn, setStudyReturn] = useState(false);
   const [sidebar, setSidebar] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
@@ -130,7 +131,6 @@ function Workspace() {
   const [noteId, setNoteId] = useState<string>();
   const [noteLoadedFor, setNoteLoadedFor] = useState("");
   const [scienceTool, setScienceTool] = useState<"chem" | "kin" | null>(null);
-  const [studyOpen, setStudyOpen] = useState(false);
   const [activityLibraryOpen, setActivityLibraryOpen] = useState(false);
   const [activeActivity, setActiveActivity] = useState<ActivitySession | null>(null);
   const [preferredBoardId, setPreferredBoardId] = useState<string>();
@@ -161,7 +161,6 @@ function Workspace() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen((open) => !open); return; }
       if (event.key !== "Escape") return;
       if (mode !== "canvas") setMode("canvas");
-      else if (studyOpen) setStudyOpen(false);
       else if (activityLibraryOpen) setActivityLibraryOpen(false);
       else if (flashcardReviewOpen) setFlashcardReviewOpen(false);
       else if (helpOpen) setHelpOpen(false);
@@ -175,7 +174,7 @@ function Workspace() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, studyOpen, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, scienceTool, tutorMenuOpen, sidebar]);
+  }, [mode, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, scienceTool, tutorMenuOpen, sidebar]);
 
   const updateActivityCanvas = useCallback((state: { id: string; revision: number; saved: boolean }) => setActivityCanvasState(state), []);
   const launchActivity = useCallback((session: ActivitySession) => {
@@ -381,7 +380,7 @@ function Workspace() {
   const changeCourse = (next: Course) => {
     setSidebar(false);
     if (next.id === course.id) return;
-    closeActivity(); setActivityLibraryOpen(false);
+    closeActivity(); setActivityLibraryOpen(false); setStudyReturn(false); setMode("canvas");
     setCourse(next);
     setLessons([]);
     setLessonId("");
@@ -391,7 +390,7 @@ function Workspace() {
 
   const changeLesson = (nextId: string) => {
     setSidebar(false);
-    closeActivity(); setActivityLibraryOpen(false);
+    closeActivity(); setActivityLibraryOpen(false); setStudyReturn(false); setMode("canvas");
     setLessonId(nextId);
     setStatus("Loading lessonâ€¦");
     if (course.id) localStorage.setItem(lessonPreferenceKey(course.id), nextId);
@@ -476,7 +475,7 @@ function Workspace() {
       <header className="topbar">
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
         <div className="immersive-actions">
-          <button disabled={!course.id} data-testid="open-concept-graph" onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
+          <button disabled={!course.id || !lessonId} data-testid="open-concept-graph" onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
           <button className="primary" disabled={!course.id || !lessonId} onClick={() => setMode("studio")} title="Open StudyAI Studio"><Sparkles size={15} /> Studio</button>
           <button disabled={!course.id || !lessonId} onClick={() => setMode("artifacts")} title="Open Artifacts"><Layers size={15} /> Artifacts</button>
           <button disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
@@ -485,8 +484,8 @@ function Workspace() {
         </div>
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => setHelpOpen(true)} title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
-      <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" tabIndex={-1} value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{humanizeLessonTitle(item.title)}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" tabIndex={-1} disabled={!course.id || !lessonId} onClick={() => setStudyOpen(true)}><Brain size={15} /> Study this lesson</button></section>
-      <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions"><button className="tool-chip" disabled={!course.id || !lessonId} onClick={() => setActivityLibraryOpen(true)}><Activity size={14} /> Activities</button><button className="tool-chip active" disabled={!course.id || !lessonId} onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
+      <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" tabIndex={-1} value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{humanizeLessonTitle(item.title)}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" tabIndex={-1} disabled={!course.id || !lessonId} onClick={() => setMode("study")}><Brain size={15} /> Study this lesson</button></section>
+      <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions">{studyReturn && <button className="tool-chip study-return" onClick={() => { setStudyReturn(false); setMode("study"); }}><ChevronLeft size={14} /> Back to study session</button>}<button className="tool-chip" disabled={!course.id || !lessonId} onClick={() => setActivityLibraryOpen(true)}><Activity size={14} /> Activities</button><button className="tool-chip active" disabled={!course.id || !lessonId} onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
       <div className={`work-area ${view.toLowerCase()}`}>
         {<div className="canvas-pane" hidden={view === "Lecture"}><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div>{course.id && lessonId ? <div className="canvas-workspace"><CanvasStudio key={`${course.id}:${lessonId}`} courseId={course.id} lessonId={lessonId} theme={dark ? "dark" : "light"} onStatus={updateStatus} onOpenNote={openLinkedNote} onOpenDocument={openLinkedDocument} onSummary={updateCanvasSummary} onSelectedObject={updateSelectedObject} preferredBoardId={preferredBoardId} onBoardState={updateActivityCanvas} activityMode={Boolean(activeActivity)} />{activeActivity && <ActivityTaskPanel courseId={course.id} lessonId={lessonId} session={activeActivity} canvas={activityCanvasState} onClose={closeActivity} />}</div> : <div className="canvas-loading">{courseError || lessonError || (course.id ? "Add a lesson to create a canvas." : "Select or create a course to create a canvas.")}</div>}</div>}
         {(view === "Lecture" || view === "Split") && <div className="lecture-pane">{course.id && <Suspense fallback={<div>Loading course sourcesâ€¦</div>}><DocumentLibrary key={`${course.id}:${lessonId}`} courseId={course.id} lessonId={lessonId} initialDocumentId={openDocumentId} courses={visibleCourses} onCourseChange={(id) => { const selected = courses.find((item) => item.id === id); if (selected) changeCourse(selected); }} initialSourceRef={openSourceRef} initialSourceKey={openSourceKey} initialQuery={query} /></Suspense>}</div>}
@@ -504,13 +503,12 @@ function Workspace() {
     {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div ref={noteDialogRef} tabIndex={-1} className="settings-modal notes-modal" role="dialog" aria-label="Lesson notes" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} Â· {lessonTitle}</span><input ref={noteTitleRef} aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" aria-label="Close notes" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lessonâ€¦" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
-    {studyOpen && course.id && lessonId && <StudyPanel courseId={course.id} lessonId={lessonId} close={() => setStudyOpen(false)} />}
     {tutorMenuOpen && <TutorMenu config={tutorConfig} onToggleContext={() => setTutorContextOpen(!tutorContextOpen)} onClose={() => setTutorMenuOpen(false)} />}
     {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} onOpenSettings={() => { setHelpOpen(false); setSettings(true); }} onOpenCanvas={() => { setHelpOpen(false); setView("Canvas"); }} />}
     {progressOpen && course.id && <ProgressDialog courseId={course.id} onClose={() => setProgressOpen(false)} />}
     {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
     {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} close={() => setFlashcardReviewOpen(false)} />}
-    {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenActivities={() => { setMode("canvas"); setActivityLibraryOpen(true); }} onOpenSources={() => { setMode("canvas"); setView("Lecture"); }} />}
+    {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenActivities={() => { setStudyReturn(true); setMode("canvas"); setActivityLibraryOpen(true); }} onOpenSources={() => { setStudyReturn(true); setMode("canvas"); setView("Lecture"); }} />}
     {mode === "concepts" && course.id && <ConceptGraphView courseId={course.id} courseTitle={course.title}
       close={() => setMode("canvas")}
       onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }}
@@ -518,8 +516,8 @@ function Workspace() {
         void prepareCoachTarget({ courseId: course.id, lessonId: node.lessonId ?? "", destination: "study", conceptId: node.id, reason: `Practice ${node.label}`, focus: node.label })
           .then((result) => { if (!result.prepared) setStatus(result.message || `No reviewed question is available for ${node.label} right now.`); });
       }} />}
-    {mode === "studio" && course.id && lessonId && <StudioSurface courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} initialFocus={coachFocus} close={() => { setMode("canvas"); setCoachFocus(""); }} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
-    {mode === "artifacts" && course.id && lessonId && <ArtifactsPage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
+    {mode === "studio" && course.id && lessonId && <StudioSurface courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} initialFocus={coachFocus} onOpenDecks={() => setMode("artifacts")} close={() => { setMode("canvas"); setCoachFocus(""); }} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
+    {mode === "artifacts" && course.id && lessonId && <ArtifactsPage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} onOpenStudio={() => setMode("studio")} close={() => setMode("canvas")} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
     {coach.surface}
   </div></>;
 }

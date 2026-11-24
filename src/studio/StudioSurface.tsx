@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useDialogFocus } from "../components/useDialogFocus";
 import {
-  ArrowLeft, BookOpen, ChartColumn, Check, CircleAlert, CircleCheck, Download,
-  ListTree, LoaderCircle, Sparkles, X,
+  BookOpen, ChartColumn, Check, CircleAlert, CircleCheck, Download,
+  Layers, ListTree, LoaderCircle, Sparkles,
 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import "./studio.css";
+import { SurfaceHeader, SurfaceNotice } from "../components/SurfaceChrome";
 import {
   acceptArtifact, generateArtifact, listArtifacts, type AcceptanceDecision, type MindMapContent,
   type PracticeContent, type PracticeType, type StudioArtifact, type StudioKind, type StudyGuideContent,
@@ -43,11 +44,12 @@ function studentMessage(error: unknown): string {
 type Props = {
   courseId: string; lessonId: string; courseTitle: string; lessonTitle: string;
   onOpenSource: (sourceRef: string) => void; close: () => void;
+  onOpenDecks: () => void;
   /** Optional material focus prepared by the Coach from a cited source. */
   initialFocus?: string;
 };
 
-export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, initialFocus = "" }: Props) {
+export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, onOpenDecks, initialFocus = "" }: Props) {
   const [kind, setKind] = useState<StudioKind>("mind-map");
   const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
@@ -117,8 +119,6 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     <div ref={dialogRef} tabIndex={-1} className="studio-surface" role="dialog" aria-modal="true" aria-label="StudyAI Studio" data-testid="studio-surface">
       <aside className="studio-sidebar">
         <div className="studio-brand"><span className="studio-mark"><Sparkles size={16} /></span> studyai <small>studio</small></div>
-        <button className="studio-back" onClick={close}><ArrowLeft size={15} /> Back to workspace</button>
-
         <div className="studio-group">This lesson</div>
         <div className="studio-lesson"><strong>{lessonTitle}</strong><small>{courseTitle}</small></div>
 
@@ -183,10 +183,21 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
       </aside>
 
       <main className="studio-main">
-        <header className="studio-head">
-          <div><strong>StudyAI Studio</strong><span>{lessonTitle} · {courseTitle}</span></div>
-          <button type="button" className="studio-close" onClick={close} aria-label="Close Studio"><X size={18} /></button>
-        </header>
+        <SurfaceHeader
+          eyebrow="Studio"
+          title="StudyAI Studio"
+          subtitle={`${lessonTitle} · ${courseTitle}`}
+          backLabel="Back to workspace"
+          onBack={close}
+          onClose={close}
+          closeLabel="Close Studio"
+          backClassName="studio-back"
+          closeClassName="studio-close"
+        >
+          <button type="button" className="surface-link" data-testid="studio-open-decks" onClick={onOpenDecks}>
+            <Layers size={15} strokeWidth={1.9} aria-hidden="true" /> Artifacts
+          </button>
+        </SurfaceHeader>
         <div className="studio-body" aria-busy={busy}>
           {error && (
             <div className="studio-error" role="alert" data-testid="studio-error">
@@ -200,10 +211,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           )}
 
           {!busy && notice && (
-            <div className="studio-notice" role="status" aria-live="polite" data-testid="studio-notice">
-              <CircleAlert size={18} strokeWidth={1.9} aria-hidden="true" />
-              <p>{notice}</p>
-            </div>
+            <SurfaceNotice tone="info" text={notice} testId="studio-notice" className="studio-notice" />
           )}
 
           {busy && (

@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { Activity, ArrowLeft, BookOpen, Layers, Sparkles, X } from "lucide-react";
+import { Activity, BookOpen, Layers, Sparkles } from "lucide-react";
 import { StudyPanel } from "../learning/StudyPanel";
 import { useDialogFocus } from "../components/useDialogFocus";
+import { SurfaceHeader } from "../components/SurfaceChrome";
 
 type Props = {
   courseId: string;
@@ -23,7 +24,6 @@ export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitl
     <div ref={dialogRef} tabIndex={-1} className="study-stage" role="dialog" aria-modal="true" aria-label="Study session">
       <aside className="stage-sidebar">
         <div className="stage-brand"><span className="stage-mark"><Sparkles size={16} /></span> studyai</div>
-        <button className="stage-back" onClick={close}><ArrowLeft size={15} /> Back to canvas</button>
         <div className="stage-group">THIS LESSON</div>
         <button className="stage-session active">{lessonTitle}<small>{courseTitle}</small></button>
         <div className="stage-group">MODES</div>
@@ -33,10 +33,16 @@ export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitl
       </aside>
 
       <main className="stage-main">
-        <header className="stage-head">
-          <div><strong>Study tutor</strong><span>{lessonTitle} · {courseTitle}</span></div>
-          <button onClick={close} aria-label="Close study session"><X size={18} /></button>
-        </header>
+        <SurfaceHeader
+          eyebrow="Study"
+          title="Study tutor"
+          subtitle={`${lessonTitle} · ${courseTitle}`}
+          backLabel="Back to canvas"
+          onBack={close}
+          onClose={close}
+          closeLabel="Close study session"
+          backClassName="stage-back"
+        />
         <div className="stage-body">
           <div style={{ width: "100%", maxWidth: 660, margin: "0 auto" }}>
             <StudyPanel courseId={courseId} lessonId={lessonId} close={close} />

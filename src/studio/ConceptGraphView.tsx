@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Network, X } from "lucide-react";
+import { Network } from "lucide-react";
 import "./studio.css";
+import { SurfaceHeader } from "../components/SurfaceChrome";
 import { API } from "../api";
 import MindMapView from "./MindMapView";
 import type { MindMapContent, MindMapNode } from "./api";
@@ -37,17 +38,23 @@ export default function ConceptGraphView({ courseId, courseTitle, onPractice, on
     <div className="studio-surface" role="dialog" aria-modal="true" aria-label="Course concept graph" data-testid="concept-graph-surface">
       <aside className="studio-sidebar">
         <div className="studio-brand"><span className="studio-mark"><Network size={16} /></span> studyai <small>concepts</small></div>
-        <button className="studio-back" onClick={close}><ArrowLeft size={15} /> Back to workspace</button>
         <div className="studio-group">This course</div>
-        <div className="studio-lesson"><strong>{courseTitle}</strong><small>From your learning records</small></div>
+        <div className="studio-lesson"><strong>{courseTitle}</strong><small className="surface-provenance">From your learning records</small></div>
         <div className="studio-group">How to read this</div>
         <p className="studio-sidebar-note">Each node is a concept from your course. Mastery comes from your answers and canvas work. Dashed links are relationships saved on your canvases. Practice opens a reviewed question for a weak concept.</p>
       </aside>
       <main className="studio-main">
-        <header className="studio-head">
-          <div><strong>Concept graph</strong><span>{graph?.title ?? courseTitle}</span></div>
-          <button type="button" className="studio-close" onClick={close} aria-label="Close concept graph"><X size={18} /></button>
-        </header>
+        <SurfaceHeader
+          eyebrow="Concepts"
+          title="Concept graph"
+          subtitle={graph?.title ?? courseTitle}
+          backLabel="Back to workspace"
+          onBack={close}
+          onClose={close}
+          closeLabel="Close concept graph"
+          backClassName="studio-back"
+          closeClassName="studio-close"
+        />
         <div className="studio-body concept-graph-body">
           {error && <div className="studio-error" role="alert" data-testid="concept-graph-error"><p>{error}</p></div>}
           {!graph && !error && <div className="studio-empty" data-testid="concept-graph-loading"><p>Loading concepts from this course…</p></div>}
