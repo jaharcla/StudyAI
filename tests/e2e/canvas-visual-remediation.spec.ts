@@ -47,7 +47,7 @@ function seedObject(kind: Kind, index: number): SeedObject {
     case "linked-document": return { ...base, documentId: "doc-1", title: "Chapter 2", excerpt: "Excerpt from the textbook." };
     case "question": return { ...base, prompt: "What is mitosis?", answer: "Nuclear cell division.", scenario: "In a dividing cell…" };
     case "flashcard": return { ...base, front: "Mitosis", back: "Division of the nucleus.", provenance: { status: "generated-unverified", sourceRefs: [] } };
-    case "mindmap": return { ...base, width: 340, height: 240, title: "Cell biology",
+    case "mindmap": return { ...base, x: 460, y: 740, width: 340, height: 240, title: "Cell biology",
       nodes: [{ id: "n0", label: "Cell", x: 0, y: 0 }, { id: "n1", label: "Nucleus", x: -110, y: 70 }, { id: "n2", label: "Membrane", x: 110, y: 70 }],
       edges: [{ from: "n0", to: "n1", label: "contains" }, { from: "n0", to: "n2" }] };
   }
@@ -237,6 +237,11 @@ test("user-readiness fixes: math, recall, maps, human names, units and geometry 
   // K2 — mind map renders its title, labelled arrowed edges and an editable panel.
   const mindmap = page.locator('[data-kind="mindmap"]');
   await expect(mindmap.getByTestId("mindmap-title")).toHaveText("Cell biology");
+  const titleBox = (await mindmap.getByTestId("mindmap-title").boundingBox())!;
+  const rootNodeBox = (await mindmap.getByTestId("mindmap-node-n0").boundingBox())!;
+  const titleGap = rootNodeBox.y - (titleBox.y + titleBox.height);
+  expect(titleGap).toBeGreaterThan(0);
+  expect(titleGap).toBeLessThan(30);
   await expect(mindmap.getByTestId("mindmap-edge-label-0")).toHaveText("contains");
   await expect(mindmap.locator(".mindmap-edge")).toHaveCount(2);
   await expect(mindmap.locator(".mindmap-edge").first()).toHaveAttribute("marker-end", /arrowhead/);
@@ -250,9 +255,13 @@ test("user-readiness fixes: math, recall, maps, human names, units and geometry 
   // Course-grounding rule: generated content, general labels and absent evidence are explicit.
   await expect(flashcard.getByTestId("generated-unverified")).toBeVisible();
   await expect(flashcard.getByTestId("no-course-evidence")).toBeVisible();
+  await expect(flashcard.getByTestId("no-course-evidence").locator("svg")).toHaveCount(1);
+  await expect(page.locator('[data-kind="anatomy"]').getByTestId("general-knowledge-label").locator("svg")).toHaveCount(1);
   const flashcardBox = (await flashcard.locator(".scene-node").boundingBox())!;
   const evidenceBox = (await flashcard.getByTestId("no-course-evidence").boundingBox())!;
   expect(evidenceBox.y + evidenceBox.height).toBeLessThanOrEqual(flashcardBox.y + flashcardBox.height + 1);
+  const hitBox = (await flashcard.locator(".scene-object-hit").boundingBox())!;
+  expect(flashcardBox.y + flashcardBox.height).toBeLessThanOrEqual(hitBox.y + hitBox.height + 1);
   await expect(page.locator('[data-kind="anatomy"]').getByTestId("general-knowledge-label")).toBeVisible();
   await expect(page.locator('[data-kind="concept"]').getByTestId("generated-unverified")).toBeVisible();
   await expect(page.locator('[data-kind="concept"]').getByTestId("no-course-evidence")).toHaveCount(0);

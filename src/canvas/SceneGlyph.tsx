@@ -1,5 +1,6 @@
 import { useState } from "react";
 import katex from "katex";
+import { CircleAlert, Info, ShieldAlert } from "lucide-react";
 import { formalCharge } from "../science";
 import { formatArrowLabel, type ScientificObject } from "./model";
 
@@ -36,10 +37,11 @@ export function GroundingBadges({ object }: { object: ScientificObject }) {
   const noEvidence = generated && object.provenance!.sourceRefs.length === 0;
   const general = isGeneralLabel(object);
   if (!generated && !general) return null;
+  // lucide-react 0.563.0: Info at dist/lucide-react.d.ts:10846, ShieldAlert at :16852, CircleAlert at :4554.
   return <span className="grounding-badges">
-    {general && <span className="grounding-badge general" data-testid="general-knowledge-label">General label</span>}
-    {generated && <span className="grounding-badge generated" data-testid="generated-unverified">Generated · not verified</span>}
-    {noEvidence && <span className="grounding-badge missing" data-testid="no-course-evidence">No course evidence</span>}
+    {general && <span className="grounding-badge general" data-testid="general-knowledge-label"><Info size={11} aria-hidden="true" />General label</span>}
+    {generated && <span className="grounding-badge generated" data-testid="generated-unverified"><ShieldAlert size={11} aria-hidden="true" />Generated · not verified</span>}
+    {noEvidence && <span className="grounding-badge missing" data-testid="no-course-evidence"><CircleAlert size={11} aria-hidden="true" />No course evidence</span>}
   </span>;
 }
 
@@ -70,10 +72,11 @@ export function SceneGlyph({ object, onOpenNote, onOpenDocument, registeredCards
   if (object.kind === "mindmap") {
     const byId = new Map(object.nodes.map((node) => [node.id, node]));
     const rootId = object.nodes[0]?.id;
+    const titleY = Math.min(...object.nodes.map((node) => node.y), 0) - 21 - 16;
     const clip = (value: string) => value.length > 20 ? `${value.slice(0, 19)}…` : value;
     return <g className="scene-mindmap" data-testid="mindmap-root" transform={`translate(${object.x} ${object.y})`}>
       <title>{object.title}</title>
-      <text className="mindmap-title" data-testid="mindmap-title" y={-object.height / 2 - 14} textAnchor="middle">{object.title}</text>
+      <text className="mindmap-title" data-testid="mindmap-title" y={titleY} textAnchor="middle">{object.title}</text>
       {object.edges.map((edge, index) => {
         const from = byId.get(edge.from), to = byId.get(edge.to);
         if (!from || !to) return null;
@@ -94,8 +97,8 @@ export function SceneGlyph({ object, onOpenNote, onOpenDocument, registeredCards
   const isFlashcard = object.kind === "flashcard";
   const isQuestion = object.kind === "question";
   // A flashcard can carry a flip control, an answer block and grounding badges; give it room so none are clipped.
-  const cardHeight = isFlashcard ? object.height + 30 : object.height;
-  const cardY = object.y - object.height / 2 - (isFlashcard ? 15 : 0);
+  const cardHeight = isFlashcard ? object.height + 40 : object.height;
+  const cardY = object.y - object.height / 2 - (isFlashcard ? 20 : 0);
   return <foreignObject x={object.x - object.width / 2} y={cardY} width={object.width} height={cardHeight}>
     <div className={`scene-node scene-${object.kind}`} data-testid="card-surface"><strong>{title}</strong>
       {isQuestion && object.scenario && <span className="scene-scenario">{object.scenario}</span>}
