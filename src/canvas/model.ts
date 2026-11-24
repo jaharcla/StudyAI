@@ -54,6 +54,11 @@ export function emptyCanvasDocument(): CanvasDocument {
   return { version: 1, snapshot: { document: { store: {} } }, objects: [] };
 }
 
+export function formatArrowLabel(label: string, magnitude: number, units: string) {
+  const value = Number.isFinite(magnitude) ? magnitude.toFixed(2) : "0.00";
+  return units.trim() ? `${label} · ${value} ${units.trim()}` : `${label} · ${value}`;
+}
+
 export function newId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
 }

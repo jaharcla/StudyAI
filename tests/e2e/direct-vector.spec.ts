@@ -62,7 +62,7 @@ test("vectors and forces draw at the pointer, manipulate endpoints, inspect, pan
   const fresh = (await page.locator(".canvas-board").boundingBox())!;
   await drag(page, { x: fresh.x + 480, y: fresh.y + 240 }, { x: fresh.x + 480, y: fresh.y + 130 });
   await expect.poll(async () => (await read()).objects[1]?.components).toEqual([0, 110, 0]);
-  expect((await read()).objects[1]).toMatchObject({ units: "", pointOfApplication: (await read()).objects[1].geometry.tail });
+  expect((await read()).objects[1]).toMatchObject({ units: "N", pointOfApplication: (await read()).objects[1].geometry.tail });
   await page.getByRole("button", { name: "Undo canvas change", exact: true }).click(); await expect(page.locator('[data-kind="force"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Redo canvas change", exact: true }).click(); await expect(page.locator('[data-kind="force"]')).toHaveCount(1);
   await tool(page, "Freehand pen"); await drag(page, { x: fresh.x + 70, y: fresh.y + 250 }, { x: fresh.x + 130, y: fresh.y + 290 });

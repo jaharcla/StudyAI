@@ -58,13 +58,13 @@ test("places equations and graphs, evaluates variables, traces/resizes plots, an
   await page.getByRole("button", { name: "Inspect selected object", exact: true }).click();
   await page.getByRole("textbox", { name: "Equation", exact: true }).fill("a*sqrt(b)");
   await page.getByLabel("Variable a", { exact: true }).fill("3"); await page.getByLabel("Variable b", { exact: true }).fill("16");
-  await expect(page.locator(".expression-result")).toHaveText("Result: 12");
+  await expect(page.locator(".canvas-object-editor .expression-result")).toHaveText("Result: 12");
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.locator('[data-kind="equation"]')).toContainText("= 12");
   await tool(page, "Graph data"); await page.mouse.click(box.x + 550, box.y + 350);
   await page.getByRole("button", { name: "Inspect selected object", exact: true }).click();
   await page.getByLabel("Graph expression", { exact: true }).fill("2*x+1");
-  await expect(page.locator(".expression-result")).toHaveText("121 sampled points");
+  await expect(page.locator(".canvas-object-editor .expression-result")).toHaveText("121 sampled points");
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
   const graph = page.locator('[data-kind="graph"]');
   await graph.locator(".graph-surface").hover(); await expect(graph.locator(".graph-trace")).toBeVisible();

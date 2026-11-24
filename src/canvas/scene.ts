@@ -34,7 +34,8 @@ export function resolveAnchor(anchor: ObjectAnchor | undefined, objects: Scienti
       const atom = object.atoms.find((atom) => atom.id === anchor.atomId);
       return atom ? atomWorldPosition(object, atom) : undefined;
     }
-    bounds = objectBounds(object);
+    // A standalone atom is a 44px glyph; anchors stop at its edge, never at the invisible 220x110 box.
+    bounds = object.kind === "atom" ? { x: object.x - 22, y: object.y - 22, w: 44, h: 44 } : objectBounds(object);
   }
   return { x: bounds.x + bounds.w * (anchor.u ?? 0.5), y: bounds.y + bounds.h * (anchor.v ?? 0.5) };
 }
