@@ -31,3 +31,10 @@ StudyAI's active work is the canvas and canvas intelligence. These rules are bin
 - One authority per board interpretation. Today that is `server/canvas-intelligence/scene/` for whole-board scene work and `server/canvas-analysis/` for direct manipulation. Do not add a third path or let two paths answer the same question.
 - Generated outputs (`data/canvas-benchmark/`, `data/canvas-dataset-benchmark/runs/`) are never committed. The baseline and ground truth are.
 - Before claiming canvas work is done, run `/canvas-verify`. A green build is not evidence that recognition still works.
+
+# Course-grounding rule (binding, 2026-11-24)
+
+- At least 99.9% of the student experience comes from that student's retrieved course material. See `docs/decisions/ADR-2026-11-24-course-grounding-rule.md`.
+- Every student-facing claim, artifact, question and canvas interpretation must trace to course evidence. Generated content is labelled `Generated · not verified`; missing evidence is stated as `No course evidence`; conventional names drawn from general knowledge are labelled `General label`.
+- Deterministic scientific tools (Math.js, KaTeX, formal charge, vector magnitude, physics diagnostics) remain authoritative for calculations. The model proposes; it never computes.
+- Do not present an unlabelled generated claim as course fact, and do not invent evidence to fill a gap.

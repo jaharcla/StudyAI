@@ -36,7 +36,7 @@ test("MathLive ASCII round-trips, parameters update linked SVG graphs, and legac
   const fraction = await typeLatex(page, "\\frac{1}{2}");
   expect(fraction.length).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Apply notation", exact: true }).click();
-  await expect(page.locator(".expression-result")).toHaveText("Result: 0.5");
+  await expect(page.locator(".canvas-object-editor .expression-result")).toHaveText("Result: 0.5");
 
   const root = await typeLatex(page, "\\sqrt{x}");
   expect(root.length).toBeGreaterThan(0);

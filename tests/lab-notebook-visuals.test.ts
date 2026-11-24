@@ -11,17 +11,18 @@ describe("lab-notebook visual tokens", () => {
     expect(studio).toContain('className="canvas-viewport lab-paper"');
   });
 
-  it("draws the graph plot on the paper, not on a white card", () => {
+  it("draws the graph plot on an opaque tinted surface with depth", () => {
     const rule = css.match(/\.graph-surface\s*\{[^}]*\}/)?.[0] ?? "";
     expect(rule).toBeTruthy();
-    expect(rule).toMatch(/fill:\s*(transparent|none)/);
-    expect(rule).not.toMatch(/fill:\s*#[0-9a-f]{3,8}/i);
+    expect(rule).toMatch(/fill:\s*#[0-9a-f]{3,8}/i);
+    expect(rule).toMatch(/drop-shadow\(0 4px 16px/);
   });
 
   it("defines the Lewis sidebar, radial actions, and notebook editor surfaces", () => {
     expect(css).toContain(".lewis-sidebar");
     expect(css).toContain(".radial-actions");
     expect(css).toContain(".notebook-editor");
-    expect(css).toMatch(/\.scene-atom[^{]*\{[^}]*fill:\s*transparent/);
+    expect(css).toMatch(/\.scene-atom[^{]*\{[^}]*fill:\s*#[0-9a-f]{3,8}/i);
+    expect(css).not.toMatch(/\.scene-atom[^{]*\{[^}]*fill:\s*transparent/);
   });
 });

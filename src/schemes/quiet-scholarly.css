@@ -101,12 +101,14 @@ button,input,select,textarea{font-family:inherit}
 .palette-tool-icon{width:24px;height:24px;border:1px solid #eadfd3;border-radius:5px;background:var(--accent-tint);color:var(--accent);font-size:10px}
 .open-tool-palette{border-color:var(--rule);border-radius:8px;background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
 
-.canvas-object{border-color:var(--rule);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-size:11px}
+.canvas-object{border-color:var(--rule);border-radius:8px;background:var(--surface);color:var(--ink);box-shadow:0 4px 16px #27344a1a;font-size:11px}
+.canvas-viewport.lab-paper .scene-node{background:var(--surface);border:1px solid var(--rule);border-radius:8px;box-shadow:0 4px 16px #27344a1a;color:var(--ink)}
+.canvas-viewport.lab-paper .scene-node span{color:var(--ink-2)}
+.scene-label-chip{fill:var(--surface);stroke:var(--rule)}
 .canvas-object.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(122,69,46,.15),var(--shadow)}
 .object-link{color:var(--accent)}
 .canvas-object-editor{border:1px solid var(--rule);background:var(--surface)}
 .canvas-object-editor>header{border-bottom:1px solid var(--rule-soft)}
-.canvas-object-editor>header span{color:var(--ink-3);font-size:9px;letter-spacing:.12em;text-transform:uppercase}
 .canvas-object-editor>header h3{color:var(--ink);font:600 17px "Literata",Georgia,serif}
 .object-editor-fields h4{color:var(--accent);font-size:9px;letter-spacing:.1em;text-transform:uppercase}
 .editor-calculation{background:var(--accent-tint);color:var(--ink-2)}
