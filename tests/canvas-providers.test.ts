@@ -4,7 +4,7 @@ import { z } from "zod";
 import { canvasInferenceJson, canvasOCR, consumeProviderFallbacks, resetProviderFallbacks } from "../server/canvas-intelligence/groq.js";
 import { allowProviderRequest, configureProviderBudgetDatabase, providerBudgetRemaining, providerBudgetSnapshot, resetProviderBudgetsForTests } from "../server/canvas-intelligence/provider-budget.js";
 import { configureProviderUsageDatabase, consumeProviderUsage, persistedProviderUsageSnapshot, providerCircuitSnapshot, providerUsageSnapshot, recordProviderBackoff, recordProviderFailure, recordProviderSuccess, recordProviderUsage, resetProviderCircuitsForTests, resetProviderUsageForTests } from "../server/canvas-intelligence/provider-usage.js";
-import { cloudOCRTimeoutMs, providerChain, resolveCompletionProviders, resolveVisionProviders } from "../server/canvas-intelligence/providers.js";
+import { cloudOCRTimeoutMs, opencodeGoModel, opencodeGoOCRModel, providerChain, resolveCompletionProviders, resolveVisionProviders } from "../server/canvas-intelligence/providers.js";
 
 const schema = z.object({ value: z.string() });
 const options = { model: "local:test", system: "Return JSON.", prompt: "Return {value:string}." };
@@ -56,7 +56,7 @@ describe("canvas provider chain", () => {
       "https://opencode.ai/inference/go/openai/v1/chat/completions",
     ]);
     expect(calls[1].headers.get("x-opencode-session")).toBeTruthy();
-    expect(calls[1].body).toMatchObject({ model: "qwen3.8-flash", response_format: { type: "json_object" } });
+    expect(calls[1].body).toMatchObject({ model: opencodeGoModel(), response_format: { type: "json_object" } });
     expect(consumeProviderFallbacks().join(" ")).toContain("Groq inference failed");
   });
 
@@ -71,7 +71,7 @@ describe("canvas provider chain", () => {
     const result = await canvasOCR({ base64: "aW1hZ2U=", mimeType: "image/png", fetcher });
     expect(result.items[0]).toMatchObject({ text: "F = 5 N", confidence: null, sourceIds: [], uncertain: true });
     expect(result.uncertain).toBe(true);
-    expect(calls[1].body).toMatchObject({ model: "qwen3.8-flash" });
+    expect(calls[1].body).toMatchObject({ model: opencodeGoOCRModel() });
     expect(JSON.stringify(calls[1].body)).toContain("image_url");
   });
 
