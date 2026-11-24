@@ -89,7 +89,7 @@ test("Continue prepares the grounded destination from the daily plan", async ({ 
 });
 
 test("switching lesson clears the plan line", async ({ page, request }) => {
-  const { course, lesson } = await seedReviewedLesson(request, ["Cell biology"], "Lesson home");
+  const { course, lesson } = await seedReviewedLesson(request, ["Cell biology", "Genetics"], "Lesson home");
   await page.goto("/");
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("heading", { name: lesson.title, exact: true })).toBeVisible();
