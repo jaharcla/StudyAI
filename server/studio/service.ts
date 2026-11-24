@@ -8,8 +8,8 @@ import { LearningService } from "../learning/service.js";
 import { buildGrounding } from "./grounding.js";
 import { initializeStudioSchema } from "./schema.js";
 import {
-  GenerateSchema, type GenerateInput, type ImportInput, type StudioArtifact, type StudioContent,
-  type StudioKind, type StudioSource,
+  GenerateSchema, type AcceptanceDecision, type GenerateInput, type ImportInput,
+  type StudioArtifact, type StudioContent, type StudioKind, type StudioSource,
 } from "./contracts.js";
 
 const MindMapOutput = z.object({
@@ -57,7 +57,7 @@ const PracticeOutput = z.object({
 
 export type StudioGenerator = (args: { system: string; user: string; input: GenerateInput }) => Promise<unknown>;
 
-const LABELS: Record<StudioKind, string> = { "mind-map": "Mind map", "study-guide": "Study guide", practice: "Practice" };
+const LABELS: Record<StudioKind, string> = { "mind-map": "Mind map", "study-guide": "Study guide", infographic: "Infographic", practice: "Practice" };
 
 /**
  * Generates one provenance-bound artifact. Every emitted citation must be a ref that came from
@@ -117,25 +117,50 @@ export async function generateStudioArtifact(
     content,
     sourceRefs: refs,
     createdAt: new Date().toISOString(),
+    acceptance: "pending",
   };
-  db.prepare("INSERT INTO studio_artifacts(id,course_id,lesson_id,kind,title,content,source_refs,created_at) VALUES(?,?,?,?,?,?,?,?)")
-    .run(artifact.id, artifact.courseId, artifact.lessonId, artifact.kind, artifact.title, JSON.stringify(content), JSON.stringify(refs), artifact.createdAt);
+  saveStudioArtifact(db, artifact);
   return artifact;
+}
+
+/** Sole insert path into the shared studio artifact store; compilePackage results use it too. */
+export function saveStudioArtifact(db: Database.Database, artifact: StudioArtifact): void {
+  initializeStudioSchema(db);
+  db.prepare("INSERT INTO studio_artifacts(id,course_id,lesson_id,kind,title,content,source_refs,created_at,acceptance) VALUES(?,?,?,?,?,?,?,?,?)")
+    .run(artifact.id, artifact.courseId, artifact.lessonId, artifact.kind, artifact.title, JSON.stringify(artifact.content), JSON.stringify(artifact.sourceRefs), artifact.createdAt, artifact.acceptance ?? "pending");
+}
+
+type StudioRow = Omit<StudioArtifact, "content" | "sourceRefs"> & { content: string; sourceRefs: string };
+
+function hydrate(row: StudioRow): StudioArtifact {
+  return { ...row, content: JSON.parse(row.content) as StudioContent, sourceRefs: JSON.parse(row.sourceRefs) as string[] };
 }
 
 export function getStudioArtifact(db: Database.Database, id: string, courseId: string, lessonId?: string): StudioArtifact | undefined {
   initializeStudioSchema(db);
-  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt FROM studio_artifacts WHERE id=? AND course_id=?")
-    .get(id, courseId) as Omit<StudioArtifact, "content" | "sourceRefs"> & { content: string; sourceRefs: string } | undefined;
+  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance FROM studio_artifacts WHERE id=? AND course_id=?")
+    .get(id, courseId) as StudioRow | undefined;
   if (!row || (lessonId && row.lessonId !== lessonId)) return undefined;
-  return { ...row, content: JSON.parse(row.content) as StudioContent, sourceRefs: JSON.parse(row.sourceRefs) as string[] };
+  return hydrate(row);
 }
 
 export function listStudioArtifacts(db: Database.Database, courseId: string, lessonId?: string, kind?: StudioKind): StudioArtifact[] {
   initializeStudioSchema(db);
-  const rows = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt FROM studio_artifacts WHERE course_id=? AND (?='' OR lesson_id=?) AND (?='' OR kind=?) ORDER BY created_at DESC LIMIT 20")
-    .all(courseId, lessonId ?? "", lessonId ?? "", kind ?? "", kind ?? "") as Array<Omit<StudioArtifact, "content" | "sourceRefs"> & { content: string; sourceRefs: string }>;
-  return rows.map((row) => ({ ...row, content: JSON.parse(row.content) as StudioContent, sourceRefs: JSON.parse(row.sourceRefs) as string[] }));
+  const rows = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance FROM studio_artifacts WHERE course_id=? AND (?='' OR lesson_id=?) AND (?='' OR kind=?) ORDER BY created_at DESC LIMIT 20")
+    .all(courseId, lessonId ?? "", lessonId ?? "", kind ?? "", kind ?? "") as StudioRow[];
+  return rows.map(hydrate);
+}
+
+/** One bounded review transaction per artifact; no revision branch per format. */
+export function setStudioArtifactAcceptance(
+  db: Database.Database, id: string, decision: AcceptanceDecision,
+): StudioArtifact | undefined {
+  initializeStudioSchema(db);
+  const result = db.prepare("UPDATE studio_artifacts SET acceptance=? WHERE id=?").run(decision, id);
+  if (!result.changes) return undefined;
+  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance FROM studio_artifacts WHERE id=?")
+    .get(id) as StudioRow | undefined;
+  return row ? hydrate(row) : undefined;
 }
 
 /** Imports accepted practice items through the existing learning authority (BKT + FSRS). */
@@ -266,6 +291,7 @@ function withSource<T extends { sourceRef: string }>(item: T, sources: StudioSou
 
 function collectRefs(content: StudioContent): string[] {
   if ("nodes" in content) return content.nodes.map((node) => node.sourceRef).filter((ref): ref is string => Boolean(ref));
+  if ("diagram" in content) return content.sourceRefs;
   if ("sections" in content) return [...content.sections.flatMap((section) => section.sourceRefs), ...content.keyTerms.map((term) => term.sourceRef)];
   return [...content.cards.map((card) => card.sourceRef), ...content.questions.map((question) => question.sourceRef)];
 }

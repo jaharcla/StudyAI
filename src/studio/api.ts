@@ -1,4 +1,4 @@
-export type StudioKind = "mind-map" | "study-guide" | "practice";
+export type StudioKind = "mind-map" | "study-guide" | "infographic" | "practice";
 export type PracticeType = "cards" | "quiz" | "both";
 
 export type MindMapNode = { id: string; label: string; parentId: string | null; detail?: string; sourceRef?: string };
@@ -14,10 +14,19 @@ export type PracticeQuestion = {
 };
 export type PracticeContent = { cards: PracticeCard[]; questions: PracticeQuestion[] };
 
+export type InfographicDiagram = {
+  title: string;
+  surfaceAngleDeg?: number;
+  forces: Array<{ label: string; components: [number, number]; position?: { x: number; y: number } }>;
+};
+export type InfographicContent = { title: string; objective: string; diagram: InfographicDiagram; sourceRefs: string[] };
+
+export type AcceptanceDecision = "pending" | "accept" | "correct" | "decline";
+
 export type StudioArtifact = {
   id: string; courseId: string; lessonId: string; kind: StudioKind; title: string;
-  content: MindMapContent | StudyGuideContent | PracticeContent;
-  sourceRefs: string[]; createdAt: string;
+  content: MindMapContent | StudyGuideContent | InfographicContent | PracticeContent;
+  sourceRefs: string[]; createdAt: string; acceptance?: AcceptanceDecision;
 };
 
 export type GenerateRequest = {
@@ -48,6 +57,14 @@ export function importPractice(artifactId: string, cards: number[], questions: n
   return requestJson("/api/studio/import", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ artifactId, cards, questions }),
+  });
+}
+
+/** One accept/correct/decline transaction for the shared studio artifact store. */
+export function acceptArtifact(id: string, decision: AcceptanceDecision): Promise<StudioArtifact> {
+  return requestJson<StudioArtifact>("/api/studio/accept", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id, decision }),
   });
 }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const StudioKindSchema = z.enum(["mind-map", "study-guide", "practice"]);
+export const StudioKindSchema = z.enum(["mind-map", "study-guide", "infographic", "practice"]);
 export type StudioKind = z.infer<typeof StudioKindSchema>;
 
 export const GenerateSchema = z.object({
@@ -63,7 +63,21 @@ export type PracticeQuestion = {
 };
 export type PracticeContent = { cards: PracticeCard[]; questions: PracticeQuestion[] };
 
-export type StudioContent = MindMapContent | StudyGuideContent | PracticeContent;
+/** The deterministic, locally rendered projection of a package `diagram` component. */
+export type InfographicDiagram = {
+  title: string;
+  surfaceAngleDeg?: number;
+  forces: Array<{ label: string; components: [number, number]; position?: { x: number; y: number } }>;
+};
+export type InfographicContent = {
+  title: string;
+  objective: string;
+  diagram: InfographicDiagram;
+  sourceRefs: string[];
+};
+
+export type StudioContent = MindMapContent | StudyGuideContent | InfographicContent | PracticeContent;
+export type AcceptanceDecision = "pending" | "accept" | "correct" | "decline";
 
 export type StudioArtifact = {
   id: string;
@@ -74,4 +88,5 @@ export type StudioArtifact = {
   content: StudioContent;
   sourceRefs: string[];
   createdAt: string;
+  acceptance?: AcceptanceDecision;
 };
