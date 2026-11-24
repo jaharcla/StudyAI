@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Store, hitShape, pageBounds, type Diff, type DiffSource, type ShapeRecord } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
+import { parseCanvasCitation } from "./citation-focus";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
 import { API } from "../api";
@@ -40,7 +41,7 @@ type Board = { id: string; name: string; revision: number };
 type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
 type ExampleSession = { exampleId: string; states: CompiledExampleState[]; player: PlayerState; mode: "replay" | "editing" };
 type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
-type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; onSelectedObject?: (object: { id: string; name: string } | null) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
+type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; onSelectedObject?: (object: { id: string; name: string } | null) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean; focusCitation?: { ref: string; key: number } };
 
 function selectedObjectName(object: ScientificObject): string {
   const fields = object as unknown as Record<string, unknown>;
@@ -125,7 +126,7 @@ function latexFromAnalysis(analysis: CanvasAnalysisResult): string {
   return text.trim().slice(0, 500) || "\\text{unread handwriting}";
 }
 
-export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, onSelectedObject, preferredBoardId, onBoardState, activityMode = false }: Props) {
+export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, onSelectedObject, preferredBoardId, onBoardState, activityMode = false, focusCitation }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
   const editorListeners = useRef<Array<() => void>>([]);
@@ -162,6 +163,8 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const [toolOpen, setToolOpen] = useState(true);
   const [toolSearch, setToolSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string>();
+  const [focusedId, setFocusedId] = useState<string>();
+  const handledFocusKey = useRef(0);
   const [editingId, setEditingId] = useState<string>();
 const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [, setEditorFrame] = useState(0);
@@ -195,6 +198,26 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const currentSelection = document.objects.find((object) => object.id === selectedId);
   useAgentContext({ description: "StudyAI selected scientific object", value: currentSelection ? { selected: true, objectId: currentSelection.id, name: selectedObjectName(currentSelection), kind: currentSelection.kind, boardId: activeBoard?.id ?? "", courseId, lessonId } : { selected: false, courseId, lessonId } });
   useEffect(() => { onSelectedObject?.(currentSelection ? { id: currentSelection.id, name: selectedObjectName(currentSelection) } : null); }, [currentSelection, onSelectedObject]);
+  useEffect(() => {
+    if (!focusCitation || focusCitation.key === handledFocusKey.current || loading || !activeBoard) return;
+    const citation = parseCanvasCitation(focusCitation.ref);
+    if (!citation) return;
+    handledFocusKey.current = focusCitation.key;
+    const object = citation.scope === "science" ? document.objects.find((item) => item.id === citation.id) : undefined;
+    const record = citation.scope === "quickdraw" ? editorRef.current?.store.get(citation.id) : undefined;
+    const shape = record?.typeName === "shape" ? record : undefined;
+    const bounds = object ? { x: object.x, y: object.y, w: object.width, h: object.height } : shape ? pageBounds(shape) : undefined;
+    if (!bounds || !editorRef.current) {
+      setFocusedId(undefined);
+      onStatus("That cited canvas item is no longer on this board.");
+      return;
+    }
+    editorRef.current.setTool("select");
+    editorRef.current.setSelection([citation.id]);
+    if (object) setSelectedId(citation.id);
+    setFocusedId(citation.id);
+    editorRef.current.followBounds(bounds, { animate: 200 });
+  }, [focusCitation, loading, activeBoard, document.objects, onStatus]);
   useFrontendTool({
     name: "propose_canvas_edit",
     description: "Consequential: requires user approval. Propose an edit to an existing scientific object on the active board. The user must apply it before it changes the canvas. Use current IDs from canvas context.",
@@ -1032,7 +1055,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
 
   const exampleState = exampleSession?.mode === "replay" ? stateAt(exampleSession.states, exampleSession.player.stepIndex) : undefined;
   const dimmedIds = exampleState ? new Set(document.objects.map((object) => object.id).filter((id) => !exampleState.objectIds.includes(id))) : undefined;
-  const highlightIds = exampleState ? new Set(exampleState.highlightIds) : undefined;
+  const highlightIds = focusedId ? new Set([focusedId]) : exampleState ? new Set(exampleState.highlightIds) : undefined;
 
   return <div className="canvas-studio">
     {canvasAnalysis && <CanvasAnalysisTutorContext analysis={canvasAnalysis} />}

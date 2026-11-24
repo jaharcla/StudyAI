@@ -4,6 +4,7 @@ import { VegaChartToolRenderer } from "./charts/VegaChartTool";
 import { Activity, Atom, BookOpen, Brain, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Library as LibraryIcon, Menu, Moon, MoreHorizontal, Network, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
 import { CanvasStudio } from "./canvas/CanvasStudio";
+import { parseCanvasCitation } from "./canvas/citation-focus";
 import { parseSourceReference } from "./components/document-intelligence/api";
 import { StudyPanel } from "./learning/StudyPanel";
 import FlashcardReview from "./learning/FlashcardReview";
@@ -146,6 +147,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   const [openDocumentId, setOpenDocumentId] = useState<string>();
   const [openSourceRef, setOpenSourceRef] = useState<string>();
   const [openSourceKey, setOpenSourceKey] = useState(0);
+  const [canvasFocus, setCanvasFocus] = useState<{ ref: string; key: number }>();
   const dragRef = useRef(false);
   const [canvasSummary, setCanvasSummary] = useState({ objectCount: 0, objectTypes: {} as Record<string, number> });
   const updateCanvasSummary = useCallback((summary: { objectCount: number; objectTypes: Record<string, number> }) => setCanvasSummary(summary), []);
@@ -435,6 +437,11 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     event.preventDefault();
     try {
       const sourceRef = decodeURIComponent(href.slice("#studyai-citation=".length));
+      if (parseCanvasCitation(sourceRef)) {
+        setCanvasFocus({ ref: sourceRef, key: Date.now() });
+        setView("Canvas");
+        return;
+      }
       if (!parseSourceReference(sourceRef)) return;
       setOpenDocumentId(undefined); setOpenSourceRef(sourceRef);
       setOpenSourceKey((key) => key + 1);
@@ -491,7 +498,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
       <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" tabIndex={-1} value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{humanizeLessonTitle(item.title)}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" tabIndex={-1} disabled={!course.id || !lessonId} onClick={() => setMode("study")}><Brain size={15} /> Study this lesson</button></section>
       <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions">{studyReturn && <button className="tool-chip study-return" onClick={() => { setStudyReturn(false); setMode("study"); }}><ChevronLeft size={14} /> Back to study session</button>}<button className="tool-chip" disabled={!course.id || !lessonId} onClick={() => setActivityLibraryOpen(true)}><Activity size={14} /> Activities</button><button className="tool-chip active" disabled={!course.id || !lessonId} onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
       <div className={`work-area ${view.toLowerCase()}`}>
-        {<div className="canvas-pane" hidden={view === "Lecture"}><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div>{course.id && lessonId ? <div className="canvas-workspace"><CanvasStudio key={`${course.id}:${lessonId}`} courseId={course.id} lessonId={lessonId} theme={dark ? "dark" : "light"} onStatus={updateStatus} onOpenNote={openLinkedNote} onOpenDocument={openLinkedDocument} onSummary={updateCanvasSummary} onSelectedObject={updateSelectedObject} preferredBoardId={preferredBoardId} onBoardState={updateActivityCanvas} activityMode={Boolean(activeActivity)} />{activeActivity && <ActivityTaskPanel courseId={course.id} lessonId={lessonId} session={activeActivity} canvas={activityCanvasState} onClose={closeActivity} />}</div> : <div className="canvas-loading">{courseError || lessonError || (course.id ? "Add a lesson to create a canvas." : "Select or create a course to create a canvas.")}</div>}</div>}
+        {<div className="canvas-pane" hidden={view === "Lecture"}><div className="pane-label"><span>STUDY CANVAS</span><span className="canvas-tip">Draw, diagram, connect ideas</span></div>{course.id && lessonId ? <div className="canvas-workspace"><CanvasStudio key={`${course.id}:${lessonId}`} courseId={course.id} lessonId={lessonId} theme={dark ? "dark" : "light"} onStatus={updateStatus} onOpenNote={openLinkedNote} onOpenDocument={openLinkedDocument} onSummary={updateCanvasSummary} onSelectedObject={updateSelectedObject} preferredBoardId={preferredBoardId} onBoardState={updateActivityCanvas} activityMode={Boolean(activeActivity)} focusCitation={canvasFocus} />{activeActivity && <ActivityTaskPanel courseId={course.id} lessonId={lessonId} session={activeActivity} canvas={activityCanvasState} onClose={closeActivity} />}</div> : <div className="canvas-loading">{courseError || lessonError || (course.id ? "Add a lesson to create a canvas." : "Select or create a course to create a canvas.")}</div>}</div>}
         {(view === "Lecture" || view === "Split") && <div className="lecture-pane">{course.id && <Suspense fallback={<div>Loading course sourcesâ€¦</div>}><DocumentLibrary key={`${course.id}:${lessonId}`} courseId={course.id} lessonId={lessonId} initialDocumentId={openDocumentId} courses={visibleCourses} onCourseChange={(id) => { const selected = courses.find((item) => item.id === id); if (selected) changeCourse(selected); }} initialSourceRef={openSourceRef} initialSourceKey={openSourceKey} initialQuery={query} /></Suspense>}</div>}
 
       </div>
