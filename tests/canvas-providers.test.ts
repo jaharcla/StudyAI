@@ -23,6 +23,8 @@ beforeEach(() => {
   vi.stubEnv("CANVAS_OCR_PROVIDER", "auto");
   vi.stubEnv("CANVAS_PROVIDER_CHAIN", "groq,opencode-go,openrouter");
   vi.stubEnv("CANVAS_OPENCODE_GO_MAX_REQUESTS_PER_DAY", "20");
+  vi.stubEnv("CANVAS_OPENCODE_GO_MODEL", "qwen3.8-flash");
+  vi.stubEnv("CANVAS_OPENCODE_GO_OCR_MODEL", "qwen3.8-flash");
   vi.stubEnv("CANVAS_OPENROUTER_MAX_REQUESTS_PER_DAY", "50");
   vi.stubEnv("CANVAS_GROQ_MAX_REQUESTS_PER_MINUTE", "100");
 });

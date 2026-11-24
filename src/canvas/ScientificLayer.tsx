@@ -96,18 +96,22 @@ export function ScientificLayer({ objects, editor, mode, placementPatch, selecte
         if (object.kind !== "vector" && object.kind !== "force") {
           const selected = selectedId === object.id;
           if (isLine(object)) return <SceneLineGlyph key={object.id} object={object} zoom={zoom} selected={selected} interactive={interactive} onStart={(event, end) => begin(event, object, end ?? "move")} onEdit={() => onEdit(object.id)} />;
-          return <g key={object.id} data-scientific-id={object.id} data-kind={object.kind} className={`scene-object ${selected ? "selected" : ""}`} style={{ pointerEvents: interactive ? "all" : "none" }} role="button" aria-label={objectTitle(object)} onPointerDown={(event) => begin(event, object)} onDoubleClick={(event) => { event.stopPropagation(); onEdit(object.id); }}>
+          return <g key={object.id} data-scientific-id={object.id} data-kind={object.kind} className={`scene-object ${selected ? "selected" : ""}`} style={{ pointerEvents: interactive ? "all" : "none" }} role="button" aria-label={objectTitle(object)} tabIndex={0} onPointerDown={(event) => begin(event, object)} onDoubleClick={(event) => { event.stopPropagation(); onEdit(object.id); }}>
             <rect className="scene-object-hit" x={object.x - object.width / 2} y={object.y - object.height / 2} width={object.width} height={object.height} />
             <SceneGlyph object={object} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />
             {selected && <rect className="science-handle" data-resize="true" x={object.x + object.width / 2 - 5 / zoom} y={object.y + object.height / 2 - 5 / zoom} width={10 / zoom} height={10 / zoom} onPointerDown={(event) => begin(event, object, "resize")} />}
           </g>;
         }
         const geometry = arrowGeometry(object), selected = selectedId === object.id;
+        const arrowLabel = `${object.label} · ${vectorMagnitude(...object.components).toFixed(2)} ${object.geometry?.unitsPerCanvasUnit === undefined ? "canvas units" : object.units}`;
         return <g key={object.id} data-scientific-id={object.id} data-kind={object.kind} className={`science-arrow ${selected ? "selected" : ""}`} role="button" aria-label={`${object.kind} ${object.label}`} tabIndex={0} onDoubleClick={(event) => { event.stopPropagation(); onEdit(object.id); }}>
           <line className="science-hit" style={{ pointerEvents: interactive ? "stroke" : "none" }} aria-label="Move arrow" x1={geometry.tail.x} y1={geometry.tail.y} x2={geometry.tip.x} y2={geometry.tip.y} strokeWidth={16 / zoom} onPointerDown={(event) => begin(event, object)} />
           <line className="science-arrow-line" x1={geometry.tail.x} y1={geometry.tail.y} x2={geometry.tip.x} y2={geometry.tip.y} strokeWidth={2.5 / zoom} markerEnd="url(#science-arrowhead)" />
           {object.kind === "force" && <circle className="science-anchor" cx={geometry.tail.x} cy={geometry.tail.y} r={5 / zoom} />}
-          <text x={(geometry.tail.x + geometry.tip.x) / 2} y={(geometry.tail.y + geometry.tip.y) / 2 - 12 / zoom} fontSize={12 / zoom}>{object.label} · {vectorMagnitude(...object.components).toFixed(2)} {object.geometry?.unitsPerCanvasUnit === undefined ? "canvas units" : object.units}</text>
+          <g className="science-label" transform={`translate(${(geometry.tail.x + geometry.tip.x) / 2} ${(geometry.tail.y + geometry.tip.y) / 2 - 12 / zoom})`}>
+            <rect className="scene-label-chip" data-testid="label-chip" x={-(arrowLabel.length * 3 + 8 / zoom)} y={-12 / zoom} width={arrowLabel.length * 6 + 16 / zoom} height={19 / zoom} rx={4 / zoom} />
+            <text textAnchor="middle" y={3 / zoom} fontSize={11 / zoom}>{arrowLabel}</text>
+          </g>
           {selected && ["tail", "tip"].map((end) => <circle key={end} className="science-handle" style={{ pointerEvents: interactive ? "all" : "none" }} data-endpoint={end} aria-label={`Move ${end}`} cx={geometry[end as "tail" | "tip"].x} cy={geometry[end as "tail" | "tip"].y} r={6 / zoom} strokeWidth={1.5 / zoom} onPointerDown={(event) => begin(event, object, end as "tail" | "tip")} />)}
         </g>;
       })}

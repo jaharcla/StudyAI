@@ -22,6 +22,7 @@ describe("lab-notebook visual tokens", () => {
     expect(css).toContain(".lewis-sidebar");
     expect(css).toContain(".radial-actions");
     expect(css).toContain(".notebook-editor");
-    expect(css).toMatch(/\.scene-atom[^{]*\{[^}]*fill:\s*transparent/);
+    expect(css).toMatch(/\.scene-atom[^{]*\{[^}]*fill:\s*#[0-9a-f]{3,8}/i);
+    expect(css).not.toMatch(/\.scene-atom[^{]*\{[^}]*fill:\s*transparent/);
   });
 });
