@@ -18,6 +18,13 @@ const componentShapes: Record<ArtifactComponent["kind"], Record<string, unknown>
   "mind-map": { title: "M", nodes: [{ id: "n", label: "N" }] },
   "interactive-exercise": { prompt: "I", exercise: { mode: "force-motion", massKg: 2, forcesN: [4] } },
   summary: { title: "S", sections: [{ heading: "H", body: "B." }] },
+  slide_deck: {
+    objective: "Friction", templateId: "general-en", language: "en",
+    slides: [
+      { role: "title", title: "Friction", claims: [], visual: { kind: "none", altText: "No visual" } },
+      { role: "summary", title: "Summary", claims: [], visual: { kind: "none", altText: "No visual" } },
+    ],
+  },
 };
 
 const components = OWNED_KINDS.map((kind, index) => ({ id: `c${index}`, kind, sourceRefs: [REF], ...componentShapes[kind] }));

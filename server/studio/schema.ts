@@ -15,11 +15,12 @@ export function initializeStudioSchema(db: Database.Database): void {
       file_path TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS studio_artifacts_scope_idx ON studio_artifacts(course_id, lesson_id, kind, created_at DESC);
-    CREATE INDEX IF NOT EXISTS studio_artifacts_collection_idx ON studio_artifacts(course_id, collection, created_at DESC);
   `);
-  // Additive review state: older databases keep their rows and gain a defaulted column.
+  // Additive columns: older databases keep their rows and gain defaulted values.
   const columns = db.prepare("PRAGMA table_info(studio_artifacts)").all() as Array<{ name: string }>;
-  if (!columns.some((column) => column.name === "acceptance")) {
-    db.exec("ALTER TABLE studio_artifacts ADD COLUMN acceptance TEXT NOT NULL DEFAULT 'pending'");
-  }
+  const has = (name: string) => columns.some((column) => column.name === name);
+  if (!has("collection")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN collection TEXT NOT NULL DEFAULT ''");
+  if (!has("file_path")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN file_path TEXT NOT NULL DEFAULT ''");
+  if (!has("acceptance")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN acceptance TEXT NOT NULL DEFAULT 'pending'");
+  db.exec("CREATE INDEX IF NOT EXISTS studio_artifacts_collection_idx ON studio_artifacts(course_id, collection, created_at DESC)");
 }

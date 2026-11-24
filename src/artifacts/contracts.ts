@@ -44,6 +44,7 @@ export const COMPONENT_OWNERS: Readonly<Record<string, ArtifactRenderer>> = Obje
   flashcard: "canvas",
   "mind-map": "canvas",
   summary: "studio",
+  slide_deck: "studio",
   "interactive-exercise": "learning",
 });
 
