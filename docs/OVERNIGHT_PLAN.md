@@ -32,7 +32,14 @@ Do not interrupt them. If a worker stalls more than ~30 minutes without progress
 
 ## After all four land
 
-1. Repeat both mock student runs from `C:\Users\Owner\AppData\Local\Temp\opencode\mock-student-brief.md`, using the owner's real local course data (CHEM 120 / Quantum theory first, then KIN 120).
+All four fix squads are merged. Main is verified: `tsc` clean, 117 files / 755 tests pass. Targeted browser checks are 11/12, with one Tutor-hygiene spec flaky only in a full combo.
+
+Expanded overnight goal — six hours, four parallel native tracks:
+
+1. **Repeat both mock student runs** from `C:\Users\Owner\AppData\Local\Temp\opencode\mock-rerun-brief.md`, using the owner's real local course data (CHEM 120 / Quantum theory first, then KIN 120). This is the primary proof.
+2. **Concept graph slice** (`work/concept-graph-slice-20261124`): course concepts with mastery and jump-to-practice, reusing `learning_concepts`, `server/progress.ts` and Studio mind-map rendering.
+3. **Three visual directions** (`work/visual-directions-20261124`): static mockups and tradeoffs so the owner can choose a theme on waking. No `DESIGN.md` until they choose.
+4. **FunASR voice ADR** (`work/funasr-adr-20261124`): cited reuse-versus-build, deployment footprint, transcript provenance and phased plan. No implementation or keys.
 2. Use `TUTOR_PROVIDER=opencode-go` and `CANVAS_OPENCODE_GO_MODEL=hy4-flash-free` explicitly; no Groq, Ollama or beam-free.
 3. Compare against the baseline note `C:\Users\Owner\AppData\Local\Temp\opencode\mock-student-runs-2026-11-24.md`. The path must work: read source → grounded answer with openable citation → canvas object work → generate artifact → practice and rate → Coach Continue → progress.
 4. Upload numbered screenshots and record exact UI text for any remaining failures.
