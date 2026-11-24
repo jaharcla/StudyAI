@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { ZodError } from "zod";
-import { CardInputSchema, RateCardSchema, ReviewedQuestionSchema } from "./contracts.js";
+import { CardInputSchema, PracticeAnswerSchema, RateCardSchema, ReviewedQuestionSchema } from "./contracts.js";
 import { LearningService } from "./service.js";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -8,6 +8,7 @@ const FIELD_LABELS: Record<string, string> = {
   choices: "Choices", correctChoice: "Correct choice", explanation: "Explanation",
   sourceDocumentId: "Source document", sourcePage: "Source page", sourceExcerpt: "Source excerpt",
   cardId: "Card", choiceId: "Answer", rating: "Rating", front: "Front text", back: "Back text",
+  artifactId: "Practice test", questionIndex: "Question", idempotencyKey: "",
 };
 
 /** Student-facing validation copy. Never return Zod paths, codes or internal field names. */
@@ -75,6 +76,10 @@ export function createLearningHandler(service: LearningService, origin: string |
       }
       if (req.method === "POST" && url.pathname === "/api/study/reviews") {
         send(200, service.rate(JSON.parse(await readBody(req))));
+        return true;
+      }
+      if (req.method === "POST" && url.pathname === "/api/study/practice-answer") {
+        send(200, service.recordPracticeAnswer(PracticeAnswerSchema.parse(JSON.parse(await readBody(req)))));
         return true;
       }
       return false;

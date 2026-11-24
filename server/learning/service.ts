@@ -14,6 +14,23 @@ type ReviewableQuestion = { id: string; version: number; concept_id: string; con
 export type CardInput = { courseId: string; lessonId: string; conceptId: string; front: string; back: string; sourceDocumentId?: string; sourcePage?: number | null; sourceExcerpt?: string };
 export type DueCard = { cardId: string; conceptId: string; concept: string; front: string; back: string; dueAt: string; sourceDocumentId?: string | null; sourcePage?: number | null; sourceExcerpt?: string; sourceTitle?: string };
 export type CardReviewInput = { cardId: string; rating: "Again" | "Hard" | "Good" | "Easy"; idempotencyKey: string };
+export type PracticeAnswerInput = { courseId: string; lessonId: string; artifactId: string; questionIndex: number; choiceId: string; idempotencyKey: string };
+export type PracticeAnswerResult = {
+  duplicate: boolean;
+  correct: boolean;
+  selectedChoiceId: string;
+  correctChoiceId: string;
+  correctAnswerText: string;
+  explanation: string;
+  source: { documentId: string; title: string; page: number | null; excerpt: string; sourceRef: string };
+  mastery: number;
+  dueAt: string;
+};
+type PracticeTestQuestion = {
+  concept: string; prompt: string; choices: Array<{ id: string; text: string }>;
+  correctChoice: string; explanation: string; sourceRef: string;
+  sourceDocumentId: string; sourcePage: number | null; sourceExcerpt: string;
+};
 
 export class LearningService {
   private readonly scheduler = fsrs({ enable_fuzz: false });
@@ -147,6 +164,66 @@ export class LearningService {
     });
     save();
     return { duplicate: false, cardId: card.id, rating: input.rating, reviewedAt: now.toISOString(), dueAt, state: State[next.state] };
+  }
+
+  /**
+   * Grades one answer from a generated practice-test artifact. The question, its answer key and
+   * its citation are re-read from the stored artifact on the server, so a client cannot invent an
+   * answer or a source. Grading uses the same LearningService authority as a reviewed question:
+   * BKT mastery via submit() and an FSRS schedule via rate() (Again for a miss, Good for a hit).
+   */
+  recordPracticeAnswer(input: PracticeAnswerInput): PracticeAnswerResult {
+    const unavailable = "This practice test is no longer available. Generate a new one from your lesson.";
+    const hasArtifacts = this.database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_artifacts'").get();
+    const row = hasArtifacts
+      ? this.database.prepare("SELECT kind,content FROM studio_artifacts WHERE id=? AND course_id=? AND lesson_id=?")
+          .get(input.artifactId, input.courseId, input.lessonId) as { kind: string; content: string } | undefined
+      : undefined;
+    if (!row || row.kind !== "practice") throw new Error(unavailable);
+    const questions = (JSON.parse(row.content) as { questions?: PracticeTestQuestion[] }).questions ?? [];
+    const question = questions[input.questionIndex];
+    if (!question) throw new Error(unavailable);
+    if (!question.choices.some((choice) => choice.id === input.choiceId)) throw new Error("Choose one of the presented answers.");
+    const correctAnswerText = question.choices.find((choice) => choice.id === question.correctChoice)?.text ?? "";
+
+    const prior = this.database.prepare(`SELECT a.is_correct,a.selected_choice,e.explanation,e.source_document_id,e.source_title,e.source_page,e.source_excerpt,m.mastery,r.due_at
+      FROM learning_attempts a
+      JOIN grading_evidence e ON e.attempt_id=a.id
+      JOIN mastery_updates m ON m.attempt_id=a.id
+      LEFT JOIN review_logs r ON r.attempt_id=a.id
+      WHERE a.idempotency_key=?`).get(input.idempotencyKey) as {
+        is_correct: number; selected_choice: string; explanation: string; source_document_id: string;
+        source_title: string; source_page: number | null; source_excerpt: string; mastery: number; due_at: string | null;
+      } | undefined;
+    if (prior) {
+      return {
+        duplicate: true, correct: Boolean(prior.is_correct), selectedChoiceId: prior.selected_choice,
+        correctChoiceId: question.correctChoice, correctAnswerText, explanation: prior.explanation,
+        source: { documentId: prior.source_document_id, title: prior.source_title, page: prior.source_page, excerpt: prior.source_excerpt, sourceRef: question.sourceRef },
+        mastery: prior.mastery, dueAt: prior.due_at ?? this.now().toISOString(),
+      };
+    }
+
+    const added = this.addReviewedQuestion({
+      courseId: input.courseId, lessonId: input.lessonId, concept: question.concept,
+      prompt: question.prompt, choices: question.choices, correctChoice: question.correctChoice,
+      explanation: question.explanation, sourceDocumentId: question.sourceDocumentId,
+      sourcePage: question.sourcePage, sourceExcerpt: question.sourceExcerpt,
+    });
+    const presentationId = randomUUID();
+    this.database.prepare("INSERT INTO question_presentations(id,question_id,question_version,course_id,lesson_id) VALUES(?,?,?,?,?)")
+      .run(presentationId, added.id, added.version, input.courseId, input.lessonId);
+    const graded = this.submit({ presentationId, choiceId: input.choiceId, idempotencyKey: input.idempotencyKey });
+    if (graded.duplicate || !("mastery" in graded)) throw new Error("Your answer could not be saved. Try again.");
+    const card = this.database.prepare("SELECT id FROM learning_cards WHERE concept_id=?").get(added.conceptId) as { id: string } | undefined;
+    if (!card) throw new Error("Your practice card could not be prepared. Try again.");
+    const rated = this.rate({ cardId: card.id, idempotencyKey: `${input.idempotencyKey}:review`, rating: graded.correct ? "Good" : "Again" });
+    return {
+      duplicate: false, correct: graded.correct, selectedChoiceId: input.choiceId,
+      correctChoiceId: question.correctChoice, correctAnswerText, explanation: graded.explanation,
+      source: { ...graded.source, sourceRef: question.sourceRef },
+      mastery: graded.mastery, dueAt: rated.dueAt ?? this.now().toISOString(),
+    };
   }
 
   registerCard(input: CardInput) {
