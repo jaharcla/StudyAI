@@ -1,4 +1,4 @@
-/* One Coach surface: a slim dock that follows the student between board, study and studio.
+/* One Coach surface: its ranked next step now lives inside the Study tutor panel.
    Operate-mode craft: contrast, real depth, generous groups, designed states, reduced motion. */
 .coach-dock {
   --coach-ink: #232b36;
@@ -7,33 +7,21 @@
   --coach-line: #d9dee6;
   --coach-accent: #8a4f31;
   --coach-accent-hover: #74412a;
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 1200;
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  width: min(760px, calc(100vw - 32px));
+  gap: 8px;
+  width: 100%;
   min-height: 68px;
   padding: 10px 12px;
-  border: 1px solid var(--coach-line);
-  border-radius: 10px;
+  border-top: 1px solid var(--coach-line);
   background: #ffffff;
-  box-shadow: 0 10px 28px rgba(23, 32, 45, 0.18), 0 2px 6px rgba(23, 32, 45, 0.08);
   color: var(--coach-ink);
   font: 12px/1.45 'DM Sans', Arial, sans-serif;
-  /* The dock follows the student but must not swallow clicks meant for the workspace. */
-  pointer-events: none;
 }
-
-.coach-continue,
-.coach-more,
-.coach-icon,
-.coach-secondary,
-.coach-secondary-open,
-.coach-enable { pointer-events: auto; }
 
 .coach-mark {
   display: grid;
@@ -45,7 +33,8 @@
   color: var(--coach-accent);
 }
 
-.coach-copy { flex: 1 1 auto; min-width: 0; }
+/* The panel is narrow, so the mark and copy take one row and the controls wrap beneath. */
+.coach-copy { flex: 1 1 calc(100% - 40px); min-width: 0; }
 .coach-reason { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0; }
 .coach-preview { margin: 3px 0 0; color: var(--coach-muted); }
 .coach-quiet { margin: 0; color: var(--coach-muted); }
@@ -75,6 +64,7 @@
   justify-content: center;
   gap: 7px;
   flex: 0 0 auto;
+  margin-left: auto;
   padding: 0 16px;
   border: 1px solid var(--coach-accent);
   background: var(--coach-accent);
@@ -112,23 +102,17 @@
 .coach-toggle { transform: rotate(180deg); }
 
 .coach-enable {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 1200;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 14px;
+  align-self: flex-start;
+  margin: 10px 12px;
   border: 1px solid var(--coach-line);
   background: #ffffff;
   color: var(--coach-body);
-  box-shadow: 0 6px 18px rgba(23, 32, 45, 0.14);
 }
 .coach-enable:hover { background: #f5f6f8; }
 
 .coach-secondary {
   position: absolute;
+  z-index: 2;
   bottom: calc(100% + 8px);
   left: 0;
   right: 0;
@@ -173,8 +157,9 @@
   --coach-line: #3b4451;
   --coach-accent: #d39a76;
   --coach-accent-hover: #b98564;
-  background: #1c232d;
+  background: #20242a;
 }
+.dark .coach-secondary { background: #1c232d; }
 .dark .coach-more, .dark .coach-secondary-open { background: #232c38; }
 .dark .coach-more:hover, .dark .coach-secondary li + li { border-color: #333e4d; }
 .dark .coach-secondary li + li { border-color: #333e4d; }
@@ -184,8 +169,8 @@
   .coach-more[aria-expanded="true"] svg { transition: transform 140ms ease; }
 }
 @keyframes coach-enter {
-  from { opacity: 0; transform: translate(-50%, 10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .coach-dock, .coach-more svg { animation: none !important; transition: none !important; }

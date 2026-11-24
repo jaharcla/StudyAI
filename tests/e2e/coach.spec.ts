@@ -156,3 +156,29 @@ test("changing course clears Coach status and prompts instead of carrying stale 
   await page.waitForTimeout(600);
   await page.screenshot({ path: "test-results/coach-course-change-cleared.png", fullPage: false });
 });
+
+test("Coach lives in the tutor panel and closes with it", async ({ page, request }) => {
+  const { course, lesson } = await seedReviewedLesson(request, ["Cell biology"], "Folded surface");
+  await openCoachedLesson(page, course.title, lesson.title);
+
+  const panel = page.locator(".tutor-panel");
+  const coach = page.getByTestId("coach-surface");
+  await expect(panel.locator('[data-testid="coach-surface"]')).toHaveCount(1);
+  await expect(page.locator(".app-shell > .coach-dock")).toHaveCount(0);
+  const panelBox = await panel.boundingBox();
+  const coachBox = await coach.boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(coachBox).not.toBeNull();
+  expect(coachBox!.x).toBeGreaterThanOrEqual(panelBox!.x);
+  expect(coachBox!.x + coachBox!.width).toBeLessThanOrEqual(panelBox!.x + panelBox!.width + 1);
+
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "test-results/coach-folded-light.png", fullPage: false });
+  await page.evaluate(() => document.querySelector(".app-shell")?.classList.add("dark"));
+  await page.screenshot({ path: "test-results/coach-folded-dark.png", fullPage: false });
+
+  await page.getByTitle("Close tutor").click();
+  await expect(coach).toHaveCount(0);
+  await page.getByRole("button", { name: "Open tutor" }).click();
+  await expect(coach).toBeVisible();
+});

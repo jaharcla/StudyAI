@@ -4,7 +4,7 @@
 
 **Goal:** Give the one Coach a dated, course-grounded sequence of next actions without adding a second recommender, surface, provider or table.
 
-**Architecture:** A pure `buildDailyPlan` wraps the unchanged `getRecommendations` projection and attaches a scheduled day and a grounding label. A read-only endpoint carries it to a `CoachProducer` that reuses `mapRecommendation`, adds a plan badge, and replaces the raw recommendation producer registration. The existing Coach dock renders one dated step line.
+**Architecture:** A pure `buildDailyPlan` wraps the unchanged `getRecommendations` projection and attaches a scheduled day and a grounding label. A read-only endpoint carries it to a `CoachProducer` that reuses `mapRecommendation`, adds a plan badge, and replaces the raw recommendation producer registration. The existing Coach next-step block inside the Study tutor panel renders one dated step line.
 
 **Tech Stack:** TypeScript, better-sqlite3, React 19, existing CSS scheme, Vitest, Playwright.
 
@@ -125,7 +125,7 @@ Run `node node_modules/typescript/bin/tsc -b` and `node node_modules/vitest/vite
 
 `git add src/coach/contract.ts src/coach/dailyPlanProducer.ts src/App.tsx tests/coach.test.ts` and commit with the Discord link.
 
-### Task 4: Dated step line in the Coach dock
+### Task 4: Dated step line in the Coach block inside the tutor panel
 
 **Files:**
 - Modify: `src/coach/useCoach.ts`, `src/coach/coach.css`
@@ -133,7 +133,7 @@ Run `node node_modules/typescript/bin/tsc -b` and `node node_modules/vitest/vite
 
 **Interfaces:**
 - Consumes: `top.plan` on the selected `CoachPrompt`.
-- Produces: one `<p className="coach-plan" data-testid="coach-plan">` inside the existing `coach-copy` block, reading `Plan <day>, step <step> of <total>` (or `Plan <date>` for a one-item day); no new dock, card or surface.
+- Produces: one `<p className="coach-plan" data-testid="coach-plan">` inside the existing `coach-copy` block, reading `Plan <day>, step <step> of <total>` (or `Plan <date>` for a one-item day); no new dock, card or surface beyond the existing tutor panel.
 
 - [ ] **Step 1: Write the failing browser tests**
 
@@ -141,7 +141,7 @@ In `tests/e2e/daily-plans.spec.ts`, reuse `seedReviewedLesson` / `openCoachedLes
 
 - [ ] **Step 2: Render the badge**
 
-In `useCoach.ts`, insert the `coach-plan` paragraph inside the existing `coach-copy` div only when `top?.plan` is present, before the `coach-reason` line. Use the same `h(...)` createElement style as the neighbouring lines. In `coach.css`, style `.coach-plan` with the dock's existing muted text token and spacing; add a `.dark` override only if the current token is not already readable. No new theme, animation or direction choice.
+In `useCoach.ts`, insert the `coach-plan` paragraph inside the existing `coach-copy` div only when `top?.plan` is present, before the `coach-reason` line. Use the same `h(...)` createElement style as the neighbouring lines. In `coach.css`, style `.coach-plan` with the Coach block's existing muted text token and spacing; add a `.dark` override only if the current token is not already readable. No new theme, animation or direction choice.
 
 - [ ] **Step 3: Run focused browser tests and typecheck**
 
@@ -166,7 +166,7 @@ Run `npm run verify`. Quote the counts for tsc, Vitest and Playwright. Name any 
 
 - [ ] **Step 2: Capture and review**
 
-Capture a light and dark screenshot of the Coach dock with the plan line and upload them in the worker thread. Generate one critique URL per commit with `bunx critique --commit <hash> --web "<title>"` and paste each patch into the review. Record the three strongest objections and their resolutions, or note that none were found.
+Capture a light and dark screenshot of the tutor panel with the Coach plan line and upload them in the worker thread. Generate one critique URL per commit with `bunx critique --commit <hash> --web "<title>"` and paste each patch into the review. Record the three strongest objections and their resolutions, or note that none were found.
 
 - [ ] **Step 3: Write the record and commit**
 
