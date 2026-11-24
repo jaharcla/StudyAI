@@ -12,8 +12,26 @@ export type TutorCitationCandidate = {
 export type TutorCitation = Pick<TutorCitationCandidate, "sourceRef" | "filename" | "unitType" | "unitNumber">;
 export type TutorStudentResponse = { answer: string; citations: TutorCitation[]; rejectedCitationCount: number };
 export type TutorContextItem = { description: string; value: unknown };
+export type TutorPresentationOptions = {
+  linkMentionedSource?: boolean;
+  /** Grounded canvas refs (scope:id -> human label) collected from trusted tool/context layers. */
+  canvasRefs?: ReadonlyMap<string, string>;
+  /** Skip redacting raw canvas ids when the student explicitly asked for them. */
+  redactCanvasIds?: boolean;
+};
 
-export function presentTutorResponse(answer: string, candidates: readonly TutorCitationCandidate[], options: { linkMentionedSource?: boolean } = {}): TutorStudentResponse {
+/** Reasoning emitted inline by local and chat models must never reach the student. */
+export function stripTutorReasoning(text: string): string {
+  return text
+    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, " ")
+    .replace(/^\s*<think(?:ing)?>[\s\S]*$/i, "")
+    .split("\n")
+    .filter((line) => !/^\s*(?:need (?:to )?search|let me (?:cite|check|search|use)|selectedCount\b|url[- ]encoded\b|i(?:'ll| will) (?:search|cite|call))\b/i.test(line))
+    .join("\n")
+    .trim();
+}
+
+export function presentTutorResponse(answer: string, candidates: readonly TutorCitationCandidate[], options: TutorPresentationOptions = {}): TutorStudentResponse {
   const candidateByRef = new Map(candidates.map((candidate) => [candidate.sourceRef, candidate]));
   const citations = new Map<string, TutorCitation>();
   let rejectedCitationCount = 0;
@@ -41,6 +59,8 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
     }
   };
   const content = answer
+    // Models copy the literal placeholder out of the prompt. Never ship a dead link.
+    .replace(/#studyai-citation=(?:URL_ENCODED_SOURCE_REF|SOURCE_REF|YOUR_SOURCE_REF)/gi, "")
     .replace(/\[([^\]]+)\]\[((?:studyai:\/\/document\/|https:\/\/studyai\.org\/document\/)[^\]]+)\]/g, (_match, _label: string, reference: string) => {
       const rendered = renderReference(reference);
       if (!rendered) { rejectedCitationCount++; return ""; }
@@ -73,10 +93,20 @@ export function presentTutorResponse(answer: string, candidates: readonly TutorC
       if (rendered) return rendered;
       if (reference.startsWith("studyai://document/") || reference.startsWith("https://studyai.org/document/")) { rejectedCitationCount++; return ""; }
       return match;
+    })
+    // Board citations are resolved last so the document-citation sanitizer cannot strip them.
+    // A board ref is only linkable when it came from a trusted tool or context layer; drop the rest.
+    .replace(/\(\s*canvas:\s*(quickdraw|science):([^)\s]+)[^)]*\)/gi, (_match, scope: string, id: string) => {
+      const sourceRef = `${scope.toLowerCase()}:${id}`;
+      const label = options.canvasRefs?.get(sourceRef);
+      if (!label) return "";
+      citations.set(sourceRef, { sourceRef, filename: label, unitType: "canvas", unitNumber: 0 });
+      return `[${markdownLabel(label)}](#studyai-citation=${encodeURIComponent(sourceRef)})`;
     });
-  const cleaned = rejectedCitationCount
-    ? content.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+([,.;!?])/g, "$1")
-    : content;
+  const redacted = options.redactCanvasIds === false
+    ? content
+    : content.replace(/\b(?:q|s|g|o|c):[A-Za-z0-9:_-]{3,}/g, "the referenced canvas item");
+  const cleaned = (rejectedCitationCount ? redacted.replace(/[ \t]{2,}/g, " ") : redacted).replace(/[ \t]+([,.;!?])/g, "$1");
   const renderedCitations = [...citations.values()];
   if (!options.linkMentionedSource || renderedCitations.length) return { answer: cleaned, citations: renderedCitations, rejectedCitationCount };
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { presentTutorResponse, projectTutorContexts, renderTutorResponse } from "../server/tutor-presentation";
+import { presentTutorResponse, projectTutorContexts, renderTutorResponse, stripTutorReasoning } from "../server/tutor-presentation";
 
 const cited = { sourceRef: "source:lecture:2", filename: "chemistry.pdf", unitType: "page", unitNumber: 2, score: -1.5, excerpt: "The supported claim." };
 const unused = { sourceRef: "source:lecture:3", filename: "unrelated.pdf", unitType: "page", unitNumber: 3, score: -0.2, excerpt: "An unrelated claim." };
@@ -82,6 +82,41 @@ describe("Tutor student response", () => {
     const response = presentTutorResponse("STUDYAI-GROQ-CONNECTED", [cited, unused]);
     expect(renderTutorResponse(response)).toBe("STUDYAI-GROQ-CONNECTED");
     expect(response.citations).toEqual([]);
+  });
+
+  it("strips inline reasoning blocks from a model answer", () => {
+    expect(stripTutorReasoning("<think>Need search docs... Let me cite the exact sourceRef.</think>\nThe answer is 4 m.")).toBe("The answer is 4 m.");
+    expect(stripTutorReasoning("<thinking>unclosed scratch")).toBe("");
+  });
+});
+
+describe("Tutor response hygiene", () => {
+  it("drops copied placeholder citation links and raw reasoning markers", () => {
+    const answer = stripTutorReasoning("Need search docs...\nLet me cite the exact sourceRef.\nThe value is 4. See #studyai-citation=URL_ENCODED_SOURCE_REF");
+    const response = presentTutorResponse(answer, [cited]);
+    expect(response.answer).not.toContain("URL_ENCODED_SOURCE_REF");
+    expect(response.answer).not.toContain("Need search docs");
+    expect(response.answer).not.toContain("Let me cite");
+    expect(response.answer).toContain("The value is 4.");
+  });
+
+  it("renders a grounded board citation with the one citation grammar", () => {
+    const canvasRefs = new Map([["science:obj-42", "Carbon dioxide"]]);
+    const response = presentTutorResponse("The force acts on the molecule (canvas: science:obj-42).", [], { canvasRefs });
+    expect(response.answer).toBe("The force acts on the molecule [Carbon dioxide](#studyai-citation=science%3Aobj-42).");
+    expect(decodeURIComponent(response.answer.match(/studyai-citation=([^)]+)/)![1])).toBe("science:obj-42");
+  });
+
+  it("drops an ungrounded board citation instead of printing a placeholder", () => {
+    const response = presentTutorResponse("The force acts on the referenced item (canvas: science:made-up-ref).", [], { canvasRefs: new Map() });
+    expect(response.answer).toBe("The force acts on the referenced item.");
+    expect(response.answer).not.toContain("(canvas:");
+    expect(response.answer).not.toContain("the referenced canvas item");
+  });
+
+  it("still redacts raw ids in prose unless explicitly requested", () => {
+    expect(presentTutorResponse("near q:shape:mw877vh004pyqs", []).answer).toBe("near the referenced canvas item");
+    expect(presentTutorResponse("near q:shape:mw877vh004pyqs", [], { redactCanvasIds: false }).answer).toBe("near q:shape:mw877vh004pyqs");
   });
 });
 
