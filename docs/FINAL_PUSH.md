@@ -25,7 +25,9 @@ Reliability: PDF worker now loads as a Vite asset (commit `19f9533`); `tests/e2e
 - Reliability sweep + smoke: `work/reliability-j1-20261124`, thread `1574910108671148052`, ports 5702/8713/8714/8612. Running.
 - Today + daily plan (J1/J6): `work/today-plan-20261124`, thread `1574910341085794476`, ports 5703/8715/8716/8613. Running; holds Playwright until the reliability worker finishes its suite.
 - Gap-fill: no worker active; aborted stale session, scope folded into Tutor/Studio workers.
-- Tutor, Studio parity, Decks, Study loop, Document intelligence, Canvas depth, Cohesion: not yet assigned.
+- Tutor trust (J2): `work/tutor-trust-20261124`, thread `1574919601777803324`, ports 5704/8717/8718/8614. Running; Playwright first.
+- Studio parity (J3, decks): `work/studio-parity-20261124`, thread `1574919600615723039`, ports 5705/8719/8720/8615. Running; holds Playwright until Tutor is clear.
+- Decks, Study loop, Document intelligence, Canvas depth, Cohesion: not yet assigned.
 
 ## Integrations checked
 
