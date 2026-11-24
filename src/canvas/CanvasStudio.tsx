@@ -145,6 +145,9 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const palmRejectionRef = useRef(palmRejection);
   palmRejectionRef.current = palmRejection;
   const activePenPointer = useRef<number | null>(null);
+  // A cancelled pen ends the session but Quickdraw arms penMode only once, so we
+  // disarm it until the next pen contact instead of leaving touch blocked forever.
+  const rearmPenModeOnNextPen = useRef(false);
   const gestureTrail = useRef<PenPoint2D[]>([]);
   const gesturePointerId = useRef<number | null>(null);
   const [lastPenGesture, setLastPenGesture] = useState<"none" | "scratch" | "circle">("none");
@@ -1110,7 +1113,13 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       })}</aside>}
       {!toolOpen && <button className="open-tool-palette" aria-label="Open canvas tools" title="Open canvas tools" onClick={() => setToolOpen(true)}><Plus size={16} /></button>}
       <div className={`canvas-board ${toolOpen ? "with-palette" : ""}`} ref={boardElement} tabIndex={0} data-selected-shape-ids={selectedShapeIds.join(",")} data-last-pen-gesture={lastPenGesture} onPointerDownCapture={(event) => {
-        if (event.pointerType === "pen") activePenPointer.current = event.pointerId;
+        if (event.pointerType === "pen") {
+          activePenPointer.current = event.pointerId;
+          if (rearmPenModeOnNextPen.current && palmRejection) {
+            rearmPenModeOnNextPen.current = false;
+            editorRef.current?.setPenMode(true);
+          }
+        }
         // Explicit pointerType filtering complements Quickdraw's penMode gate:
         // a palm landing mid-stroke never even reaches the editor's listeners.
         if (palmRejection && event.pointerType === "touch" && activePenPointer.current !== null) { event.stopPropagation(); return; }
@@ -1166,7 +1175,18 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
           }
         }
         finishNativeGesture();
-      }} onPointerCancelCapture={() => { nativeGesture.current = null; gestureTrail.current = []; gesturePointerId.current = null; }} onKeyDownCapture={(event) => {
+      }} onPointerCancelCapture={(event) => {
+        if (activePenPointer.current === event.pointerId) {
+          activePenPointer.current = null;
+          if (palmRejection) {
+            rearmPenModeOnNextPen.current = true;
+            editorRef.current?.setPenMode(false);
+          }
+        }
+        nativeGesture.current = null;
+        gestureTrail.current = [];
+        gesturePointerId.current = null;
+      }} onKeyDownCapture={(event) => {
         if ((event.target as HTMLElement).closest("input,textarea,select,math-field,[contenteditable='true']")) return;
         if (nativeGesture.current && TOOL_KEYS.has(event.key.toLowerCase())) cancelNativeGesture();
         if (event.code === "Space") setSpaceHeld(true);

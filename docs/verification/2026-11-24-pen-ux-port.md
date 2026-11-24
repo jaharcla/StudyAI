@@ -121,11 +121,14 @@ record; no hardware behaviour is claimed.
 
 ## Three strongest objections to this port
 
-1. **A cancelled pen pointer can strand palm rejection.** `onPointerUpCapture` clears
-   `activePenPointer`, but `onPointerCancelCapture` does not. If a stylus `pointerdown` is
-   followed by `pointercancel` rather than `pointerup` (common on OS gesture interruption),
-   `activePenPointer` stays set and every subsequent touch pointer is stopped until reload.
-   The e2e spec exercises clean up/down strokes only.
+1. **A cancelled pen pointer could strand palm rejection — fixed in this follow-up commit.**
+   `onPointerUpCapture` cleared `activePenPointer`, but `onPointerCancelCapture` did not. A
+   stylus `pointerdown` followed by `pointercancel` left touch blocked until reload. The new
+   browser test `a cancelled pen pointer lets touch input through again` was RED (expected 2
+   strokes, received 1), then GREEN after clearing the pointer on cancel. Quickdraw also arms
+   `penMode` only once on first stylus contact (`editor.js:451-455`), so merely clearing the ref
+   was not enough: the fix disarms `penMode` on cancel and re-arms it on the next pen contact,
+   which the test also asserts. Zoom thresholds were deliberately left unchanged.
 2. **Gesture thresholds are fixed page-space pixels.** `isCircle` needs a ≥24 px bbox and
    radius ≥12; `isScratchOut` needs a ≥20 px diagonal and path length ≥2.2× diagonal. Hit
    tolerance divides by `camera.z`, but those recognition thresholds do not, so recognition

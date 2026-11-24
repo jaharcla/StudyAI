@@ -15,7 +15,7 @@ async function openBoard(page: Page) {
   return { course, lesson };
 }
 
-async function firePointer(page: Page, type: "pointerdown" | "pointermove" | "pointerup", point: PenPoint, pointerType: "pen" | "touch" | "mouse", pointerId = 7) {
+async function firePointer(page: Page, type: "pointerdown" | "pointermove" | "pointerup" | "pointercancel", point: PenPoint, pointerType: "pen" | "touch" | "mouse", pointerId = 7) {
   await page.evaluate(({ type, point, pointerType, pointerId }) => {
     const canvas = document.querySelector(".quickdraw-native canvas.qd-canvas");
     if (!canvas) throw new Error("Quickdraw canvas missing");
@@ -28,10 +28,10 @@ async function firePointer(page: Page, type: "pointerdown" | "pointermove" | "po
   }, { type, point, pointerType, pointerId });
 }
 
-async function penStroke(page: Page, points: PenPoint[], pointerType: "pen" | "touch" | "mouse" = "pen") {
-  await firePointer(page, "pointerdown", points[0], pointerType);
-  for (let i = 1; i < points.length; i++) await firePointer(page, "pointermove", points[i], pointerType);
-  await firePointer(page, "pointerup", points[points.length - 1], pointerType);
+async function penStroke(page: Page, points: PenPoint[], pointerType: "pen" | "touch" | "mouse" = "pen", pointerId = 7) {
+  await firePointer(page, "pointerdown", points[0], pointerType, pointerId);
+  for (let i = 1; i < points.length; i++) await firePointer(page, "pointermove", points[i], pointerType, pointerId);
+  await firePointer(page, "pointerup", points[points.length - 1], pointerType, pointerId);
 }
 
 type SavedBoard = { id: string; revision: number; document: string | { snapshot?: { document?: { store?: Record<string, { type?: string; props?: { pts?: number[] } }> } } } };
@@ -163,4 +163,29 @@ test("pen capture smooths pressure: saved pressure differs from raw synthetic po
   const maxDelta = Math.max(...pressures.map((value, index) => Math.abs(value - rawPressures[index])));
   expect(maxDelta).toBeGreaterThan(0.02);
   expect(pressures.every((value) => Number.isFinite(value) && value >= 0.05 && value <= 1)).toBe(true);
+});
+
+test("a cancelled pen pointer lets touch input through again", async ({ page }) => {
+  test.setTimeout(120_000);
+  const { course, lesson } = await openBoard(page);
+
+  // A stylus contact interrupted by pointercancel must not leave palm rejection armed.
+  const pen = { x: 200, y: 120, pressure: 0.5 };
+  await firePointer(page, "pointerdown", pen, "pen", 21);
+  await firePointer(page, "pointercancel", pen, "pen", 21);
+  await page.waitForTimeout(800);
+  const before = await drawStrokeCount(page, course.id, lesson.id);
+
+  const touchPoints = Array.from({ length: 6 }, (_, i) => ({ x: 150 + i * 20, y: 260, pressure: 0.5 }));
+  await penStroke(page, touchPoints, "touch", 22);
+  await expect.poll(() => drawStrokeCount(page, course.id, lesson.id), { timeout: 15_000 }).toBe(before + 1);
+
+  // The next real pen contact must re-arm rejection; touch is blocked again.
+  const penAgain = Array.from({ length: 6 }, (_, i) => ({ x: 320 + i * 20, y: 130, pressure: 0.5 }));
+  await penStroke(page, penAgain, "pen", 23);
+  await page.waitForTimeout(800);
+  const afterPen = await drawStrokeCount(page, course.id, lesson.id);
+  await penStroke(page, touchPoints, "touch", 24);
+  await page.waitForTimeout(800);
+  expect(await drawStrokeCount(page, course.id, lesson.id)).toBe(afterPen);
 });
