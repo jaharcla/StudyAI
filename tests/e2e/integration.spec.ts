@@ -15,8 +15,11 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
   await page.getByRole("button", { name: "Choose canvas board" }).click();
   await page.getByRole("button", { name: "New board" }).click();
+  await expect(page.getByRole("button", { name: /Choose canvas board: Board 2/ })).toBeVisible();
+  await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved");
   await expect(page.locator("[data-scientific-id], .canvas-object")).toHaveCount(0);
   await page.getByRole("button", { name: "Lecture", exact: true }).click();
+  await expect(page.locator(".di-file-input")).toHaveCount(1);
   const filename = `bonding-${Date.now()}.pdf`;
   await page.locator(".di-file-input").setInputFiles({ name: filename, mimeType: "application/pdf", buffer: Buffer.from(pdfFixture("The carbon dioxide Lewis structure has two double bonds and four nonbonding electrons on each oxygen. The lecture marker is LEWIS-7042.")) });
   await expect(page.getByText("Indexed", { exact: true })).toBeVisible({ timeout: 30_000 });
@@ -40,6 +43,9 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   await expect(viewer.locator(".react-pdf__Page__canvas")).toBeVisible({ timeout: 30_000 });
   await viewer.getByRole("button", { name: "Close preview" }).click();
   await page.getByRole("button", { name: "Canvas", exact: true }).click();
+  await expect(page.locator(".canvas-board")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Choose canvas board: Board 2/ })).toBeVisible();
+  await expect(page.locator(".top-actions .saved")).toHaveText("All changes saved");
   await drawCarbonDioxide(page);
   await page.getByRole("combobox", { name: "Bond order", exact: true }).first().selectOption("1");
   await page.getByRole("spinbutton", { name: "Nonbonding electrons", exact: true }).first().fill("6");
@@ -58,7 +64,7 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
     return JSON.parse(row.document);
   };
   const shapes = (document: { snapshot: { document: { store: Record<string, { typeName?: string }> } } }) => Object.entries(document.snapshot.document.store).filter(([, record]) => record.typeName === "shape");
-  await expect.poll(async () => shapes(await savedCanvas()).length).toBeGreaterThan(0);
+  await expect.poll(async () => ((await savedCanvas()).objects ?? []).some((object: { kind: string }) => object.kind === "molecule")).toBe(true);
   const drawing = shapes(await savedCanvas());
   await chat.fill('Read the molecule on my active canvas and the imported carbon dioxide lecture. Use propose_canvas_edit with the parent molecule objectId. Use atomEdits to set the first oxygen nonbondingElectrons to 4 and bondEdits to set its bond order to 2. Also change the molecule name to "Tutor reviewed CO2". Preserve every atom, bond and resonance ID and all other data. Call the tool to propose these changes for my review.');
   await chat.press("Enter");

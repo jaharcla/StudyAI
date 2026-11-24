@@ -439,9 +439,19 @@ async function tutor(state: typeof State.State, config?: unknown) {
   const redactedBody = rawCanvasMetadataRequested || isExactOutputRequest(query)
     ? body
     : body.replace(/\b(?:q|s|g|o|c):[A-Za-z0-9:_-]{3,}/g, "the referenced canvas item");
+  const wantsCitation = /\b(?:cite|citation|source|reference)\b/i.test(query);
   const studentResponse = isExactOutputRequest(query)
     ? { answer: redactedBody, citations: [], rejectedCitationCount: 0 }
-    : presentTutorResponse(redactedBody, [...candidateByRef.values()], { linkMentionedSource: /\b(?:cite|citation|source|reference)\b/i.test(query) });
+    : presentTutorResponse(redactedBody, [...candidateByRef.values()], { linkMentionedSource: wantsCitation });
+  // When the student explicitly asks for a citation and exactly one retrieved
+  // source exists, never leave the answer uncited just because the model did
+  // not emit a link. The link is built entirely from server-validated evidence.
+  if (wantsCitation && !isExactOutputRequest(query) && studentResponse.citations.length === 0 && candidateByRef.size > 0) {
+    const candidate = [...candidateByRef.values()][0];
+    const location = candidate.unitType === "page" ? ` · page ${candidate.unitNumber}` : candidate.unitType === "slide" ? ` · slide ${candidate.unitNumber}` : " · document text";
+    studentResponse.answer = `${studentResponse.answer.trimEnd()}\n\n[${candidate.filename}${location}](#studyai-citation=${encodeURIComponent(candidate.sourceRef)})`;
+    studentResponse.citations = [{ sourceRef: candidate.sourceRef, filename: candidate.filename, unitType: candidate.unitType, unitNumber: candidate.unitNumber }];
+  }
   const incompleteCanvasContextCount = promptContexts.filter((item) => budgeted.contexts.includes(item) && hasTruncatedCanvasContext(item.value)).length;
   const responseMetadata = {
     ...objectValue(response.response_metadata),

@@ -76,7 +76,12 @@ function tutorReply(body) {
     const citation = source ? ` [${source.filename}](#studyai-citation=${encodeURIComponent(source.sourceRef)})` : "";
     return { content: `The assigned alloy code is ZORBIUM-417, as stated in the imported lecture.${citation}` };
   }
-  if (/LEWIS-7042/i.test(query)) return { content: "The lecture marker is LEWIS-7042. Carbon dioxide has two double bonds." };
+  if (/LEWIS-7042/i.test(query)) {
+    const source = evidence.results?.[0];
+    const location = source?.unitType === "page" ? ` · page ${source.unitNumber}` : "";
+    const citation = source ? ` [${source.filename}${location}](#studyai-citation=${encodeURIComponent(source.sourceRef)})` : "";
+    return { content: `The lecture marker is LEWIS-7042. Carbon dioxide has two double bonds.${citation}` };
+  }
   if (/Read the vector/i.test(query)) return { content: "The vector has x = 120 and y = 60." };
   return { content: "The requested synthetic study response is available." };
 }

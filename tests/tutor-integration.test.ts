@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { makeMolecule } from "../src/canvas/model";
+import { pdfFixture } from "./fixtures/document-intelligence.js";
 
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), bindTools: vi.fn(), ollamaOptions: [] as unknown[], groqInvoke: vi.fn(), groqBindTools: vi.fn(), groqBindToolOptions: [] as unknown[], groqOptions: [] as unknown[] }));
 vi.mock("@langchain/ollama", () => ({ ChatOllama: class {
@@ -91,6 +92,20 @@ it("retrieves course evidence, canonicalizes real citations and removes invented
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain("TUTOR-771");
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).not.toContain(molecule.atoms[0].id);
   expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain("Carbon dioxide");
+});
+
+it("links the single retrieved source when the student asks for a citation", async () => {
+  const filename = `cite-proof-${Date.now()}.pdf`;
+  const marker = `CITE-${Date.now()}`;
+  const excerpt = `The carbon dioxide Lewis structure has two double bonds and four nonbonding electrons on each oxygen. The lecture marker is ${marker}.`;
+  await importDocuments(db, "chem-120", [{ name: filename, bytes: pdfFixture(excerpt) }], join(folder, "documents"));
+  const prompt = `According to my imported lecture, what is the lecture marker ${marker} and how many bonds does carbon dioxide have? Cite the page.`;
+  const hit = searchDocuments(db, "chem-120", prompt)[0];
+  mocks.invoke.mockResolvedValue(new AIMessage("The lecture marker is LEWIS-7042; carbon dioxide has two double bonds."));
+  const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage(prompt)] });
+  expect(JSON.stringify(mocks.invoke.mock.calls[0][0])).toContain(excerpt);
+  expect(result.messages.at(-1)?.content).toContain(`[${filename} · page 1](#studyai-citation=${encodeURIComponent(hit.sourceRef)})`);
+  expect(tutorMetadata(result).retrieval.citedSourceRefs).toContain(hit.sourceRef);
 });
 
 it("returns an exact requested string without retrieval or citation additions", async () => {

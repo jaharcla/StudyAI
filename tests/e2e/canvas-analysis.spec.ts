@@ -11,6 +11,8 @@ test("Canvas analysis is sent only after an explicit user action", async ({ page
   const { course, lesson } = await createCourseWithLesson(page.request);
   const submitted: Array<{ url: string; payload: Record<string, any> }> = [];
   await page.route(/\/api\/canvases\/[^/]+\/analysis\?/, async (route) => {
+    // Loading a stored analysis is a GET; only POSTs are user submissions.
+    if (route.request().method() !== "POST") { await route.continue(); return; }
     const url = new URL(route.request().url());
     const boardId = url.pathname.split("/").at(-2)!;
     const payload = route.request().postDataJSON() as Record<string, any>;
@@ -66,6 +68,7 @@ test("Canvas analysis is sent only after an explicit user action", async ({ page
   expect(submitted).toHaveLength(1);
   expect(submitted[0].payload).toMatchObject({ expectedRevision: expect.any(Number), image: { regions: [expect.objectContaining({ mimeType: "image/png", base64: expect.any(String), sourceIds: expect.any(Array), pixelToWorld: expect.any(Object) })] } });
   expect(submitted[0].payload.image.regions[0].base64.length).toBeGreaterThan(10);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
 test("handwritten F = 5 N keeps source evidence and a unique force candidate through Analyze Board", async ({ page, request }) => {
