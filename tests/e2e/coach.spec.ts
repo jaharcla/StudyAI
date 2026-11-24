@@ -109,3 +109,50 @@ test("a failed preparation shows a plain message and never invents a target", as
   await expect(page.getByTestId("coach-status")).toHaveText("That step is not available right now. Nothing was changed.");
   await expect(page.getByRole("dialog", { name: "Study session" })).toBeHidden();
 });
+
+test("Continue says plainly when no question was prepared and offers the real next action", async ({ page, request }) => {
+  const { course, lesson } = await seedReviewedLesson(request, ["Cell biology"], "No question loaded");
+  await page.route("**/api/study/ask*", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      status: "no-reviewed-questions",
+      reason: "No reviewed questions for this lesson yet.",
+      nextAction: { kind: "author-question", label: "Create a question from course text" },
+      suggestedSource: { documentId: "d1", title: "cell-notes.txt", page: null, excerpt: "DNA lives in the nucleus." },
+    }),
+  }));
+  await openCoachedLesson(page, course.title, lesson.title);
+
+  await page.getByTestId("coach-continue").click();
+  await expect(page.getByTestId("coach-status")).toContainText("No reviewed question is ready");
+  await expect(page.getByTestId("coach-status")).toContainText("Create a question from course text");
+  await expect(page.getByTestId("coach-status")).not.toContainText("loaded");
+  await expect(page.getByRole("dialog", { name: "Study session" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^What is true about/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Ask a reviewed question" }).click();
+  await expect(page.getByTestId("study-no-questions")).toBeVisible();
+  await expect(page.getByTestId("author-from-source")).toHaveText("Create a question from course text");
+
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "test-results/coach-no-question-truth.png", fullPage: false });
+});
+
+test("changing course clears Coach status and prompts instead of carrying stale text", async ({ page, request }) => {
+  const first = await seedReviewedLesson(request, ["Cell biology"], "First course lesson");
+  const second = await seedReviewedLesson(request, ["Genetics"], "Second course lesson");
+  await openCoachedLesson(page, first.course.title, first.lesson.title);
+  await expect(page.getByTestId("coach-reason")).toContainText("Cell biology");
+  await page.getByTestId("coach-continue").click();
+  await expect(page.getByTestId("coach-status")).toHaveText("Ready in Study. Your next question is loaded.");
+  await page.getByRole("button", { name: "Close study session" }).click();
+
+  await selectCourseOnPage(page, second.course.title);
+  await expect(page.getByRole("heading", { name: "Second course lesson", exact: true })).toBeVisible();
+  await expect(page.getByTestId("coach-status")).toHaveCount(0);
+  const reason = page.getByTestId("coach-reason");
+  if (await reason.count()) await expect(reason).not.toContainText("Cell biology");
+
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "test-results/coach-course-change-cleared.png", fullPage: false });
+});

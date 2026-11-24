@@ -6,6 +6,12 @@ export type TutorProviderMode = "auto" | TutorProvider;
 
 const EXPLICIT_MODES: readonly string[] = ["groq", "ollama", "openai-compatible", "opencode-go", "openrouter", "gemini"];
 
+function requestedMode(env: NodeJS.ProcessEnv): TutorProviderMode {
+  const requested = env.TUTOR_PROVIDER?.trim().toLowerCase();
+  const normalized = requested === "omniroute" ? "openai-compatible" : requested;
+  return normalized && EXPLICIT_MODES.includes(normalized) ? normalized as TutorProviderMode : "auto";
+}
+
 function positiveNumber(value: string | undefined, fallback: number, name: string): number {
   const result = value === undefined || value.trim() === "" ? fallback : Number(value);
   if (!Number.isFinite(result) || result <= 0) throw new Error(`${name} must be a positive number.`);
@@ -13,9 +19,7 @@ function positiveNumber(value: string | undefined, fallback: number, name: strin
 }
 
 export function getTutorProviderSettings(env: NodeJS.ProcessEnv = process.env) {
-  const requested = env.TUTOR_PROVIDER?.trim().toLowerCase();
-  const requestedMode = requested === "omniroute" ? "openai-compatible" : requested;
-  const mode: TutorProviderMode = requestedMode && EXPLICIT_MODES.includes(requestedMode) ? requestedMode as TutorProviderMode : "auto";
+  const mode = requestedMode(env);
   const groqConfigured = Boolean(env.GROQ_API_KEY?.trim());
   // A local gateway needs no key; any explicit OMNIROUTE_* setting opts it into auto mode.
   const omnirouteConfigured = Boolean(env.OMNIROUTE_BASE_URL?.trim() || env.OMNIROUTE_API_KEY?.trim() || env.OMNIROUTE_MODEL?.trim());
@@ -80,6 +84,37 @@ export function tutorModelForProvider(provider: TutorProvider, settings: TutorPr
   if (provider === "openrouter") return settings.openRouterModel;
   if (provider === "gemini") return settings.geminiModel;
   return selectedModel || settings.ollamaModel;
+}
+
+/**
+ * Config-only view of the active Tutor provider, safe to show in the UI. Reads no key value,
+ * makes no provider call, and never lets the disabled local picker stand in for the real model.
+ */
+export function tutorProviderStatus(env: NodeJS.ProcessEnv = process.env) {
+  const mode = requestedMode(env);
+  try {
+    const settings = getTutorProviderSettings(env);
+    const provider = settings.provider;
+    const model = tutorModelForProvider(provider, settings);
+    return {
+      mode,
+      provider,
+      model,
+      pickerActive: provider === "ollama",
+      note: provider === "ollama"
+        ? "The local model picker sets the Ollama model used by the Tutor."
+        : `The local model picker is inactive: the Tutor uses ${provider} with ${model} from configuration (TUTOR_PROVIDER=${mode}).`,
+    };
+  } catch (error) {
+    const provider: TutorProvider = mode !== "auto" ? mode as TutorProvider : "ollama";
+    return {
+      mode,
+      provider,
+      model: "",
+      pickerActive: provider === "ollama",
+      note: error instanceof Error ? error.message : "The Tutor provider is not configured.",
+    };
+  }
 }
 
 // Explicit modes are single-provider, like groq/ollama today. Only auto falls back.

@@ -52,8 +52,10 @@
 .coach-status { margin: 3px 0 0; font-weight: 600; }
 .coach-status.error { color: #9a3b2f; }
 .coach-status.success { color: #2f6b4f; }
+.coach-status.notice { color: #6b5a2f; }
 .dark .coach-status.error { color: #f0a99b; }
 .dark .coach-status.success { color: #9bd3b4; }
+.dark .coach-status.notice { color: #dcc48c; }
 
 .coach-continue,
 .coach-more,

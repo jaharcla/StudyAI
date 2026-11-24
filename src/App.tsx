@@ -26,7 +26,7 @@ import { Streamdown, defaultRemarkPlugins, defaultRehypePlugins } from "streamdo
 import { useCoach } from "./coach/useCoach";
 import { recommendationProducer } from "./coach/recommendationProducer";
 import { registerCoachProducer } from "./coach/service";
-import type { CoachTarget } from "./coach/contract";
+import { studyPreparationResult, type CoachPreparationResult, type CoachTarget } from "./coach/contract";
 
 // Paid rail is dormant (PRODUCT_ROADMAP, 2026-11-23). Off unless explicitly enabled.
 const PAID_ENABLED = import.meta.env.VITE_STUDYAI_PAID_ENABLED === "1";
@@ -37,6 +37,7 @@ import "katex/dist/katex.min.css";
 type Course = { id: string; title: string; code: string; color: string };
 type View = "Canvas" | "Lecture" | "Split";
 type Lesson = { id: string; title: string };
+type TutorStatus = { mode: string; provider: string; model: string; pickerActive: boolean; note: string };
 const noCourse: Course = { id: "", title: "", code: "", color: "#888888" };
 const generatedCourseId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Only collapse generated courses when the picker is flooded; small workspaces keep every course visible.
@@ -98,7 +99,8 @@ function Workspace() {
   const [settings, setSettings] = useState(false);
   const [models, setModels] = useState<Array<{ name: string; size: number }>>([]);
   const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem("studyai.model") ?? "");
-  const [aiStatus, setAiStatus] = useState("Checking Ollamaâ€¦");
+  const [aiStatus, setAiStatus] = useState("Checking Ollama…");
+  const [tutorStatus, setTutorStatus] = useState<TutorStatus | null>(null);
   const [creditProvider, setCreditProvider] = useState(() => localStorage.getItem("studyai.credit.provider") ?? "local");
   const [creditToken] = useState(() => {
     const saved = localStorage.getItem("studyai.credits.token");
@@ -119,6 +121,7 @@ function Workspace() {
   const [supportStatus, setSupportStatus] = useState("");
   const creditClientToken = String(import.meta.env.VITE_STUDYAI_CLIENT_TOKEN ?? "");
   const creditRecovery = `RC-${creditToken.match(/.{1,4}/g)?.join("-") ?? creditToken}`;
+  const activeTutor = tutorStatus ? (tutorStatus.model ? `${tutorStatus.provider} · ${tutorStatus.model}` : tutorStatus.note) : aiStatus;
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
   const [noteTitle, setNoteTitle] = useState("");
@@ -169,17 +172,18 @@ function Workspace() {
 
   // Activation prepares real state in the destination, then the pinned Coach is already there.
   // A failed preparation reports a plain message; no target is invented or navigated to.
-  const prepareCoachTarget = useCallback(async (target: CoachTarget): Promise<boolean> => {
-    if (!target.courseId || !target.lessonId) return false;
+  const prepareCoachTarget = useCallback(async (target: CoachTarget): Promise<CoachPreparationResult> => {
+    const unavailable: CoachPreparationResult = { prepared: false, message: "" };
+    if (!target.courseId || !target.lessonId) return unavailable;
     if (target.courseId !== course.id) {
       const next = courses.find((item) => item.id === target.courseId);
-      if (!next) return false;
+      if (!next) return unavailable;
       setCourse(next);
       localStorage.setItem("studyai.course", next.id);
       localStorage.setItem(lessonPreferenceKey(next.id), target.lessonId);
       setLessonId(target.lessonId);
     } else if (target.lessonId !== lessonId) {
-      if (!lessons.some((item) => item.id === target.lessonId)) return false;
+      if (!lessons.some((item) => item.id === target.lessonId)) return unavailable;
       setLessonId(target.lessonId);
       localStorage.setItem(lessonPreferenceKey(course.id), target.lessonId);
     }
@@ -187,22 +191,28 @@ function Workspace() {
     if (target.destination === "study") {
       const focused = target.conceptId ? `&concept=${encodeURIComponent(target.conceptId)}` : "";
       const response = await fetch(`${API}/study/ask?${scope}${focused}`);
-      if (!response.ok) return false;
+      if (!response.ok) return unavailable;
+      const result = studyPreparationResult(await response.json() as Parameters<typeof studyPreparationResult>[0]);
       setMode("study");
-      return true;
+      return result;
     }
     if (target.destination === "board") {
-      if (!target.boardId) return false;
+      if (!target.boardId) return unavailable;
       const response = await fetch(`${API}/canvases/${encodeURIComponent(target.boardId)}?${scope}`);
-      if (!response.ok) return false;
+      if (!response.ok) return unavailable;
+      const board = await response.json() as { document?: unknown };
+      if (!board.document) return unavailable;
       setPreferredBoardId(target.boardId);
       setView("Canvas");
       setMode("canvas");
-      return true;
+      return { prepared: true, message: "Ready on the board. The saved activity is open." };
     }
-    setCoachFocus(target.focus ?? "");
+    const focus = target.focus ?? "";
+    setCoachFocus(focus);
     setMode("studio");
-    return true;
+    return focus
+      ? { prepared: true, message: "Ready in Studio. Your source focus is set." }
+      : { prepared: false, message: "Studio is open, but no source focus was set for this lesson." };
   }, [course.id, courses, lessonId, lessons]);
 
   const coach = useCoach(
@@ -236,6 +246,7 @@ function Workspace() {
         return next;
       });
     }).catch((error) => { if (live) { setModels([]); setSelectedModel(""); localStorage.removeItem("studyai.model"); setAiStatus(error instanceof Error ? error.message : "Ollama is unavailable"); } });
+    fetch(`${API}/tutor-status`).then(async (response) => { const value = await response.json() as TutorStatus; if (live && response.ok) setTutorStatus(value); }).catch(() => { /* keep the Ollama status as fallback */ });
     return () => { live = false; };
   }, []);
 
@@ -427,7 +438,7 @@ function Workspace() {
   };
 
 
-  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""} ${tutor ? "tutor-open" : ""}`} style={{ "--tutor-width": `${tutorWidth}px` } as React.CSSProperties}>
+  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={tutorStatus?.model || selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""} ${tutor ? "tutor-open" : ""}`} style={{ "--tutor-width": `${tutorWidth}px` } as React.CSSProperties}>
     {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar">
       <div className="brand-row"><div className="brand-mark"><Sparkles size={17} /></div><span>study<span className="brand-ai">ai</span></span><button className="icon-button sidebar-close" onClick={() => setSidebar(false)} title="Collapse sidebar"><ChevronLeft size={16} /></button></div>
       <button className="search-button" onClick={() => setSearchOpen(true)} title="Search anything"><Search size={15} /><span>Search anything</span><kbd>âŒ˜ K</kbd></button>
@@ -466,9 +477,9 @@ function Workspace() {
       else if (event.key === "ArrowRight") { event.preventDefault(); setTutorWidth((width) => Math.max(300, width - 20)); }
       else if (event.key === "Home") { event.preventDefault(); setTutorWidth(300); }
       else if (event.key === "End") { event.preventDefault(); setTutorWidth(520); }
-    }} onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small><i />{aiStatus}</small></span></div><div><button className="icon-button" title="Tutor options" onClick={() => setTutorMenuOpen(true)}><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div>{tutorContextOpen && course.id && lessonId && <div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button" onClick={() => setTutorContextOpen(false)} aria-label="Hide lesson context"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>{lessonTitle}</b><small>{course.title}</small></span></div>{selectedObject && <div className="context-card" data-testid="selected-object-context"><div className="context-icon"><Atom size={15} /></div><span><b>{selectedObject.name}</b><small>Selected canvas object</small></span></div>}<p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div>}{course.id && lessonId ? <div className="copilot-slot" onClick={openCitation}><CopilotChat className="study-chat" messageView={{ assistantMessage: { markdownRenderer: CustomMarkdownRenderer }, toolCallDisplay: "turn" }} inspectorTools={import.meta.env.DEV} labels={{ welcomeMessageText: `Ask about ${lessonTitle}, request a worked example, or ask about the canvas.` }} /></div> : <div className="copilot-slot"><div className="canvas-loading">Select or create a lesson to start tutoring.</div></div>}<div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
+    }} onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small data-testid="tutor-provider-status"><i />{activeTutor}</small></span></div><div><button className="icon-button" title="Tutor options" onClick={() => setTutorMenuOpen(true)}><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div>{tutorContextOpen && course.id && lessonId && <div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button" onClick={() => setTutorContextOpen(false)} aria-label="Hide lesson context"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>{lessonTitle}</b><small>{course.title}</small></span></div>{selectedObject && <div className="context-card" data-testid="selected-object-context"><div className="context-icon"><Atom size={15} /></div><span><b>{selectedObject.name}</b><small>Selected canvas object</small></span></div>}<p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div>}{course.id && lessonId ? <div className="copilot-slot" onClick={openCitation}><CopilotChat className="study-chat" messageView={{ assistantMessage: { markdownRenderer: CustomMarkdownRenderer }, toolCallDisplay: "turn" }} inspectorTools={import.meta.env.DEV} labels={{ welcomeMessageText: `Ask about ${lessonTitle}, request a worked example, or ask about the canvas.` }} /></div> : <div className="copilot-slot"><div className="canvas-loading">Select or create a lesson to start tutoring.</div></div>}<div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
     {!tutor && <button className="reopen-tutor" onClick={() => setTutor(true)}><Sparkles size={16} /> Open tutor</button>}
-    {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" role="dialog" aria-label="StudyAI settings" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label>Local model service (Ollama)<input value={aiStatus} readOnly /></label><FreeKeyGuide /><label>Local model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p data-testid="model-provider-note">{models.length ? "This list is the local Ollama service. It applies only when the Study tutor runs on Ollama; otherwise the tutor uses the model configured for the active provider, which this list cannot change." : aiStatus}</p>{PAID_ENABLED && <><label>AI provider<select data-testid="credit-provider-option" value={creditProvider} onChange={(e) => { setCreditProvider(e.target.value); localStorage.setItem("studyai.credit.provider", e.target.value); }}><option value="local">Local / BYOK</option><option value="credits">StudyAI Credits</option></select></label>{creditProvider === "credits" && <div className="credits-panel"><p data-testid="credit-balance">Balance: ${(creditBalance / 1_000_000).toFixed(2)}</p><p data-testid="credit-recovery-code">{creditRecovery}</p><p data-testid="credit-disclosure">Your wallet lives in this browser only. Save the recovery code: without it a balance cannot be recovered.</p><label>Redeem code<input data-testid="credit-redeem-input" value={creditCode} onChange={(e) => setCreditCode(e.target.value)} /></label><button data-testid="credit-redeem-button" onClick={redeemCredit}>Redeem</button><label>Ask with credits<input data-testid="credit-chat-input" value={creditQuestion} onChange={(e) => setCreditQuestion(e.target.value)} /></label><button data-testid="credit-chat-send" onClick={sendCreditChat}>Send</button>{creditAnswer && <div data-testid="credit-chat-answer"><CustomMarkdownRenderer content={creditAnswer} /></div>}{creditStatus && <p>{creditStatus}</p>}</div>}<div className="credits-panel" data-testid="support-panel"><h3>Support StudyAI</h3><div className="science-tabs"><button data-testid="support-kind-donation" className={supportKind === "donation" ? "current" : ""} onClick={() => { setSupportKind("donation"); setSupportChoice("small"); }}>Donate</button><button data-testid="support-kind-credits" className={supportKind === "credits" ? "current" : ""} onClick={() => { setSupportKind("credits"); setSupportChoice("small"); }}>Buy credits</button></div><label>Amount<select data-testid="support-amount" value={supportChoice} onChange={(e) => setSupportChoice(e.target.value)}>{(supportKind === "donation" ? [["small", "$2"], ["medium", "$5"], ["large", "$10"]] : [["small", "$5"], ["medium", "$10"], ["large", "$20"]]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button data-testid="support-checkout-button" onClick={requestCheckout}>Continue to Stripe</button>{supportStatus && <p data-testid="support-status">{supportStatus}</p>}<p>Payments are processed by Stripe. Refunds are handled manually and credits are not revoked automatically.</p></div></>}<button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
+    {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div className="settings-modal" role="dialog" aria-label="StudyAI settings" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" onClick={() => setSettings(false)}><X size={18} /></button></div><label data-testid="active-tutor-provider">Active tutor provider<input value={activeTutor} readOnly /></label><label>Local model service (Ollama)<input value={aiStatus} readOnly /></label><FreeKeyGuide /><label>Local model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p data-testid="model-provider-note">{tutorStatus && !tutorStatus.pickerActive ? tutorStatus.note : models.length ? "This list is the local Ollama service. It applies only when the Study tutor runs on Ollama; otherwise the tutor uses the model configured for the active provider, which this list cannot change." : aiStatus}</p>{PAID_ENABLED && <><label>AI provider<select data-testid="credit-provider-option" value={creditProvider} onChange={(e) => { setCreditProvider(e.target.value); localStorage.setItem("studyai.credit.provider", e.target.value); }}><option value="local">Local / BYOK</option><option value="credits">StudyAI Credits</option></select></label>{creditProvider === "credits" && <div className="credits-panel"><p data-testid="credit-balance">Balance: ${(creditBalance / 1_000_000).toFixed(2)}</p><p data-testid="credit-recovery-code">{creditRecovery}</p><p data-testid="credit-disclosure">Your wallet lives in this browser only. Save the recovery code: without it a balance cannot be recovered.</p><label>Redeem code<input data-testid="credit-redeem-input" value={creditCode} onChange={(e) => setCreditCode(e.target.value)} /></label><button data-testid="credit-redeem-button" onClick={redeemCredit}>Redeem</button><label>Ask with credits<input data-testid="credit-chat-input" value={creditQuestion} onChange={(e) => setCreditQuestion(e.target.value)} /></label><button data-testid="credit-chat-send" onClick={sendCreditChat}>Send</button>{creditAnswer && <div data-testid="credit-chat-answer"><CustomMarkdownRenderer content={creditAnswer} /></div>}{creditStatus && <p>{creditStatus}</p>}</div>}<div className="credits-panel" data-testid="support-panel"><h3>Support StudyAI</h3><div className="science-tabs"><button data-testid="support-kind-donation" className={supportKind === "donation" ? "current" : ""} onClick={() => { setSupportKind("donation"); setSupportChoice("small"); }}>Donate</button><button data-testid="support-kind-credits" className={supportKind === "credits" ? "current" : ""} onClick={() => { setSupportKind("credits"); setSupportChoice("small"); }}>Buy credits</button></div><label>Amount<select data-testid="support-amount" value={supportChoice} onChange={(e) => setSupportChoice(e.target.value)}>{(supportKind === "donation" ? [["small", "$2"], ["medium", "$5"], ["large", "$10"]] : [["small", "$5"], ["medium", "$10"], ["large", "$20"]]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button data-testid="support-checkout-button" onClick={requestCheckout}>Continue to Stripe</button>{supportStatus && <p data-testid="support-status">{supportStatus}</p>}<p>Payments are processed by Stripe. Refunds are handled manually and credits are not revoked automatically.</p></div></>}<button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
     {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div className="settings-modal notes-modal" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} Â· {lessonTitle}</span><input aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lessonâ€¦" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} />}
@@ -484,7 +495,7 @@ function Workspace() {
       onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }}
       onPractice={(node) => {
         void prepareCoachTarget({ courseId: course.id, lessonId: node.lessonId ?? "", destination: "study", conceptId: node.id, reason: `Practice ${node.label}`, focus: node.label })
-          .then((prepared) => { if (!prepared) setStatus(`No reviewed question is available for ${node.label} right now.`); });
+          .then((result) => { if (!result.prepared) setStatus(result.message || `No reviewed question is available for ${node.label} right now.`); });
       }} />}
     {mode === "studio" && course.id && lessonId && <StudioSurface courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} initialFocus={coachFocus} close={() => { setMode("canvas"); setCoachFocus(""); }} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
     {mode === "artifacts" && course.id && lessonId && <ArtifactsPage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}

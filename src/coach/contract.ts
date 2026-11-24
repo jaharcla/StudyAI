@@ -58,6 +58,29 @@ export type CoachContext = {
   boardRevision?: number;
 };
 
+/** What an activation actually achieved, with the exact words the Coach may report. */
+export type CoachPreparationResult = { prepared: boolean; message: string };
+
+type StudyAskResponse = {
+  status?: string;
+  reason?: string;
+  nextAction?: { kind?: string; label?: string };
+  presentationId?: string;
+  questionId?: string;
+};
+
+/** Report only what /api/study/ask returned: never claim a loaded question that is absent. */
+export function studyPreparationResult(value: StudyAskResponse): CoachPreparationResult {
+  if (value.status === "no-reviewed-questions") {
+    const next = value.nextAction?.label?.trim();
+    return { prepared: false, message: `No reviewed question is ready.${next ? ` Next: ${next}.` : ""}` };
+  }
+  if (value.presentationId || value.questionId) {
+    return { prepared: true, message: "Ready in Study. Your next question is loaded." };
+  }
+  return { prepared: false, message: "No question was loaded. Ask a reviewed question to begin." };
+}
+
 /** A feature registers one of these; it never renders a card or calls a view setter. */
 export type CoachProducer = {
   id: string;
