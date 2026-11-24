@@ -12,6 +12,7 @@ test("tutor answers hide reasoning, ship one citation grammar and no placeholder
 
   const marker = `HYGIENE-${Date.now()}`;
   const input = page.locator(".di-file-input");
+  await expect(input).toBeAttached({ timeout: 30_000 });
   await input.setInputFiles({ name: "hygiene-proof.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdfFixture(`The lecture marker is ${marker}.`)) });
   await expect(page.getByText("Indexed", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect.poll(async () => {
