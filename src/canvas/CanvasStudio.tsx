@@ -17,7 +17,9 @@ import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
 import { approveCanvasProposal, type CanvasProposal as ShapeProposal } from "./ai/canvas-actions";
-import { artifactBriefSchema, type ArtifactBrief } from "./ai/teaching-scene";
+import { artifactBriefSchema, type ArtifactBrief, type CompiledExampleState } from "./ai/teaching-scene";
+import { ExamplePlayer } from "./replay/ExamplePlayer";
+import { initPlayer, reducePlayer, stateAt, type PlayerEvent, type PlayerState } from "./replay/example-player";
 import { buildBriefRepairResult, briefRepairSignature, checkBriefPreserve } from "./ai/author-repair";
 import { ArtifactValidationError } from "../artifacts/contracts";
 import type { PreserveList } from "../artifacts/repair-message";
@@ -35,6 +37,7 @@ type CourseNote = { id: string; title: string; body: string };
 type CourseDocument = { id: string; title: string };
 type Board = { id: string; name: string; revision: number };
 type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
+type ExampleSession = { exampleId: string; states: CompiledExampleState[]; player: PlayerState; mode: "replay" | "editing" };
 type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
 type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; onSelectedObject?: (object: { id: string; name: string } | null) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
 
@@ -90,6 +93,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [shapeProposal, setShapeProposal] = useState<ShapeProposal>();
   const [artifactProposal, setArtifactProposal] = useState<ArtifactBriefProposal>();
   const [artifactError, setArtifactError] = useState<string | null>(null);
+  const [exampleSession, setExampleSession] = useState<ExampleSession>();
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [canvasAnalysis, setCanvasAnalysis] = useState<CanvasAnalysisResult>();
   const [analysisBusy, setAnalysisBusy] = useState(false);
@@ -97,6 +101,8 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [allowImageEgress, setAllowImageEgress] = useState(() => { try { return localStorage.getItem("studyai.canvas.imageEgress") !== "off"; } catch { return true; } });
   const [proposalBusy, setProposalBusy] = useState(false);
   useEffect(() => setToolOpen(!activityMode), [activityMode]);
+  // Step descriptors are view state, not persisted board data; a board switch drops the rail.
+  useEffect(() => { setExampleSession(undefined); }, [activeBoard?.id]);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
   const currentSelection = document.objects.find((object) => object.id === selectedId);
   useAgentContext({ description: "StudyAI selected scientific object", value: currentSelection ? { selected: true, objectId: currentSelection.id, name: selectedObjectName(currentSelection), kind: currentSelection.kind, boardId: activeBoard?.id ?? "", courseId, lessonId } : { selected: false, courseId, lessonId } });
@@ -502,6 +508,8 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       objectHistory.current.undo.push(base); objectHistory.current.redo = [];
       documentRef.current = next; setDocument(next); setCanvasAnalysis(undefined);
       setArtifactProposal(undefined); refreshHistory();
+      // The applied proposal carries compiler-produced states; the rail is view state only.
+      setExampleSession(pending.states?.length ? { exampleId: pending.id, states: pending.states, player: initPlayer(pending.id), mode: "replay" } : undefined);
       onStatus("Artifact added to the board");
     } catch (error) { onStatus(error instanceof Error ? error.message : "Could not add the artifact"); }
     finally { setProposalBusy(false); }
@@ -719,7 +727,21 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     refreshHistory();
   }, [refreshHistory, scheduleSave]);
 
+  // Any real object edit pauses replay. Take over and navigation are mode/view changes only:
+  // neither writes the board, and the next edit uses the normal single-revision save path.
+  const pauseExample = useCallback(() => {
+    setExampleSession((current) => current?.player.playing ? { ...current, player: { ...current.player, playing: false } } : current);
+  }, []);
+  const handleExampleEvent = useCallback((event: PlayerEvent) => {
+    setExampleSession((current) => current ? { ...current, player: reducePlayer(current.player, event, current.states.length) } : current);
+  }, []);
+  const handleTakeover = useCallback(() => {
+    setExampleSession((current) => current ? { ...current, mode: "editing", player: { ...current.player, playing: false } } : current);
+    onStatus("Worked example taken over — edit the objects directly");
+  }, [onStatus]);
+
   const replaceObjects = useCallback((objects: ScientificObject[], trackHistory = true) => {
+    pauseExample();
     if (trackHistory) {
       objectHistory.current.undo.push(structuredClone(currentDocument()));
       objectHistory.current.redo = [];
@@ -727,7 +749,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     latestChange.current = "objects";
     scheduleSave(boardRef.current, { ...currentDocument(), objects });
     refreshHistory();
-  }, [currentDocument, refreshHistory, scheduleSave]);
+  }, [currentDocument, pauseExample, refreshHistory, scheduleSave]);
 
   const updateObject = useCallback((id: string, update: Partial<ScientificObject>, trackHistory = true) => {
     const next = documentRef.current.objects.map((object) => object.id === id ? { ...object, ...update } as ScientificObject : object);
@@ -881,6 +903,10 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     finally { if (importRef.current) importRef.current.value = ""; }
   }, [onStatus, scheduleSave]);
 
+  const exampleState = exampleSession?.mode === "replay" ? stateAt(exampleSession.states, exampleSession.player.stepIndex) : undefined;
+  const dimmedIds = exampleState ? new Set(document.objects.map((object) => object.id).filter((id) => !exampleState.objectIds.includes(id))) : undefined;
+  const highlightIds = exampleState ? new Set(exampleState.highlightIds) : undefined;
+
   return <div className="canvas-studio">
     {canvasAnalysis && <CanvasAnalysisTutorContext analysis={canvasAnalysis} />}
     {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved editâ€¦" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
@@ -908,6 +934,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       <button className="button-primary" disabled={proposalBusy} data-testid="apply-artifact" onClick={() => void applyArtifactProposal()}>{proposalBusy ? "Saving artifact…" : "Apply to board"}</button>
       <button className="button-soft" disabled={proposalBusy} data-testid="decline-artifact" onClick={() => setArtifactProposal(undefined)}>Decline</button>
     </section>}
+    {exampleSession && <ExamplePlayer player={exampleSession.player} states={exampleSession.states} mode={exampleSession.mode} onEvent={handleExampleEvent} onTakeover={handleTakeover} />}
     {recognitionOpen && <section className="canvas-recognition" role="region" aria-label="Canvas recognition review">
       <header><strong>Canvas labels</strong><span>Teach selected ink, then confirm or correct labels</span><button className="icon-button" aria-label="Close canvas label review" onClick={() => setRecognitionOpen(false)}><X size={14} /></button></header>
       <div className="canvas-recognition-teach">
@@ -967,7 +994,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       }} onKeyUpCapture={(event) => { if (event.code === "Space") setSpaceHeld(false); }} onBlur={() => setSpaceHeld(false)}>
         {loading ? <div className="canvas-loading">Loading saved canvasâ€¦</div> : <>
           <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} onSelectionChange={(ids) => setSelectedShapeIds(ids)} />
-          {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} registeredCards={registeredCards} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { cancelNativeGesture(); editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
+          {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} registeredCards={registeredCards} dimmedIds={dimmedIds} highlightIds={highlightIds} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { cancelNativeGesture(); editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
           <NarrationPanel objects={document.objects} boardRevision={activeBoard?.revision ?? 0} editor={editorRef.current} />
         </>}
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas changeâ€¦</div>}
