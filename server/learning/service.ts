@@ -5,6 +5,7 @@ import { parseCanvasDocument, type CanvasDocument } from "../../src/canvas/model
 import { updateMastery, DEFAULT_BKT, selectWeakest } from "./bkt.js";
 import { RateCardSchema, SubmitAttemptSchema, type Rating as StudyRating } from "./contracts.js";
 import { initializeLearningSchema } from "./schema.js";
+import { indexedSources } from "./sources.js";
 import { LearningEventSchema, type LearningEvent } from "../../src/learning/activities/contracts.js";
 
 type QuestionDraft = { courseId: string; lessonId: string; concept: string; prompt: string; choices: Array<{ id: string; text: string }>; correctChoice: string; explanation: string; sourceDocumentId: string; sourcePage?: number | null; sourceExcerpt: string };
@@ -22,6 +23,7 @@ export class LearningService {
   addReviewedQuestion(input: QuestionDraft) {
     const choices = input.choices;
     if (!this.database.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) throw new Error("Lesson not found in this course.");
+    if (!input.sourceDocumentId) throw new Error("Choose a source document from this course.");
     if (!input.concept.trim() || !input.prompt.trim() || choices.length < 2 || new Set(choices.map((item) => item.id)).size !== choices.length || !choices.some((item) => item.id === input.correctChoice)) throw new Error("Question content is invalid.");
     const chunks = this.database.prepare("SELECT d.title,c.page,c.content FROM documents d JOIN document_chunks c ON c.document_id=d.id WHERE d.id=? AND d.course_id=?").all(input.sourceDocumentId, input.courseId) as Array<{ title: string; page: number | null; content: string }>;
     if (this.database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='di_documents'").get()) {
@@ -42,6 +44,10 @@ export class LearningService {
       return { id, version, conceptId };
     });
     return create();
+  }
+
+  sources(courseId: string) {
+    return indexedSources(this.database, courseId);
   }
 
   ask(courseId: string, lessonId: string) {

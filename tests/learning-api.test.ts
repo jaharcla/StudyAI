@@ -3,6 +3,8 @@ import { createServer } from "node:http";
 import Database from "better-sqlite3";
 import { LearningService } from "../server/learning/service.js";
 import { createLearningHandler } from "../server/learning/http.js";
+import { getCourseProgress } from "../server/progress.js";
+import { getRecommendations } from "../server/recommendations.js";
 
 const db = new Database(":memory:");
 db.exec(`CREATE TABLE courses(id TEXT PRIMARY KEY,title TEXT,code TEXT,color TEXT);
@@ -50,5 +52,49 @@ describe("learning HTTP contract", () => {
     expect((await review()).status).toBe(200);
     expect(await (await review()).json()).toMatchObject({ duplicate: true });
     expect(await (await fetch(`${origin}/api/study/cards?course=c`)).status).toBe(400);
+  });
+
+  it("returns a truthful, actionable next step when a lesson has no reviewed questions", async () => {
+    db.prepare("INSERT INTO lessons(id,course_id,title) VALUES('l2','c','Grounded lesson')").run();
+    db.prepare("INSERT INTO di_documents(id,course_id,title) VALUES('di-e','c','A real lesson source')").run();
+    db.prepare("INSERT INTO di_chunks(document_id,course_id,unit_type,unit_number,content) VALUES('di-e','c','page',7,'Planck set h = 6.626 x 10^-34 J s in his quantum hypothesis.')").run();
+    const ask = await fetch(`${origin}/api/study/ask?course=c&lesson=l2`);
+    expect(ask.status).toBe(200);
+    const body = await ask.json() as { status: string; reason: string; nextAction: { label: string }; suggestedSource: { title: string; excerpt: string } | null };
+    expect(body.status).toBe("no-reviewed-questions");
+    expect(body.reason.length).toBeGreaterThan(20);
+    expect(body.nextAction.label).toMatch(/question/i);
+    expect(body.suggestedSource?.title).toBeTruthy();
+    const chunkTexts = [...db.prepare("SELECT content FROM document_chunks").all(), ...db.prepare("SELECT content FROM di_chunks").all()] as Array<{ content: string }>;
+    expect(chunkTexts.some((chunk) => chunk.content.includes(body.suggestedSource!.excerpt))).toBe(true);
+    const sources = await (await fetch(`${origin}/api/study/sources?course=c&lesson=l2`)).json() as { sources: Array<{ documentId: string; title: string }> };
+    expect(sources.sources.some((source) => source.documentId === "di-e" && source.title === "A real lesson source")).toBe(true);
+    expect(sources.sources.some((source) => source.documentId === "di-d")).toBe(true);
+  });
+
+  it("never returns raw Zod JSON for an invalid authoring request", async () => {
+    const response = await fetch(`${origin}/api/study/questions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId: "c", lessonId: "l", concept: "Cell biology", prompt: "Where is DNA?", choices: [{ id: "a", text: "Nucleus" }, { id: "b", text: "Ribosome" }], correctChoice: "a", explanation: "The source states DNA is in the nucleus.", sourceDocumentId: "", sourceExcerpt: "A cell contains DNA in its nucleus.", reviewed: true }) });
+    expect(response.status).toBe(400);
+    const body = await response.json() as { error: string };
+    expect(body.error).toContain("Source document");
+    expect(body.error).not.toMatch(/sourceDocumentId|path|Zod|\{|\}/);
+  });
+
+  it("closes answer, grading, FSRS, mastery, progress and Coach on a di-backed lesson", async () => {
+    const create = await fetch(`${origin}/api/study/questions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId: "c", lessonId: "l2", concept: "Quantum constants", prompt: "What value did Planck set for h?", choices: [{ id: "a", text: "6.626e-34 J s" }, { id: "b", text: "9.8 m/s^2" }], correctChoice: "a", explanation: "The cited page states Planck's constant.", sourceDocumentId: "di-e", sourcePage: 7, sourceExcerpt: "Planck set h = 6.626 x 10^-34 J s in his quantum hypothesis.", reviewed: true }) });
+    expect(create.status).toBe(201);
+    const presented = await (await fetch(`${origin}/api/study/ask?course=c&lesson=l2`)).json() as { presentationId: string; source: { title: string } };
+    expect(presented.source.title).toBe("A real lesson source");
+    const attempt = await (await fetch(`${origin}/api/study/attempts`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ presentationId: presented.presentationId, idempotencyKey: "loop-attempt", choiceId: "a" }) })).json() as { correct: boolean; mastery: number };
+    expect(attempt).toMatchObject({ correct: true, mastery: expect.any(Number) });
+    const card = db.prepare("SELECT c.id FROM learning_cards c JOIN learning_concepts k ON k.id=c.concept_id WHERE k.name='Quantum constants'").get() as { id: string };
+    const rating = await (await fetch(`${origin}/api/study/reviews`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ cardId: card.id, idempotencyKey: "loop-review", rating: "Good" }) })).json() as { rating: string };
+    expect(rating.rating).toBe("Good");
+    const progress = getCourseProgress(db, "c");
+    expect(progress.totalAttempts).toBeGreaterThan(0);
+    expect(progress.lessons.some((lesson) => lesson.id === "l2" && lesson.attempts >= 1 && lesson.mastery > 0)).toBe(true);
+    const coach = getRecommendations(db, "c", "l2");
+    expect(coach.length).toBeGreaterThan(0);
+    expect(coach[0].source?.title).toBe("A real lesson source");
   });
 });
