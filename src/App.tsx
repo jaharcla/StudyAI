@@ -1,6 +1,6 @@
 ﻿import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CopilotChat, CopilotChatConfigurationProvider, CopilotKitProvider, useAgentContext, useCopilotChatConfiguration } from "@copilotkit/react-core/v2";
-import { Activity, Atom, BookOpen, Brain, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Menu, Moon, MoreHorizontal, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
+import { Activity, Atom, BookOpen, Brain, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Menu, Moon, MoreHorizontal, Network, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
 import { CanvasStudio } from "./canvas/CanvasStudio";
 import { parseSourceReference } from "./components/document-intelligence/api";
@@ -12,6 +12,7 @@ import { lessonPreferenceKey, selectCourse, selectLesson } from "./workspace-sta
 import FreeKeyGuide from "./FreeKeyGuide";
 import StudyStage from "./lab/StudyStage";
 import StudioSurface from "./studio/StudioSurface";
+import ConceptGraphView from "./studio/ConceptGraphView";
 import ArtifactsPage from "./artifacts/ArtifactsPage";
 import SearchDialog from "./components/SearchDialog";
 import ProgressDialog from "./components/ProgressDialog";
@@ -74,7 +75,7 @@ function Workspace() {
   const [lessonError, setLessonError] = useState("");
   const lessonTitle = humanizeLessonTitle(lessons.find((item) => item.id === lessonId)?.title ?? "");
   const [view, setView] = useState<View>("Canvas");
-  const [mode, setMode] = useState<"canvas" | "study" | "studio" | "artifacts">("canvas");
+  const [mode, setMode] = useState<"canvas" | "study" | "studio" | "artifacts" | "concepts">("canvas");
   const [sidebar, setSidebar] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
@@ -184,7 +185,8 @@ function Workspace() {
     }
     const scope = `course=${encodeURIComponent(target.courseId)}&lesson=${encodeURIComponent(target.lessonId)}`;
     if (target.destination === "study") {
-      const response = await fetch(`${API}/study/ask?${scope}`);
+      const focused = target.conceptId ? `&concept=${encodeURIComponent(target.conceptId)}` : "";
+      const response = await fetch(`${API}/study/ask?${scope}${focused}`);
       if (!response.ok) return false;
       setMode("study");
       return true;
@@ -442,6 +444,7 @@ function Workspace() {
       <header className="topbar">
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
         <div className="immersive-actions">
+          <button disabled={!course.id} data-testid="open-concept-graph" onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
           <button className="primary" disabled={!course.id || !lessonId} onClick={() => setMode("studio")} title="Open StudyAI Studio"><Sparkles size={15} /> Studio</button>
           <button disabled={!course.id || !lessonId} onClick={() => setMode("artifacts")} title="Open Artifacts"><Layers size={15} /> Artifacts</button>
           <button disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
@@ -476,6 +479,13 @@ function Workspace() {
     {searchOpen && <SearchDialog courseId={course.id} onClose={() => setSearchOpen(false)} onOpen={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setView("Lecture"); setSearchOpen(false); }} />}
     {flashcardReviewOpen && course.id && lessonId && <FlashcardReview courseId={course.id} lessonId={lessonId} close={() => setFlashcardReviewOpen(false)} />}
     {mode === "study" && course.id && lessonId && <StudyStage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenActivities={() => { setMode("canvas"); setActivityLibraryOpen(true); }} onOpenSources={() => { setMode("canvas"); setView("Lecture"); }} />}
+    {mode === "concepts" && course.id && <ConceptGraphView courseId={course.id} courseTitle={course.title}
+      close={() => setMode("canvas")}
+      onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }}
+      onPractice={(node) => {
+        void prepareCoachTarget({ courseId: course.id, lessonId: node.lessonId ?? "", destination: "study", conceptId: node.id, reason: `Practice ${node.label}`, focus: node.label })
+          .then((prepared) => { if (!prepared) setStatus(`No reviewed question is available for ${node.label} right now.`); });
+      }} />}
     {mode === "studio" && course.id && lessonId && <StudioSurface courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} initialFocus={coachFocus} close={() => { setMode("canvas"); setCoachFocus(""); }} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
     {mode === "artifacts" && course.id && lessonId && <ArtifactsPage courseId={course.id} lessonId={lessonId} courseTitle={course.title} lessonTitle={lessonTitle} close={() => setMode("canvas")} onOpenSource={(sourceRef) => { setOpenDocumentId(undefined); setOpenSourceRef(sourceRef); setOpenSourceKey((key) => key + 1); setMode("canvas"); setView("Lecture"); }} />}
     {coach.surface}

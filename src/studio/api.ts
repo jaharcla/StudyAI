@@ -1,8 +1,12 @@
 export type StudioKind = "mind-map" | "study-guide" | "infographic" | "practice";
 export type PracticeType = "cards" | "quiz" | "both";
 
-export type MindMapNode = { id: string; label: string; parentId: string | null; detail?: string; sourceRef?: string };
-export type MindMapContent = { title: string; nodes: MindMapNode[] };
+export type MindMapNode = {
+  id: string; label: string; parentId: string | null; detail?: string; sourceRef?: string;
+  /** Optional: course concept graph adds truthful mastery and a practice action. */
+  mastery?: number; lessonId?: string; lessonTitle?: string; canPractice?: boolean; sourceLabel?: string;
+};
+export type MindMapContent = { title: string; nodes: MindMapNode[]; edges?: Array<{ source: string; target: string; label?: string }> };
 export type GuideSection = { heading: string; body: string; sourceRefs: string[] };
 export type GuideTerm = { term: string; definition: string; sourceRef: string };
 export type StudyGuideContent = { title: string; overview: string; sections: GuideSection[]; keyTerms: GuideTerm[] };
@@ -68,7 +72,8 @@ export function acceptArtifact(id: string, decision: AcceptanceDecision): Promis
   });
 }
 
-export function sourceLabel(ref: string): string {
+export function sourceLabel(ref: string, label?: string): string {
+  if (label) return label;
   const match = ref.match(/^studyai:\/\/document\/[^/]+\/(page|slide|text)\/(\d+)/);
   if (!match) return "Canvas knowledge";
   return `${match[1]} ${match[2]}`;

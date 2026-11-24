@@ -50,11 +50,12 @@ export class LearningService {
     return indexedSources(this.database, courseId);
   }
 
-  ask(courseId: string, lessonId: string) {
+  ask(courseId: string, lessonId: string, conceptId = "") {
     const candidates = this.database.prepare(`SELECT q.id,q.version,q.concept_id,k.name concept,q.prompt,q.choices,q.source_document_id,q.source_title,q.source_page,q.source_excerpt,
       COALESCE((SELECT e.value FROM learning_mastery_evidence e WHERE e.concept_id=q.concept_id ORDER BY e.occurred_at DESC,e.sequence DESC LIMIT 1),0.1) mastery
       FROM reviewed_questions q JOIN learning_concepts k ON k.id=q.concept_id JOIN learning_cards c ON c.concept_id=k.id WHERE q.course_id=? AND q.lesson_id=? AND json_extract(c.fsrs_state,'$.due')<=? AND q.rowid=(SELECT MAX(q2.rowid) FROM reviewed_questions q2 WHERE q2.id=q.id)
-      AND NOT EXISTS(SELECT 1 FROM question_presentations p JOIN reviewed_questions pq ON pq.id=p.question_id AND pq.version=p.question_version WHERE pq.concept_id=q.concept_id AND p.status='asked')`).all(courseId, lessonId, this.now().toISOString()) as Array<ReviewableQuestion & { mastery: number }>;
+      AND (? = '' OR q.concept_id = ?)
+      AND NOT EXISTS(SELECT 1 FROM question_presentations p JOIN reviewed_questions pq ON pq.id=p.question_id AND pq.version=p.question_version WHERE pq.concept_id=q.concept_id AND p.status='asked')`).all(courseId, lessonId, this.now().toISOString(), conceptId, conceptId) as Array<ReviewableQuestion & { mastery: number }>;
     const chosen = selectWeakest(candidates);
     if (!chosen) return null;
     const id = randomUUID();

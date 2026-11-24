@@ -25,7 +25,7 @@ export function createLearningHandler(service: LearningService, origin = "http:/
       if (req.method === "GET" && url.pathname === "/api/study/ask") {
         const course = url.searchParams.get("course") ?? "", lesson = url.searchParams.get("lesson") ?? "";
         if (!course || !lesson) { send(400, { error: "course and lesson are required." }); return true; }
-        const question = service.ask(course, lesson);
+        const question = service.ask(course, lesson, url.searchParams.get("concept") ?? "");
         if (question) { send(200, question); return true; }
         const suggestedSource = service.sources(course)[0] ?? null;
         send(200, {

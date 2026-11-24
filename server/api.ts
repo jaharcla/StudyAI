@@ -13,6 +13,7 @@ import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { getCourseProgress } from "./progress.js";
 import { getRecommendations } from "./recommendations.js";
+import { buildConceptGraph } from "./concept-graph.js";
 import { createLearningHandler } from "./learning/http.js";
 import { createStudioHandler } from "./studio/http.js";
 import { createSlideDeckHandler } from "./presentations/http.js";
@@ -118,6 +119,12 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { chain: providerChain(), completion: resolveCompletionProviders(), vision: resolveVisionProviders(), budgets: providerBudgetSnapshot(), usage: persistedProviderUsageSnapshot(), circuits: providerCircuitSnapshot(), imageEgress: isImageEgressAllowed() });
   }
   if (req.method === "GET" && url.pathname === "/api/courses") return json(res, 200, db.prepare("SELECT * FROM courses").all());
+  if (req.method === "GET" && url.pathname === "/api/concepts/graph") {
+    const courseId = url.searchParams.get("course") ?? "";
+    if (!courseExists(courseId)) return json(res, 404, { error: "Course not found." });
+    const course = db.prepare("SELECT title FROM courses WHERE id=?").get(courseId) as { title: string };
+    return json(res, 200, buildConceptGraph(db, courseId, course.title));
+  }
   if (req.method === "GET" && url.pathname === "/api/canvas-recognition/examples") {
     const courseId = url.searchParams.get("course") ?? "";
     if (!courseId || !courseExists(courseId)) return json(res, 404, { error: "Course not found." });
