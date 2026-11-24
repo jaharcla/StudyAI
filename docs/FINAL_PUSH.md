@@ -10,13 +10,15 @@ Hardware: system-stats MCP reports free-RAM differently from Windows "available"
 
 | Journey | What must pass | Status |
 | --- | --- | --- |
-| J1 First 60 seconds | New course + files; indexing progress; grounded summary with citations; three suggested actions; one Continue | Not started |
+| J1 First 60 seconds | New course + files; indexing progress; grounded summary with citations; three suggested actions; one Continue | Partial — smoke proves no dead actions; first-run summary/three actions not built |
 | J2 Ask and verify | Streamed grounded Tutor answer, citations open exact passage; honest refusal when ungrounded | Not started |
-| J3 One-click artifacts | Quiz, cards, practice test, guide, mind map, deck, infographic; shared library; per-node edit, regenerate, export; honest failures | Partial — one-click actions merged; no shared library/export gate |
-| J4 Canvas and Tutor | Human object names, citation focus/highlight, deterministic validation, board switching, safe duplicates/deletes | Partial — board switching fixed by origin guard; rest to verify |
-| J5 Practice and mastery | Check answer works, misses feed mastery/FSRS, one best next action with prepared target | Partial — check answer fixed by origin guard |
-| J6 Return visit | Today view with daily plan and resume | Not started |
+| J3 One-click artifacts | Quiz, cards, practice test, guide, mind map, deck, infographic; shared library; per-node edit, regenerate, export; honest failures | Partial — one-click quiz/cards/guide/mind map/deck exist; practice test and shared library/export gate not built |
+| J4 Canvas and Tutor | Human object names, citation focus/highlight, deterministic validation, board switching, safe duplicates/deletes | Partial — board switching verified in smoke; rest to verify |
+| J5 Practice and mastery | Check answer works, misses feed mastery/FSRS, one best next action with prepared target | Partial — check answer works; practice test missing |
+| J6 Return visit | Today view with daily plan and resume | Partial — daily plans endpoint, Coach badge and dated step line merged (4/4 e2e); Today view itself not built |
 | J7 One app | Shared tokens light/dark, 180–220 ms interruptible motion, reduced motion, keyboard, phone width | Not started |
+
+Reliability: PDF worker now loads as a Vite asset (commit `19f9533`); `tests/e2e/final-push-smoke.spec.ts` clicks every primary action and passes. Provider-dependent PDF/tutor failures were seen once and passed on rerun; no assertions were weakened.
 
 ## Workers and branches
 
