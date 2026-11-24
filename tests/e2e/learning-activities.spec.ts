@@ -15,6 +15,7 @@ async function addSource(request: APIRequestContext, courseId: string, lessonId:
 }
 
 async function selectSourceAndTemplate(page: Page, template: "force" | "graph") {
+  await page.getByText("Advanced").click();
   await page.getByRole("textbox", { name: "Search course sources" }).fill(template === "force" ? "net force acceleration" : "linear graph slope");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: /Motion and graphs/ }).first().click();

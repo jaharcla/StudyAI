@@ -133,26 +133,29 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
         </nav>
 
         <div className="studio-group">Generate from</div>
-        <label className="studio-field">Focus
-          <input data-testid="studio-focus" value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="e.g. equilibrium and forces" />
-        </label>
-        {kind === "practice" && (
-          <>
-            <label className="studio-field">Items
-              <select value={practiceType} onChange={(event) => setPracticeType(event.target.value as PracticeType)}>
-                <option value="both">Cards and quiz</option><option value="cards">Flashcards only</option><option value="quiz">Quiz only</option>
-              </select>
-            </label>
-            <label className="studio-field">Count
-              <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
-                {[2, 3, 4, 6, 8].map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
-          </>
-        )}
+        <details>
+          <summary>Advanced</summary>
+          <label className="studio-field">Focus
+            <input data-testid="studio-focus" value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="e.g. equilibrium and forces" />
+          </label>
+          {kind === "practice" && (
+            <>
+              <label className="studio-field">Items
+                <select value={practiceType} onChange={(event) => setPracticeType(event.target.value as PracticeType)}>
+                  <option value="both">Cards and quiz</option><option value="cards">Flashcards only</option><option value="quiz">Quiz only</option>
+                </select>
+              </label>
+              <label className="studio-field">Count
+                <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
+                  {[2, 3, 4, 6, 8].map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+        </details>
         <button type="button" className="studio-primary studio-generate" data-testid="studio-generate" disabled={busy} aria-busy={busy} onClick={() => void generate()}>
           {busy ? <LoaderCircle size={15} strokeWidth={2} aria-hidden="true" /> : <Sparkles size={15} strokeWidth={1.8} aria-hidden="true" />}
-          {busy ? "Generating…" : `Generate ${KIND_LABEL[kind].toLowerCase()}`}
+          {busy ? "Generating…" : `Generate ${KIND_LABEL[kind]}`}
         </button>
 
         {history.length > 0 && (

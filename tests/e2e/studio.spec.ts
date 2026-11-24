@@ -78,6 +78,7 @@ test("Studio generates a grounded mind map, guide and practice in the new UI", a
 
   await page.getByTitle("Open StudyAI Studio").click();
   await expect(page.getByTestId("studio-surface")).toBeVisible();
+  await page.getByText("Advanced").click();
   await page.getByTestId("studio-focus").fill("forces and equilibrium");
 
   // Mind map: real ReactFlow nodes, branch collapse, concept inspector, source navigation.

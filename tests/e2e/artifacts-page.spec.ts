@@ -62,6 +62,7 @@ test("Artifacts page builds, lists, opens and organizes a slide deck", async ({ 
   await expect(page.getByTestId("artifact-row")).toHaveCount(1);
   await expect(page.getByTestId("artifact-row")).toContainText("Forces study deck");
 
+  await page.getByText("Advanced").click();
   await page.getByTestId("deck-focus").fill("Forces and equilibrium");
   await page.getByTestId("deck-generate").click();
   await expect(page.getByTestId("artifacts-status")).toContainText("Building your deck");
