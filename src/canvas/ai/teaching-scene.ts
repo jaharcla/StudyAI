@@ -4,6 +4,7 @@ import { canvasActionSchema, type CanvasActionBatch } from "./canvas-actions";
 import { planLayout, type LayoutRect, type LayoutRequest } from "./layout";
 import { compileExpressionSync } from "../expressions";
 import { exampleStepSchema, type ExampleStep } from "../../artifacts/package";
+import type { ClaimProvenance } from "../../artifacts/contracts";
 
 const nodeId = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/);
 
@@ -189,6 +190,13 @@ export const artifactBriefSchema = z.object({
       context.addIssue({ code: "custom", message: `Item sourceRef "${item.sourceRef}" was not retrieved.`, path: ["artifact", "items"] });
     }
   }
+  for (const state of value.artifact.states ?? []) {
+    for (const claim of state.claims ?? []) {
+      if (!value.sourceRefs.includes(claim.sourceRef)) {
+        context.addIssue({ code: "custom", message: `State claim sourceRef "${claim.sourceRef}" was not retrieved.`, path: ["artifact", "states"] });
+      }
+    }
+  }
   const figure = value.artifact.figure;
   if (figure?.kind === "graph") {
     if (!figure.expression) context.addIssue({ code: "custom", message: "A graph figure requires an expression.", path: ["artifact", "figure", "expression"] });
@@ -200,7 +208,11 @@ export const artifactBriefSchema = z.object({
 
 export type ArtifactBrief = z.infer<typeof artifactBriefSchema>;
 export type StepIntent = ExampleStep;
-/** One replayable state over the single planner-placed object set. Positions never change. */
+/**
+ * One replayable state over the single planner-placed object set. Positions never change.
+ * `kind: "view"` is a layout/checkpoint with no course claim; `claims` carry the shared
+ * provenance type and are reviewed with the same gates as any other artifact claim.
+ */
 export type CompiledExampleState = {
   index: number;
   id: string;
@@ -208,6 +220,8 @@ export type CompiledExampleState = {
   objectIds: string[];
   highlightIds: string[];
   sourceRefs: string[];
+  claims: ClaimProvenance[];
+  kind: "view" | "evidence";
 };
 export type CompiledArtifact = {
   objects: ScientificObject[];
@@ -427,14 +441,15 @@ export function compileArtifactBrief(input: ArtifactBrief, options: {
         for (const alias of step.reveal) { const id = resolve(alias); if (!revealed.includes(id)) revealed.push(id); }
         const highlightIds = step.highlight.map(resolve);
         if (step.focus) resolve(step.focus);
-        return validateState({ index, id: step.id, narration: step.narration, objectIds: [...revealed], highlightIds, sourceRefs: [...input.sourceRefs] });
+        const claims = [...(step.claims ?? [])];
+        return validateState({ index, id: step.id, narration: step.narration, objectIds: [...revealed], highlightIds, sourceRefs: [...input.sourceRefs], claims, kind: claims.length ? "evidence" : "view" });
       });
     } else {
       const legacy = input.artifact.steps ?? ["Worked example"];
       states = legacy.map((narration, index) => {
         const last = index === legacy.length - 1;
         const objectIds = last ? [...orderedIds] : orderedIds.slice(0, Math.min(index + 1, orderedIds.length));
-        return validateState({ index, id: `step-${index}`, narration, objectIds, highlightIds: objectIds.length ? [objectIds[Math.min(index, objectIds.length - 1)]] : [], sourceRefs: [...input.sourceRefs] });
+        return validateState({ index, id: `step-${index}`, narration, objectIds, highlightIds: objectIds.length ? [objectIds[Math.min(index, objectIds.length - 1)]] : [], sourceRefs: [...input.sourceRefs], claims: [], kind: "view" });
       });
     }
     if (states.length && states.at(-1)!.objectIds.length < objects.length) {

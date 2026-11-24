@@ -4,9 +4,9 @@ import type { CompiledExampleState } from "../src/canvas/ai/teaching-scene";
 import type { CanvasDocument } from "../src/canvas/model";
 
 const states: CompiledExampleState[] = [
-  { index: 0, id: "setup", narration: "Setup", objectIds: ["q", "g"], highlightIds: ["g"], sourceRefs: ["ref-1"] },
-  { index: 1, id: "forces", narration: "Forces", objectIds: ["q", "g", "n"], highlightIds: ["n"], sourceRefs: ["ref-1"] },
-  { index: 2, id: "result", narration: "Result", objectIds: ["q", "g", "n", "f"], highlightIds: [], sourceRefs: ["ref-1"] },
+  { index: 0, id: "setup", narration: "Setup", objectIds: ["q", "g"], highlightIds: ["g"], sourceRefs: ["ref-1"], claims: [], kind: "view" },
+  { index: 1, id: "forces", narration: "Forces", objectIds: ["q", "g", "n"], highlightIds: ["n"], sourceRefs: ["ref-1"], claims: [], kind: "view" },
+  { index: 2, id: "result", narration: "Result", objectIds: ["q", "g", "n", "f"], highlightIds: [], sourceRefs: ["ref-1"], claims: [], kind: "view" },
 ];
 
 const object = (id: string) => ({ id, kind: "question" as const, x: 0, y: 0, width: 10, height: 10, prompt: id, provenance: { status: "generated-unverified" as const, sourceRefs: ["ref-1"] } });

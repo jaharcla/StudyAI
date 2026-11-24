@@ -150,6 +150,9 @@ export function parseArtifactPackage(
   }
   const claims = [
     ...pkg.components.flatMap((component) => component.claims ?? []),
+    ...pkg.components.flatMap((component) => component.kind === "worked-example"
+      ? (component.states ?? []).flatMap((state) => state.claims ?? [])
+      : []),
     ...(pkg.provenance.claims ?? []),
   ];
   for (const claim of claims) {
