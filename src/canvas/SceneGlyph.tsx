@@ -93,7 +93,10 @@ export function SceneGlyph({ object, onOpenNote, onOpenDocument, registeredCards
   if (object.kind === "anatomy") body = [object.system, ...object.labels].filter(Boolean).join(" · ");
   const isFlashcard = object.kind === "flashcard";
   const isQuestion = object.kind === "question";
-  return <foreignObject x={object.x - object.width / 2} y={object.y - object.height / 2} width={object.width} height={object.height}>
+  // A flashcard can carry a flip control, an answer block and grounding badges; give it room so none are clipped.
+  const cardHeight = isFlashcard ? object.height + 30 : object.height;
+  const cardY = object.y - object.height / 2 - (isFlashcard ? 15 : 0);
+  return <foreignObject x={object.x - object.width / 2} y={cardY} width={object.width} height={cardHeight}>
     <div className={`scene-node scene-${object.kind}`} data-testid="card-surface"><strong>{title}</strong>
       {isQuestion && object.scenario && <span className="scene-scenario">{object.scenario}</span>}
       {!isFlashcard && !isQuestion && <span>{body}</span>}

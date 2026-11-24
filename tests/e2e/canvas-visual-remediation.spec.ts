@@ -250,6 +250,9 @@ test("user-readiness fixes: math, recall, maps, human names, units and geometry 
   // Course-grounding rule: generated content, general labels and absent evidence are explicit.
   await expect(flashcard.getByTestId("generated-unverified")).toBeVisible();
   await expect(flashcard.getByTestId("no-course-evidence")).toBeVisible();
+  const flashcardBox = (await flashcard.locator(".scene-node").boundingBox())!;
+  const evidenceBox = (await flashcard.getByTestId("no-course-evidence").boundingBox())!;
+  expect(evidenceBox.y + evidenceBox.height).toBeLessThanOrEqual(flashcardBox.y + flashcardBox.height + 1);
   await expect(page.locator('[data-kind="anatomy"]').getByTestId("general-knowledge-label")).toBeVisible();
   await expect(page.locator('[data-kind="concept"]').getByTestId("generated-unverified")).toBeVisible();
   await expect(page.locator('[data-kind="concept"]').getByTestId("no-course-evidence")).toHaveCount(0);
