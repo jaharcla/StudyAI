@@ -252,6 +252,13 @@ test("user-readiness fixes: math, recall, maps, human names, units and geometry 
   await expect(page.getByRole("textbox", { name: "Edge label 1", exact: true })).toBeVisible();
   await page.locator(".canvas-object-editor").getByRole("button", { name: "Done", exact: true }).click();
 
+  // Taste standard: Operate restraint — no gradient costume, and a clear type step between title and body.
+  const conceptCard = page.locator('[data-kind="concept"] .scene-node');
+  expect(await conceptCard.evaluate((element) => getComputedStyle(element).backgroundImage)).toBe("none");
+  const titleSize = parseFloat(await conceptCard.locator("strong").evaluate((element) => getComputedStyle(element).fontSize));
+  const bodySize = parseFloat(await conceptCard.locator("span").first().evaluate((element) => getComputedStyle(element).fontSize));
+  expect(titleSize).toBeGreaterThan(bodySize);
+
   // Course-grounding rule: generated content, general labels and absent evidence are explicit.
   await expect(flashcard.getByTestId("generated-unverified")).toBeVisible();
   await expect(flashcard.getByTestId("no-course-evidence")).toBeVisible();
