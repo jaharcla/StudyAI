@@ -2,6 +2,15 @@ import type Database from "better-sqlite3";
 
 export type RecommendationSource = { documentId?: string; title: string; page?: number | null; excerpt: string; sourceRef?: string };
 export type RecommendationAction = { kind: "study" | "canvas" | "studio"; courseId: string; lessonId: string };
+/** Deterministic descriptors the Coach uses to prepare a destination. No view logic here. */
+export type RecommendationPreparation = {
+  cardId?: string | null;
+  boardId?: string | null;
+  activityId?: string | null;
+  dueAt?: string | null;
+  focus?: string | null;
+  sourceRef?: string | null;
+};
 export type Recommendation = {
   id: string;
   kind: "review" | "practice" | "relearn" | "canvas" | "start";
@@ -13,6 +22,7 @@ export type Recommendation = {
   lessonTitle: string;
   source: RecommendationSource | null;
   action: RecommendationAction;
+  preparation: RecommendationPreparation;
   priority: number;
 };
 
@@ -25,13 +35,14 @@ type ConceptRow = {
   attempts: number;
   correct: number;
   due_at: string | null;
+  card_id: string | null;
   source_document_id: string | null;
   source_title: string | null;
   source_page: number | null;
   source_excerpt: string | null;
 };
 
-type CanvasRow = { concept_id: string; concept: string; lesson_id: string; lesson_title: string; source_refs_json: string };
+type CanvasRow = { concept_id: string; concept: string; lesson_id: string; lesson_title: string; source_refs_json: string; canvas_id: string | null; activity_id: string | null };
 type FreshRow = { lesson_id: string; lesson_title: string; document_id: string; document_title: string; page: number | null; content: string };
 
 const MAX_RECOMMENDATIONS = 5;
@@ -74,6 +85,7 @@ export function getRecommendations(database: Database.Database, courseId: string
       COALESCE(act.attempts, 0) AS attempts,
       COALESCE(act.correct, 0) AS correct,
       (SELECT json_extract(c.fsrs_state, '$.due') FROM learning_cards c WHERE c.concept_id = k.id) AS due_at,
+      (SELECT c.id FROM learning_cards c WHERE c.concept_id = k.id) AS card_id,
       (SELECT q.source_document_id FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_document_id,
       (SELECT q.source_title FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_title,
       (SELECT q.source_page FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_page,
@@ -91,7 +103,8 @@ export function getRecommendations(database: Database.Database, courseId: string
   `).all(courseId, lessonId, lessonId) as ConceptRow[];
 
   const canvasRows = database.prepare(`
-    SELECT e.concept_id, k.name AS concept, e.lesson_id, l.title AS lesson_title, e.source_refs_json
+    SELECT e.concept_id, k.name AS concept, e.lesson_id, l.title AS lesson_title, e.source_refs_json,
+      e.canvas_id, e.activity_id
     FROM learning_events e
     JOIN learning_concepts k ON k.id = e.concept_id
     JOIN lessons l ON l.course_id = e.course_id AND l.id = e.lesson_id
@@ -111,6 +124,7 @@ export function getRecommendations(database: Database.Database, courseId: string
     priority: number,
     row: { concept_id?: string; concept?: string; lesson_id: string; lesson_title: string },
     source: RecommendationSource | null,
+    preparation: RecommendationPreparation,
     title: string,
     reason: string,
   ): Recommendation => ({
@@ -125,6 +139,7 @@ export function getRecommendations(database: Database.Database, courseId: string
     lessonTitle: row.lesson_title,
     source,
     action: { kind: kind === "canvas" ? "canvas" : kind === "start" ? "studio" : "study", courseId, lessonId: row.lesson_id },
+    preparation,
   });
 
   for (const row of conceptRows) {
@@ -135,18 +150,20 @@ export function getRecommendations(database: Database.Database, courseId: string
     const source = questionSource(row);
     const concept = row.concept;
     const weight = (1 - Math.max(0, Math.min(1, mastery))) * 10;
+    const preparation: RecommendationPreparation = { cardId: row.card_id, dueAt: row.due_at, focus: concept };
 
     if (due) {
-      consider(make("review", 100 + weight, row, source, `Review ${concept}`, `A review of ${concept} is due. Answer a short question now to keep it fresh.`));
+      consider(make("review", 100 + weight, row, source, preparation, `Review ${concept}`, `A review of ${concept} is due. Answer a short question now to keep it fresh.`));
     } else if (mastery < WEAK_MASTERY && attempts > 0) {
-      consider(make("practice", 80 + weight, row, source, `Practice ${concept}`, `${concept} is at ${percent(mastery)} mastery. Practice it with another reviewed question.`));
+      consider(make("practice", 80 + weight, row, source, preparation, `Practice ${concept}`, `${concept} is at ${percent(mastery)} mastery. Practice it with another reviewed question.`));
     } else if (attempts > correct && mastery < 0.7) {
-      consider(make("relearn", 60 + weight, row, source, `Relearn ${concept}`, `Recent answers on ${concept} were incorrect. Read the source again, then try a new question.`));
+      consider(make("relearn", 60 + weight, row, source, preparation, `Relearn ${concept}`, `Recent answers on ${concept} were incorrect. Read the source again, then try a new question.`));
     }
   }
 
   for (const row of canvasRows) {
-    consider(make("canvas", 40, row, activitySource(row.source_refs_json), `Rework ${row.concept} on the canvas`, `A canvas activity on ${row.concept} was marked incorrect. Reopen the board and rework it.`));
+    const preparation: RecommendationPreparation = { boardId: row.canvas_id, activityId: row.activity_id, focus: row.concept };
+    consider(make("canvas", 40, row, activitySource(row.source_refs_json), preparation, `Rework ${row.concept} on the canvas`, `A canvas activity on ${row.concept} was marked incorrect. Reopen the board and rework it.`));
   }
 
   // Lessons with no learning signal still get one honest, cited next step.
@@ -163,7 +180,10 @@ export function getRecommendations(database: Database.Database, courseId: string
   `).get(courseId, lessonId, lessonId) as FreshRow | undefined);
 
   if (freshRow) {
-    consider(make("start", 10, freshRow, documentSource(freshRow), `Create a study guide for ${freshRow.lesson_title}`, `No study activity yet in ${freshRow.lesson_title}. Make a study guide from your course sources in Studio.`));
+    const source = documentSource(freshRow);
+    source.sourceRef = `doc:${freshRow.document_id}`;
+    const preparation: RecommendationPreparation = { focus: `${freshRow.document_title}: ${freshRow.content.slice(0, 160)}`, sourceRef: source.sourceRef };
+    consider(make("start", 10, freshRow, source, preparation, `Create a study guide for ${freshRow.lesson_title}`, `No study activity yet in ${freshRow.lesson_title}. Make a study guide from your course sources in Studio.`));
   }
 
   return [...ranked.values()]

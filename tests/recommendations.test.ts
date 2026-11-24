@@ -84,4 +84,16 @@ describe("recommendations", () => {
     expect(getRecommendations(db, "unknown")).toEqual([]);
     db.close();
   });
+
+  it("carries deterministic preparation descriptors for study, board and studio targets", () => {
+    const db = seededDb();
+    const items = getRecommendations(db, "c");
+    const review = items.find((item) => item.kind === "review")!;
+    expect(review.preparation).toMatchObject({ cardId: "card1", dueAt: "2020-01-01T00:00:00.000Z", focus: "Cell biology" });
+    const canvas = items.find((item) => item.kind === "canvas")!;
+    expect(canvas.preparation).toMatchObject({ boardId: "board1", activityId: "act1", focus: "Genetics" });
+    const studio = items.find((item) => item.kind === "start")!;
+    expect(studio.preparation).toMatchObject({ sourceRef: "doc:d1", focus: expect.stringContaining("Cell notes") });
+    db.close();
+  });
 });
