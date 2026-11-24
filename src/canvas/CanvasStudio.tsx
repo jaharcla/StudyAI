@@ -35,13 +35,19 @@ type CourseDocument = { id: string; title: string };
 type Board = { id: string; name: string; revision: number };
 type PersistedBoard = { id: string; course_id: string; lesson_id: string; revision: number; document: string };
 type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
-type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
+type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; onSelectedObject?: (object: { id: string; name: string } | null) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean };
+
+function selectedObjectName(object: ScientificObject): string {
+  const fields = object as unknown as Record<string, unknown>;
+  const name = ["label", "name", "title"].map((key) => fields[key]).find((value) => typeof value === "string" && value.trim());
+  return typeof name === "string" ? name.trim().slice(0, 80) : object.kind;
+}
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 // Quickdraw's own tool shortcuts (editor.js toolKeys) switch tools without
 // ending an active pointer session; match the set so we can close it first.
 const TOOL_KEYS = new Set(["v", "1", "h", "d", "p", "b", "i", "e", "k", "a", "l", "t", "n", "g", "r", "o"]);
 
-export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, preferredBoardId, onBoardState, activityMode = false }: Props) {
+export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, onOpenDocument, onSummary, onSelectedObject, preferredBoardId, onBoardState, activityMode = false }: Props) {
   const quickdrawRef = useRef<QuickdrawRef>(null);
   const editorRef = useRef<Editor | null>(null);
   const editorListeners = useRef<Array<() => void>>([]);
@@ -91,6 +97,9 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [proposalBusy, setProposalBusy] = useState(false);
   useEffect(() => setToolOpen(!activityMode), [activityMode]);
   useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
+  const currentSelection = document.objects.find((object) => object.id === selectedId);
+  useAgentContext({ description: "StudyAI selected scientific object", value: currentSelection ? { selected: true, objectId: currentSelection.id, name: selectedObjectName(currentSelection), kind: currentSelection.kind, boardId: activeBoard?.id ?? "", courseId, lessonId } : { selected: false, courseId, lessonId } });
+  useEffect(() => { onSelectedObject?.(currentSelection ? { id: currentSelection.id, name: selectedObjectName(currentSelection) } : null); }, [currentSelection, onSelectedObject]);
   useFrontendTool({
     name: "propose_canvas_edit",
     description: "Consequential: requires user approval. Propose an edit to an existing scientific object on the active board. The user must apply it before it changes the canvas. Use current IDs from canvas context.",

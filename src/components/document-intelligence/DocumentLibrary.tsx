@@ -75,7 +75,7 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
   };
 
   const deleteItem = async (document: LibraryDocument) => {
-    if (!window.confirm("Delete “" + document.title + "” and its indexed text?")) return;
+    if (!window.confirm("Delete “" + document.filename + "” and its indexed text?")) return;
     try {
       await requestJson<{ deleted: boolean }>(DOCUMENT_API + "/documents/" + encodeURIComponent(document.id) + "?course=" + encodeURIComponent(courseId), { method: "DELETE" });
       if (viewer?.documentId === document.id) setViewer(undefined);
@@ -131,7 +131,7 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
       {query.trim() && hits.length > 0 && <div className="di-search-results">
         <span className="di-eyebrow">MATCHING PASSAGES</span>
         {hits.map((hit) => <div className="di-search-hit" key={hit.sourceRef}>
-          <button className="di-search-hit-main" onClick={() => openSource(hit.sourceRef)}><span className="di-hit-copy"><strong>{hit.title}</strong><small>{hit.excerpt}</small></span></button>
+          <button className="di-search-hit-main" onClick={() => openSource(hit.sourceRef)}><span className="di-hit-copy"><strong>{hit.filename}</strong><small>{hit.excerpt}</small></span></button>
           <Citation sourceRef={hit.sourceRef} title="" compact onOpen={openSource} />
         </div>)}
       </div>}
@@ -139,7 +139,7 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
       {loading ? <div className="di-library-state">Loading course sources…</div>
         : documents.length ? <div className="di-document-grid">{documents.map((document) => <article className="di-document-card" key={document.id}>
           <button className="di-document-open" onClick={() => setViewer({ documentId: document.id })}>
-            <span className="di-document-icon"><FileText size={19} /></span><span className="di-document-main"><strong>{document.title}</strong><small>{document.filename}</small></span><ChevronRight size={16} className="di-document-chevron" />
+            <span className="di-document-icon"><FileText size={19} /></span><span className="di-document-main"><strong>{document.filename}</strong></span><ChevronRight size={16} className="di-document-chevron" />
           </button>
           <div className="di-document-meta"><span>{formatType(document.mimeType)}</span><span>{document.unitCount} {document.mimeType.includes("presentation") ? "slides" : document.mimeType === "application/pdf" ? "pages" : "text units"}</span><time>{formatDate(document.importedAt)}</time><button className="di-delete-button" title="Delete document" onClick={() => void deleteItem(document)}><Trash2 size={14} /></button></div>
         </article>)}</div>
