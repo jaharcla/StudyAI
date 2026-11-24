@@ -9,8 +9,11 @@ describe("radial atom actions", () => {
     const source = component();
     for (const id of ["radial-add-pair", "radial-remove-pair", "radial-element", "radial-charge", "radial-remove", "radial-bond-from", "radial-bond-order", "radial-resonance"]) expect(source).toContain(`id: "${id}"`);
     expect(source).toContain('className="radial-actions"');
-    expect(source).toContain("* 40");
-    expect(source).toContain("r={11}");
+    expect(source).toContain("const RADIUS = 100");
+    expect(source).toContain("* RADIUS");
+    expect(source).toContain('className="radial-hub"');
+    expect(source).toContain('className="radial-action"');
+    expect(source).toContain("disabled={!open}");
   });
 
   it("is wired to the selected atom's existing callbacks", () => {

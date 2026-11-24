@@ -12,7 +12,7 @@ test("the object editor keeps all molecule controls in notebook styling", async 
   await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
   await page.getByTestId("lewis-element-row-O").click();
   const box = (await page.locator(".canvas-board").boundingBox())!;
-  await page.mouse.click(box.x + 360, box.y + 220);
+  await page.mouse.click(box.x + 560, box.y + 260);
   await page.getByTestId("lewis-inspect").click();
   const editor = page.locator(".canvas-object-editor.notebook-editor");
   await expect(editor.getByRole("combobox", { name: "Resonance form" })).toBeVisible();

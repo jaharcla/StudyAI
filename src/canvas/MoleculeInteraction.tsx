@@ -32,19 +32,25 @@ export function useMoleculeInteraction({ objects, editor, enabled, interactive, 
   const updateBond = (value: BondOrder) => { if (selected && selectedBond) commit(connectAtoms(selected, selectedBond.from, selectedBond.to, value)); };
   const radialElementOptions: Element[] = ["H", "C", "N", "O", "F", "P", "S", "Cl", "Br", "I"];
   const cycleElement = (current: Element) => radialElementOptions[(radialElementOptions.indexOf(current) + 1) % radialElementOptions.length];
-  const radial = selected && selectedAtom ? <g transform={`translate(${atomWorldPosition(selected, selectedAtom).x} ${atomWorldPosition(selected, selectedAtom).y})`}>
-    <RadialAtomActions
-      radialAtom={selectedAtom}
-      onAddPair={() => updateAtom({ nonbondingElectrons: selectedAtom.nonbondingElectrons + 2 })}
-      onRemovePair={() => { if (selectedAtom.nonbondingElectrons >= 2) updateAtom({ nonbondingElectrons: selectedAtom.nonbondingElectrons - 2 }); }}
-      onElement={(element) => updateAtom({ element: cycleElement(element) })}
-      onCharge={() => updateAtom({ nonbondingElectrons: (selectedAtom.nonbondingElectrons + 2) % 12 })}
-      onRemoveAtom={() => { const keep = selected.atoms.filter((atom) => atom.id !== selectedAtom.id).map((atom) => atom.id); commit({ ...selected, atoms: selected.atoms.filter((atom) => atom.id !== selectedAtom.id), resonanceForms: selected.resonanceForms.map((form) => ({ ...form, bonds: form.bonds.filter((bond) => keep.includes(bond.from) && keep.includes(bond.to)) })) }); setAtomId(undefined); }}
-      onBondFrom={() => { setAction("bond"); setBondFrom(selectedAtom.id); setAtomId(undefined); }}
-      onBondOrder={() => { const bond = moleculeBonds(selected).find((item) => item.from === selectedAtom.id || item.to === selectedAtom.id); if (bond) commit(connectAtoms(selected, bond.from, bond.to, bond.order === 1 ? 1.5 : bond.order === 1.5 ? 2 : bond.order === 2 ? 3 : 1)); }}
-      onResonance={() => { const active = selected.resonanceForms.find((form) => form.id === selected.activeResonanceId) ?? selected.resonanceForms[0]; const form = { id: newId("form"), name: `Resonance form ${selected.resonanceForms.length + 1}`, bonds: active.bonds.map((bond) => ({ ...bond })) }; commit({ ...selected, resonanceForms: [...selected.resonanceForms, form], activeResonanceId: form.id }); }}
-    />
-  </g> : null;
+  const atomScreen = selected && selectedAtom ? atomWorldPosition(selected, selectedAtom) : undefined;
+  const screen = atomScreen ? editor.pageToScreen(atomScreen.x, atomScreen.y) : undefined;
+  const radialX = screen ? Math.max(530, Math.min(screen.x, editor.container.clientWidth - 120)) : 0;
+  const radialY = screen ? Math.max(140, Math.min(screen.y, editor.container.clientHeight - 150)) : 0;
+  const radialOpen = Boolean(selected && selectedAtom && action !== "bond");
+  const radial = <RadialAtomActions
+    open={radialOpen}
+    x={radialX}
+    y={radialY}
+    radialAtom={selectedAtom}
+    onAddPair={() => { if (selectedAtom) updateAtom({ nonbondingElectrons: selectedAtom.nonbondingElectrons + 2 }); }}
+    onRemovePair={() => { if (selectedAtom && selectedAtom.nonbondingElectrons >= 2) updateAtom({ nonbondingElectrons: selectedAtom.nonbondingElectrons - 2 }); }}
+    onElement={(element) => { if (selectedAtom) updateAtom({ element: cycleElement(element) }); }}
+    onCharge={() => { if (selectedAtom) updateAtom({ nonbondingElectrons: (selectedAtom.nonbondingElectrons + 2) % 12 }); }}
+    onRemoveAtom={() => { if (!selected || !selectedAtom) return; const keep = selected.atoms.filter((atom) => atom.id !== selectedAtom.id).map((atom) => atom.id); commit({ ...selected, atoms: selected.atoms.filter((atom) => atom.id !== selectedAtom.id), resonanceForms: selected.resonanceForms.map((form) => ({ ...form, bonds: form.bonds.filter((bond) => keep.includes(bond.from) && keep.includes(bond.to)) })) }); setAtomId(undefined); }}
+    onBondFrom={() => { if (!selectedAtom) return; setAction("bond"); setBondFrom(selectedAtom.id); setAtomId(undefined); }}
+    onBondOrder={() => { if (!selected || !selectedAtom) return; const bond = moleculeBonds(selected).find((item) => item.from === selectedAtom.id || item.to === selectedAtom.id); if (bond) commit(connectAtoms(selected, bond.from, bond.to, bond.order === 1 ? 1.5 : bond.order === 1.5 ? 2 : bond.order === 2 ? 3 : 1)); }}
+    onResonance={() => { if (!selected) return; const active = selected.resonanceForms.find((form) => form.id === selected.activeResonanceId) ?? selected.resonanceForms[0]; const form = { id: newId("form"), name: `Resonance form ${selected.resonanceForms.length + 1}`, bonds: active.bonds.map((bond) => ({ ...bond })) }; commit({ ...selected, resonanceForms: [...selected.resonanceForms, form], activeResonanceId: form.id }); }}
+  />;
   const start = (event: React.PointerEvent<SVGElement>, molecule: ScientificMolecule, child?: string) => {
     if (!interactive || event.button !== 0) return;
     event.preventDefault(); event.stopPropagation(); editor.setSelection([]); onSelect(molecule.id); editor.container.focus();
@@ -89,19 +95,20 @@ export function useMoleculeInteraction({ objects, editor, enabled, interactive, 
   const controls = (enabled || selected) && <LewisSidebar
     element={element}
     order={selectedBond?.order ?? order}
+    action={action}
     onElement={(next) => { if (selectedAtom) { updateAtom({ element: next }); setBondFrom(undefined); return; } setAction("atom"); setElement(next); setAtomId(undefined); setBondFrom(undefined); onActivate(); }}
     onBondOrder={(next) => { setOrder(next); setAction("bond"); const bond = selectedBond ?? (selected && selectedAtom ? moleculeBonds(selected).find((item) => item.from === selectedAtom.id || item.to === selectedAtom.id) : undefined); if (selected && bond) commit(connectAtoms(selected, bond.from, bond.to, next)); }}
     onClose={() => { setBondFrom(undefined); onFinish(); }}
     onInspect={() => { if (selected) onEdit(selected.id); }}
     onFinish={() => { setBondFrom(undefined); onFinish(); }}
-    onPlace={() => { setAction("atom"); setBondFrom(undefined); onActivate(); }}
-    onConnect={() => { setAction("bond"); setBondFrom(undefined); onActivate(); }}
+    onPlace={() => { setAction("atom"); setAtomId(undefined); setBondId(undefined); setBondFrom(undefined); onActivate(); }}
+    onConnect={() => { setAction("bond"); setAtomId(undefined); setBondId(undefined); setBondFrom(undefined); onActivate(); }}
   />;
   const render = (molecule: ScientificMolecule) => {
     const box = moleculeBounds(molecule), zoom = editor.camera.z, selected = selectedId === molecule.id;
     const sourceAtom = molecule.atoms.find((atom) => atom.id === bondFrom);
     const from = sourceAtom && atomWorldPosition(molecule, sourceAtom);
-    return <g key={molecule.id} data-scientific-id={molecule.id} data-kind="molecule" className={`science-molecule ${selected ? "selected" : ""}`} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
+    return <g key={molecule.id} data-scientific-id={molecule.id} data-kind="molecule" data-radial-open={radialOpen && selected ? "true" : undefined} className={`science-molecule ${selected ? "selected" : ""}`} onPointerMove={move} onPointerUp={(event) => finish(event)} onPointerCancel={(event) => finish(event, true)}>
       {selected && <rect className="molecule-selection" x={box.x} y={box.y} width={box.width} height={box.height} rx={8 / zoom} strokeWidth={1 / zoom} />}
       <text className="molecule-name" style={{ pointerEvents: interactive ? "all" : "none" }} x={box.x} y={box.y - 10 / zoom} fontSize={12 / zoom} onPointerDown={(event) => start(event, molecule)} onDoubleClick={() => onEdit(molecule.id)}>{molecule.name}</text>
       {moleculeBonds(molecule).map((bond) => {

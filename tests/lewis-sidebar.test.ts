@@ -15,10 +15,11 @@ describe("Lewis sidebar", () => {
   it("uses the canvas-tool panel grammar with testable hooks", () => {
     const source = sidebarSource();
     expect(source).toContain('className="lewis-sidebar"');
-    expect(source).toContain('className="palette-heading"');
+    expect(source).toContain('className="lewis-head"');
+    expect(source).toContain('className="lewis-element-grid"');
     expect(source).toContain('data-testid="lewis-bond-row"');
     expect(source).toContain('data-testid="lewis-bond-row-toggle"');
-    expect(source).toContain('data-testid={`lewis-element-row-${item}`}');
+    expect(source).toContain('data-testid={`lewis-element-row-${item.symbol}`}');
     expect(source).toContain('aria-label="Close Lewis tools"');
     expect(source).toContain('role="toolbar"');
   });

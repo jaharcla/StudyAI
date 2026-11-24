@@ -36,7 +36,7 @@ export async function drawCarbonDioxide(page: Page, leaveInspectorOpen = true): 
   if (await opener.isVisible()) await opener.click();
   await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
   const box = (await page.locator(".canvas-board").boundingBox())!;
-  const y = box.y + 200, left = box.x + 280;
+  const y = box.y + 300, left = box.x + 560;
   for (const [index, element] of ["O", "C", "O"].entries()) {
     // A board load or tool event can dismiss the Lewis panel between placements.
     if (!(await page.getByTestId(`lewis-element-row-${element}`).isVisible())) {
@@ -44,8 +44,9 @@ export async function drawCarbonDioxide(page: Page, leaveInspectorOpen = true): 
       if (await reopen.isVisible()) await reopen.click();
       await page.getByRole("button", { name: "Lewis structure", exact: true }).click();
     }
+    await page.getByTestId("lewis-place").click();
     await page.getByTestId(`lewis-element-row-${element}`).click();
-    await page.mouse.click(left + index * 80, y);
+    await page.mouse.click(left + index * 120, y);
   }
   await page.getByTestId("lewis-connect").click();
   await page.getByTestId("lewis-bond-row-toggle").click();

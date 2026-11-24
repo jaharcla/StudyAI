@@ -775,7 +775,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
 
   const activatePlacement = useCallback((kind: ScientificObject["kind"], patch: Partial<ScientificObject> = {}) => {
     cancelNativeGesture();
-    editorRef.current?.setTool("select"); setScienceMode(kind); setPlacementPatch(patch); setToolOpen(false); setEditingId(undefined); setSelectedId(undefined);
+    editorRef.current?.setTool("select"); setScienceMode(kind); setPlacementPatch(patch); setToolOpen(kind === "molecule"); setEditingId(undefined); setSelectedId(undefined);
   }, [cancelNativeGesture]);
 
   const useTool = useCallback(async (tool: CanvasTool) => {
