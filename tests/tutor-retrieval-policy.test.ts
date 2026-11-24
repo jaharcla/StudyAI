@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requestsCanvasAction, requestsCanvasMetadata, shouldRetrieveCourseDocuments } from "../server/tutor-retrieval-policy";
+import { recommendedToolsForQuery, requestsCanvasAction, requestsCanvasMetadata, shouldRetrieveCourseDocuments } from "../server/tutor-retrieval-policy";
 
 describe("Tutor retrieval intent", () => {
   it("skips a greeting", () => {
@@ -41,6 +41,20 @@ describe("Tutor canvas action intent", () => {
     expect(requestsCanvasAction("Change the label to F.")).toBe(true);
     expect(requestsCanvasAction("Can you move the arrow to the right?")).toBe(true);
     expect(requestsCanvasAction("Please add a text label.")).toBe(true);
+  });
+});
+
+describe("Tutor library artifact intent", () => {
+  const available = ["make_library_artifact", "search_course_documents", "author_board"];
+
+  it("routes quiz, cards and slides requests to the library tool", () => {
+    expect(recommendedToolsForQuery("Quiz me on this lesson", available)).toContain("make_library_artifact");
+    expect(recommendedToolsForQuery("Make cards for these notes", available)).toContain("make_library_artifact");
+    expect(recommendedToolsForQuery("Make slides from this lesson", available)).toContain("make_library_artifact");
+  });
+
+  it("does not hijack ordinary questions or canvas authoring", () => {
+    expect(recommendedToolsForQuery("What is on the board?", available)).not.toContain("make_library_artifact");
   });
 });
 

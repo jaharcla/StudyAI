@@ -34,6 +34,7 @@ test("a citation opens and highlights the exact course passage", async ({ page }
   await expect(viewer).toBeVisible();
   await expect(viewer.getByTestId("cited-passage").locator("mark")).toHaveText(PASSAGE);
   await expect(viewer.locator(".di-readable-text mark").first()).toHaveText(PASSAGE);
+  await page.screenshot({ path: "test-results/shots/tutor-citation-highlight.png", fullPage: true });
 });
 
 test("a stale citation shows a plain message instead of a blank highlight", async ({ page }) => {

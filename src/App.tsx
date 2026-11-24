@@ -21,6 +21,7 @@ import SearchDialog from "./components/SearchDialog";
 import ProgressDialog from "./components/ProgressDialog";
 import HelpDialog from "./components/HelpDialog";
 import TutorMenu from "./components/TutorMenu";
+import { LibraryArtifactTool } from "./tutor/LibraryArtifactTool";
 import { useDialogFocus } from "./components/useDialogFocus";
 const DocumentLibrary = lazy(() => import("./components/document-intelligence").then((module) => ({ default: module.DocumentLibrary })));
 
@@ -468,7 +469,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   };
 
 
-  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={tutorStatus?.model || selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""} ${tutor ? "tutor-open" : ""}`} style={{ "--tutor-width": `${tutorWidth}px` } as React.CSSProperties}>
+  return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={tutorStatus?.model || selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<LibraryArtifactTool courseId={course.id} lessonId={lessonId} /><div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""} ${tutor ? "tutor-open" : ""}`} style={{ "--tutor-width": `${tutorWidth}px` } as React.CSSProperties}>
     {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar" inert={!sidebar}>
       <div className="brand-row"><div className="brand-mark"><Sparkles size={17} /></div><span>study<span className="brand-ai">ai</span></span><button className="icon-button sidebar-close" onClick={() => setSidebar(false)} title="Collapse sidebar"><ChevronLeft size={16} /></button></div>
       <button className="search-button" onClick={() => setSearchOpen(true)} title="Search anything"><Search size={15} /><span>Search anything</span><kbd>âŒ˜ K</kbd></button>

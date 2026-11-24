@@ -45,6 +45,7 @@ test("a Tutor canvas citation focuses and highlights the named object", async ({
   await expect(page.locator(".scientific-layer")).toBeVisible();
   await expect(page.getByTestId("selected-object-context")).toContainText("Cited molecule");
   await expect(page.locator(".scientific-layer .steppable-highlight")).toHaveCount(1);
+  await page.screenshot({ path: "test-results/shots/tutor-canvas-citation-focus.png", fullPage: true });
 });
 
 test("a stale canvas citation fails safely with a plain message", async ({ page }) => {

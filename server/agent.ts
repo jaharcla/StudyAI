@@ -175,6 +175,8 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ? { name: "author_board", description: "Consequential: requires user approval. ONE verb for composing learning content onto the board: a question with a figure, a problem set (count 1-8), a worked example or a review deck. Describe what the artifact must show and where it belongs relative to the board; never supply x/y. The app resolves geometry against real board occupancy. Citations must be exact sourceRef values you retrieved; invented refs are removed server-side. The whole artifact is applied in one review and is labelled generated, not verified.", schema: artifactBriefSchema } : undefined;
   const artifactCapabilities = sameCanvasScope && state.copilotkit.actions?.some((action) => action.name === "get_artifact_capabilities")
     ? { name: "get_artifact_capabilities", description: "Read-only and advisory. Lists artifact kinds, their renderer owners, deterministic validators and the item limit. It cannot read or change a board; author_board remains the only apply verb.", schema: z.object({}).strict() } : undefined;
+  const libraryArtifact = state.copilotkit.actions?.some((action) => action.name === "make_library_artifact")
+    ? { name: "make_library_artifact", description: "Consequential: creates a real, course-grounded artifact in the shared Library. Use only when the student asks to quiz me, make cards or flashcards, or make slides. Never invent content or citations; the app generates from this lesson's retrieved course material and reports an honest failure when generation is unavailable.", schema: z.object({ kind: z.enum(["quiz", "cards", "slides"]), focus: z.string().min(1).max(300), count: z.number().int().min(2).max(12).optional() }).strict() } : undefined;
   let evidence: RetrievalResult | null = null;
   if (course && retrievalRequested) evidence = retrieveCourseDocuments(db, course.id, query);
 
@@ -249,6 +251,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     ...(teachingScene ? ["propose_teaching_scene"] : []),
     ...(authorBoard ? ["author_board"] : []),
     ...(artifactCapabilities ? ["get_artifact_capabilities"] : []),
+    ...(libraryArtifact ? ["make_library_artifact"] : []),
     ...wolframTools.map((externalTool) => externalTool.name),
     ...(vegaChart ? [vegaChart.name] : []),
     "search_fact_checks",
@@ -289,7 +292,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
     instructions + " Workspace and canvas context: " + budgeted.canvasJson + ". Course evidence from the server: " + budgeted.evidenceJson,
   );
   const executableBaseTools = [...(retrieval ? [retrieval] : []), ...scienceTools];
-  const baseTools = [...executableBaseTools, ...(canvasTool ? [canvasTool] : []), ...(quickdrawActions ? [quickdrawActions] : []), ...(quickdrawRead ? [quickdrawRead] : []), ...(canvasSceneRead ? [canvasSceneRead] : []), ...(canvasInkRead ? [canvasInkRead] : []), ...(canvasEvidenceSearch ? [canvasEvidenceSearch] : []), ...(canvasObjectCreate ? [canvasObjectCreate] : []), ...(moleculeTool ? [moleculeTool] : []), ...(canvasDescribe ? [canvasDescribe] : []), ...(canvasDesignGuide ? [canvasDesignGuide] : []), ...(teachingScene ? [teachingScene] : []), ...(authorBoard ? [authorBoard] : []), ...(artifactCapabilities ? [artifactCapabilities] : []), ...wolframTools, ...(vegaChart ? [vegaChart] : [])];
+  const baseTools = [...executableBaseTools, ...(canvasTool ? [canvasTool] : []), ...(quickdrawActions ? [quickdrawActions] : []), ...(quickdrawRead ? [quickdrawRead] : []), ...(canvasSceneRead ? [canvasSceneRead] : []), ...(canvasInkRead ? [canvasInkRead] : []), ...(canvasEvidenceSearch ? [canvasEvidenceSearch] : []), ...(canvasObjectCreate ? [canvasObjectCreate] : []), ...(moleculeTool ? [moleculeTool] : []), ...(canvasDescribe ? [canvasDescribe] : []), ...(canvasDesignGuide ? [canvasDesignGuide] : []), ...(teachingScene ? [teachingScene] : []), ...(authorBoard ? [authorBoard] : []), ...(artifactCapabilities ? [artifactCapabilities] : []), ...(libraryArtifact ? [libraryArtifact] : []), ...wolframTools, ...(vegaChart ? [vegaChart] : [])];
   const factCheckTool = createFactCheckTool();
   const requestSignal = signalFromConfig(config);
   const run: TutorModelRun = { provider: providerSettings.provider, model: activeModel, providersTried: [providerSettings.provider], invocationCount: 0, retries: 0, groqReservedCostUsd: 0, groqAccountedCostUsd: 0, maxGroqCostUsd: providerSettings.maxGroqCostUsd, maxProviderCalls: providerSettings.maxProviderCalls, groqInputUsdPerMillion: providerSettings.groqInputUsdPerMillion, groqOutputUsdPerMillion: providerSettings.groqOutputUsdPerMillion, startedAt: Date.now() };
