@@ -21,6 +21,7 @@ Hardware: system-stats MCP reports free-RAM differently from Windows "available"
 ## Workers and branches
 
 - Reliability sweep + smoke: `work/reliability-j1-20261124`, thread `1574910108671148052`, ports 5702/8713/8714/8612. Running.
+- Today + daily plan (J1/J6): `work/today-plan-20261124`, thread `1574910341085794476`, ports 5703/8715/8716/8613. Running; holds Playwright until the reliability worker finishes its suite.
 - Gap-fill: no worker active; aborted stale session, scope folded into Tutor/Studio workers.
 - Tutor, Studio parity, Decks, Study loop, Document intelligence, Canvas depth, Cohesion: not yet assigned.
 
