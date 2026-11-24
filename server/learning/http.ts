@@ -3,6 +3,19 @@ import { ZodError } from "zod";
 import { CardInputSchema, RateCardSchema, ReviewedQuestionSchema } from "./contracts.js";
 import { LearningService } from "./service.js";
 
+const FIELD_LABELS: Record<string, string> = {
+  courseId: "Course", lessonId: "Lesson", concept: "Concept", prompt: "Prompt",
+  choices: "Choices", correctChoice: "Correct choice", explanation: "Explanation",
+  sourceDocumentId: "Source document", sourcePage: "Source page", sourceExcerpt: "Source excerpt",
+  cardId: "Card", choiceId: "Answer", rating: "Rating", front: "Front text", back: "Back text",
+};
+
+/** Student-facing validation copy. Never return Zod paths, codes or internal field names. */
+function validationMessage(error: ZodError): string {
+  const labels = [...new Set(error.issues.map((issue) => FIELD_LABELS[String(issue.path[0] ?? "")]).filter((label): label is string => Boolean(label)))];
+  return labels.length ? `Check ${labels.join(", ")} and try again.` : "Check the form and try again.";
+}
+
 export function createLearningHandler(service: LearningService, origin = "http://127.0.0.1:5173") {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -13,7 +26,20 @@ export function createLearningHandler(service: LearningService, origin = "http:/
         const course = url.searchParams.get("course") ?? "", lesson = url.searchParams.get("lesson") ?? "";
         if (!course || !lesson) { send(400, { error: "course and lesson are required." }); return true; }
         const question = service.ask(course, lesson);
-        send(question ? 200 : 404, question ?? { error: "No reviewed questions are available for this lesson." });
+        if (question) { send(200, question); return true; }
+        const suggestedSource = service.sources(course)[0] ?? null;
+        send(200, {
+          status: "no-reviewed-questions",
+          reason: "No reviewed questions for this lesson yet. Start from an excerpt of your course material, then answer and rate it to build mastery.",
+          nextAction: { kind: "author-question", label: "Create a question from course text" },
+          suggestedSource,
+        });
+        return true;
+      }
+      if (req.method === "GET" && url.pathname === "/api/study/sources") {
+        const course = url.searchParams.get("course") ?? "", lesson = url.searchParams.get("lesson") ?? "";
+        if (!course || !lesson) { send(400, { error: "course and lesson are required." }); return true; }
+        send(200, { sources: service.sources(course) });
         return true;
       }
       if (req.method === "GET" && url.pathname === "/api/study/resume") {
@@ -52,7 +78,10 @@ export function createLearningHandler(service: LearningService, origin = "http:/
       }
       return false;
     } catch (error) {
-      send(error instanceof ZodError ? 400 : 409, { error: error instanceof Error ? error.message : "Invalid request" });
+      if (error instanceof ZodError) { send(400, { error: validationMessage(error) }); return true; }
+      if (error instanceof SyntaxError) { send(400, { error: "The request could not be read. Try again." }); return true; }
+      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) { send(409, { error: "That item is already saved. Try a different prompt or name." }); return true; }
+      send(409, { error: error instanceof Error ? error.message : "Invalid request" });
       return true;
     }
   };

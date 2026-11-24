@@ -34,6 +34,7 @@ test("authors a question from a cited excerpt and can answer it", async ({ page,
   const documentId = await seedDocument(request, course.id);
   await openAuthorForm(page, course.title);
   await fillForm(page, documentId, "A cell contains DNA in its nucleus.");
+  await expect(page.getByTestId("attached-source")).toContainText("bio.txt");
   await page.getByRole("button", { name: "Save question" }).click();
   await expect(page.getByTestId("question-author")).toBeHidden();
   await page.getByRole("button", { name: "Ask a reviewed question" }).click();
@@ -50,5 +51,6 @@ test("rejects an excerpt that is not in the document", async ({ page, request })
   await fillForm(page, documentId, "not in the source");
   await page.getByRole("button", { name: "Save question" }).click();
   await expect(page.getByRole("status")).toContainText("Citation must match text and page");
+  await expect(page.getByRole("status")).not.toContainText("sourceDocumentId");
   await expect(page.getByTestId("question-author")).toBeVisible();
 });
