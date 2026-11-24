@@ -14,4 +14,9 @@ export function initializeStudioSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS studio_artifacts_scope_idx ON studio_artifacts(course_id, lesson_id, kind, created_at DESC);
   `);
+  // Additive review state: older databases keep their rows and gain a defaulted column.
+  const columns = db.prepare("PRAGMA table_info(studio_artifacts)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "acceptance")) {
+    db.exec("ALTER TABLE studio_artifacts ADD COLUMN acceptance TEXT NOT NULL DEFAULT 'pending'");
+  }
 }

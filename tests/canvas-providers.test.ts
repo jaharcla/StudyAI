@@ -21,6 +21,8 @@ beforeEach(() => {
   vi.stubEnv("OPENROUTER_API_KEY", "test-openrouter");
   vi.stubEnv("CANVAS_INFERENCE_PROVIDER", "auto");
   vi.stubEnv("CANVAS_OCR_PROVIDER", "auto");
+  // The shell may legitimately configure a different OpenCode model; this test asserts the default.
+  vi.stubEnv("CANVAS_OPENCODE_GO_MODEL", "");
   vi.stubEnv("CANVAS_PROVIDER_CHAIN", "groq,opencode-go,openrouter");
   vi.stubEnv("CANVAS_OPENCODE_GO_MAX_REQUESTS_PER_DAY", "20");
   vi.stubEnv("CANVAS_OPENROUTER_MAX_REQUESTS_PER_DAY", "50");

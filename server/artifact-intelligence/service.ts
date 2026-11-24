@@ -5,7 +5,7 @@ import { validateCompiled } from "../../src/artifacts/validate";
 import type { ValidationReport } from "../../src/artifacts/contracts";
 import type { ArtifactPackage } from "../../src/artifacts/package";
 import { componentsOfKind, projectPackage } from "../../src/artifacts/project";
-import type { StudioArtifact, StudyGuideContent } from "../studio/contracts";
+import type { InfographicContent, StudioArtifact, StudyGuideContent } from "../studio/contracts";
 import { ActivitySpecSchema, type ActivitySpec } from "../../src/learning/activities/contracts";
 
 export type CompilePackageContext = {
@@ -38,7 +38,7 @@ function deriveBrief(pkg: ArtifactPackage, ctx: CompilePackageContext): Artifact
   const mindmap = componentsOfKind(pkg, ["mind-map"])[0];
 
   let figure: ArtifactBrief["artifact"]["figure"];
-  if (diagram) {
+  if (diagram && pkg.format !== "infographic") {
     figure = {
       kind: "freebody", title: diagram.title,
       forces: diagram.forces?.map((force) => ({
@@ -134,6 +134,26 @@ function consumedCanvasIds(pkg: ArtifactPackage, brief: ArtifactBrief): string[]
 }
 
 function buildStudio(pkg: ArtifactPackage, ctx: CompilePackageContext): StudioArtifact | undefined {
+  const shared = {
+    id: newId("studio-artifact"), courseId: ctx.courseId, lessonId: ctx.lessonId,
+    sourceRefs: [...new Set(pkg.components.flatMap((component) => component.sourceRefs))],
+    createdAt: new Date().toISOString(),
+  };
+  const diagrams = componentsOfKind(pkg, ["diagram"]);
+  if (pkg.format === "infographic" && diagrams.length) {
+    const diagram = diagrams[0];
+    const content: InfographicContent = {
+      title: diagram.title,
+      objective: pkg.objective,
+      diagram: {
+        title: diagram.title,
+        ...(diagram.surfaceAngleDeg === undefined ? {} : { surfaceAngleDeg: diagram.surfaceAngleDeg }),
+        forces: diagram.forces ?? [],
+      },
+      sourceRefs: [...new Set([...diagram.sourceRefs, ...shared.sourceRefs])],
+    };
+    return { ...shared, kind: "infographic", title: content.title, content };
+  }
   const summaries = componentsOfKind(pkg, ["summary"]);
   if (!summaries.length) return undefined;
   const content: StudyGuideContent = {
@@ -144,12 +164,7 @@ function buildStudio(pkg: ArtifactPackage, ctx: CompilePackageContext): StudioAr
     }))),
     keyTerms: [],
   };
-  return {
-    id: newId("studio-artifact"), courseId: ctx.courseId, lessonId: ctx.lessonId,
-    kind: "study-guide", title: content.title, content,
-    sourceRefs: [...new Set(pkg.components.flatMap((component) => component.sourceRefs))],
-    createdAt: new Date().toISOString(),
-  };
+  return { ...shared, kind: "study-guide", title: content.title, content };
 }
 
 function buildLearning(pkg: ArtifactPackage, ctx: CompilePackageContext): ActivitySpec | undefined {

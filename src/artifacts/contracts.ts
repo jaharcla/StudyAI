@@ -30,6 +30,29 @@ export type ValidationProblem = {
 
 export type ValidationReport = { ok: boolean; problems: ValidationProblem[] };
 
+/** One renderer per component. The map is the shared ownership authority used by compilePackage. */
+export const ARTIFACT_RENDERERS = ["canvas", "studio", "learning"] as const;
+export type ArtifactRenderer = (typeof ARTIFACT_RENDERERS)[number];
+
+export const COMPONENT_OWNERS: Readonly<Record<string, ArtifactRenderer>> = Object.freeze({
+  explanation: "canvas",
+  "worked-example": "canvas",
+  diagram: "canvas",
+  equation: "canvas",
+  graph: "canvas",
+  question: "canvas",
+  flashcard: "canvas",
+  "mind-map": "canvas",
+  summary: "studio",
+  "interactive-exercise": "learning",
+});
+
+/** An infographic is the studio projection of a diagram; otherwise a diagram belongs to the board. */
+export function componentOwner(kind: string, format?: string): ArtifactRenderer | undefined {
+  if (format === "infographic" && kind === "diagram") return "studio";
+  return COMPONENT_OWNERS[kind];
+}
+
 export type ValidationContext = {
   objects: readonly ScientificObject[];
   brief: ArtifactBrief;

@@ -1,18 +1,18 @@
+import { COMPONENT_OWNERS, componentOwner } from "./contracts";
 import type { ArtifactComponent, ArtifactPackage } from "./package";
 
 export type ProjectionTargets = { canvas: string[]; studio: string[]; learning: string[] };
 
-const CANVAS_KINDS = new Set<ArtifactComponent["kind"]>([
-  "question", "worked-example", "flashcard", "diagram", "graph", "equation", "mind-map",
-]);
+/** Every advertised component kind, so a renderer-ownership test can cover the schema exhaustively. */
+export const OWNED_KINDS = Object.keys(COMPONENT_OWNERS) as ArtifactComponent["kind"][];
 
-/** Pure ownership map. A component appears in exactly one renderer's list. */
+/** Pure ownership map. A component appears in exactly one renderer's list, never zero or two. */
 export function projectPackage(pkg: ArtifactPackage): ProjectionTargets {
   const targets: ProjectionTargets = { canvas: [], studio: [], learning: [] };
   for (const component of pkg.components) {
-    if (CANVAS_KINDS.has(component.kind) || component.kind === "explanation") targets.canvas.push(component.id);
-    else if (component.kind === "summary") targets.studio.push(component.id);
-    else targets.learning.push(component.id);
+    const owner = componentOwner(component.kind, pkg.format);
+    if (!owner) throw new Error(`Component "${component.id}" of kind "${component.kind}" has no renderer.`);
+    targets[owner].push(component.id);
   }
   return targets;
 }

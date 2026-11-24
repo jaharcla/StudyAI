@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { claimProvenanceSchema } from "./contracts";
+import { claimProvenanceSchema, componentOwner } from "./contracts";
+import type { RetrievedEvidence } from "./context";
 
 const finite = z.number().finite().min(-1_000_000).max(1_000_000);
 const componentBase = {
@@ -63,6 +64,8 @@ export const artifactPackageSchema = z.object({
   objective: z.string().min(1).max(280),
   courseId: z.string().min(1).max(200),
   lessonId: z.string().min(1).max(200),
+  /** Optional presentation intent: routes a diagram to the infographic studio projection. */
+  format: z.enum(["study-guide", "infographic"]).optional(),
   components: z.array(artifactComponentSchema).max(20),
   outcome: z.object({
     status: z.literal("insufficient-source"),
@@ -82,15 +85,46 @@ export type ArtifactComponent = z.infer<typeof artifactComponentSchema>;
 export type ComponentRelation = z.infer<typeof componentRelationSchema>;
 export type ArtifactPackage = z.infer<typeof artifactPackageSchema>;
 
-/** Parse a package against the refs actually retrieved this turn, then validate its relation graph. */
-export function parseArtifactPackage(value: unknown, retrievedRefs: readonly string[]): ArtifactPackage {
+/**
+ * Parse a package against the refs actually retrieved this turn, then enforce the shared
+ * contract: every ref/claim ref was retrieved, every direct claim is contained in its chunk,
+ * and every component has exactly one renderer. `retrievedChunks` is the containment authority;
+ * callers that only have refs still get the ref and ownership checks.
+ */
+export function parseArtifactPackage(
+  value: unknown,
+  retrievedRefs: readonly string[],
+  retrievedChunks?: readonly RetrievedEvidence[],
+): ArtifactPackage {
   const pkg = artifactPackageSchema.parse(value);
   const ids = new Set<string>();
   for (const component of pkg.components) {
     if (ids.has(component.id)) throw new Error(`Duplicate component id: ${component.id}`);
     ids.add(component.id);
+    if (!componentOwner(component.kind, pkg.format)) {
+      throw new Error(`Component "${component.id}" of kind "${component.kind}" has no renderer.`);
+    }
     for (const ref of component.sourceRefs) {
       if (!retrievedRefs.includes(ref)) throw new Error(`sourceRef "${ref}" was not retrieved this turn.`);
+    }
+  }
+  const claims = [
+    ...pkg.components.flatMap((component) => component.claims ?? []),
+    ...(pkg.provenance.claims ?? []),
+  ];
+  for (const claim of claims) {
+    if (!retrievedRefs.includes(claim.sourceRef)) {
+      throw new Error(`Claim sourceRef "${claim.sourceRef}" was not retrieved this turn.`);
+    }
+  }
+  if (retrievedChunks) {
+    const textByRef = new Map(retrievedChunks.map((chunk) => [chunk.ref, chunk.text]));
+    for (const claim of claims) {
+      if (claim.relationship !== "direct") continue;
+      const text = textByRef.get(claim.sourceRef);
+      if (text === undefined || !text.includes(claim.excerpt)) {
+        throw new Error(`Direct claim "${claim.claim}" has no excerpt containment in retrieved chunk "${claim.sourceRef}".`);
+      }
     }
   }
   const edges = new Map<string, string[]>();
