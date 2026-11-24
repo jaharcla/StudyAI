@@ -1,0 +1,112 @@
+.canvas-board > .narration-open {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 12;
+  width: auto;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid #e3d5c4;
+  border-radius: 7px;
+  background: #fffaf4;
+  color: #8a4f31;
+  font: 600 12px/1.2 Arial, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(60, 40, 20, .08);
+}
+.canvas-board > .narration-open:hover:not(:disabled) { background: #f6ead9; }
+.canvas-board > .narration-open:disabled { opacity: .5; cursor: not-allowed; }
+
+.narration-highlights {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-board > .narration-panel {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 11;
+  width: 340px;
+  max-width: calc(100% - 24px);
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e6e0d7;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .97);
+  box-shadow: 0 8px 28px rgba(60, 45, 30, .16);
+  backdrop-filter: blur(4px);
+  font: 12px/1.45 Arial, sans-serif;
+  color: #303640;
+}
+.narration-panel header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.narration-panel header div { display: flex; flex-direction: column; }
+.narration-panel header strong { font-size: 13px; }
+.narration-panel header span { color: #737b86; font-size: 11px; }
+.narration-notice { margin: 0; padding: 7px 9px; border-radius: 6px; background: #fff7e6; color: #8a5a15; }
+.narration-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.narration-controls button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+.narration-controls .button-primary { border: 1px solid #8a4f31; background: #8a4f31; color: #fff; }
+.narration-controls .button-soft { border: 1px solid #dedfe3; background: #fff; color: #4b515b; }
+.narration-controls button:disabled { opacity: .5; cursor: not-allowed; }
+.narration-controls label { margin-left: auto; color: #737b86; }
+.narration-controls select { margin-left: 4px; padding: 3px 5px; border: 1px solid #dedfe3; border-radius: 5px; background: #fff; font: inherit; }
+.narration-progress { display: flex; gap: 5px; }
+.narration-progress button { flex: 1; height: 4px; padding: 0; border: 0; border-radius: 3px; background: #e6e8eb; cursor: pointer; }
+.narration-progress button.current { background: #d97706; }
+.narration-caption {
+  margin: 0;
+  min-height: 62px;
+  padding: 9px 11px;
+  border-left: 3px solid #d97706;
+  border-radius: 0 6px 6px 0;
+  background: #faf7f2;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.narration-transcript { flex: 1; min-height: 0; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.narration-transcript li + li { border-top: 1px solid #f0f0f2; }
+.narration-transcript button {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 5px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.narration-transcript button:hover { background: #f8f6f2; }
+.narration-transcript button[data-active="true"] { border-left-color: #d97706; background: #fff8ed; }
+.narration-cue-index { flex: 0 0 18px; color: #a1a7b0; font-variant-numeric: tabular-nums; }
+.narration-cue-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.narration-cue-label { font-weight: 700; }
+.narration-cue-text { color: #5f6670; }
+.narration-grounding, .narration-source {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.narration-grounding.board { background: #eaf6ee; color: #2f6b43; }
+.narration-grounding.general { background: #eaf1fb; color: #355b8e; }
+.narration-grounding.generated { background: #fff1dd; color: #8a5a15; }
+.narration-grounding.no-evidence { background: #fdeaea; color: #9b3030; }
+.narration-source { background: #f0f0f2; color: #5f6670; margin-left: 4px; }
+.narration-panel footer { color: #9a9fa8; font-size: 10px; }
