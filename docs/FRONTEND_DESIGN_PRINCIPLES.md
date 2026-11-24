@@ -6,6 +6,10 @@ Owner instruction, 2026-11-23: all agents working on frontend must follow modern
 
 StudyAI's app surfaces are **Operate** — the student is completing a task. Clarity, scanability, consistency and the real usage scene outrank expression. Brand lives in precise details, not decoration.
 
+## Audience and taste
+
+The product is for students, many of them Gen Z, but the design must not perform a generation. Bright gradients, mascots, forced playfulness, slang copy and trend-chasing are not the brief. What students actually want from a study tool is speed, low friction, clarity, control, honest feedback, and an interface that respects their intelligence. Visual pleasure comes from craft — typography, spacing, depth, restraint, and motion that means something — not from aesthetic pandering. Know the audience; do not caricature it.
+
 ## Non-negotiable craft floor
 
 - **Contrast:** body and placeholder text ≥4.5:1, large text ≥3:1. On coloured surfaces, tint secondary text from that hue or the foreground — never neutral gray.
