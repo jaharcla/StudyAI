@@ -37,6 +37,16 @@ Motion explains state, relationship and hierarchy. It never gates the UI or make
 - A splash screen or page-load choreography.
 - A new Coach, hint, next-action or due-task card — the app has one unified Coach stream.
 
+## Critique is part of the work
+
+No UI is considered finished on the builder's own say-so. Every frontend worker must:
+
+- run an inline critique of its own result against this document before reporting completion, and state the three strongest objections a critic would raise;
+- keep the output reviewable — screenshots, DOM assertions and `npm run verify` output in the thread — so the coordinator can run a separate **native** critique thread on it;
+- treat critique findings as work items, not suggestions, and re-verify after acting on them.
+
+Critique agents are native thread agents only. The subagent tool stays banned, including any skill workflow that asks for a builder-check or review subagent; do the check inline or report the gap.
+
 ## Verification, not intention
 
 - Judge the actual render at shipped sizes, light and dark, before and after.
