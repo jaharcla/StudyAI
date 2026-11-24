@@ -14,6 +14,7 @@ import { getModelStatus } from "./models.js";
 import { LearningService } from "./learning/service.js";
 import { getCourseProgress } from "./progress.js";
 import { getRecommendations } from "./recommendations.js";
+import { buildDailyPlan } from "./daily-plans.js";
 import { buildConceptGraph } from "./concept-graph.js";
 import { createLearningHandler } from "./learning/http.js";
 import { createStudioHandler } from "./studio/http.js";
@@ -266,6 +267,11 @@ const server = createServer(async (req, res) => {
     const course = url.searchParams.get("course") ?? "";
     if (!course) return json(res, 400, { error: "course is required." });
     return json(res, 200, { recommendations: getRecommendations(db, course, url.searchParams.get("lesson") ?? "") });
+  }
+  if (req.method === "GET" && url.pathname === "/api/daily-plans") {
+    const course = url.searchParams.get("course") ?? "";
+    if (!course) return json(res, 400, { error: "course is required." });
+    return json(res, 200, buildDailyPlan(db, course, new Date(), url.searchParams.get("lesson") ?? ""));
   }
   if (req.method === "GET" && url.pathname === "/api/search") {
     const query = url.searchParams.get("q") ?? "";

@@ -26,14 +26,14 @@ const DocumentLibrary = lazy(() => import("./components/document-intelligence").
 import { API, CREDITS_API } from "./api";
 import { Streamdown, defaultRemarkPlugins, defaultRehypePlugins } from "streamdown";
 import { useCoach } from "./coach/useCoach";
-import { recommendationProducer } from "./coach/recommendationProducer";
+import { dailyPlanProducer } from "./coach/dailyPlanProducer";
 import { registerCoachProducer } from "./coach/service";
 import { studyPreparationResult, type CoachPreparationResult, type CoachTarget } from "./coach/contract";
 
 // Paid rail is dormant (PRODUCT_ROADMAP, 2026-11-23). Off unless explicitly enabled.
 const PAID_ENABLED = import.meta.env.VITE_STUDYAI_PAID_ENABLED === "1";
 // Features only register producers; the Coach surface and activation live in src/coach.
-registerCoachProducer(recommendationProducer);
+registerCoachProducer(dailyPlanProducer);
 import "katex/dist/katex.min.css";
 
 type Course = { id: string; title: string; code: string; color: string };
