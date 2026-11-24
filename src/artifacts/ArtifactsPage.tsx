@@ -22,6 +22,7 @@ type Props = {
   close: () => void;
   onOpenSource: (sourceRef: string) => void;
   onOpenStudio: () => void;
+  initialDeckId?: string;
 };
 
 type Notice = { tone: "info" | "error" | "success"; text: string };
@@ -43,7 +44,7 @@ function deckFileName(title: string): string {
   return `${slug || "study-deck"}.pptx`;
 }
 
-export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenSource, onOpenStudio }: Props) {
+export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenSource, onOpenStudio, initialDeckId }: Props) {
   const [items, setItems] = useState<SlideDeckArtifact[]>([]);
   const [selected, setSelected] = useState<SlideDeckArtifact | undefined>();
   const [filter, setFilter] = useState("");
@@ -57,10 +58,21 @@ export default function ArtifactsPage({ courseId, lessonId, courseTitle, lessonT
 
   const refresh = useCallback(() => {
     void listSlideDecks(courseId)
-      .then(setItems)
+      .then((decks) => {
+        setItems(decks);
+        if (initialDeckId) {
+          const found = decks.find((d) => d.id === initialDeckId);
+          if (found) {
+            setSelected(found);
+            setRename(found.title);
+            setConfirmDelete(false);
+            setNotice(undefined);
+          }
+        }
+      })
       .catch((error: unknown) => setNotice({ tone: "error", text: studentMessage(error) }))
       .finally(() => setBusy(undefined));
-  }, [courseId]);
+  }, [courseId, initialDeckId]);
 
   useEffect(refresh, [refresh]);
 

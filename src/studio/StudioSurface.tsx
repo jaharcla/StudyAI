@@ -47,9 +47,11 @@ type Props = {
   onOpenDecks: () => void;
   /** Optional material focus prepared by the Coach from a cited source. */
   initialFocus?: string;
+  /** Optional artifact to select when the library hands off. */
+  initialArtifactId?: string;
 };
 
-export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, onOpenDecks, initialFocus = "" }: Props) {
+export default function StudioSurface({ courseId, lessonId, courseTitle, lessonTitle, onOpenSource, close, onOpenDecks, initialFocus = "", initialArtifactId }: Props) {
   const [kind, setKind] = useState<StudioKind>("mind-map");
   const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
@@ -66,9 +68,16 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
 
   useEffect(() => {
     let live = true;
-    void listArtifacts(courseId, lessonId).then((items) => { if (live) setHistory(items); }).catch(() => { if (live) setHistory([]); });
+    void listArtifacts(courseId, lessonId).then((items) => {
+      if (!live) return;
+      setHistory(items);
+      if (initialArtifactId) {
+        const found = items.find((item) => item.id === initialArtifactId);
+        if (found) setArtifact(found);
+      }
+    }).catch(() => { if (live) setHistory([]); });
     return () => { live = false; };
-  }, [courseId, lessonId]);
+  }, [courseId, lessonId, initialArtifactId]);
 
   const generate = async () => {
     setBusy(true); setError(""); setNotice(""); setErrorAction("generate");
