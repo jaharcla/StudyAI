@@ -106,6 +106,22 @@ test("PDF import → index → tutor citation → Lewis edit → save → reload
   expect(errors).toEqual([]);
 });
 
+test("lesson notes persist when Done is clicked immediately", async ({ page, request }) => {
+  test.setTimeout(120_000);
+  const { course, lesson } = await createCourseWithLesson(request, `Notes immediate Done ${Date.now()}`, "Notes lesson");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const notesLoaded = page.waitForResponse((response) => response.url().includes("/api/notes?") && response.request().method() === "GET");
+  await selectCourseOnPage(page, course.title);
+  await notesLoaded;
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Lesson notes" });
+  await expect(modal).toBeVisible();
+  await modal.locator("textarea").fill("Immediate Done must not drop this text");
+  await modal.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  await expect.poll(async () => (await (await request.get(`/api/notes?course=${course.id}&lesson=${lesson.id}`)).json())[0]?.body).toBe("Immediate Done must not drop this text");
+});
+
 test("canvas API rejects cross-course reads, writes, deletes and invalid lessons", async ({ request }) => {
   const { course, lesson } = await createCourseWithLesson(request);
   const otherCourse = await createCourse(request, `Second course ${Date.now()}`);
