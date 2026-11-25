@@ -2,6 +2,7 @@
 import { Store, hitShape, pageBounds, type Diff, type DiffSource, type ShapeRecord } from "@quickdrawjs/core";
 import { Quickdraw, type Editor, type QuickdrawRef } from "@quickdrawjs/react";
 import { parseCanvasCitation } from "./citation-focus";
+import { displayNames, objectName } from "./naming";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { CanvasAnalysisResult } from "../../server/canvas-analysis/contract.js";
 import { API } from "../api";
@@ -43,11 +44,6 @@ type ExampleSession = { exampleId: string; states: CompiledExampleState[]; playe
 type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
 type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; onSelectedObject?: (object: { id: string; name: string } | null) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean; focusCitation?: { ref: string; key: number } };
 
-function selectedObjectName(object: ScientificObject): string {
-  const fields = object as unknown as Record<string, unknown>;
-  const name = ["label", "name", "title"].map((key) => fields[key]).find((value) => typeof value === "string" && value.trim());
-  return typeof name === "string" ? name.trim().slice(0, 80) : object.kind;
-}
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 // Quickdraw's own tool shortcuts (editor.js toolKeys) switch tools without
 // ending an active pointer session; match the set so we can close it first.
@@ -191,13 +187,15 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [analysisTelemetry, setAnalysisTelemetry] = useState<AnalysisTelemetry>();
   const [allowImageEgress, setAllowImageEgress] = useState(() => { try { return localStorage.getItem("studyai.canvas.imageEgress") !== "off"; } catch { return true; } });
   const [proposalBusy, setProposalBusy] = useState(false);
+  const names = useMemo(() => displayNames(document.objects), [document.objects]);
   useEffect(() => setToolOpen(!activityMode), [activityMode]);
   // Step descriptors are view state, not persisted board data; a board switch drops the rail.
   useEffect(() => { setExampleSession(undefined); }, [activeBoard?.id]);
-  useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), freehand: "Uninterpreted Quickdraw snapshot" } });
+  useAgentContext({ description: "StudyAI active scientific canvas objects", value: { boardId: activeBoard?.id ?? "", courseId, lessonId, objects: loading ? [] : document.objects.map((object) => ({ ...(object.kind === "equation" && object.mathWorkspace ? { ...object, mathWorkspace: tutorMathWorkspace(object.mathWorkspace) } : object), displayName: names.get(object.id) ?? objectName(object) })), freehand: "Uninterpreted Quickdraw snapshot" } });
   const currentSelection = document.objects.find((object) => object.id === selectedId);
-  useAgentContext({ description: "StudyAI selected scientific object", value: currentSelection ? { selected: true, objectId: currentSelection.id, name: selectedObjectName(currentSelection), kind: currentSelection.kind, boardId: activeBoard?.id ?? "", courseId, lessonId } : { selected: false, courseId, lessonId } });
-  useEffect(() => { onSelectedObject?.(currentSelection ? { id: currentSelection.id, name: selectedObjectName(currentSelection) } : null); }, [currentSelection, onSelectedObject]);
+  const selectedName = currentSelection ? names.get(currentSelection.id) ?? objectName(currentSelection) : undefined;
+  useAgentContext({ description: "StudyAI selected scientific object", value: currentSelection && selectedName ? { selected: true, objectId: currentSelection.id, name: selectedName, kind: currentSelection.kind, boardId: activeBoard?.id ?? "", courseId, lessonId } : { selected: false, courseId, lessonId } });
+  useEffect(() => { onSelectedObject?.(currentSelection && selectedName ? { id: currentSelection.id, name: selectedName } : null); }, [currentSelection, selectedName, onSelectedObject]);
   useEffect(() => {
     if (!focusCitation || focusCitation.key === handledFocusKey.current || loading || !activeBoard) return;
     const citation = parseCanvasCitation(focusCitation.ref);

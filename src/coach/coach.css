@@ -166,7 +166,7 @@
 .dark .coach-secondary li + li { border-color: #333e4d; }
 
 @media (prefers-reduced-motion: no-preference) {
-  .coach-dock { animation: coach-enter 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+  .coach-dock { animation: coach-enter var(--motion-slow) cubic-bezier(0.16, 1, 0.3, 1); }
   .coach-more[aria-expanded="true"] svg { transition: transform 140ms ease; }
 }
 @keyframes coach-enter {

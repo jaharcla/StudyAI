@@ -12,7 +12,7 @@
 .practice-test-number{display:grid;flex:0 0 21px;place-items:center;height:21px;border-radius:6px;background:#f2eeeb;color:#7a4a30;font-size:10px}
 .practice-test-concept{margin:0 0 9px 29px;color:#8a4f31;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .practice-test-choices{display:grid;gap:6px;margin-left:29px}
-.practice-test-choice{padding:8px 10px;border:1px solid #e7e9ed;border-radius:6px;background:#fff;color:#4d5561;text-align:left;font:11px Arial,sans-serif;cursor:pointer;transition:background 180ms ease,border-color 180ms ease}
+.practice-test-choice{padding:8px 10px;border:1px solid #e7e9ed;border-radius:6px;background:#fff;color:#4d5561;text-align:left;font:11px Arial,sans-serif;cursor:pointer;transition:background var(--motion-fast) ease,border-color var(--motion-fast) ease}
 .practice-test-choice:hover:not(:disabled){background:#f7f4f1;border-color:#d9b8a5}
 .practice-test-choice.selected{border-color:#ab7255;background:#f5eee9;color:#7a4a30;font-weight:700}
 .practice-test-choice.answer{border-left:3px solid #75a889}
