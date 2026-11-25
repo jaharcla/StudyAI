@@ -58,7 +58,7 @@ Keep these links; install and actually use them if RAM or performance dips again
 - Uninterrupted J1–J7 proof: `tests/e2e/journey-uninterrupted.spec.ts` with 13 ordered screenshots.
 
 ## Open goals
-- Execute the one-drop start plan task by task; no merge before `tsc -b`, Vitest and targeted Playwright pass.
-- Queued after the one-drop plan (user asked on 2026-11-25): fix the two mock-student defects — canvas inspection refuses a moderately populated board (3/3 attempts), and Notes autosave drops text when Done is clicked immediately.
+- One-drop start plan merged into main on 2026-11-25 after green full gate (`tsc -b`, Vitest 918, Playwright 151 passed, 13-screenshot journey). Verification report: `docs/verification/2026-11-25-one-drop-start.md`. Next-Lesson Pre-flight was merged earlier the same day.
+- The two mock-student defects (canvas inspection refusing a populated board, Notes autosave dropping text on immediate Done) were fixed by the Creative Muse worker but remain uncommitted in `feat/creative-muse`; they are not merged. Live-provider behavior of the canvas fix is still unconfirmed.
 - Live-provider tutor turn remains unverified locally: no BYOK key configured.
 - ChatGPT upload limit (~18h from 2026-11-25 09:00) still blocks attaching ten walkthrough screenshots.
