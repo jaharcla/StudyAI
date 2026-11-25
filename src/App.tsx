@@ -86,6 +86,7 @@ function CustomMarkdownRenderer(props: { content: string; messageId?: string }) 
 
 function Workspace() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [coursesLoaded, setCoursesLoaded] = useState(false);
   const [course, setCourse] = useState(noCourse);
   const [courseError, setCourseError] = useState("");
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -300,12 +301,13 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     fetch(`${API}/courses`).then(async (response) => { if (!response.ok) throw new Error("Local storage is unavailable."); return response.json() as Promise<Course[]>; }).then((rows) => {
       if (!live) return;
       setCourses(rows);
+      setCoursesLoaded(true);
       const selected = selectCourse(rows, localStorage.getItem("studyai.course")) ?? noCourse;
       setCourse(selected);
       if (selected.id) localStorage.setItem("studyai.course", selected.id);
       setCourseError("");
       setStatus(rows.length ? "Local storage connected" : "No courses yet");
-    }).catch((error) => { if (live) { setCourses([]); setCourse(noCourse); setCourseError(error instanceof Error ? error.message : "Could not load courses."); setStatus("Local storage unavailable"); } });
+    }).catch((error) => { if (live) { setCourses([]); setCoursesLoaded(true); setCourse(noCourse); setCourseError(error instanceof Error ? error.message : "Could not load courses."); setStatus("Local storage unavailable"); } });
     fetch(`${API}/models`).then(async (response) => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Ollama is unavailable.");
@@ -579,6 +581,14 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   const nextSurface = (["study", "studio", "concepts"] as const).find((key) => surfaceHasWork[key]) ?? "canvas";
   const surfaceLabels = { canvas: "Canvas", study: "Study", studio: "Studio", concepts: "Concepts" } as const;
 
+  // A truly empty workspace gets one surface. The canvas, toolbar and Tutor are
+  // created only after a source exists, so nothing competes with the drop zone.
+  if (coursesLoaded && !course.id && courses.length === 0) {
+    return <div className={`app-shell one-drop-shell ${dark ? "dark" : ""}`}>
+      <main className="main-area"><OneDropSurface onReady={(context) => void handleOneDropReady(context)} /></main>
+    </div>;
+  }
+
   return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={tutorStatus?.model || selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<LibraryArtifactTool courseId={course.id} lessonId={lessonId} /><div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""} ${tutor ? "tutor-open" : ""}`} style={{ "--tutor-width": `${tutorWidth}px` } as React.CSSProperties}>
     {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar" inert={!sidebar}>
       <div className="brand-row"><div className="brand-mark"><Sparkles size={17} /></div><span>study<span className="brand-ai">ai</span></span><button className="icon-button sidebar-close" onClick={() => setSidebar(false)} title="Collapse sidebar"><ChevronLeft size={16} /></button></div>
@@ -606,7 +616,6 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
         <button type="button" className="surface-next-chip" data-testid="surface-next" data-target={nextSurface} title={`Next: ${surfaceLabels[nextSurface]}`} onClick={() => setMode(nextSurface)}><span>Next</span><b>{surfaceLabels[nextSurface]}</b><ChevronRight size={13} /></button>
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setTutor(!tutor)} title="Toggle study tutor"><Sparkles size={15} /></button><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => setHelpOpen(true)} title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
-      {!course.id && <OneDropSurface onReady={(context) => void handleOneDropReady(context)} />}
       {course.id && lessonId && mode === "canvas" && coach.prompts.length > 0 && <TodayStrip prompts={coach.prompts} onPrepare={prepareCoachTarget} onStatus={setTodayNotice} onOpenToday={() => setMode("today")} />}
       <section className="lesson-header"><div><div className="eyebrow"><span className="eyebrow-icon"><Atom size={14} /></span>{course.title || "COURSE"}</div><h1>{lessonTitle || (course.id ? "Choose a lesson" : "Create a course")}</h1><select aria-label="Active lesson" tabIndex={-1} value={lessonId} disabled={!lessons.length} onChange={(event) => changeLesson(event.target.value)}>{lessons.map((item) => <option key={item.id} value={item.id}>{humanizeLessonTitle(item.title)}</option>)}</select><p>{lessonTitle ? `Study materials, notes, and canvas for ${lessonTitle}.` : lessonError || "Select or create a lesson to start studying."}</p></div><button className="button-soft" tabIndex={-1} disabled={!course.id || !lessonId} onClick={() => setMode("study")}><Brain size={15} /> Study this lesson</button></section>
       <section className="workspace-toolbar"><div className="view-switch">{(["Canvas", "Lecture", "Split"] as View[]).map((item) => <button key={item} className={view === item ? "current" : ""} onClick={() => setView(item)}>{item === "Canvas" ? <Layers size={14} /> : item === "Lecture" ? <BookOpen size={14} /> : <PanelRightOpen size={14} />}{item}</button>)}</div><div className="toolbar-actions">{studyReturn && <button className="tool-chip study-return" onClick={() => { setStudyReturn(false); setMode("study"); }}><ChevronLeft size={14} /> Back to study session</button>}<button className="tool-chip" disabled={!course.id || !lessonId} onClick={() => setActivityLibraryOpen(true)}><Activity size={14} /> Activities</button><button className="tool-chip active" disabled={!course.id || !lessonId} onClick={() => setNoteOpen(true)}><FileText size={14} /> Notes</button><button className="tool-chip" onClick={() => setScienceTool("chem")}><Atom size={14} /> Chemistry</button><button className="icon-button" onClick={() => setView("Lecture")} title="Open document library"><BookOpen size={16} /></button></div></section>
