@@ -23,7 +23,8 @@ test("a quiz request in Tutor chat creates a real artifact in the shared Library
   await page.route("**/api/studio/import", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ cardsAdded: 1, questionsAdded: 1, errors: [] }) }));
   await openWithSeam(page, course.title);
 
-  const result = await page.evaluate(async () => (window as Window & { __studyaiMakeLibraryArtifact: Seam }).__studyaiMakeLibraryArtifact({ kind: "quiz", focus: "equilibrium", count: 2 }));
+  const result = await page.evaluate(async () => (window as Window & { __studyaiMakeLibraryArtifact?: Seam }).__studyaiMakeLibraryArtifact?.({ kind: "quiz", focus: "equilibrium", count: 2 }));
+  if (!result) throw new Error("The Library artifact tool did not respond.");
   expect(result.status).toBe("ok");
   expect(result.message).toContain("Library");
 
@@ -40,7 +41,8 @@ test("a failed generation reports honestly and leaves the Library unchanged", as
   await page.route("**/api/studio/artifacts**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await openWithSeam(page, course.title);
 
-  const result = await page.evaluate(async () => (window as Window & { __studyaiMakeLibraryArtifact: Seam }).__studyaiMakeLibraryArtifact({ kind: "cards", focus: "equilibrium" }));
+  const result = await page.evaluate(async () => (window as Window & { __studyaiMakeLibraryArtifact?: Seam }).__studyaiMakeLibraryArtifact?.({ kind: "cards", focus: "equilibrium" }));
+  if (!result) throw new Error("The Library artifact tool did not respond.");
   expect(result.status).toBe("error");
   expect(result.message).toMatch(/isn't responding|unchanged/i);
 });
