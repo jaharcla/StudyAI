@@ -7,6 +7,7 @@
 
 ## Coordination preferences
 - Do not paste the user's messages verbatim into worker prompts. Write short, synthesized briefs that give the worker only what it needs. User corrected this on 2026-11-25.
+- If the user does not answer a request, keep working on every other front. When they return, append the still-unanswered request at the bottom of every reply, whatever the new request is. User instructed this on 2026-11-25. The currently unanswered request is whether to spec the bounded, typed JSON math-evaluation tool instead of Pyodide.
 
 ## Decisions
 - Preferred UX approach: one-drop start with progressive surfaces. Design: `docs/superpowers/specs/2026-11-25-one-drop-start-design.md`; plan: `docs/superpowers/plans/2026-11-25-one-drop-start.md`.
