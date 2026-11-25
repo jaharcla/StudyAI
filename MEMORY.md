@@ -18,6 +18,20 @@
 - The Unstuck skill in the MCP listing no longer exists in its source repo; these two were chosen as substitutes.
 - Not installed: LoopTroop, WildCrane, Shinobi, opencode-evolve, AutoIdeator (services, keys or autonomous loops conflicting with worker limits). Karpathy's autoresearch is a method, not an install.
 
+## Performance tools on call (user-supplied, 2026-11-25)
+Keep these links; install and actually use them if RAM or performance dips again. Do not install while the machine is healthy. Do not restart the bot to connect an MCP without a new explicit request.
+
+- Windows PC Optimizer skill: https://mcpmarket.com/tools/skills/windows-pc-optimizer
+- Windows 11 Performance Optimizer skill: https://mcpmarket.com/tools/skills/windows-11-performance-optimizer
+- Windows RAM Optimizer skill: https://mcpmarket.com/tools/skills/windows-ram-optimizer (installed as `memory`; bundled scripts were not included)
+- CPU/GPU Performance skill: https://mcpmarket.com/tools/skills/cpu-gpu-performance-optimizer (installed as `cpu-gpu-performance`)
+- ProcMon MCP: https://github.com/0xhackerfren/ProcMon-MCP (POC, admin, sensitive Windows internals)
+- Process Monitor MCP: https://mcpmarket.com/server/process-monitor
+- AppControl: https://www.appcontrol.com/
+- Windows MCP Server: https://windowsmcpserver.dev/
+- Windows Task Manager MCP: https://mcpmarket.com/es/server/windows-task-manager
+- Earlier Athola CPU/GPU skill page: https://skillselion.com/skills/athola/claude-night-market/cpu-gpu-performance
+
 ## Where things live
 - UI source of truth: `DESIGN.md` at repo root.
 - Coordination ledger and scorecard: `docs/FINAL_PUSH.md`.
