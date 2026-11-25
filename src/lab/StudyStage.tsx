@@ -12,11 +12,12 @@ type Props = {
   close: () => void;
   onOpenActivities: () => void;
   onOpenSources: () => void;
+  onOpenSource: (sourceRef: string) => void;
 };
 
 /** Conversation-first secondary surface. The study content is the real
  *  adaptive StudyPanel (questions, FSRS reviews, real course citations). */
-export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenActivities, onOpenSources }: Props) {
+export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenActivities, onOpenSources, onOpenSource }: Props) {
   const [mode, setMode] = useState<"quiz" | "activities" | "sources">("quiz");
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef);
@@ -45,7 +46,7 @@ export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitl
         />
         <div className="stage-body">
           <div style={{ width: "100%", maxWidth: 660, margin: "0 auto" }}>
-            <StudyPanel courseId={courseId} lessonId={lessonId} lessonTitle={lessonTitle} close={close} />
+            <StudyPanel courseId={courseId} lessonId={lessonId} lessonTitle={lessonTitle} close={close} onOpenSource={onOpenSource} />
             <p className="stage-tip">Questions and reviews come from your course sources. Ratings schedule the next review locally.</p>
           </div>
         </div>

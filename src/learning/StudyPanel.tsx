@@ -3,7 +3,9 @@ import { Brain, CheckCircle2, CircleAlert, RotateCcw, X } from "lucide-react";
 import "./study.css";
 import { API } from "../api";
 import QuestionAuthor from "./QuestionAuthor";
-import { makePractice } from "./make-practice";
+import { makePractice, makePracticeTest } from "./make-practice";
+import PracticeTestView from "./PracticeTestView";
+import type { StudioArtifact } from "../studio/api";
 
 type Source = { documentId: string; title: string; page: number | null; excerpt: string };
 type Question = { presentationId: string; questionId: string; version: number; conceptId: string; concept: string; prompt: string; choices: Array<{ id: string; text: string }>; source: Source };
@@ -16,7 +18,7 @@ function readyMessage(card: Record<string, unknown> | null) {
   catch { return "No answer is waiting for a rating. Ask a reviewed question to begin."; }
 }
 
-export function StudyPanel({ courseId, lessonId, lessonTitle, close }: { courseId: string; lessonId: string; lessonTitle: string; close: () => void }) {
+export function StudyPanel({ courseId, lessonId, lessonTitle, close, onOpenSource }: { courseId: string; lessonId: string; lessonTitle: string; close: () => void; onOpenSource: (sourceRef: string) => void }) {
   const [question, setQuestion] = useState<Question | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [cardId, setCardId] = useState("");
@@ -25,6 +27,7 @@ export function StudyPanel({ courseId, lessonId, lessonTitle, close }: { courseI
   const [busy, setBusy] = useState(false);
   const [authorOpen, setAuthorOpen] = useState(false);
   const [suggestion, setSuggestion] = useState<NoQuestions | null>(null);
+  const [testArtifact, setTestArtifact] = useState<StudioArtifact | null>(null);
   const scope = `course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`;
 
   async function resume() {
@@ -80,5 +83,18 @@ export function StudyPanel({ courseId, lessonId, lessonTitle, close }: { courseI
     await ask();
   }
 
-  return <div className="study-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><section className="study-panel" role="dialog" aria-modal="true" aria-labelledby="study-title"><header><span><Brain size={17} /> ADAPTIVE STUDY</span><button className="icon-button" onClick={close} aria-label="Close study"><X size={17} /></button></header><h2 id="study-title">{question?.prompt ?? (result ? "Review your answer" : "Study this lesson")}</h2>{question && <><p className="study-concept" data-testid="study-concept">{question.concept}</p><div className="study-choices">{question.choices.map((choice) => <button key={choice.id} className={selected === choice.id ? "selected" : ""} onClick={() => setSelected(choice.id)} disabled={busy}>{choice.text}</button>)}</div><p className="study-citation">Source: {question.source.title}{question.source.page ? `, p. ${question.source.page}` : ""}. {question.source.excerpt}</p><button className="button-primary" onClick={submit} disabled={!selected || busy}>Check answer</button></>}{result && <><p className={`study-result ${result.correct ? "correct" : "incorrect"}`}>{result.correct ? <CheckCircle2 size={16} /> : <CircleAlert size={16} />}{result.correct ? "Correct" : "Not quite"}</p><p>{result.explanation}</p><p className="study-mastery" data-testid="study-mastery">Concept mastery: {Math.round(result.mastery * 100)}%</p><p className="study-citation">Source: {result.source.title}{result.source.page ? `, p. ${result.source.page}` : ""}. {result.source.excerpt}</p><div className="study-ratings">{(["Again", "Hard", "Good", "Easy"] as const).map((rating) => <button key={rating} onClick={() => rate(rating)} disabled={busy}>{rating}</button>)}</div></>}{suggestion && !question && !result && <div className="study-empty" data-testid="study-no-questions"><p className="study-status">{suggestion.reason}</p>{suggestion.suggestedSource && <><p className="study-citation" data-testid="suggested-source">Start with {suggestion.suggestedSource.title}{suggestion.suggestedSource.page ? `, p. ${suggestion.suggestedSource.page}` : ""}: {suggestion.suggestedSource.excerpt.slice(0, 160)}</p><button className="button-primary" data-testid="author-from-source" onClick={() => setAuthorOpen(true)}>{suggestion.nextAction.label}</button></>}{!suggestion.suggestedSource && <p className="study-status">Import course material in the library to create a question.</p>}</div>}{status && <p className="study-status" aria-live="polite">{status}</p>}{!question && !result && <div className="study-actions"><button className="button-primary" onClick={makeQuiz} disabled={busy}>Make quiz</button><button className="button-soft" onClick={ask} disabled={busy}><RotateCcw size={14} /> Ask a reviewed question</button><details><summary>Advanced</summary><button className="button-soft" aria-label="Add a question by hand" onClick={() => setAuthorOpen(true)}>Add a question by hand</button></details></div>}{authorOpen && <QuestionAuthor courseId={courseId} lessonId={lessonId} initialSource={suggestion?.suggestedSource ?? null} close={() => setAuthorOpen(false)} onCreated={() => { void resume(); }} />}</section></div>;
+  async function startTest() {
+    setBusy(true); setStatus("Building a practice test from your course material…"); setQuestion(null); setResult(null);
+    try {
+      const artifact = await makePracticeTest({ courseId, lessonId, focus: lessonTitle });
+      setTestArtifact(artifact);
+      setStatus("Practice test saved to your library. Answer the questions, then check your work.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Your practice test couldn't be made. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="study-shade" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><section className="study-panel" role="dialog" aria-modal="true" aria-labelledby="study-title"><header><span><Brain size={17} /> ADAPTIVE STUDY</span><button className="icon-button" onClick={close} aria-label="Close study"><X size={17} /></button></header><h2 id="study-title">{question?.prompt ?? (result ? "Review your answer" : "Study this lesson")}</h2>{question && <><p className="study-concept" data-testid="study-concept">{question.concept}</p><div className="study-choices">{question.choices.map((choice) => <button key={choice.id} className={selected === choice.id ? "selected" : ""} onClick={() => setSelected(choice.id)} disabled={busy}>{choice.text}</button>)}</div><p className="study-citation">Source: {question.source.title}{question.source.page ? `, p. ${question.source.page}` : ""}. {question.source.excerpt}</p><button className="button-primary" onClick={submit} disabled={!selected || busy}>Check answer</button></>}{result && <><p className={`study-result ${result.correct ? "correct" : "incorrect"}`}>{result.correct ? <CheckCircle2 size={16} /> : <CircleAlert size={16} />}{result.correct ? "Correct" : "Not quite"}</p><p>{result.explanation}</p><p className="study-mastery" data-testid="study-mastery">Concept mastery: {Math.round(result.mastery * 100)}%</p><p className="study-citation">Source: {result.source.title}{result.source.page ? `, p. ${result.source.page}` : ""}. {result.source.excerpt}</p><div className="study-ratings">{(["Again", "Hard", "Good", "Easy"] as const).map((rating) => <button key={rating} onClick={() => rate(rating)} disabled={busy}>{rating}</button>)}</div></>}{suggestion && !question && !result && <div className="study-empty" data-testid="study-no-questions"><p className="study-status">{suggestion.reason}</p>{suggestion.suggestedSource && <><p className="study-citation" data-testid="suggested-source">Start with {suggestion.suggestedSource.title}{suggestion.suggestedSource.page ? `, p. ${suggestion.suggestedSource.page}` : ""}: {suggestion.suggestedSource.excerpt.slice(0, 160)}</p><button className="button-primary" data-testid="author-from-source" onClick={() => setAuthorOpen(true)}>{suggestion.nextAction.label}</button></>}{!suggestion.suggestedSource && <p className="study-status">Import course material in the library to create a question.</p>}</div>}{testArtifact && <div className="study-test"><PracticeTestView artifact={testArtifact} courseId={courseId} lessonId={lessonId} onOpenSource={onOpenSource} /><button type="button" className="button-soft" data-testid="close-practice-test" onClick={() => setTestArtifact(null)}>Back to study questions</button></div>}{status && <p className="study-status" aria-live="polite">{status}</p>}{!question && !result && <div className="study-actions"><button className="button-primary" onClick={makeQuiz} disabled={busy}>Make quiz</button><button className="button-soft" data-testid="make-practice-test" onClick={() => void startTest()} disabled={busy}>Practice test</button><button className="button-soft" onClick={ask} disabled={busy}><RotateCcw size={14} /> Ask a reviewed question</button><details><summary>Advanced</summary><button className="button-soft" aria-label="Add a question by hand" onClick={() => setAuthorOpen(true)}>Add a question by hand</button></details></div>}{authorOpen && <QuestionAuthor courseId={courseId} lessonId={lessonId} initialSource={suggestion?.suggestedSource ?? null} close={() => setAuthorOpen(false)} onCreated={() => { void resume(); }} />}</section></div>;
 }
