@@ -218,7 +218,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
               <div>
                 <strong>That didn't go through</strong>
                 <p>{error}</p>
-                <button type="button" className="studio-error-retry" onClick={retry}>Try again</button>
+                <button type="button" className="studio-error-retry" data-testid="studio-error-retry" onClick={retry}>Try again</button>
               </div>
             </div>
           )}

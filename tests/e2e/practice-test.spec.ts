@@ -93,7 +93,7 @@ test("checking grades locally against the stored key, with four choices and clic
   await page.screenshot({ path: "test-results/shots/practice-test-02-graded.png" });
 
   await page.getByTestId("practice-citation").first().click();
-  await expect(page.getByTestId("practice-test")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Document preview" })).toBeVisible();
   await page.screenshot({ path: "test-results/shots/practice-test-03-citation.png" });
 });
 
