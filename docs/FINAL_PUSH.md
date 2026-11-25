@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `0966464`. Last full `npm run verify` at `c465cfd` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 139 passed, 1 flaky (`tutor-round2-hygiene` selected object), 6 skipped (2026-11-25). Final verify pending after the guided-artifact and local-deck merges. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `59f02b1`. Final full `npm run verify` exit 0 on `d0f9430`: `tsc -b` clean, Vitest 140 files / 882 tests, Playwright 141 passed, 3 flaky (`canvas-physics-fbd` sliders, `canvas-visual-remediation` user-readiness, `math-workspace` Quickdraw), 6 skipped (2026-11-25). Voice branch after alignment: `tsc -b` clean, Vitest 144 files / 908 tests. No engine has been benchmarked yet. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -62,6 +62,9 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - `ee0775d` voice benchmark plan — https://critique.work/v/94e04a453b8b7a98d08e3e0b72d6054d
 - `24e4902` merge guided artifact routes — https://critique.work/v/3f4536ec5717cc3a188f8baf083bb083
 - `0966464` merge local deck pipeline — https://critique.work/v/16db8d637d0c91a01be19886b78cc9fc
+- `ada67cb` voice benchmark harness — https://critique.work/v/10e358c48371370451bc2ad98fceb3e3
+- `5eaf20b` align voice branch with main — https://critique.work/v/612265eb0b5d345883281adcefd36246
+- `59f02b1` merge voice benchmark harness — https://critique.work/v/8f8f935e35d2c382c416ab451939180b
 
 ## Workers and threads
 
@@ -78,7 +81,7 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - Uninterrupted J1–J7 journey run: https://discord.com/channels/1574451017817399346/1575001612894736504 — merged; live c121 PDF run with 13 ordered screenshots
 - Local decks and in-site slide viewer: https://discord.com/channels/1574451017817399346/1575037172128546816 — merged
 - Guided artifact creation: https://discord.com/channels/1574451017817399346/1575041473534238730 — merged
-- Voice benchmark harness: https://discord.com/channels/1574451017817399346/1575054063345606760 — running
+- Voice benchmark harness: https://discord.com/channels/1574451017817399346/1575054063345606760 — merged; tsc and Vitest clean, no engine measured
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
