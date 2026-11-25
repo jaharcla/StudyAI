@@ -34,30 +34,35 @@ async function seedObjects(request: APIRequestContext, course: { id: string }, l
   expect(saved.status()).toBe(200);
 }
 
-async function clickCanvasCitation(page: Page, ref: string, tag: string) {
-  await page.locator(".copilot-slot").evaluate((element, args) => {
+async function clickCanvasCitation(page: Page, ref: string) {
+  await page.locator(".copilot-slot").evaluate((element, sourceRef) => {
     const link = document.createElement("a");
-    link.href = `#studyai-citation=${args.ref}`;
+    link.href = `#studyai-citation=${sourceRef}`;
     link.textContent = "Cited canvas object";
-    link.dataset.testid = args.tag;
-    link.style.cssText = "position:fixed;top:80px;left:80px;z-index:99999;background:white;color:black;padding:6px";
     element.appendChild(link);
-  }, { ref, tag });
-  await page.getByTestId(tag).click();
+    link.click();
+    link.remove();
+  }, ref);
 }
 
 test("duplicate object labels are disambiguated by human name, never by id", async ({ page }) => {
   const { course, lesson } = await createCourseWithLesson(page.request, `Duplicate labels ${Date.now()}`, "Labelled board");
-  await seedObjects(page.request, course, lesson, [namedMolecule("dup-alpha", "Shared name"), namedMolecule("dup-beta", "Shared name")]);
   await openCourse(page, course.title);
   await expect(page.locator(".scientific-layer")).toBeVisible();
+  await seedObjects(page.request, course, lesson, [namedMolecule("dup-alpha", "Shared name"), namedMolecule("dup-beta", "Shared name")]);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator(".scientific-layer")).toBeVisible();
+  if (!(await page.locator(".tutor-panel").isVisible())) {
+    await page.getByRole("button", { name: "Toggle study tutor" }).click();
+  }
+  await expect(page.locator(".tutor-panel")).toBeVisible();
 
-  await clickCanvasCitation(page, "science:dup-alpha", "cite-first-duplicate");
+  await clickCanvasCitation(page, "science:dup-alpha");
   const card = page.getByTestId("selected-object-context");
   await expect(card).toContainText("Shared name (1 of 2)");
   await expect(card).not.toContainText("dup-alpha");
 
-  await clickCanvasCitation(page, "science:dup-beta", "cite-second-duplicate");
+  await clickCanvasCitation(page, "science:dup-beta");
   await expect(card).toContainText("Shared name (2 of 2)");
   await expect(card).not.toContainText("dup-beta");
   await page.screenshot({ path: "test-results/shots/canvas-duplicate-labels.png", fullPage: true });
@@ -83,9 +88,12 @@ test("shell motion uses the shared 180-220ms tokens and reverses cleanly", async
   expect(durations.scrim).toBeGreaterThanOrEqual(180);
   expect(durations.scrim).toBeLessThanOrEqual(220);
 
-  await toggle.click();
-  await toggle.click();
+  const scrim = page.locator(".sidebar-scrim");
+  if (await scrim.isVisible()) await scrim.click();
+  else await toggle.click();
   await expect(page.locator(".app-shell .sidebar")).toHaveCount(0);
+  await toggle.click();
+  await expect(page.locator(".app-shell .sidebar")).toBeVisible();
 });
 
 test("phone width keeps the board usable and the tutor dockable", async ({ page }) => {
