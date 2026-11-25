@@ -12,7 +12,8 @@ export function initializeStudioSchema(db: Database.Database): void {
       source_refs TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       collection TEXT NOT NULL DEFAULT '',
-      file_path TEXT NOT NULL DEFAULT ''
+      file_path TEXT NOT NULL DEFAULT '',
+      prompt TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS studio_artifacts_scope_idx ON studio_artifacts(course_id, lesson_id, kind, created_at DESC);
   `);
@@ -22,5 +23,6 @@ export function initializeStudioSchema(db: Database.Database): void {
   if (!has("collection")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN collection TEXT NOT NULL DEFAULT ''");
   if (!has("file_path")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN file_path TEXT NOT NULL DEFAULT ''");
   if (!has("acceptance")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN acceptance TEXT NOT NULL DEFAULT 'pending'");
+  if (!has("prompt")) db.exec("ALTER TABLE studio_artifacts ADD COLUMN prompt TEXT NOT NULL DEFAULT ''");
   db.exec("CREATE INDEX IF NOT EXISTS studio_artifacts_collection_idx ON studio_artifacts(course_id, collection, created_at DESC)");
 }
