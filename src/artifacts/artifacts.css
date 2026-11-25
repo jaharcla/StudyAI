@@ -82,3 +82,32 @@
 .slide-citation:hover { color: var(--art-accent, #8d583e); text-decoration: underline; }
 .slide-notes { color: var(--art-muted, #5f564a); font-size: 12px; margin: 10px 0 0; }
 .slide-notes strong { display: block; color: var(--art-ink, #2a2621); font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+.deck-detail-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.deck-viewer { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: var(--art-bg, #fffdf8); color: var(--art-ink, #2a2621); outline: none; }
+.deck-viewer-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-bottom: 1px solid var(--art-border, #ded7c9); }
+.deck-viewer-bar > div:first-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.deck-viewer-kicker { text-transform: uppercase; letter-spacing: .1em; font-size: 10px; color: var(--art-muted, #5f564a); }
+.deck-viewer-bar strong { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-viewer-tools { display: flex; align-items: center; gap: 12px; }
+.deck-viewer-count { font-size: 13px; color: var(--art-muted, #5f564a); font-variant-numeric: tabular-nums; }
+.deck-viewer-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--art-border, #ded7c9); background: var(--art-surface-2, #f4f2ec); color: inherit; cursor: pointer; }
+.deck-viewer-stage { flex: 1; display: grid; place-items: center; padding: 28px; min-height: 0; }
+.deck-viewer-slide { width: min(100%, 1020px); max-height: 100%; overflow: auto; box-sizing: border-box; aspect-ratio: 16 / 9; padding: 4% 5%; border: 1px solid var(--art-border, #ded7c9); border-radius: 14px; background: var(--art-surface-2, #f4f2ec); box-shadow: 0 18px 60px rgba(42, 38, 33, .14); }
+.deck-viewer-role { display: inline-block; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; color: var(--art-accent, #8d583e); margin-bottom: 12px; }
+.deck-viewer-slide h2 { margin: 0 0 18px; font-size: clamp(22px, 3.6vw, 42px); line-height: 1.15; color: var(--art-ink, #2a2621); }
+.deck-viewer-visual { border: 1px dashed var(--art-border, #ded7c9); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; background: var(--art-bg, #fffdf8); }
+.deck-viewer-visual span { display: block; font-size: 11px; font-weight: 600; color: var(--art-muted, #5f564a); margin-bottom: 4px; }
+.deck-viewer-visual p { margin: 0; font-size: clamp(13px, 1.6vw, 17px); }
+.deck-viewer-claims { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.deck-viewer-claims li { border-left: 3px solid var(--art-accent, #8d583e); padding: 4px 0 4px 14px; }
+.deck-viewer-claims p { margin: 0 0 5px; font-size: clamp(14px, 1.8vw, 20px); line-height: 1.45; }
+.deck-viewer-notes { margin-top: 18px; border-top: 1px solid var(--art-border, #ded7c9); padding-top: 12px; }
+.deck-viewer-notes strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--art-muted, #5f564a); margin-bottom: 4px; }
+.deck-viewer-notes p { margin: 0; font-size: 13px; color: var(--art-muted, #5f564a); }
+.deck-viewer-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--art-border, #ded7c9); }
+.deck-viewer-controls button { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--art-border, #ded7c9); background: var(--art-surface-2, #f4f2ec); color: inherit; font-size: 13px; cursor: pointer; }
+.deck-viewer-controls button:disabled { opacity: .45; cursor: not-allowed; }
+.deck-viewer-dots { display: flex; gap: 7px; }
+.deck-viewer-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--art-border, #ded7c9); }
+.deck-viewer-dots span.active { background: var(--art-accent, #8d583e); }
+@media (prefers-reduced-motion: reduce) { .deck-viewer * { transition: none !important; animation: none !important; } }

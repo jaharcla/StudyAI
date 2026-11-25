@@ -78,7 +78,7 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - PR #19 Wolfram/Vega already ported behind `STUDYAI_EXTERNAL_MCP_TOOLS=1`, off by default; do not merge.
 - `work/deck-in-canvas-20261123` is the rejected deck-dock direction; not merged.
 - `work/canvas-remediation-phase1-20261123` has no commits beyond main; nothing to integrate.
-- Presenton/deck flow is on main as cited editable PPTX; export needs a running Presenton service.
+- Presenton is no longer required: decks write an editable PPTX locally from grounded slide text and open in an in-site presenter view with speaker notes and citations.
 
 ## Design source of truth
 

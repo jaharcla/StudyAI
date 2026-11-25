@@ -76,7 +76,7 @@ describe("missing presentation renderer", () => {
     expect(artifact.content.slides.length).toBeGreaterThan(1);
     expect(artifact.sourceRefs).toEqual([REF]);
     expect(artifact.notice).toMatch(/slides and citations are ready/i);
-    expect(artifact.notice).toMatch(/Presenton/);
+    expect(artifact.notice).toMatch(/couldn't be saved/);
   });
 });
 
@@ -111,7 +111,7 @@ describe("slide deck download of a deck without a rendered file", () => {
     const response = await fetch(`${base}/api/slide-decks/download?id=${created.id}&course=${COURSE}`);
     expect(response.status).toBe(422);
     const body = await response.json() as { error: string };
-    expect(body.error).toMatch(/presentation service/i);
+    expect(body.error).toMatch(/build it again/i);
     expect(body.error).not.toMatch(/busy/i);
   });
 });
