@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `89a8c55`. Full `npm run verify` exit 0 on `89a8c55`: `tsc -b` clean, Vitest 144 files / 911 tests, Playwright 151 total — 143 passed, 2 flaky (`canvas-visual-remediation` shared tokens, `math-workspace` Quickdraw parameter sync), 6 skipped (2026-11-25). Voice branch after alignment: `tsc -b` clean, Vitest 144 files / 908 tests. No engine has been benchmarked yet. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `7731854`. Full `npm run verify` exit 0 on `7731854`: `tsc -b` clean, Vitest 145 files / 915 tests, Playwright 151 total — 143 passed, 2 flaky (`canvas-visual-remediation` shared tokens, `math-workspace` Quickdraw parameter sync), 6 skipped (2026-11-25). The browser Web Speech baseline was probed in headless and headed Chromium but produced no usable speech result and zero output voices, so every latency and naturalness field is honestly unmeasured. No engine is selected and no weights are downloaded. ChatGPT and Gemini are signed in, but ChatGPT's file-attachment limit still shows "wait 19 hours" in the UI. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -19,6 +19,8 @@ Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-1
 One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state screenshots on a real course PDF with live generation; the only stub is an injected 503. Persistent objections: the live provider is flaky and needed bounded student retries; answer keys are not entailment-checked; infographic and deck are not proven as generated artifacts in that run.
 
 Six-boundary integration audit on 2026-11-25: Sources→Tutor, Tutor→Study, Study→Concepts, Canvas→Tutor and Persistence→Return visits passed; Sources→Studio had a real defect — a cited source focus survived leaving Studio by Escape, the sidebar or a scope change and prefilled the next lesson's Studio. Fixed with a failing-then-passing Playwright assertion. The 02:49 "Welcome to KIN 120" reappearance was confirmed as intentional onboarding, not a regression. Record: `docs/verification/2026-11-25-integration-boundary-audit.md`.
+
+Browser Web Speech baseline probe on 2026-11-25: a bounded Playwright probe ran headless and headed Chromium on the existing harness. `SpeechRecognition` exists, but headless gave no result and headed failed with `network`; `speechSynthesis.getVoices()` returned 0 voices in both. TTFA, end-to-end latency, endpointing, synthesis start, barge-in and naturalness are all null with exact reasons in gitignored JSONL. Four new Vitest tests prove nulls are never promoted to measured values. No weights, dependencies, keys or product-code changes. Record: `docs/research/2026-11-25-browser-voice-baseline.md`.
 
 ## Merged commits and critique URLs
 
@@ -73,6 +75,9 @@ Six-boundary integration audit on 2026-11-25: Sources→Tutor, Tutor→Study, St
 - `cc3ebfa` ledger head and tutor fix record — https://critique.work/v/2d704abebcf03270b5b56febc37921fa
 - `98b5314` clear Studio source handoff on every exit — https://critique.work/v/01396597c20e1177f434dc0b0ed61a5b
 - `89a8c55` merge Studio handoff fix and boundary audit — https://critique.work/v/a3ee7f000693edc2ff904873d9160d9d
+- `c11befd` ledger head after boundary audit — https://critique.work/v/f7b90fe3c13d44133fee0f27d512730b
+- `7468b29` probe browser Web Speech baseline in real Chromium — https://critique.work/v/c11e39b2153362622a2d3d1fbd7ed65b
+- `7731854` merge browser voice baseline probe — https://critique.work/v/c8251ab4b2bb34904322f6dad3b397a8
 
 ## Workers and threads
 
@@ -89,7 +94,7 @@ Six-boundary integration audit on 2026-11-25: Sources→Tutor, Tutor→Study, St
 - Uninterrupted J1–J7 journey run: https://discord.com/channels/1574451017817399346/1575001612894736504 — merged; live c121 PDF run with 13 ordered screenshots
 - Local decks and in-site slide viewer: https://discord.com/channels/1574451017817399346/1575037172128546816 — merged
 - Guided artifact creation: https://discord.com/channels/1574451017817399346/1575041473534238730 — merged
-- Voice benchmark harness: https://discord.com/channels/1574451017817399346/1575054063345606760 — merged; tsc and Vitest clean, no engine measured
+- Voice benchmark harness and browser baseline: https://discord.com/channels/1574451017817399346/1575054063345606760 — merged at `7468b29` / `7731854`; headless and headed Chromium probed, no usable speech or voices, all timing fields honestly unmeasured, no engine selected
 - Tutor session reset fix: https://discord.com/channels/1574451017817399346/1575081898248507492 — merged at `78d0df1` / `1d468d5`; thread now resets only on a genuine change between complete course:lesson scopes
 - Integration boundary audit: https://discord.com/channels/1574451017817399346/1575090293940682852 — merged at `98b5314` / `89a8c55`; one real handoff defect fixed, other five boundaries passed
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
