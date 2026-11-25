@@ -131,6 +131,16 @@
 .dark .radial-action{background:#2a313b;border-color:#3f4a57;color:#e7effa;box-shadow:0 2px 4px rgba(0,0,0,.35),0 12px 28px rgba(0,0,0,.45)}
 .dark .radial-action:hover{background:#333c47;border-color:var(--lewis-accent);color:#f2c9ac}
 .dark .radial-hub{border-color:rgba(217,162,126,.5);box-shadow:0 0 0 7px rgba(35,41,50,.6)}
+/* One tool surface: Notes reads as a panel toggle, and an empty board offers one quiet next step. */
+.tool-chip.toggle{background:transparent;color:#574e43;border-style:dashed}
+.tool-chip.toggle[aria-pressed="true"]{background:#f4ebe3;border-style:solid;color:#8a4f31}
+.dark .tool-chip.toggle{color:#d7cfc4}
+.dark .tool-chip.toggle[aria-pressed="true"]{background:#352d26;color:#e0a982}
+.canvas-empty-state{position:absolute;z-index:12;left:50%;top:18px;transform:translateX(-50%);display:grid;justify-items:center;gap:6px;max-width:min(360px,calc(100% - 32px));padding:10px 14px;border:1px solid #ded7c9;border-radius:10px;background:#fffdf8;color:#2a2621;font:11px/1.4 "DM Sans",Arial,sans-serif;box-shadow:0 4px 12px rgba(40,30,20,.08)}
+.canvas-empty-state>span{color:#8a4f31;font-size:9px;font-weight:700;letter-spacing:.08em}
+.canvas-empty-state p{margin:0;text-align:center}
+.dark .canvas-empty-state{border-color:#4a433b;background:#24211d;color:#f4f2ea}
+.dark .canvas-empty-state>span{color:#e0a982}
 
 /* Keep the arc clear while it is open; the labels return on close. */
 .science-molecule[data-radial-open="true"] .molecule-name,

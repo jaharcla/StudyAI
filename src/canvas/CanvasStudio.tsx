@@ -1231,6 +1231,10 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         </>}
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>
+      {!loading && document.objects.length === 0 && !exampleState && <div className="canvas-empty-state" data-testid="canvas-empty-state">
+        <span>START HERE</span><p>Draw on the board or add a scientific object.</p>
+        <button type="button" className="button-soft" onClick={() => setToolOpen(true)}>Open canvas tools</button>
+      </div>}
     </div>
     {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} onRegisterCard={async (front, back, conceptId) => {
       try {

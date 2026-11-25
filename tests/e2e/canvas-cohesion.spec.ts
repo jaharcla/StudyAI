@@ -69,6 +69,34 @@ test("duplicate object labels are disambiguated by human name, never by id", asy
   await page.screenshot({ path: "test-results/shots/canvas-duplicate-labels.png", fullPage: true });
 });
 
+test("canvas hierarchy keeps one selected view and one quiet tool surface", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Canvas hierarchy ${Date.now()}`, "Hierarchy lesson");
+  await openCourse(page, course.title);
+  await expect(page.locator(".scientific-layer")).toBeVisible();
+
+  const surface = page.getByTestId("canvas-tool-surface");
+  await expect(surface).toHaveCount(1);
+  const viewButtons = surface.locator(".view-switch button");
+  await expect(viewButtons).toHaveCount(3);
+  await expect(surface.locator(".view-switch .current")).toHaveCount(1);
+  await expect(viewButtons.filter({ hasText: "Notes" })).toHaveCount(0);
+
+  const notes = page.getByRole("button", { name: "Notes", exact: true });
+  await expect(notes).toHaveAttribute("aria-pressed", "false");
+  await expect(notes).not.toHaveClass(/active/);
+
+  const empty = page.getByTestId("canvas-empty-state");
+  await expect(empty).toBeVisible();
+  await expect(empty).toContainText(/start here/i);
+  await expect(empty.getByRole("button")).toHaveCount(1);
+  await empty.getByRole("button").click();
+  await expect(page.locator(".canvas-tool-palette")).toBeVisible();
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  await expect(page.locator(".canvas-board")).toBeVisible();
+});
+
 test("shell motion uses the shared 180-220ms tokens and reverses cleanly", async ({ page }) => {
   const { course } = await createCourseWithLesson(page.request, `Cohesion motion ${Date.now()}`, "Motion lesson");
   await openCourse(page, course.title);
