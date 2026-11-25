@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { extname, basename, resolve } from "node:path";
 import { db } from "./db.js";
 import { createDocumentIntelligenceHandler } from "./document-intelligence/http.js";
+import { reconcileDocumentFiles } from "./document-intelligence/service.js";
 import { parseCanvasDocument } from "../src/canvas/model.js";
 import { initializeDocumentIntelligenceSchema } from "./document-intelligence/schema.js";
 import { migrateLegacyDocuments } from "./document-intelligence/legacy.js";
@@ -54,6 +55,7 @@ export function resolveAllowedOrigin(reqOrOrigin: import("node:http").IncomingMe
 configureProviderBudgetDatabase(db);
 configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
+await reconcileDocumentFiles(db, process.env.STUDYAI_DOCUMENTS);
 initializeStudioSchema(db);
 initializeCanvasAnalysisStorage(db);
 const legacyDocuments = await migrateLegacyDocuments(db);
