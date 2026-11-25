@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `1d468d5`. Last full `npm run verify` exit 0 on `d0f9430`: `tsc -b` clean, Vitest 140 files / 882 tests, Playwright 141 passed, 3 flaky (`canvas-physics-fbd` sliders, `canvas-visual-remediation` user-readiness, `math-workspace` Quickdraw), 6 skipped (2026-11-25). After the voice merge and tutor fix only targeted checks ran: `tsc -b` clean, Vitest 144 files / 911 tests, Playwright `tutor-round2-hygiene` 2/2. A full verify on the current head is still pending. Voice branch after alignment: `tsc -b` clean, Vitest 144 files / 908 tests. No engine has been benchmarked yet. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `89a8c55`. Full `npm run verify` exit 0 on `89a8c55`: `tsc -b` clean, Vitest 144 files / 911 tests, Playwright 151 total — 143 passed, 2 flaky (`canvas-visual-remediation` shared tokens, `math-workspace` Quickdraw parameter sync), 6 skipped (2026-11-25). Voice branch after alignment: `tsc -b` clean, Vitest 144 files / 908 tests. No engine has been benchmarked yet. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -17,6 +17,8 @@ Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-1
 | J7 One app | Shared tokens light/dark, 180–220 ms interruptible motion, reduced motion, keyboard, phone width | Green in the live run: dark mode, motion tokens, reduced motion, keyboard traversal and phone width; screenshots 12–13 |
 
 One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state screenshots on a real course PDF with live generation; the only stub is an injected 503. Persistent objections: the live provider is flaky and needed bounded student retries; answer keys are not entailment-checked; infographic and deck are not proven as generated artifacts in that run.
+
+Six-boundary integration audit on 2026-11-25: Sources→Tutor, Tutor→Study, Study→Concepts, Canvas→Tutor and Persistence→Return visits passed; Sources→Studio had a real defect — a cited source focus survived leaving Studio by Escape, the sidebar or a scope change and prefilled the next lesson's Studio. Fixed with a failing-then-passing Playwright assertion. The 02:49 "Welcome to KIN 120" reappearance was confirmed as intentional onboarding, not a regression. Record: `docs/verification/2026-11-25-integration-boundary-audit.md`.
 
 ## Merged commits and critique URLs
 
@@ -68,6 +70,9 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - `d148516` final verify and voice harness ledger — https://critique.work/v/e4905c43cab5d4ee6964bfae82e0b02b
 - `78d0df1` tutor thread survives transient course or lesson loading — https://critique.work/v/0af78b5a53aa421755b3a4b46eb01e09
 - `1d468d5` grounded-answer course persistence assertion — https://critique.work/v/f5d1d4b35d07430bb2e1b97422020a95
+- `cc3ebfa` ledger head and tutor fix record — https://critique.work/v/2d704abebcf03270b5b56febc37921fa
+- `98b5314` clear Studio source handoff on every exit — https://critique.work/v/01396597c20e1177f434dc0b0ed61a5b
+- `89a8c55` merge Studio handoff fix and boundary audit — https://critique.work/v/a3ee7f000693edc2ff904873d9160d9d
 
 ## Workers and threads
 
@@ -86,6 +91,7 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - Guided artifact creation: https://discord.com/channels/1574451017817399346/1575041473534238730 — merged
 - Voice benchmark harness: https://discord.com/channels/1574451017817399346/1575054063345606760 — merged; tsc and Vitest clean, no engine measured
 - Tutor session reset fix: https://discord.com/channels/1574451017817399346/1575081898248507492 — merged at `78d0df1` / `1d468d5`; thread now resets only on a genuine change between complete course:lesson scopes
+- Integration boundary audit: https://discord.com/channels/1574451017817399346/1575090293940682852 — merged at `98b5314` / `89a8c55`; one real handoff defect fixed, other five boundaries passed
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
