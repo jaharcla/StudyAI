@@ -103,6 +103,18 @@ describe("document file reconciliation", () => {
     expect(second.removedRows).toBe(0);
   });
 
+  it("keeps valid files when the storage root spelling changes only by case", async () => {
+    const [imported] = await importDocuments(db, "chem-120", [{ name: "case.txt", bytes: new TextEncoder().encode("Case matters.") }], storage);
+    const row = db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id) as { storage_path: string };
+    const alternate = row.storage_path.replace(/[A-Za-z]/g, (character) => character === character.toUpperCase() ? character.toLowerCase() : character.toUpperCase());
+    db.prepare("UPDATE di_documents SET storage_path=? WHERE id=?").run(alternate, imported.id);
+    const result = await reconcile!(db, storage, now);
+    expect(result.removedFiles).toBe(0);
+    expect(result.removedRows).toBe(0);
+    expect(existsSync(row.storage_path)).toBe(true);
+    expect(db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id)).toMatchObject({ storage_path: alternate });
+  });
+
   it("removes only aged incomplete upload parts", async () => {
     const aged = makeUpload(randomUUID(), 48 * 60 * 60 * 1000);
     const recent = makeUpload(randomUUID(), 60 * 1000);

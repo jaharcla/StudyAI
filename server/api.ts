@@ -230,7 +230,7 @@ const server = createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/api/documents") {
     const input = await readJson(req);
     if (!input.courseId || !courseExists(String(input.courseId))) return json(res, 404, { error: "Course not found." });
-    if (!input.name || typeof input.content !== "string" || extname(input.name).toLowerCase() !== ".txt") return json(res, 400, { error: "Only UTF-8 .txt import is currently enabled." });
+    if (typeof input.name !== "string" || !input.name || typeof input.content !== "string" || extname(input.name).toLowerCase() !== ".txt") return json(res, 400, { error: "Only UTF-8 .txt import is currently enabled." });
     const id = randomUUID();
     const storageRoot = resolve(process.env.STUDYAI_DOCUMENTS ?? "data/documents");
     const path = resolve(storageRoot, `${id}-${basename(input.name)}`);
@@ -288,31 +288,38 @@ class RequestAbortedError extends Error {}
 
 async function readJson(req: import("node:http").IncomingMessage, limit?: number) {
   const raw = await body(req, limit);
-  try { return JSON.parse(raw); } catch { throw new InvalidJsonError("Invalid JSON body."); }
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new InvalidJsonError("Invalid JSON body."); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new InvalidJsonError("JSON request body must be an object.");
+  return parsed as Record<string, unknown>;
 }
 
+// The cap counts incoming UTF-8 bytes, not decoded characters.
 function body(req: import("node:http").IncomingMessage, limit = 1_000_000) {
   return new Promise<string>((resolveBody, reject) => {
-    let value = "";
+    const chunks: Buffer[] = [];
+    let bytes = 0;
     let settled = false;
     const abort = () => {
       if (settled) return;
       settled = true;
       reject(new RequestAbortedError("request aborted"));
     };
-    req.setEncoding("utf8");
-    req.on("data", (chunk) => {
+    req.on("data", (chunk: Buffer | string) => {
       if (settled) return;
-      value += chunk;
-      if (value.length > limit) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      bytes += buffer.byteLength;
+      if (bytes > limit) {
         settled = true;
         reject(new PayloadTooLargeError("payload too large"));
+        return;
       }
+      chunks.push(buffer);
     });
     req.on("end", () => {
       if (settled) return;
       settled = true;
-      resolveBody(value);
+      resolveBody(Buffer.concat(chunks).toString("utf8"));
     });
     req.on("aborted", abort);
     req.on("error", (error: NodeJS.ErrnoException) => {

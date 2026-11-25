@@ -94,6 +94,22 @@ describe("bounded body parsing", () => {
     expect(await response.json()).toMatchObject({ error: "Invalid JSON body." });
   });
 
+  it("rejects valid non-object JSON with 400", async () => {
+    for (const payload of ["null", "[]", '"text"']) {
+      const response = await post(payload);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: "JSON request body must be an object." });
+    }
+  });
+
+  it("enforces the byte limit for multi-byte UTF-8 payloads", async () => {
+    const payload = exactLimitPayload().replace("x".repeat(10_000), "é".repeat(10_000));
+    expect(payload.length).toBe(limit);
+    expect(Buffer.byteLength(payload, "utf8")).toBeGreaterThan(limit);
+    const response = await post(payload);
+    expect(response.status).toBe(413);
+  });
+
   it("survives a client abort without a second write or an unhandled failure", async () => {
     await abortMidBody();
     await new Promise((resolve) => setTimeout(resolve, 300));

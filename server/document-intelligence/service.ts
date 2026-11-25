@@ -174,9 +174,16 @@ export async function deleteDocument(db: Database.Database, courseId: string, do
   return true;
 }
 
+// Windows paths compare case-insensitively; the separator keeps `files` from
+// matching a sibling such as `files-archive`.
+function pathKey(value: string): string {
+  const resolved = resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
 function insideStorage(root: string, candidate: string): boolean {
-  const resolved = resolve(candidate);
-  return resolved.startsWith(root.endsWith(sep) ? root : root + sep);
+  const rootKey = pathKey(root);
+  return pathKey(candidate).startsWith(rootKey.endsWith(sep) ? rootKey : rootKey + sep);
 }
 
 /** Reconciles interrupted imports and deletes after a restart. Only files with
@@ -191,7 +198,7 @@ export async function reconcileDocumentFiles(db: Database.Database, storageRoot 
   for (const row of rows) {
     const path = resolve(row.storage_path);
     if (!insideStorage(root, path) || !OWNED_DOCUMENT_FILE.test(basename(path))) continue;
-    owned.add(path);
+    owned.add(pathKey(path));
     if (!existsSync(path)) dangling.push(row.id);
   }
 
@@ -199,7 +206,7 @@ export async function reconcileDocumentFiles(db: Database.Database, storageRoot 
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (!entry.isFile() || !OWNED_DOCUMENT_FILE.test(entry.name)) continue;
     const path = resolve(root, entry.name);
-    if (!insideStorage(root, path) || owned.has(path)) continue;
+    if (!insideStorage(root, path) || owned.has(pathKey(path))) continue;
     await unlink(path).catch(() => undefined);
     removedFiles++;
   }
