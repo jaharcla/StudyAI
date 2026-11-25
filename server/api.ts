@@ -269,6 +269,7 @@ const server = createServer(async (req, res) => {
   }
   return json(res, 404, { error: "not found" });
   } catch (error) {
+    if (error instanceof RequestAbortedError) return;
     if (error instanceof PayloadTooLargeError) return json(res, 413, { error: "Payload too large." });
     if (error instanceof InvalidJsonError) return json(res, 400, { error: error.message });
     console.error("StudyAI API request failed:", error);
@@ -281,13 +282,43 @@ void warmClipRuntime()
   .catch((error: unknown) => console.warn("CLIP warmup failed:", error instanceof Error ? error.message : error));
 class PayloadTooLargeError extends Error {}
 class InvalidJsonError extends Error {}
+class RequestAbortedError extends Error {}
 
 async function readJson(req: import("node:http").IncomingMessage, limit?: number) {
   const raw = await body(req, limit);
   try { return JSON.parse(raw); } catch { throw new InvalidJsonError("Invalid JSON body."); }
 }
 
-function body(req: import("node:http").IncomingMessage, limit = 1_000_000) { return new Promise<string>((resolveBody, reject) => { let value = ""; req.setEncoding("utf8"); req.on("data", (chunk) => { value += chunk; if (value.length > limit) reject(new PayloadTooLargeError("payload too large")); }); req.on("end", () => resolveBody(value)); req.on("error", reject); }); }
+function body(req: import("node:http").IncomingMessage, limit = 1_000_000) {
+  return new Promise<string>((resolveBody, reject) => {
+    let value = "";
+    let settled = false;
+    const abort = () => {
+      if (settled) return;
+      settled = true;
+      reject(new RequestAbortedError("request aborted"));
+    };
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      if (settled) return;
+      value += chunk;
+      if (value.length > limit) {
+        settled = true;
+        reject(new PayloadTooLargeError("payload too large"));
+      }
+    });
+    req.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolveBody(value);
+    });
+    req.on("aborted", abort);
+    req.on("error", (error: NodeJS.ErrnoException) => {
+      if (error?.code === "ECONNRESET" || error?.message === "aborted") abort();
+      else if (!settled) { settled = true; reject(error); }
+    });
+  });
+}
 
 function courseExists(courseId: string): boolean { return Boolean(db.prepare("SELECT 1 FROM courses WHERE id=?").get(courseId)); }
 function lessonExists(courseId: string, lessonId: string): boolean { return courseExists(courseId) && Boolean(db.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(courseId, lessonId)); }
