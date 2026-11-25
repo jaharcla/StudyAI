@@ -21,6 +21,7 @@ import MindMapView from "./MindMapView";
 import StudyGuideView from "./StudyGuideView";
 import PracticeView from "./PracticeView";
 import InfographicView from "./InfographicView";
+import SlideDeckView from "./SlideDeckView";
 
 const KIND_LABEL: Record<StudioKind, string> = {
   "mind-map": "Mind map",
@@ -61,7 +62,7 @@ const MADE_FILTERS: Array<{ id: MadeKind | "all"; label: string }> = [
 ];
 
 const FORMAT_ERROR = "The study assistant couldn't turn this lesson's material into an artifact this time. Your course material is unchanged. Try again or choose another artifact type.";
-const RENDER_MISSING = "The local presentation service (Presenton) isn't running. Slides and citations are ready to review; start the service and build again to download a .pptx.";
+const SAVE_FAILED = "Your slides and citations are ready, but the .pptx couldn't be saved. Try building the deck again.";
 
 type Note = { tone: "info" | "error" | "success"; text: string };
 type MadeKind = StudioKind | "slide_deck";
@@ -90,6 +91,7 @@ function studentMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "";
   const status = (error as { status?: number } | null)?.status;
   if (/did not return a JSON|couldn't format a response|could not format|study assistant couldn't/i.test(raw)) return FORMAT_ERROR;
+  if (/Direction can shape presentation/i.test(raw)) return "Please rephrase your direction. It can't add sources, answers or numbers from outside your lesson.";
   if (/No course sources|No grounded/i.test(raw)) return "This lesson doesn't have enough course material yet. Add a source or notes, then try again.";
   if (status === 502 || status === 503 || /502|503|fetch failed|network/i.test(raw)) return "The study assistant isn't responding right now. Your course material is unchanged. Try again in a moment.";
   return "Generation didn't complete. Your course material is unchanged. Try again.";
@@ -99,7 +101,7 @@ function deckMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "";
   if (/No course sources/i.test(raw)) return "This lesson has no course material to build a deck from yet. Add a source or notes first.";
   if (/validation failed|repair/i.test(raw)) return "The deck didn't pass the course-material checks. Try a different focus or source.";
-  if (/presenton|presentation service|renderer|502|503/i.test(raw)) return RENDER_MISSING;
+  if (/couldn't be saved|renderer|502|503/i.test(raw)) return SAVE_FAILED;
   return "We couldn't finish that. Try again in a moment.";
 }
 
@@ -113,6 +115,9 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
   const [count, setCount] = useState(10);
+  const [direction, setDirection] = useState("");
+  const [directKind, setDirectKind] = useState<StudioKind>("mind-map");
+  const [directPractice, setDirectPractice] = useState<PracticeType>("both");
   const [artifact, setArtifact] = useState<StudioArtifact | undefined>();
   const [history, setHistory] = useState<StudioArtifact[]>([]);
   const [filter, setFilter] = useState<StudioKind | "all">("all");
@@ -134,6 +139,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [selectedDeck, setSelectedDeck] = useState<SlideDeckArtifact | undefined>();
   const [deckRename, setDeckRename] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [presenting, setPresenting] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef);
@@ -161,6 +167,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   }, [courseId, lessonId]);
 
   useEffect(() => { refreshMade(); }, [refreshMade]);
+  useEffect(() => { setPresenting(false); }, [selectedDeck]);
 
   const openDeck = useCallback((id: string) => {
     if (deckBusy) return;
@@ -182,11 +189,14 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [madeLoading]);
 
-  const generate = async (target: StudioKind = kind, type: PracticeType = practiceType) => {
+  const generate = async (target: StudioKind = kind, type: PracticeType = practiceType, guidance = "") => {
     setBusy(true); setError(""); setNotice(""); setErrorAction("generate");
     setKind(target); setPracticeType(type);
     try {
-      const created = await generateArtifact({ courseId, lessonId, kind: target, focus: focus.trim() || "Key concepts and mechanisms", practiceType: type, count });
+      const created = await generateArtifact({
+        courseId, lessonId, kind: target, focus: focus.trim() || "Key concepts and mechanisms",
+        practiceType: type, count, ...(guidance.trim() ? { direction: guidance.trim() } : {}),
+      });
       setArtifact(created);
       setFilter("all");
       if ("notice" in created && typeof created.notice === "string") setNotice(created.notice);
@@ -236,7 +246,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     void generateSlideDeck({ courseId, lessonId, focus: deckFocus.trim() || lessonTitle || "Key concepts and mechanisms" })
       .then((item) => {
         const degraded = !item.filePath;
-        const reason = degraded && "notice" in item && typeof item.notice === "string" ? item.notice : RENDER_MISSING;
+        const reason = degraded && "notice" in item && typeof item.notice === "string" ? item.notice : SAVE_FAILED;
         setDeckNotice({ tone: degraded ? "info" : "success", text: degraded ? reason : "Deck ready. Open it below to review slides and speaker notes." });
         setSelectedDeck(item); setDeckRename(item.title); setConfirmDelete(false);
         return refreshMade();
@@ -304,6 +314,37 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
             </button>
           ))}
         </nav>
+
+        <details className="studio-direct">
+          <summary>Direct the tutor <span>optional</span></summary>
+          <label className="studio-field">Artifact type
+            <select data-testid="studio-direct-kind" value={directKind} onChange={(event) => setDirectKind(event.target.value as StudioKind)}>
+              {CREATE_ITEMS.filter((item) => item.kind !== "slide_deck").map((item) => (
+                <option key={item.id} value={item.kind}>{item.label}</option>
+              ))}
+            </select>
+          </label>
+          {directKind === "practice" && (
+            <label className="studio-field">Practice style
+              <select data-testid="studio-direct-practice" value={directPractice} onChange={(event) => setDirectPractice(event.target.value as PracticeType)}>
+                <option value="cards">Flashcards</option>
+                <option value="quiz">Quiz</option>
+                <option value="both">Cards and quiz</option>
+              </select>
+            </label>
+          )}
+          <label className="studio-field">Your direction
+            <textarea data-testid="studio-direction" rows={3} maxLength={500} value={direction}
+              onChange={(event) => setDirection(event.target.value)}
+              placeholder="e.g. explain it step by step for a beginner" />
+          </label>
+          <button type="button" className="studio-primary studio-direct-button" data-testid="studio-generate-directed"
+            disabled={busy || !!deckBusy || !direction.trim()}
+            onClick={() => void generate(directKind, directKind === "practice" ? directPractice : practiceType, direction)}>
+            Generate with direction
+          </button>
+          <p className="studio-direct-note">Shapes how it's presented. Facts and citations still come from this lesson.</p>
+        </details>
 
         <details>
           <summary>Advanced</summary>
@@ -441,28 +482,36 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           )}
 
           {!busy && shown && (
-            <div className="studio-artifact-bar">
-              <div className="studio-artifact-heading">
-                <span className="studio-kind" data-testid="artifact-kind">{KIND_LABEL[shown.kind]}</span>
-                {(shown.kind === "mind-map" || shown.kind === "practice")
-                  ? <h2>{shown.title}</h2>
-                  : <span className="studio-artifact-context">From this lesson</span>}
+            <>
+              <div className="studio-artifact-bar">
+                <div className="studio-artifact-heading">
+                  <span className="studio-kind" data-testid="artifact-kind">{KIND_LABEL[shown.kind]}</span>
+                  {(shown.kind === "mind-map" || shown.kind === "practice")
+                    ? <h2>{shown.title}</h2>
+                    : <span className="studio-artifact-context">From this lesson</span>}
+                </div>
+                <div className="studio-artifact-actions">
+                  <span className={`studio-review-status${acceptance === "accept" ? " accepted" : ""}`} data-testid="artifact-status" aria-live="polite">
+                    {acceptance === "accept"
+                      ? <><CircleCheck size={14} strokeWidth={2} aria-hidden="true" /><span data-testid="artifact-acceptance">Accepted</span></>
+                      : "Awaiting review"}
+                  </span>
+                  <button type="button" className="studio-toolbar-button" data-testid="artifact-accept" disabled={acceptance === "accept"} onClick={() => void accept()}>
+                    {acceptance === "accept" ? <CircleCheck size={15} strokeWidth={2} aria-hidden="true" /> : <Check size={15} strokeWidth={2} aria-hidden="true" />}
+                    {acceptance === "accept" ? "Accepted" : "Accept"}
+                  </button>
+                  <button type="button" className="studio-toolbar-button" data-testid="artifact-download" onClick={download}>
+                    <Download size={15} strokeWidth={1.9} aria-hidden="true" /> Download
+                  </button>
+                </div>
               </div>
-              <div className="studio-artifact-actions">
-                <span className={`studio-review-status${acceptance === "accept" ? " accepted" : ""}`} data-testid="artifact-status" aria-live="polite">
-                  {acceptance === "accept"
-                    ? <><CircleCheck size={14} strokeWidth={2} aria-hidden="true" /><span data-testid="artifact-acceptance">Accepted</span></>
-                    : "Awaiting review"}
-                </span>
-                <button type="button" className="studio-toolbar-button" data-testid="artifact-accept" disabled={acceptance === "accept"} onClick={() => void accept()}>
-                  {acceptance === "accept" ? <CircleCheck size={15} strokeWidth={2} aria-hidden="true" /> : <Check size={15} strokeWidth={2} aria-hidden="true" />}
-                  {acceptance === "accept" ? "Accepted" : "Accept"}
-                </button>
-                <button type="button" className="studio-toolbar-button" data-testid="artifact-download" onClick={download}>
-                  <Download size={15} strokeWidth={1.9} aria-hidden="true" /> Download
-                </button>
-              </div>
-            </div>
+              {shown.prompt && (
+                <details className="studio-prompt">
+                  <summary>Prompt used</summary>
+                  <p data-testid="artifact-prompt">{shown.prompt}</p>
+                </details>
+              )}
+            </>
           )}
 
           {!busy && !shown && !madeError && (
@@ -483,13 +532,16 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
             <section className="studio-deck" data-testid="deck-detail" aria-label="Slide deck">
               <div className="artifacts-detail-head">
                 <div><h3>{selectedDeck.title}</h3><small>{selectedDeck.content.slides.length} slides · {selectedDeck.sourceRefs.length} cited sources</small></div>
-                {selectedDeck.filePath ? (
-                  <a className="button-soft" data-testid="artifact-download" href={downloadSlideDeckUrl(selectedDeck.id, selectedDeck.courseId)} download={deckFileName(selectedDeck.title)}>Download .pptx</a>
-                ) : (
-                  <button type="button" className="button-soft" data-testid="artifact-download-unavailable" aria-describedby="artifact-download-note" disabled>Download unavailable</button>
-                )}
+                <div className="deck-detail-actions">
+                  <button type="button" className="button-primary" data-testid="deck-viewer-present" onClick={() => setPresenting(true)}>Present deck</button>
+                  {selectedDeck.filePath ? (
+                    <a className="button-soft" data-testid="artifact-download" href={downloadSlideDeckUrl(selectedDeck.id, selectedDeck.courseId)} download={deckFileName(selectedDeck.title)}>Download .pptx</a>
+                  ) : (
+                    <button type="button" className="button-soft" data-testid="artifact-download-unavailable" aria-describedby="artifact-download-note" disabled>Download unavailable</button>
+                  )}
+                </div>
               </div>
-              {!selectedDeck.filePath && <p id="artifact-download-note" className="artifacts-empty" data-testid="artifact-download-note">{RENDER_MISSING}</p>}
+              {!selectedDeck.filePath && <p id="artifact-download-note" className="artifacts-empty" data-testid="artifact-download-note">{SAVE_FAILED}</p>}
               <div className="artifacts-rename">
                 <label htmlFor="artifact-title">Deck name</label>
                 <input id="artifact-title" data-testid="artifact-rename" aria-label="Artifact title" value={deckRename} onChange={(event) => setDeckRename(event.target.value)} maxLength={200} />
@@ -520,6 +572,9 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           )}
         </div>
       </main>
+      {presenting && selectedDeck && (
+        <SlideDeckView deck={selectedDeck} onOpenSource={onOpenSource} onClose={() => setPresenting(false)} />
+      )}
     </div>
   );
 }

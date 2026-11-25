@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `874671f`. Last full `npm run verify` at `c465cfd` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 139 passed, 1 flaky (`tutor-round2-hygiene` selected object), 6 skipped (2026-11-25). Final verify pending the local-deck worker. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `0966464`. Last full `npm run verify` at `c465cfd` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 139 passed, 1 flaky (`tutor-round2-hygiene` selected object), 6 skipped (2026-11-25). Final verify pending after the guided-artifact and local-deck merges. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -10,7 +10,7 @@ Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-1
 | --- | --- | --- |
 | J1 First 60 seconds | New course + files; indexing progress; grounded summary with citations; three suggested actions; one Continue | Green in the live run: real `c121-module3` PDF imported, indexing, verbatim cited summary, three actions and one prepared Continue; screenshots 1–2 |
 | J2 Ask and verify | Streamed grounded Tutor answer, citations open exact passage; honest refusal | Green in the live run: live Tutor answer with source count, citation opens the highlighted PDF passage, honest refusal; screenshots 3–4 |
-| J3 One-click artifacts | Quiz, cards, practice test, guide, mind map, deck, infographic; shared library; per-node edit, regenerate, export; honest failures | Partial: study guide, mind map, quiz and flashcards generated live from the real PDF; infographic and deck end in their honest failures with Retry asserted; screenshot 5. Local deck work is in progress |
+| J3 One-click artifacts | Quiz, cards, practice test, guide, mind map, deck, infographic; shared library; per-node edit, regenerate, export; honest failures | Partial: study guide, mind map, quiz and flashcards generated live from the real PDF; each artifact also has a one-prompt guided route; decks now export locally as editable PPTX and open in an in-site viewer with notes and citations; infographic still ends in an honest failure with Retry; screenshot 5 |
 | J4 Canvas and Tutor | Human object names, citation focus/highlight, deterministic validation, board switching, safe duplicates/deletes | Green in the live run: duplicate labels disambiguated, citation focus, stale-ref failure and board switching; screenshot 9. Canvas citations are injected in the test, not authored by the Tutor |
 | J5 Practice and mastery | Check answer works, misses feed mastery/FSRS, best next action and prepared Continue | Green in the live run: local grading, mastery and sync-failure retry; screenshots 6–8. Live practice returned cards but no questions, so questions were seeded from the PDF's own sample-test facts through the real learning store |
 | J6 Return visit | Today view with daily plan and resume | Green in the live run: Today strip, prepared Continue and full Today view; screenshots 10–11 |
@@ -56,6 +56,12 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - `0a5cb5c` merge of first uninterrupted run — https://critique.work/v/4b88ed1db59a0ecfbf33641b7558479f
 - `39ee485` live-generation J1–J7 run on a real c121 PDF — https://critique.work/v/b63ae7276dae2c693f62959cfc6d10d1
 - `874671f` merge of live-generation run — https://critique.work/v/e9f52f7d088e5f4411b56a008d6bb21a
+- `69d3427` TTS/STT route research — https://critique.work/v/bea9785255f1bc72efdee5931edf9190
+- `6c7950b` natural voice options — https://critique.work/v/388b971a1851e774a23bd71023867a60
+- `027ad84` speech repo survey — https://critique.work/v/8bebddee7c5c67c7a62b9e354051e0a5
+- `ee0775d` voice benchmark plan — https://critique.work/v/94e04a453b8b7a98d08e3e0b72d6054d
+- `24e4902` merge guided artifact routes — https://critique.work/v/3f4536ec5717cc3a188f8baf083bb083
+- `0966464` merge local deck pipeline — https://critique.work/v/16db8d637d0c91a01be19886b78cc9fc
 
 ## Workers and threads
 
@@ -70,7 +76,9 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - Practice correctness: https://discord.com/channels/1574451017817399346/1574953731907125369 — merged
 - Studio unification: https://discord.com/channels/1574451017817399346/1574977985943965767 — merged
 - Uninterrupted J1–J7 journey run: https://discord.com/channels/1574451017817399346/1575001612894736504 — merged; live c121 PDF run with 13 ordered screenshots
-- Local decks and in-site slide viewer: https://discord.com/channels/1574451017817399346/1575037172128546816 — running
+- Local decks and in-site slide viewer: https://discord.com/channels/1574451017817399346/1575037172128546816 — merged
+- Guided artifact creation: https://discord.com/channels/1574451017817399346/1575041473534238730 — merged
+- Voice benchmark harness: https://discord.com/channels/1574451017817399346/1575054063345606760 — running
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
@@ -78,7 +86,7 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - PR #19 Wolfram/Vega already ported behind `STUDYAI_EXTERNAL_MCP_TOOLS=1`, off by default; do not merge.
 - `work/deck-in-canvas-20261123` is the rejected deck-dock direction; not merged.
 - `work/canvas-remediation-phase1-20261123` has no commits beyond main; nothing to integrate.
-- Presenton/deck flow is on main as cited editable PPTX; export needs a running Presenton service.
+- Presenton is no longer required: decks write an editable PPTX locally from grounded slide text and open in an in-site presenter view with speaker notes and citations.
 
 ## Design source of truth
 

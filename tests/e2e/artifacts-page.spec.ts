@@ -103,10 +103,10 @@ test("Artifacts page builds, lists, opens and organizes a slide deck", async ({ 
   await expect(page.getByTestId("artifacts-status")).toContainText("Deck deleted.");
 });
 
-test("Artifacts page names the missing service instead of saying the deck service is busy", async ({ page }) => {
+test("Artifacts page names the save failure instead of saying the deck service is busy", async ({ page }) => {
   await mockArtifacts(page);
   await page.route("**/api/slide-decks/generate", (route) => route.fulfill({
-    status: 502, contentType: "application/json", body: JSON.stringify({ error: "The local presentation service (Presenton) is not available." }),
+    status: 502, contentType: "application/json", body: JSON.stringify({ error: "The .pptx couldn't be saved." }),
   }));
   const { course } = await createCourseWithLesson(page.request);
   await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
@@ -115,7 +115,7 @@ test("Artifacts page names the missing service instead of saying the deck servic
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-slide_deck").click();
   const status = page.getByTestId("artifacts-status");
-  await expect(status).toContainText("presentation service");
+  await expect(status).toContainText("couldn't be saved");
   await expect(status).not.toContainText("busy");
   await expect(status).not.toContainText("502");
   await expect(page.getByTestId("studio-tab-slide_deck")).toBeEnabled();
@@ -123,7 +123,7 @@ test("Artifacts page names the missing service instead of saying the deck servic
 });
 
 test("Artifacts page keeps a semantic deck usable when the renderer is absent", async ({ page }) => {
-  const semanticDeck = { ...deck, filePath: "", notice: "Your deck's slides and citations are ready. The .pptx download needs the local presentation service (Presenton), which isn't running. Start it and build again to export." };
+  const semanticDeck = { ...deck, filePath: "", notice: "Your deck's slides and citations are ready, but the .pptx couldn't be saved. Try building it again to export." };
   await page.route("**/api/slide-decks/generate", (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(semanticDeck) }));
   await page.route("**/api/slide-decks?course=**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([semanticDeck]) }));
   await page.route("**/api/slide-decks/artifact?id=**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(semanticDeck) }));
@@ -140,6 +140,6 @@ test("Artifacts page keeps a semantic deck usable when the renderer is absent", 
   await expect(page.getByTestId("slide-citation")).toHaveCount(1);
   await expect(page.getByTestId("artifact-download")).toHaveCount(0);
   await expect(page.getByTestId("artifact-download-unavailable")).toBeDisabled();
-  await expect(page.getByTestId("artifact-download-note")).toContainText("Presenton");
+  await expect(page.getByTestId("artifact-download-note")).toContainText("couldn't be saved");
   await page.screenshot({ path: "test-results/shots/artifacts-degraded-after.png" });
 });

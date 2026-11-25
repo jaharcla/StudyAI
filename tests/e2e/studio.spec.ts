@@ -107,3 +107,45 @@ test("Studio generates a grounded mind map, guide and practice in the new UI", a
   await expect(page.getByRole("status")).toContainText("1 cards and 1 questions added");
   expect(imports).toEqual([{ artifactId: "art-practice", cards: [0], questions: [0] }]);
 });
+
+test("Studio offers a one-click route and a guided direction route", async ({ page }) => {
+  const requests: Array<{ kind: string; direction?: string }> = [];
+  await page.route("**/api/studio/artifacts**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route("**/api/studio/generate", async (route) => {
+    const input = route.request().postDataJSON() as { kind: string; direction?: string };
+    requests.push(input);
+    const fixture = fixtures[input.kind] as Record<string, unknown>;
+    await route.fulfill({
+      status: 201, contentType: "application/json",
+      body: JSON.stringify({
+        ...fixture, id: `art-${requests.length}`,
+        prompt: input.direction ? `Direction from you: ${input.direction}` : "Standard preset; no extra direction.",
+      }),
+    });
+  });
+  const { course } = await createCourseWithLesson(page.request);
+  await page.goto("/");
+  await selectCourseOnPage(page, course.title);
+
+  await page.getByTitle("Open StudyAI Studio").click();
+  await expect(page.getByTestId("studio-surface")).toBeVisible();
+
+  // Quick route: the Create button generates immediately with no direction.
+  await page.getByTestId("studio-tab-study-guide").click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0].direction).toBeUndefined();
+
+  // Guided route: a chevron, a type, a short direction, and one explicit generate.
+  await page.locator(".studio-direct summary").click();
+  await page.getByTestId("studio-direct-kind").selectOption("practice");
+  await expect(page.getByTestId("studio-direct-practice")).toBeVisible();
+  await page.getByTestId("studio-direct-practice").selectOption("quiz");
+  await page.getByTestId("studio-direction").fill("Explain it like I'm new to physics");
+  await expect(page.getByTestId("studio-generate-directed")).toBeEnabled();
+  await page.getByTestId("studio-generate-directed").click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1]).toMatchObject({ kind: "practice", direction: "Explain it like I'm new to physics" });
+
+  await page.getByText("Prompt used").click();
+  await expect(page.getByTestId("artifact-prompt")).toContainText("Explain it like I'm new to physics");
+});
