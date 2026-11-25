@@ -25,7 +25,7 @@ import { initPlayer, reducePlayer, stateAt, type PlayerEvent, type PlayerState }
 import { buildBriefRepairResult, briefRepairSignature, checkBriefPreserve } from "./ai/author-repair";
 import { ArtifactValidationError } from "../artifacts/contracts";
 import type { PreserveList } from "../artifacts/repair-message";
-import { boardOccupancy } from "./ai/canvas-context";
+import { boardOccupancy, roundViewport } from "./ai/canvas-context";
 import { objectOccupancy, type LayoutRect } from "./ai/layout";
 import { useQuickdrawAIBridge } from "./ai/canvas-bridge";
 import { invalidateCanvasSceneCache, requestCanvasScene } from "./ai/scene-tools";
@@ -163,6 +163,7 @@ export function CanvasStudio({ courseId, lessonId, theme, onStatus, onOpenNote, 
   const handledFocusKey = useRef(0);
   const [editingId, setEditingId] = useState<string>();
 const [registeredCards, setRegisteredCards] = useState<string[]>([]);
+  const cameraViewportKey = useRef("");
   const [, setEditorFrame] = useState(0);
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false });
   const [boardMenu, setBoardMenu] = useState(false);
@@ -813,7 +814,15 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     editorRef.current = editor;
     setNativeTool(editor.tool);
     const unlistenHistory = editor.store.listenHistory(refreshHistory);
-    const unlistenCamera = editor.on("camera", () => setEditorFrame((frame) => frame + 1));
+    // Pan/zoom fires a camera event per frame; re-render only when the quantized
+    // viewport actually moves, so the memoized agent context is not rebuilt.
+    const unlistenCamera = editor.on("camera", () => {
+      const bounds = roundViewport(editor.viewportPageBounds());
+      const key = `${bounds.x},${bounds.y},${bounds.w},${bounds.h}`;
+      if (key === cameraViewportKey.current) return;
+      cameraViewportKey.current = key;
+      setEditorFrame((frame) => frame + 1);
+    });
     const unlistenTool = editor.on("tool", () => { setNativeTool(editor.tool); setScienceMode(null); });
     const unlistenSelection = editor.on("selection", () => {
       setSelectedShapeIds([...editor.selection]);
