@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CalendarDays, ChevronDown, CloudUpload, FileText, LoaderCircle, Sparkles, TriangleAlert, X } from "lucide-react";
 import { Citation } from "../components/document-intelligence/Citation.js";
+import { PreflightCard } from "./PreflightCard.js";
 import { DOCUMENT_API, type DocumentData, type LibraryDocument, sourceDocumentUrl, requestJson, uploadOne } from "../components/document-intelligence/api.js";
 import type { CoachPreparationResult, CoachPrompt, CoachTarget } from "../coach/contract.js";
 import "./daily-surfaces.css";
@@ -82,13 +83,16 @@ export function TodayStrip({ prompts, onPrepare, onStatus, onOpenToday }: {
   );
 }
 
-export function TodaySurface({ prompts, courseTitle, lessonTitle, onPrepare, onStatus, onOpenSource, close }: {
+export function TodaySurface({ prompts, courseId, lessonId, courseTitle, lessonTitle, onPrepare, onStatus, onOpenSource, onStartQuestion, close }: {
   prompts: CoachPrompt[];
+  courseId: string;
+  lessonId: string;
   courseTitle: string;
   lessonTitle: string;
   onPrepare: Preparation;
   onStatus: (message: string) => void;
   onOpenSource: (sourceRef: string) => void;
+  onStartQuestion: () => void;
   close: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -131,6 +135,8 @@ export function TodaySurface({ prompts, courseTitle, lessonTitle, onPrepare, onS
           </div>
         ))}
       </section>
+
+      <PreflightCard courseId={courseId} lessonId={lessonId} onStart={onStartQuestion} onOpenSource={onOpenSource} />
 
       {top && <div className="daily-surface-actions"><button type="button" className="daily-primary" data-testid="today-surface-continue" disabled={busy} onClick={() => void activate(top)}>Continue <ArrowRight size={15} aria-hidden="true" /></button><p className="daily-preview">{top.preview}</p></div>}
 
