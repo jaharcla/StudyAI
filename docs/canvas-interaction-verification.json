@@ -90,7 +90,7 @@
       },
       {
         "file": "integration.spec.ts",
-        "title": "PDF import â†’ index â†’ tutor citation â†’ Lewis edit â†’ save â†’ reload",
+        "title": "PDF import → index → tutor citation → Lewis edit → save → reload",
         "status": "passed",
         "durationMs": 17151
       },

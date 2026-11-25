@@ -435,7 +435,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     setDocument(next);
     if (!board) return;
     onBoardState?.({ id: board.id, revision: revisions.current.get(board.id) ?? board.revision, saved: false });
-    onStatus("Savingâ€¦");
+    onStatus("Saving…");
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => void postDocument(board, next), 400);
   }, [onBoardState, onStatus, postDocument]);
@@ -654,7 +654,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       setTeachLabel("");
       invalidateCanvasSceneCache();
       await refreshRecognition();
-      onStatus(`Taught â€œ${result.label}â€ (${result.examples} example${result.examples === 1 ? "" : "s"})`);
+      onStatus(`Taught “${result.label}” (${result.examples} example${result.examples === 1 ? "" : "s"})`);
     } catch (error) { onStatus(error instanceof Error ? error.message : "Teaching failed"); }
     finally { setRecognitionBusy(false); }
   }, [courseId, lessonId, onStatus, recognitionBusy, refreshRecognition, selectedShapeIds, teachLabel]);
@@ -1018,7 +1018,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   }, [activeBoard?.id, boards, loadBoard, onStatus, saveNow]);
 
   const deleteBoard = useCallback(async () => {
-    if (!activeBoard || boards.length < 2 || !window.confirm(`Delete â€œ${activeBoard.name}â€?`)) return;
+    if (!activeBoard || boards.length < 2 || !window.confirm(`Delete “${activeBoard.name}”?`)) return;
     if (!await saveNow()) { onStatus("The current board could not be saved. It remains open."); return; }
     await fetch(`${API}/canvases/${encodeURIComponent(activeBoard.id)}?course=${encodeURIComponent(courseId)}&lesson=${encodeURIComponent(lessonId)}`, { method: "DELETE" });
     revisions.current.delete(activeBoard.id);
@@ -1057,12 +1057,12 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
 
   return <div className="canvas-studio">
     {canvasAnalysis && <CanvasAnalysisTutorContext analysis={canvasAnalysis} />}
-    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved editâ€¦" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
+    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved edit…" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
     {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>AI canvas proposal</strong><p>{shapeProposal.description}</p><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => {
       if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
       void applyQuickdrawProposal();
-    }}>{proposalBusy ? "Saving approved proposalâ€¦" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
-    {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>{objectProposal.reason}</strong><p>Add {objectProposal.object.kind} object</p><pre>{JSON.stringify(objectProposal.object, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved objectâ€¦" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
+    }}>{proposalBusy ? "Saving approved proposal…" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
+    {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>{objectProposal.reason}</strong><p>Add {objectProposal.object.kind} object</p><pre>{JSON.stringify(objectProposal.object, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved object…" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
     {artifactError && <section className="canvas-proposal" role="alert" aria-label="Board artifact problem" data-testid="board-artifact-problem">
       <strong>Board artifact needs correction</strong>
       <pre>{artifactError}</pre>
@@ -1087,14 +1087,14 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
       <header><strong>Canvas labels</strong><span>Teach selected ink, then confirm or correct labels</span><button className="icon-button" aria-label="Close canvas label review" onClick={() => setRecognitionOpen(false)}><X size={14} /></button></header>
       <div className="canvas-recognition-teach">
         <label>Label the selected ink<input aria-label="Recognition label" maxLength={80} value={teachLabel} placeholder="e.g. spring, Î¼, integral" onChange={(event) => setTeachLabel(event.target.value)} /></label>
-        <button className="button-primary" disabled={!selectedShapeIds.length || !teachLabel.trim() || recognitionBusy} onClick={() => void teachSelection()}>{recognitionBusy ? "Savingâ€¦" : "Teach selected drawing"}</button>
+        <button className="button-primary" disabled={!selectedShapeIds.length || !teachLabel.trim() || recognitionBusy} onClick={() => void teachSelection()}>{recognitionBusy ? "Saving…" : "Teach selected drawing"}</button>
         <small>{selectedShapeIds.length ? `${selectedShapeIds.length} stroke(s) selected` : "Select freehand strokes on the board first"}</small>
       </div>
       {recognitionGroups.length ? <ul className="canvas-recognition-list">{recognitionGroups.map(({ key, primary, count, confirmed }) => primary && <li key={key}>
         <div className="recognition-label"><b>{primary.text ?? "unlabeled"}</b>{confirmed ? <span className="recognition-confirmed">confirmed</span> : primary.confidence !== null ? <span>{Math.round(primary.confidence * 100)}%</span> : null}{count > 1 && !confirmed ? <span>+{count - 1} alternative</span> : null}</div>
         {confirmed ? null : <div className="recognition-actions">
           <button className="button-soft" disabled={recognitionBusy || !primary.text} onClick={() => void reviewCandidate(primary, "accept", primary.text ?? undefined)}>Accept</button>
-          <button className="button-soft" disabled={recognitionBusy} onClick={() => void correctionPrompt(primary)}>Correctâ€¦</button>
+          <button className="button-soft" disabled={recognitionBusy} onClick={() => void correctionPrompt(primary)}>Correct…</button>
           <button className="button-soft" disabled={recognitionBusy} onClick={() => void reviewCandidate(primary, "reject")}>Dismiss</button>
         </div>}
       </li>)}</ul> : <p className="canvas-recognition-empty">No recognition candidates on this revision. Teach a label to improve them.</p>}
@@ -1105,7 +1105,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label={`Choose canvas board: ${activeBoard?.name ?? "Loading board"}`}><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
         {boardMenu && <div className="canvas-board-menu">{boards.map((board) => <button key={board.id} className={board.id === activeBoard?.id ? "current" : ""} onClick={() => void changeBoard(board.id)}>{board.name}</button>)}<button onClick={() => void createBoard()}><Plus size={13} /> New board</button>{boards.length > 1 && <button className="delete-board" onClick={() => void deleteBoard()}><Trash2 size={13} /> Delete current board</button>}</div>}
       </div>
-      {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} Â· Esc cancels</span>}
+      {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} · Esc cancels</span>}
       {selectedId && <div className="science-selection-actions"><button className="button-soft" aria-label="Inspect selected object" onClick={() => setEditingId(selectedId)}>Inspect</button><button className="button-soft" aria-label="Send scientific object to back" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([object, ...document.objects.filter((item) => item.id !== selectedId)]); }}>Back</button><button className="button-soft" aria-label="Bring scientific object to front" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([...document.objects.filter((item) => item.id !== selectedId), object]); }}>Front</button><button className="button-soft" aria-label="Delete selected scientific object" onClick={() => { replaceObjects(document.objects.filter((item) => item.id !== selectedId)); setSelectedId(undefined); }}>Delete</button></div>}
       <div className="canvas-actions">
         <label className="canvas-egress" title="When on, cropped ink images may be sent to the configured cloud OCR providers. When off, ink images stay on this device and text-only analysis continues.">
@@ -1115,9 +1115,9 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
           <input type="checkbox" aria-label="Palm rejection" checked={palmRejection} onChange={(event) => togglePalmRejection(event.target.checked)} />Palm rejection
         </label>
         {canvasAnalysis && analysisTelemetry && <output className="canvas-analysis-meta" title={analysisTelemetry.usage.length ? analysisTelemetry.usage.map((entry) => `${entry.provider}: ${entry.calls} call(s), ${entry.promptTokens + entry.completionTokens} tokens, $${entry.costUsd.toFixed(6)}`).join("\n") : "No cloud provider calls; deterministic and local stages only."}>
-          {(analysisTelemetry.totalMs / 1000).toFixed(1)} s Â· {analysisTelemetry.usage.length ? `$${analysisTelemetry.usage.reduce((sum, entry) => sum + entry.costUsd, 0).toFixed(4)}` : "local only"}
+          {(analysisTelemetry.totalMs / 1000).toFixed(1)} s · {analysisTelemetry.usage.length ? `$${analysisTelemetry.usage.reduce((sum, entry) => sum + entry.costUsd, 0).toFixed(4)}` : "local only"}
         </output>}
-        <button className="button-soft" aria-label="Analyze board" disabled={!activeBoard || loading || analysisBusy || proposalBusy} title="Select freehand strokes to target their complete ink groups; otherwise the highest-scoring, spatially diverse groups are analyzed." onClick={() => void analyzeBoard()}><Atom size={14} />{analysisBusy ? "Analyzingâ€¦" : "Analyze board"}</button>
+        <button className="button-soft" aria-label="Analyze board" disabled={!activeBoard || loading || analysisBusy || proposalBusy} title="Select freehand strokes to target their complete ink groups; otherwise the highest-scoring, spatially diverse groups are analyzed." onClick={() => void analyzeBoard()}><Atom size={14} />{analysisBusy ? "Analyzing…" : "Analyze board"}</button>
         <button className="button-soft" aria-label="Review canvas labels" aria-pressed={recognitionOpen} disabled={!activeBoard || loading} title="Teach selected ink a label, then accept, correct, or dismiss recognition candidates." onClick={() => void openRecognition()}><Tag size={14} />Labels</button>
         <button className="icon-button" title="Undo" aria-label="Undo canvas change" disabled={!undoState.canUndo} onClick={undo}><Undo2 size={15} /></button>
         <button className="icon-button" title="Redo" aria-label="Redo canvas change" disabled={!undoState.canRedo} onClick={redo}><Redo2 size={15} /></button>
@@ -1215,12 +1215,12 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         if (event.key === "Escape") { setScienceMode(null); setSelectedId(undefined); setEditingId(undefined); }
         if ((event.key === "Delete" || event.key === "Backspace") && selectedId) { event.preventDefault(); event.stopPropagation(); replaceObjects(documentRef.current.objects.filter((object) => object.id !== selectedId)); setSelectedId(undefined); }
       }} onKeyUpCapture={(event) => { if (event.code === "Space") setSpaceHeld(false); }} onBlur={() => setSpaceHeld(false)}>
-        {loading ? <div className="canvas-loading">Loading saved canvasâ€¦</div> : <>
+        {loading ? <div className="canvas-loading">Loading saved canvas…</div> : <>
           <Quickdraw className="quickdraw-native" key={activeBoard?.id ?? "loading"} ref={quickdrawRef} theme={theme} grid="dots" snapshot={document.snapshot} onMount={onMount} onChange={handleQuickdrawChange} onSelectionChange={(ids) => setSelectedShapeIds(ids)} />
           {editorRef.current && <ScientificLayer objects={document.objects} editor={editorRef.current} mode={scienceMode} placementPatch={placementPatch} selectedId={selectedId} interactive={!spaceHeld && (nativeTool === "select" || Boolean(scienceMode))} registeredCards={registeredCards} dimmedIds={dimmedIds} highlightIds={highlightIds} onSelect={(id) => { setSelectedId(id); editorRef.current?.setSelection([]); }} onEdit={setEditingId} onCommit={replaceObjects} onFinish={() => setScienceMode(null)} onActivateMolecule={() => { cancelNativeGesture(); editorRef.current?.setTool("select"); setScienceMode("molecule"); }} onOpenNote={onOpenNote} onOpenDocument={onOpenDocument} />}
           <NarrationPanel objects={document.objects} boardRevision={activeBoard?.revision ?? 0} editor={editorRef.current} />
         </>}
-        {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas changeâ€¦</div>}
+        {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>
     </div>
     {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} onRegisterCard={async (front, back, conceptId) => {
@@ -1327,8 +1327,8 @@ function MathWorkspaceEditor({ object, onChange, onCreateLinkedGraph }: { object
     <h4>Mathematical workspace</h4>
     {!open ? <button className="button-soft" onClick={() => { setReady(false); setOpen(true); }}>Open MathLive editor</button> : <>
       <div ref={host} className="mathlive-field-host" />
-      {!ready && <span role="status">Loading MathLiveâ€¦</span>}
-      <button className="button-soft" disabled={!ready || busy} onClick={() => void applyNotation()}>{busy ? "Checking notationâ€¦" : "Apply notation"}</button>
+      {!ready && <span role="status">Loading MathLive…</span>}
+      <button className="button-soft" disabled={!ready || busy} onClick={() => void applyNotation()}>{busy ? "Checking notation…" : "Apply notation"}</button>
     </>}
     {error && <output role="alert" className="expression-result">{error}</output>}
     {workspace && <>
@@ -1339,7 +1339,7 @@ function MathWorkspaceEditor({ object, onChange, onCreateLinkedGraph }: { object
       <label>Assumptions<textarea aria-label="Math assumptions" value={workspace.assumptions.join("\n")} maxLength={2400} onChange={(event) => updateWorkspace({ assumptions: event.target.value.split("\n").slice(0, 100).map((item) => item.slice(0, 240)) })} /></label>
       <label>Domain restrictions<textarea aria-label="Domain restrictions" value={workspace.domainRestrictions.join("\n")} maxLength={2400} onChange={(event) => updateWorkspace({ domainRestrictions: event.target.value.split("\n").slice(0, 100).map((item) => item.slice(0, 240)) })} /></label>
       <button className="button-soft" onClick={onCreateLinkedGraph}>Create linked graph</button>
-      {workspace.verifiedSteps.map((step, index) => <output className="math-step-status" key={`${workspace.revision}-${index}`}>{step.status}: {step.before.left} = {step.before.right} â†’ {step.after.left} = {step.after.right}</output>)}
+      {workspace.verifiedSteps.map((step, index) => <output className="math-step-status" key={`${workspace.revision}-${index}`}>{step.status}: {step.before.left} = {step.before.right} → {step.after.left} = {step.after.right}</output>)}
     </>}
   </section>;
 }
@@ -1358,8 +1358,8 @@ function MoleculeEditor({ molecule, onChange }: { molecule: Extract<ScientificOb
   return <>
     <label>Molecule name<input value={molecule.name} onChange={(event) => onChange({ name: event.target.value } as Partial<ScientificObject>)} /></label>
     <label>Resonance form<select value={active.id} onChange={(event) => onChange({ activeResonanceId: event.target.value } as Partial<ScientificObject>)}>{molecule.resonanceForms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
-    <h4>Atoms</h4>{molecule.atoms.map((atom) => <div className="molecule-row" key={atom.id}><select aria-label="Atom element" value={atom.element} onChange={(event) => updateAtom(atom.id, { element: event.target.value as Element })}>{elementOptions}</select><span>{atom.id.slice(0, 8)}</span><input aria-label="Nonbonding electrons" type="number" min="0" step="1" value={atom.nonbondingElectrons} onChange={(event) => updateAtom(atom.id, { nonbondingElectrons: Number(event.target.value) })} /><b>q {formatCharge(formalChargeForAtom(atom, bondOrderSum(molecule, atom.id)))}</b><button aria-label="Remove atom" onClick={() => { const ids = new Set(molecule.atoms.filter((item) => item.id !== atom.id).map((item) => item.id)); onChange({ atoms: molecule.atoms.filter((item) => item.id !== atom.id), resonanceForms: molecule.resonanceForms.map((form) => ({ ...form, bonds: form.bonds.filter((bond) => ids.has(bond.from) && ids.has(bond.to)) })) } as Partial<ScientificObject>); }}>Ã—</button></div>)}<button className="button-soft" onClick={addAtom}>Add atom</button>
-    <h4>Bonds</h4>{active.bonds.map((bond) => <div className="molecule-row bond-row" key={bond.id}><select aria-label="Bond start atom" value={bond.from} onChange={(event) => updateBond(bond.id, { from: event.target.value })}>{molecule.atoms.map((atom) => <option key={atom.id} value={atom.id}>{atom.element} Â· {atom.id.slice(0, 4)}</option>)}</select><span>â†’</span><select aria-label="Bond end atom" value={bond.to} onChange={(event) => updateBond(bond.id, { to: event.target.value })}>{molecule.atoms.map((atom) => <option key={atom.id} value={atom.id}>{atom.element} Â· {atom.id.slice(0, 4)}</option>)}</select><select aria-label="Bond order" value={bond.order} onChange={(event) => updateBond(bond.id, { order: Number(event.target.value) as BondOrder })}>{valenceOrder.map((order) => <option key={order} value={order}>{order}</option>)}</select><button aria-label="Remove bond" onClick={() => onChange({ resonanceForms: molecule.resonanceForms.map((form) => form.id === active.id ? { ...form, bonds: form.bonds.filter((item) => item.id !== bond.id) } : form) } as Partial<ScientificObject>)}>Ã—</button></div>)}<button className="button-soft" onClick={addBond}>Add bond</button><button className="button-soft resonance-button" onClick={addResonance}>Duplicate as resonance form</button><button className="button-soft ocl-button" disabled={checkingChemistry} onClick={async () => { setCheckingChemistry(true); setChemistryStatus(""); try { const { validateWithOpenChemLib } = await import("./chemistry"); const result = validateWithOpenChemLib(molecule); setChemistryStatus(`OpenChemLib SMILES: ${result.smiles}`); } catch (error) { setChemistryStatus(error instanceof Error ? `OpenChemLib: ${error.message}` : "OpenChemLib could not convert this structure."); } finally { setCheckingChemistry(false); } }}>{checkingChemistry ? "Checking structureâ€¦" : "Convert with OpenChemLib"}</button>{chemistryStatus && <p className="chemistry-status">{chemistryStatus}</p>}
+    <h4>Atoms</h4>{molecule.atoms.map((atom) => <div className="molecule-row" key={atom.id}><select aria-label="Atom element" value={atom.element} onChange={(event) => updateAtom(atom.id, { element: event.target.value as Element })}>{elementOptions}</select><span>{atom.id.slice(0, 8)}</span><input aria-label="Nonbonding electrons" type="number" min="0" step="1" value={atom.nonbondingElectrons} onChange={(event) => updateAtom(atom.id, { nonbondingElectrons: Number(event.target.value) })} /><b>q {formatCharge(formalChargeForAtom(atom, bondOrderSum(molecule, atom.id)))}</b><button aria-label="Remove atom" onClick={() => { const ids = new Set(molecule.atoms.filter((item) => item.id !== atom.id).map((item) => item.id)); onChange({ atoms: molecule.atoms.filter((item) => item.id !== atom.id), resonanceForms: molecule.resonanceForms.map((form) => ({ ...form, bonds: form.bonds.filter((bond) => ids.has(bond.from) && ids.has(bond.to)) })) } as Partial<ScientificObject>); }}>×</button></div>)}<button className="button-soft" onClick={addAtom}>Add atom</button>
+    <h4>Bonds</h4>{active.bonds.map((bond) => <div className="molecule-row bond-row" key={bond.id}><select aria-label="Bond start atom" value={bond.from} onChange={(event) => updateBond(bond.id, { from: event.target.value })}>{molecule.atoms.map((atom) => <option key={atom.id} value={atom.id}>{atom.element} · {atom.id.slice(0, 4)}</option>)}</select><span>→</span><select aria-label="Bond end atom" value={bond.to} onChange={(event) => updateBond(bond.id, { to: event.target.value })}>{molecule.atoms.map((atom) => <option key={atom.id} value={atom.id}>{atom.element} · {atom.id.slice(0, 4)}</option>)}</select><select aria-label="Bond order" value={bond.order} onChange={(event) => updateBond(bond.id, { order: Number(event.target.value) as BondOrder })}>{valenceOrder.map((order) => <option key={order} value={order}>{order}</option>)}</select><button aria-label="Remove bond" onClick={() => onChange({ resonanceForms: molecule.resonanceForms.map((form) => form.id === active.id ? { ...form, bonds: form.bonds.filter((item) => item.id !== bond.id) } : form) } as Partial<ScientificObject>)}>×</button></div>)}<button className="button-soft" onClick={addBond}>Add bond</button><button className="button-soft resonance-button" onClick={addResonance}>Duplicate as resonance form</button><button className="button-soft ocl-button" disabled={checkingChemistry} onClick={async () => { setCheckingChemistry(true); setChemistryStatus(""); try { const { validateWithOpenChemLib } = await import("./chemistry"); const result = validateWithOpenChemLib(molecule); setChemistryStatus(`OpenChemLib SMILES: ${result.smiles}`); } catch (error) { setChemistryStatus(error instanceof Error ? `OpenChemLib: ${error.message}` : "OpenChemLib could not convert this structure."); } finally { setCheckingChemistry(false); } }}>{checkingChemistry ? "Checking structure…" : "Convert with OpenChemLib"}</button>{chemistryStatus && <p className="chemistry-status">{chemistryStatus}</p>}
   </>;
 }
 

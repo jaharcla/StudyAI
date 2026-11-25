@@ -28,6 +28,12 @@ async function openCoachedLesson(page: import("@playwright/test").Page, courseTi
   await expect(page.getByTestId("coach-surface")).toBeVisible();
 }
 
+test("Coach shows no quiet placeholder when the lesson has no recommendation", async ({ page, request }) => {
+  const { course, lesson } = await createCourseWithLesson(request, `Coach quiet ${Date.now()}`, "Empty lesson");
+  await openCoachedLesson(page, course.title, lesson.title);
+  await expect(page.getByText("Coach is quiet")).toHaveCount(0);
+});
+
 test("Coach emits one ranked prompt with a preview and an accessible secondary list", async ({ page, request }) => {
   const { course, lesson } = await seedReviewedLesson(request, ["Cell biology", "Genetics"], "Lesson home");
   await openCoachedLesson(page, course.title, lesson.title);
