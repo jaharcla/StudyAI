@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `dc9565b`. Final `npm run verify` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 138 passed, 6 skipped (2026-11-25). Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `c465cfd`. Final `npm run verify` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 139 passed, 1 flaky (`tutor-round2-hygiene` selected object), 6 skipped (2026-11-25). Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -49,6 +49,9 @@ No journey counts green until one uninterrupted mock-student run produces screen
 - `dc9565b` evidence contract implementation note — https://critique.work/v/e32f422ec8709ef11da691e7f704d025
 - `ad570b3` adopt DESIGN.md — https://critique.work/v/4a8674b77593c223a755e4a219bbc0a0
 - `14346d1` one primary action in Study — https://critique.work/v/12d2bc9dfb453c7e47a10092807df1cd
+- `8af8015` unify Studio, Artifacts and Library — https://critique.work/v/c58d851a0bcbb9a639950222dd93849b
+- `44b4b3b` four-destination top bar and one-click Create — https://critique.work/v/5636a1cad491e2040ecea06317059911
+- `c465cfd` Cards follows the consolidated nav — https://critique.work/v/42769bef6f2444418fee1c4af5311906
 
 ## Workers and threads
 
@@ -61,7 +64,8 @@ No journey counts green until one uninterrupted mock-student run produces screen
 - J1/Today: https://discord.com/channels/1574451017817399346/1574946647929000036 — merged
 - Canvas/cohesion: https://discord.com/channels/1574451017817399346/1574946695655981227 — merged
 - Practice correctness: https://discord.com/channels/1574451017817399346/1574953731907125369 — merged
-- Studio unification: https://discord.com/channels/1574451017817399346/1574977985943965767 — running
+- Studio unification: https://discord.com/channels/1574451017817399346/1574977985943965767 — merged
+- Uninterrupted J1–J7 journey run: https://discord.com/channels/1574451017817399346/1575001612894736504 — running
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
@@ -82,7 +86,7 @@ One worktree and branch per worker. Commits carry the Discord link, one critique
 ## Additional acceptance criteria
 
 - **UTF-8**: done — `App.tsx` and `CanvasStudio.tsx` repaired; cited page re-captured with passage highlighted; Coach quiet row removed.
-- **Library**: open — error and empty states must be mutually exclusive, Retry must work, empty banner dot removed, filter restyled. Studio unification worker is on it.
+- **Library**: done — one Studio surface with a card catalog, filter chips, skeleton loading, error plus working Retry, and no empty banner dot.
 - **Grading**: done — local deterministic grading from the stored key; provider failure only affects generation; browser proof included.
-- **One surface**: open — Studio, Artifacts and Library unified behind one nav entry with creation on one side and everything made on the other.
+- **One surface**: done — Studio, Artifacts and Library unified behind one nav entry with creation on one side and everything made on the other. Remaining DESIGN.md gaps: Cards still opens as a modal over Study, the course sidebar remains, and Studio generation shows a progress card rather than a skeleton card.
 - **Practice tests**: done — 10-question default, four choices, distractors from same material, plain note when fewer questions are supported.
