@@ -6,6 +6,22 @@ const cited = { sourceRef: "source:lecture:2", filename: "chemistry.pdf", unitTy
 const unused = { sourceRef: "source:lecture:3", filename: "unrelated.pdf", unitType: "page", unitNumber: 3, score: -0.2, excerpt: "An unrelated claim." };
 
 describe("Tutor student response", () => {
+  it("renders the grounding notice before the answer", () => {
+    const out = renderTutorResponse({
+      answer: "The slope is $0.9$.",
+      citations: [],
+      rejectedCitationCount: 0,
+      evidence: { version: 1, status: "grounded", sourceRefs: ["a", "b"], sourceCount: 2, courseId: "c" },
+    });
+    expect(out.startsWith("Course evidence · 2 sources checked\n\n")).toBe(true);
+    expect(out).toContain("The slope is $0.9$.");
+  });
+
+  it("does not render a notice when the contract is absent", () => {
+    const out = renderTutorResponse({ answer: "Hello.", citations: [], rejectedCitationCount: 0 });
+    expect(out).toBe("Hello.");
+  });
+
   it("returns only validated sources cited in the answer", () => {
     const answer = `The claim is supported [wrong label](#studyai-citation=${encodeURIComponent(cited.sourceRef)}). [fake](#studyai-citation=unknown-ref)`;
     const response = presentTutorResponse(answer, [cited, unused]);

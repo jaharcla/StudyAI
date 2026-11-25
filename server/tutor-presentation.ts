@@ -1,4 +1,5 @@
 import { directionAngleDegrees } from "../src/canvas/geometry.js";
+import { groundingNotice, type TutorEvidenceContract } from "./tutor-evidence-contract.js";
 
 export type TutorCitationCandidate = {
   sourceRef: string;
@@ -10,7 +11,7 @@ export type TutorCitationCandidate = {
 };
 
 export type TutorCitation = Pick<TutorCitationCandidate, "sourceRef" | "filename" | "unitType" | "unitNumber">;
-export type TutorStudentResponse = { answer: string; citations: TutorCitation[]; rejectedCitationCount: number };
+export type TutorStudentResponse = { answer: string; citations: TutorCitation[]; rejectedCitationCount: number; evidence?: TutorEvidenceContract };
 export type TutorContextItem = { description: string; value: unknown };
 export type TutorPresentationOptions = {
   linkMentionedSource?: boolean;
@@ -158,7 +159,7 @@ function wrapBareRun(run: string): string {
 }
 
 export function renderTutorResponse(response: TutorStudentResponse): string {
-  return response.answer
+  const rendered = response.answer
     .split(/(```[\s\S]*?```)/)
     .map((part, index) => {
       if (index % 2 === 1) return part;
@@ -184,6 +185,8 @@ export function renderTutorResponse(response: TutorStudentResponse): string {
         return out;
       }).join("").replace(/\$\$(?=\$)/g, () => "$$\n").replace(/\$(?=\$\$)/g, () => "$\n").replace(/\n{3,}/g, "\n\n");
     }).join("");
+  const notice = response.evidence ? groundingNotice(response.evidence) : null;
+  return notice ? `${notice}\n\n${rendered}` : rendered;
 }
 
 export function projectTutorContexts(contexts: TutorContextItem[], includeRawCanvasMetadata: boolean): TutorContextItem[] {

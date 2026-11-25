@@ -98,7 +98,7 @@ function exactOutputRequest(query: string): boolean {
     || /\bexactly\s*:/i.test(query);
 }
 
-function greetingOnly(query: string): boolean {
+export function greetingOnly(query: string): boolean {
   const normalized = query.trim().toLocaleLowerCase().replace(/[.!?,;:]+$/g, "").replace(/\s+/g, " ");
   return /^(?:hi|hello|hey|good morning|good afternoon|good evening|how are you)(?: there| tutor| studyai)?$/.test(normalized);
 }

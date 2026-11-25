@@ -216,7 +216,7 @@ it("makes context omitted under the token budget visible in the tutor answer", a
   const conversation = Array.from({ length: 8 }, (_, index) => [new HumanMessage(`Old question ${index} ${"background ".repeat(200)}`), new AIMessage("Old answer")]).flat();
   conversation.push(new HumanMessage("Current question"));
   const result = await graph.invoke({ activeScope: "chem-120:lesson-03", scopeStart: String(conversation[0].id), copilotkit: { context }, messages: conversation });
-  expect(result.messages.at(-1)?.content).toBe("Answer based on current context.");
+  expect(result.messages.at(-1)?.content).toBe("No course evidence · Not in your course material\n\nAnswer based on current context.");
   expect(tutorMetadata(result).context.omittedTurnCount).toBeGreaterThan(0);
   expect(mocks.invoke.mock.calls[0][0].some((message: { content?: unknown }) => String(message.content).includes("Old question 0"))).toBe(false);
 });
@@ -225,7 +225,7 @@ it("flags canvas context already marked truncated by its producer", async () => 
   mocks.invoke.mockResolvedValue(new AIMessage("Answer with available canvas evidence."));
   const active = { ...context[2], value: { ...(context[2].value as Record<string, unknown>), truncated: true, omittedShapeCount: 3 } };
   const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Explain the board")] });
-  expect(result.messages.at(-1)?.content).toBe("Answer with available canvas evidence.");
+  expect(result.messages.at(-1)?.content).toBe("Course evidence · 2 sources checked\n\nAnswer with available canvas evidence.");
   expect(tutorMetadata(result).context.incompleteCanvasContextCount).toBe(1);
 });
 
@@ -247,7 +247,7 @@ it("serializes arrow attachments into the tutor prompt", async () => {
     },
   };
   const result = await graph.invoke({ copilotkit: { context: [...context.slice(0, 2), active] }, messages: [new HumanMessage("Which photon has the shortest wavelength?")] });
-  expect(result.messages.at(-1)?.content).toBe("b");
+  expect(result.messages.at(-1)?.content).toBe("Course evidence · 2 sources checked\n\nb");
   const prompt = String(mocks.invoke.mock.calls[0][0][0].content);
   expect(prompt).toContain("startAttached");
   expect(prompt).toContain('"label":"2"');
@@ -291,7 +291,7 @@ it("removes inline reasoning before the student sees the answer", async () => {
   mocks.invoke.mockResolvedValue(new AIMessage("<think>Need search docs... selectedCount 0</think>\nThe vector magnitude is 5 units."));
   const result = await graph.invoke({ copilotkit: { context }, messages: [new HumanMessage("What is the magnitude?")] });
   const answer = String(result.messages.at(-1)?.content);
-  expect(answer).toBe("The vector magnitude is 5 units.");
+  expect(answer).toBe("Course evidence · 4 sources checked\n\nThe vector magnitude is 5 units.");
   expect(answer).not.toMatch(/<think>|Need search docs|selectedCount/i);
 });
 

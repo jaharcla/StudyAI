@@ -3,7 +3,7 @@ import { buildTutorEvidenceContract, groundingNotice, shouldAttachEvidenceContra
 
 const evidence = {
   status: "evidence" as const,
-  message: "Candidate excerpts found; verify each excerpt before using it as an answer.",
+  message: "Candidate excerpts found; verify each excerpt before using it as an answer." as const,
   courseId: "course-1",
   results: [],
 };

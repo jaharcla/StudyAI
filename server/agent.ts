@@ -21,8 +21,9 @@ import { CanvasAnalysisValidationError } from "./canvas-analysis/contract.js";
 import { validateCanvasAnalysisAtReceiver } from "./canvas-analysis/receiver.js";
 import { aiRequestQueues, AIRequestQueueFullError, type AIProvider } from "./ai-requests.js";
 import { getTutorContextBudget, budgetTutorContext, diagnoseTutorMessages, estimateTutorMessageTokens, TutorContextBudgetError } from "./tutor-context.js";
-import { isExactOutputRequest, recommendedToolsForQuery, requestsCanvasAction as policyRequestsCanvasAction, requestsCanvasMetadata, shouldRetrieveCourseDocuments } from "./tutor-retrieval-policy.js";
-import { presentTutorResponse, projectTutorContexts, renderTutorResponse, stripTutorReasoning } from "./tutor-presentation.js";
+import { greetingOnly, isExactOutputRequest, recommendedToolsForQuery, requestsCanvasAction as policyRequestsCanvasAction, requestsCanvasMetadata, shouldRetrieveCourseDocuments } from "./tutor-retrieval-policy.js";
+import { presentTutorResponse, projectTutorContexts, renderTutorResponse, stripTutorReasoning, type TutorStudentResponse } from "./tutor-presentation.js";
+import { buildTutorEvidenceContract, shouldAttachEvidenceContract } from "./tutor-evidence-contract.js";
 import { getTutorProviderSettings, nextTutorFallbackProvider, tutorModelForProvider, type TutorProvider } from "./tutor-provider.js";
 import { createTutorChatModel, type TutorChatModel } from "./tutor-chat-model.js";
 import { LearningService } from "./learning/service.js";
@@ -482,7 +483,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
   });
   if (!canvasToolProposed && !priorCanvasProposal && (quickdrawActions || quickdrawRead || canvasTool || canvasObjectCreate || moleculeTool) && requestsCanvasAction(query)) return { activeScope, scopeStart, messages: [new AIMessage("I did not receive a structured canvas tool call, so the canvas was not changed. This model may not support tool calling; try a model with tool-calling support.")] };
   const wantsCitation = /\b(?:cite|citation|source|reference)\b/i.test(query);
-  const studentResponse = isExactOutputRequest(query)
+  const studentResponse: TutorStudentResponse = isExactOutputRequest(query)
     ? { answer: body, citations: [], rejectedCitationCount: 0 }
     : presentTutorResponse(body, [...candidateByRef.values()], {
       linkMentionedSource: wantsCitation,
@@ -498,6 +499,13 @@ async function tutor(state: typeof State.State, config?: unknown) {
     studentResponse.answer = `${studentResponse.answer.trimEnd()}\n\n[${candidate.filename}${location}](#studyai-citation=${encodeURIComponent(candidate.sourceRef)})`;
     studentResponse.citations = [{ sourceRef: candidate.sourceRef, filename: candidate.filename, unitType: candidate.unitType, unitNumber: candidate.unitNumber }];
   }
+  if (shouldAttachEvidenceContract(isExactOutputRequest(query), greetingOnly(query), retrievalRequested, candidateByRef.size)) {
+    studentResponse.evidence = buildTutorEvidenceContract({
+      evidence,
+      dropped: Boolean(budgeted.courseEvidenceDropped),
+      sourceRefs: candidateByRef.keys(),
+    });
+  }
   const incompleteCanvasContextCount = promptContexts.filter((item) => budgeted.contexts.includes(item) && hasTruncatedCanvasContext(item.value)).length;
   const responseMetadata = {
     ...objectValue(response.response_metadata),
@@ -507,6 +515,7 @@ async function tutor(state: typeof State.State, config?: unknown) {
         candidates: [...candidateByRef.values()].map(({ sourceRef, filename, unitType, unitNumber, score }) => ({ sourceRef, filename, unitType, unitNumber, score })),
         citedSourceRefs: studentResponse.citations.map((citation) => citation.sourceRef),
         rejectedCitationCount: studentResponse.rejectedCitationCount,
+        evidence: studentResponse.evidence ?? null,
       },
       context: { omittedContextCount: budgeted.omittedContextCount, omittedTurnCount: budgeted.omittedTurnCount, incompleteCanvasContextCount },
       canvas: {
