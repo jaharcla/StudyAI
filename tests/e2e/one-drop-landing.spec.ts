@@ -65,3 +65,37 @@ test("no retrieved passage abstains without a citation or send button", async ({
   await expect(page.getByTestId("prepared-question-send")).toHaveCount(0);
   await expect(prepared.locator(".di-citation")).toHaveCount(0);
 });
+
+test("course storage loading is its own state before the intake surface", async ({ page }) => {
+  await page.route("**/api/courses", async (route) => {
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 2500));
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByTestId("intake-loading")).toBeVisible();
+  await expect(page.getByTestId("one-drop-zone")).toHaveCount(0);
+  await expect(page.getByTestId("one-drop-surface")).toHaveCount(0);
+  await expect(page.getByTestId("intake-loading")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("one-drop-zone")).toBeVisible();
+});
+
+test("course storage failure offers retry instead of an upload invitation", async ({ page }) => {
+  let unavailable = true;
+  await page.route("**/api/courses", (route) => unavailable
+    ? route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"Local storage is unavailable."}' })
+    : route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto("/");
+
+  const failure = page.getByTestId("intake-error");
+  await expect(failure).toBeVisible();
+  await expect(failure).toHaveAttribute("role", "alert");
+  await expect(failure).toContainText(/storage/i);
+  await expect(page.getByTestId("one-drop-zone")).toHaveCount(0);
+  await expect(page.getByTestId("one-drop-input")).toHaveCount(0);
+
+  unavailable = false;
+  await page.getByTestId("intake-retry").click();
+  await expect(failure).toHaveCount(0);
+  await expect(page.getByTestId("one-drop-zone")).toBeVisible();
+});

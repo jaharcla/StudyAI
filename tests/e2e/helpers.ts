@@ -21,9 +21,11 @@ export async function createCourseWithLesson(request: APIRequestContext, courseT
 
 export async function selectCourseOnPage(page: Page, title: string): Promise<void> {
   const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // The immersive shell keeps courses in a slide-over until the hamburger opens it.
+  // Course intake shows its own loading shell; wait for the ready shell first.
   const toggle = page.getByTitle("Toggle courses");
-  if (await toggle.isVisible() && !(await page.locator(".app-shell").evaluate((el) => el.classList.contains("sidebar-open")))) {
+  await toggle.waitFor({ state: "visible" });
+  // The immersive shell keeps courses in a slide-over until the hamburger opens it.
+  if (!(await page.locator(".app-shell").evaluate((el) => el.classList.contains("sidebar-open")))) {
     await toggle.click();
   }
   const showMore = page.getByRole("button", { name: /Show \d+ more courses/ });

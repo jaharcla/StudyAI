@@ -140,3 +140,31 @@ test("phone width keeps the board usable and the tutor dockable", async ({ page 
   await expect(page.locator(".tutor-panel")).toBeVisible();
   await page.screenshot({ path: "test-results/shots/canvas-phone-width.png", fullPage: true });
 });
+
+test("secondary board file actions are grouped and the board leads at 375px", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Board hierarchy ${Date.now()}`, "Board lesson");
+  await openCourse(page, course.title);
+
+  await expect(page.locator(".canvas-tools-bar")).toHaveCount(1);
+  const fileMenu = page.getByTestId("board-file-menu");
+  await expect(fileMenu).toBeVisible();
+  await expect(fileMenu).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Import canvas JSON" })).toHaveCount(0);
+
+  await fileMenu.click();
+  await expect(fileMenu).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("button", { name: "Import canvas JSON" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export board image" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Analyze board" })).toBeVisible();
+  await fileMenu.click();
+  await expect(page.getByRole("button", { name: "Import canvas JSON" })).toHaveCount(0);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const bar = await page.locator(".canvas-tools-bar").boundingBox();
+  const board = await page.locator(".canvas-board").boundingBox();
+  expect(bar).not.toBeNull();
+  expect(board).not.toBeNull();
+  expect(board!.height).toBeGreaterThan(bar!.height * 3);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  await expect(page.locator(".canvas-board")).toBeVisible();
+});
