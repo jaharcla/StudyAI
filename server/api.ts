@@ -38,6 +38,7 @@ import { configureProviderUsageDatabase, persistedProviderUsageSnapshot, provide
 import { providerChain, resolveCompletionProviders, resolveVisionProviders } from "./canvas-intelligence/providers.js";
 import { isImageEgressAllowed } from "./canvas-intelligence/groq.js";
 import { tutorProviderStatus } from "./tutor-provider.js";
+import { handleMathRequest } from "./math/http.js";
 
 const config = getStudyAIConfig();
 const port = config.dataPort;
@@ -95,6 +96,7 @@ const server = createServer(async (req, res) => {
   if (await canvasSceneHandler(req, res)) return;
   if (await canvasAnalysisProducerHandler(req, res)) return;
   if (await canvasAnalysisHandler(req, res)) return;
+  if (await handleMathRequest(req, res, json, body)) return;
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url ?? "/", `http://${LOOPBACK_HOST}:${port}`);
   if (req.method === "GET" && url.pathname === "/api/models") {
