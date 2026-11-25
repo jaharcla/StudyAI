@@ -41,9 +41,28 @@ Live voice Tutor reuses the existing evidence contract, not a second tutor. The 
 
 Do not build a separate orchestration framework. A small state machine in the Tutor surface (listening → thinking → speaking → interrupted) is enough; the hard parts are turn detection, barge-in and history trimming, all of which stay inside that one component.
 
+## Better voices after the iPhone listen test (2026-11-25)
+
+The student listened to every iPhone `SpeechSynthesis` voice and rejected all of them. Browser voices are therefore a fallback only, not a voice strategy. Three findings change the recommendation:
+
+1. **Narration and conversation are different jobs.** A [2026 evaluation of naturalness and appropriateness](https://arxiv.org/html/2606.31729v1) found Kokoro strong for reading and assistant roles but weak for spontaneous conversation; Kyutai's model strong for spontaneous conversation but raw for assistant roles; ElevenLabs and GPT-4o-mini strong for acting but weak for spontaneous conversation. A single voice engine is unlikely to serve both the podcast and the live tutor well.
+2. **Open-weight quality is now measurable.** A [CPU benchmark with UTMOS scores](https://heyneo.com/blog/kokoro-supertonic-inflect-nano-pocket-tts-cpu-benchmark) puts Kokoro-82M at 4.44–4.46, Supertonic-3 5-step at 4.32 and Pocket TTS at 4.10 on a 1–5 naturalness scale; Supertonic 2-step at 1.53 is not usable. Kyutai's [Pocket TTS report](https://kyutai.org/pocket-tts-technical-report/) reports human preference quality above F5-TTS and DSM, with real-time CPU synthesis and voice cloning. These are predicted or protocol-specific scores, not a guarantee for our script.
+3. **A browser model is viable on desktop, not iPhone.** [kokoro-js](https://www.npmjs.com/package/kokoro-js) runs Kokoro-82M locally in the browser via WebGPU/WASM, with 54 voices; q8 is about 92 MB and fp32 about 326 MB. A [browser voice-agent account](https://sreekeshokky.in/blog/browser-voice-agent/) reports WebGPU fp16 first audio around 1–1.6 s on desktop, but iPhone has no useful multi-threading and a 90 MB first download. The same account settles on system voices on phones and the local model on desktop.
+
+Recommended split:
+
+| Use | Route | Why |
+| --- | --- | --- |
+| Source-driven podcast | Pre-render with Kokoro-82M, curated voices (`af_heart`, `af_bella`, `am_michael`, `bf_emma`), once the student approves `kokoro-js` plus the weight download | Best measured narration quality, local, downloadable audio, stable two-host voices |
+| Live voice tutor on desktop | Pocket-TTS or Phonon-class streaming engine, or BYOK ElevenLabs/Cartesia if the student supplies a key | Spontaneous conversation prosody and sub-second first audio; browser voices stay as fallback |
+| Live voice tutor on iPhone | BYOK cloud voice or system voice fallback, podcast audio pre-rendered elsewhere | On-device neural TTS is not viable on iPhone within our RAM and download budget |
+
+Cloud pricing and quality change quickly; one [provider comparison](https://www.cekura.ai/blogs/elevenlabs-vs-cartesia) puts ElevenLabs v4 and Cartesia Sonic 3.6 near each other on naturalness but far apart on pronunciation. We would keep any cloud provider optional and BYOK, never a default.
+
 ## Needs approval before implementation
 
-- A local TTS binary and voice model (Piper-class) if downloadable podcast audio is required. No install or download until the user approves.
+- `kokoro-js` plus a Kokoro-82M q8/fp16 weight download (roughly 92–326 MB) for natural narration and downloadable podcast audio.
+- A Pocket-TTS/Phonon-class streaming engine or a BYOK key for a conversational voice. No provider key is currently configured in this environment, and `kimaki tts` reports "No OpenAI or Gemini key".
 - Any local STT model route if browser `processLocally` proves insufficient on the target browsers.
 
 ## Objections and uncertainties
