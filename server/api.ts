@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { extname, basename, resolve } from "node:path";
 import { db } from "./db.js";
 import { createDocumentIntelligenceHandler } from "./document-intelligence/http.js";
+import { reconcileDocumentFiles } from "./document-intelligence/service.js";
 import { parseCanvasDocument } from "../src/canvas/model.js";
 import { initializeDocumentIntelligenceSchema } from "./document-intelligence/schema.js";
 import { migrateLegacyDocuments } from "./document-intelligence/legacy.js";
@@ -54,12 +55,13 @@ export function resolveAllowedOrigin(reqOrOrigin: import("node:http").IncomingMe
 configureProviderBudgetDatabase(db);
 configureProviderUsageDatabase(db);
 initializeDocumentIntelligenceSchema(db);
+await reconcileDocumentFiles(db, process.env.STUDYAI_DOCUMENTS);
 initializeStudioSchema(db);
 initializeCanvasAnalysisStorage(db);
 const legacyDocuments = await migrateLegacyDocuments(db);
 if (legacyDocuments.failures.length) console.warn("Legacy document indexing failures:", legacyDocuments.failures);
-let currentRequestOrigin = config.webOrigin;
-const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": currentRequestOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
+const requestOrigins = new WeakMap<import("node:http").ServerResponse, string>();
+const json = (res: import("node:http").ServerResponse, status: number, data: unknown) => { res.writeHead(status, { "content-type": "application/json", "access-control-allow-origin": requestOrigins.get(res) ?? config.webOrigin, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS" }); res.end(JSON.stringify(data)); };
 const documentHandler = createDocumentIntelligenceHandler(db, process.env.STUDYAI_DOCUMENTS);
 const learningService = new LearningService(db);
 const learningHandler = createLearningHandler(learningService, resolveAllowedOrigin);
@@ -83,7 +85,7 @@ const canvasRecognitionHandler = createCanvasRecognitionHandler(db, resolveAllow
 
 const server = createServer(async (req, res) => {
   try {
-  currentRequestOrigin = resolveAllowedOrigin(req.headers.origin as string | undefined);
+  requestOrigins.set(res, resolveAllowedOrigin(req.headers.origin as string | undefined));
   const untrusted = rejectUntrustedRequest(req);
   if (untrusted) return json(res, 403, { error: untrusted });
   if (await activityHandler(req, res)) return;
@@ -120,7 +122,7 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { courseId, labels: countCanvasRecognitionExamples(db, courseId) });
   }
   if (req.method === "POST" && url.pathname === "/api/canvas-recognition/examples") {
-    const input = JSON.parse(await body(req, 8_000_000));
+    const input = await readJson(req, 8_000_000);
     if (typeof input.courseId !== "string" || !courseExists(input.courseId)) return json(res, 404, { error: "Course not found." });
     try {
       const result = await teachCanvasRecognitionExample(db, { courseId: input.courseId, label: String(input.label ?? ""), pngBase64: String(input.pngBase64 ?? "") });
@@ -130,7 +132,7 @@ const server = createServer(async (req, res) => {
     }
   }
   if (req.method === "POST" && url.pathname === "/api/courses") {
-    const input = JSON.parse(await body(req));
+    const input = await readJson(req);
     const title = typeof input.title === "string" ? input.title.trim().slice(0, 120) : "";
     if (!title) return json(res, 400, { error: "A course title is required." });
     const id = randomUUID();
@@ -146,7 +148,7 @@ const server = createServer(async (req, res) => {
     return json(res, 200, db.prepare("SELECT id,title FROM lessons WHERE course_id=? ORDER BY rowid").all(courseId));
   }
   if (req.method === "POST" && url.pathname === "/api/lessons") {
-    const input = JSON.parse(await body(req));
+    const input = await readJson(req);
     const courseId = typeof input.courseId === "string" ? input.courseId : "";
     const title = typeof input.title === "string" ? input.title.trim().slice(0, 160) : "";
     if (!courseId || !title) return json(res, 400, { error: "courseId and title are required." });
@@ -184,7 +186,7 @@ const server = createServer(async (req, res) => {
     return row ? json(res, 200, row) : json(res, 404, { error: "canvas not found" });
   }
   if (req.method === "POST" && url.pathname === "/api/canvases") {
-    const input = JSON.parse(await body(req, 20_000_000));
+    const input = await readJson(req, 20_000_000);
     if (!input.courseId || !input.lessonId || !input.name || !input.document || typeof input.document !== "object") return json(res, 400, { error: "courseId, lessonId, name, and document are required" });
     if (!db.prepare("SELECT id FROM lessons WHERE course_id=? AND id=?").get(input.courseId, input.lessonId)) return json(res, 400, { error: "Lesson not found in this course" });
     parseCanvasDocument(input.document);
@@ -201,7 +203,7 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { id, deleted: true });
   }
   if (req.method === "POST" && url.pathname === "/api/notes") {
-    const input = JSON.parse(await body(req));
+    const input = await readJson(req);
     const id = input.id ?? randomUUID();
     if (!input.courseId || !input.lessonId || typeof input.title !== "string" || typeof input.body !== "string") return json(res, 400, { error: "courseId, lessonId, title, and body are required." });
     if (!lessonExists(String(input.courseId), String(input.lessonId))) return json(res, 404, { error: "Lesson not found in this course." });
@@ -211,9 +213,11 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { id });
   }
   if (req.method === "POST" && url.pathname === "/api/drawings") {
-    const input = JSON.parse(await body(req));
+    const input = await readJson(req);
     if (!input.courseId || !courseExists(String(input.courseId)) || !input.snapshot || typeof input.snapshot !== "object") return json(res, 400, { error: "A valid courseId and snapshot are required." });
     const id = input.id ?? randomUUID();
+    const existing = db.prepare("SELECT course_id FROM drawings WHERE id=?").get(id) as { course_id: string } | undefined;
+    if (existing && existing.course_id !== String(input.courseId)) return json(res, 409, { error: "Drawing belongs to another course." });
     db.prepare("INSERT INTO drawings(id,course_id,snapshot,revision) VALUES(?,?,?,1) ON CONFLICT(id) DO UPDATE SET snapshot=excluded.snapshot,revision=drawings.revision+1,updated_at=CURRENT_TIMESTAMP").run(id, input.courseId, JSON.stringify(input.snapshot));
     return json(res, 200, { id });
   }
@@ -224,9 +228,9 @@ const server = createServer(async (req, res) => {
     return json(res, 200, db.prepare("SELECT * FROM drawings WHERE course_id=? ORDER BY updated_at DESC LIMIT 1").get(courseId) ?? null);
   }
   if (req.method === "POST" && url.pathname === "/api/documents") {
-    const input = JSON.parse(await body(req));
+    const input = await readJson(req);
     if (!input.courseId || !courseExists(String(input.courseId))) return json(res, 404, { error: "Course not found." });
-    if (!input.name || typeof input.content !== "string" || extname(input.name).toLowerCase() !== ".txt") return json(res, 400, { error: "Only UTF-8 .txt import is currently enabled." });
+    if (typeof input.name !== "string" || !input.name || typeof input.content !== "string" || extname(input.name).toLowerCase() !== ".txt") return json(res, 400, { error: "Only UTF-8 .txt import is currently enabled." });
     const id = randomUUID();
     const storageRoot = resolve(process.env.STUDYAI_DOCUMENTS ?? "data/documents");
     const path = resolve(storageRoot, `${id}-${basename(input.name)}`);
@@ -266,13 +270,64 @@ const server = createServer(async (req, res) => {
     return json(res, 200, rows);
   }
   return json(res, 404, { error: "not found" });
-  } catch (error) { return json(res, 400, { error: error instanceof Error ? error.message : "Invalid request" }); }
+  } catch (error) {
+    if (error instanceof RequestAbortedError) return;
+    if (error instanceof PayloadTooLargeError) return json(res, 413, { error: "Payload too large." });
+    if (error instanceof InvalidJsonError) return json(res, 400, { error: error.message });
+    console.error("StudyAI API request failed:", error);
+    return json(res, 500, { error: "Internal server error." });
+  }
 });
 server.listen(port, LOOPBACK_HOST, () => console.log(`StudyAI local data API on http://${LOOPBACK_HOST}:${port}`));
 void warmClipRuntime()
   .then((warmed) => { if (warmed) console.log("CLIP recognition runtime warmed."); })
   .catch((error: unknown) => console.warn("CLIP warmup failed:", error instanceof Error ? error.message : error));
-function body(req: import("node:http").IncomingMessage, limit = 1_000_000) { return new Promise<string>((resolveBody, reject) => { let value = ""; req.setEncoding("utf8"); req.on("data", (chunk) => { value += chunk; if (value.length > limit) reject(new Error("payload too large")); }); req.on("end", () => resolveBody(value)); req.on("error", reject); }); }
+class PayloadTooLargeError extends Error {}
+class InvalidJsonError extends Error {}
+class RequestAbortedError extends Error {}
+
+async function readJson(req: import("node:http").IncomingMessage, limit?: number) {
+  const raw = await body(req, limit);
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { throw new InvalidJsonError("Invalid JSON body."); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new InvalidJsonError("JSON request body must be an object.");
+  return parsed as Record<string, unknown>;
+}
+
+// The cap counts incoming UTF-8 bytes, not decoded characters.
+function body(req: import("node:http").IncomingMessage, limit = 1_000_000) {
+  return new Promise<string>((resolveBody, reject) => {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    let settled = false;
+    const abort = () => {
+      if (settled) return;
+      settled = true;
+      reject(new RequestAbortedError("request aborted"));
+    };
+    req.on("data", (chunk: Buffer | string) => {
+      if (settled) return;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      bytes += buffer.byteLength;
+      if (bytes > limit) {
+        settled = true;
+        reject(new PayloadTooLargeError("payload too large"));
+        return;
+      }
+      chunks.push(buffer);
+    });
+    req.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolveBody(Buffer.concat(chunks).toString("utf8"));
+    });
+    req.on("aborted", abort);
+    req.on("error", (error: NodeJS.ErrnoException) => {
+      if (error?.code === "ECONNRESET" || error?.message === "aborted") abort();
+      else if (!settled) { settled = true; reject(error); }
+    });
+  });
+}
 
 function courseExists(courseId: string): boolean { return Boolean(db.prepare("SELECT 1 FROM courses WHERE id=?").get(courseId)); }
 function lessonExists(courseId: string, lessonId: string): boolean { return courseExists(courseId) && Boolean(db.prepare("SELECT 1 FROM lessons WHERE course_id=? AND id=?").get(courseId, lessonId)); }

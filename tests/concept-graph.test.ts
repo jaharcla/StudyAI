@@ -15,11 +15,15 @@ function seededDb() {
   const db = new Database(":memory:");
   db.exec(`CREATE TABLE courses(id TEXT PRIMARY KEY,title TEXT,code TEXT,color TEXT);
     CREATE TABLE lessons(id TEXT,course_id TEXT,title TEXT,PRIMARY KEY(course_id,id));
-    CREATE TABLE di_documents(id TEXT PRIMARY KEY,course_id TEXT,title TEXT);
+    CREATE TABLE di_documents(id TEXT PRIMARY KEY,course_id TEXT,title TEXT,filename TEXT);
+    CREATE TABLE di_units(id INTEGER PRIMARY KEY,document_id TEXT,unit_type TEXT,unit_number INTEGER,title TEXT,content TEXT);
+    CREATE TABLE di_chunks(id INTEGER PRIMARY KEY,document_id TEXT,course_id TEXT,unit_type TEXT,unit_number INTEGER,chunk_index INTEGER,content TEXT);
     CREATE TABLE canvases(id TEXT PRIMARY KEY,course_id TEXT,lesson_id TEXT,name TEXT,document TEXT,revision INTEGER);
     INSERT INTO courses VALUES('c','Course','','#000'),('other','Other','','#111');
     INSERT INTO lessons VALUES('l1','c','One'),('l2','c','Two'),('lo','other','Elsewhere');
-    INSERT INTO di_documents VALUES('d1','c','Cell notes');`);
+    INSERT INTO di_documents VALUES('d1','c','Cell notes','cell.txt');
+    INSERT INTO di_units VALUES(1,'d1','page',1,'Page 1','DNA is in the nucleus.');
+    INSERT INTO di_chunks VALUES(1,'d1','c','page',1,0,'DNA is in the nucleus.');`);
   initializeLearningSchema(db);
   db.exec(`INSERT INTO learning_concepts(id,course_id,lesson_id,name) VALUES
       ('k1','c','l1','Cell biology'),('k2','c','l2','Genetics'),('k3','c','l2','Unused'),('ko','other','lo','Other concept');
@@ -77,6 +81,45 @@ describe("concept graph assembly", () => {
     expect(buildConceptGraph(db, "c")).toEqual(buildConceptGraph(db, "c"));
     expect(buildConceptGraph(db, "other").nodes.map((node) => node.id)).toEqual(["ko"]);
     expect(buildConceptGraph(db, "unknown")).toEqual({ title: "Course · concept graph", nodes: [], edges: [] });
+    db.close();
+  });
+
+  it("omits edges that would rely on an ambiguous concept name", () => {
+    const db = seededDb();
+    // Legacy data can predate the unique (course, lesson, name) constraint.
+    db.pragma("foreign_keys = OFF");
+    db.exec(`ALTER TABLE learning_concepts RENAME TO learning_concepts_scoped;
+      CREATE TABLE learning_concepts(id TEXT PRIMARY KEY, course_id TEXT, lesson_id TEXT, name TEXT);
+      INSERT INTO learning_concepts SELECT id,course_id,lesson_id,name FROM learning_concepts_scoped;
+      DROP TABLE learning_concepts_scoped;
+      INSERT INTO learning_concepts VALUES('k4','c','l2','Shared'),('k5','c','l2','Shared');`);
+    db.pragma("foreign_keys = ON");
+    db.prepare("INSERT INTO canvases VALUES('board3','c','l2','Ambiguous',?,1)").run(canvasDocument([
+      conceptObject("sa", "Shared"),
+      conceptObject("su", "Unused"),
+      conceptObject("sexp", "Anything", "k2"),
+      { id: "ra", kind: "relationship", x: 0, y: 0, width: 40, height: 20, fromId: "su", toId: "sa", label: "guessed" },
+      { id: "rb", kind: "relationship", x: 0, y: 0, width: 40, height: 20, fromId: "su", toId: "sexp", label: "kept" },
+    ]));
+    const graph = buildConceptGraph(db, "c", "Course");
+    expect(graph.edges).toEqual([
+      { source: "k1", target: "k2", label: "prerequisite of" },
+      { source: "k3", target: "k2", label: "kept" },
+    ]);
+    expect(graph.nodes.filter((node) => node.label === "Shared").map((node) => node.parentId)).toEqual([null, null]);
+    db.close();
+  });
+
+  it("omits a citation when the referenced chunk does not resolve", () => {
+    const db = seededDb();
+    db.exec(`INSERT INTO di_documents VALUES('d2','c','Missing chunk','missing.txt');
+      INSERT INTO reviewed_questions(id,course_id,lesson_id,concept_id,version,prompt,choices,correct_choice,explanation,source_document_id,source_title,source_page,source_excerpt,reviewed_at)
+        VALUES('q2','c','l2','k3',1,'Q?','[{"id":"a"}]','a','why','d2','Missing chunk',1,'No such chunk.','2026-01-03');`);
+    const graph = buildConceptGraph(db, "c", "Course");
+    const node = graph.nodes.find((item) => item.id === "k3")!;
+    expect(node.sourceRef).toBeUndefined();
+    expect(node.sourceLabel).toBe("Missing chunk");
+    expect(node.detail).toBe("Missing chunk");
     db.close();
   });
 });

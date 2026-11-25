@@ -32,6 +32,8 @@ The default `.env.example` is configured for a cloud provider and needs a `GROQ_
 
 StudyAI is single-user and stores its data locally. With the default configuration, tutor prompts — and canvas image crops when analysis is requested — are sent to the configured provider. Choosing local inference keeps those requests on your machine. See [Configuration](docs/CONFIGURATION.md#privacy-and-data-flow) and [Status and limitations](docs/STATUS.md) for the details.
 
+CopilotKit Intelligence is an optional cloud opt-in. Leave `CPK_INTELLIGENCE_API_KEY` unset to keep the local SSE runtime with no cloud connection. Setting a non-empty key in `.env` enables hosted CopilotKit Intelligence: a copy of tutor interaction history (messages and tool activity) is sent to CopilotKit's managed external service. Keep the key in `.env`; never put a secret in `.env.example`.
+
 ## Checks
 
 ```powershell

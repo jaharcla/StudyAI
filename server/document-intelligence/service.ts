@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile, unlink, readFile } from "node:fs/promises";
-import { basename, extname, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile, unlink, readFile, readdir, rm, stat } from "node:fs/promises";
+import { basename, extname, join, resolve, sep } from "node:path";
 import type Database from "better-sqlite3";
 import { chunkUnits } from "./chunk.js";
 import { extractDocument } from "./extract.js";
@@ -10,6 +11,10 @@ import type { ImportFile, SourceReference } from "./types.js";
 export const MAX_BATCH_FILES = 20;
 export const MAX_BATCH_BYTES = 50 * 1024 * 1024;
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+const OWNED_DOCUMENT_FILE = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.(pdf|docx|pptx|txt)$/i;
+const UPLOAD_SESSION = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+const STALE_UPLOAD_MS = 24 * 60 * 60 * 1000;
 
 export type IndexedDocument = { id: string; courseId: string; lessonId: string | null; title: string; filename: string; mimeType: string; importedAt: string; unitCount: number; chunkCount: number };
 export type DocumentSearchResult = { documentId: string; title: string; filename: string; unitType: string; unitNumber: number; chunkIndex: number; sourceRef: string; excerpt: string; score: number };
@@ -167,6 +172,72 @@ export async function deleteDocument(db: Database.Database, courseId: string, do
   })();
   await unlink(document.storage_path).catch(() => undefined);
   return true;
+}
+
+// Windows paths compare case-insensitively; the separator keeps `files` from
+// matching a sibling such as `files-archive`.
+function pathKey(value: string): string {
+  const resolved = resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
+function insideStorage(root: string, candidate: string): boolean {
+  const rootKey = pathKey(root);
+  return pathKey(candidate).startsWith(rootKey.endsWith(sep) ? rootKey : rootKey + sep);
+}
+
+/** Reconciles interrupted imports and deletes after a restart. Only files with
+ *  this service's UUID naming are eligible, and only inside the storage root. */
+export async function reconcileDocumentFiles(db: Database.Database, storageRoot = "data/documents", now = Date.now()): Promise<{ removedFiles: number; removedRows: number; removedUploads: number }> {
+  initializeDocumentIntelligenceSchema(db);
+  const root = resolve(storageRoot);
+  await mkdir(root, { recursive: true });
+  const rows = db.prepare("SELECT id,storage_path FROM di_documents").all() as Array<{ id: string; storage_path: string }>;
+  const owned = new Set<string>();
+  const dangling: string[] = [];
+  for (const row of rows) {
+    const path = resolve(row.storage_path);
+    if (!insideStorage(root, path) || !OWNED_DOCUMENT_FILE.test(basename(path))) continue;
+    owned.add(pathKey(path));
+    if (!existsSync(path)) dangling.push(row.id);
+  }
+
+  let removedFiles = 0;
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    if (!entry.isFile() || !OWNED_DOCUMENT_FILE.test(entry.name)) continue;
+    const path = resolve(root, entry.name);
+    if (!insideStorage(root, path) || owned.has(pathKey(path))) continue;
+    await unlink(path).catch(() => undefined);
+    removedFiles++;
+  }
+
+  let removedRows = 0;
+  if (dangling.length) db.transaction(() => {
+    for (const id of dangling) {
+      db.prepare("DELETE FROM di_chunks WHERE document_id=?").run(id);
+      db.prepare("DELETE FROM di_units WHERE document_id=?").run(id);
+      db.prepare("DELETE FROM di_documents WHERE id=?").run(id);
+      removedRows++;
+    }
+  })();
+
+  let removedUploads = 0;
+  const uploadsRoot = join(root, ".uploads");
+  if (existsSync(uploadsRoot)) for (const entry of await readdir(uploadsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !UPLOAD_SESSION.test(entry.name)) continue;
+    const dir = resolve(uploadsRoot, entry.name);
+    if (!insideStorage(root, dir)) continue;
+    const parts = (await readdir(dir)).filter((name) => /^\d+\.part$/.test(name));
+    if (!parts.length) continue;
+    const times = await Promise.all(parts.map(async (name) => {
+      try { return (await stat(join(dir, name))).mtimeMs; } catch { return now; }
+    }));
+    if (Math.max(...times) >= now - STALE_UPLOAD_MS) continue;
+    await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    removedUploads++;
+  }
+
+  return { removedFiles, removedRows, removedUploads };
 }
 
 export async function getDocumentFile(db: Database.Database, courseId: string, documentId: string): Promise<{ filename: string; mimeType: string; bytes: Buffer } | undefined> {
