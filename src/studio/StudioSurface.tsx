@@ -90,6 +90,7 @@ function studentMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "";
   const status = (error as { status?: number } | null)?.status;
   if (/did not return a JSON|couldn't format a response|could not format|study assistant couldn't/i.test(raw)) return FORMAT_ERROR;
+  if (/Direction can shape presentation/i.test(raw)) return "Please rephrase your direction. It can't add sources, answers or numbers from outside your lesson.";
   if (/No course sources|No grounded/i.test(raw)) return "This lesson doesn't have enough course material yet. Add a source or notes, then try again.";
   if (status === 502 || status === 503 || /502|503|fetch failed|network/i.test(raw)) return "The study assistant isn't responding right now. Your course material is unchanged. Try again in a moment.";
   return "Generation didn't complete. Your course material is unchanged. Try again.";
@@ -113,6 +114,9 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
   const [count, setCount] = useState(10);
+  const [direction, setDirection] = useState("");
+  const [directKind, setDirectKind] = useState<StudioKind>("mind-map");
+  const [directPractice, setDirectPractice] = useState<PracticeType>("both");
   const [artifact, setArtifact] = useState<StudioArtifact | undefined>();
   const [history, setHistory] = useState<StudioArtifact[]>([]);
   const [filter, setFilter] = useState<StudioKind | "all">("all");
@@ -182,11 +186,14 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [madeLoading]);
 
-  const generate = async (target: StudioKind = kind, type: PracticeType = practiceType) => {
+  const generate = async (target: StudioKind = kind, type: PracticeType = practiceType, guidance = "") => {
     setBusy(true); setError(""); setNotice(""); setErrorAction("generate");
     setKind(target); setPracticeType(type);
     try {
-      const created = await generateArtifact({ courseId, lessonId, kind: target, focus: focus.trim() || "Key concepts and mechanisms", practiceType: type, count });
+      const created = await generateArtifact({
+        courseId, lessonId, kind: target, focus: focus.trim() || "Key concepts and mechanisms",
+        practiceType: type, count, ...(guidance.trim() ? { direction: guidance.trim() } : {}),
+      });
       setArtifact(created);
       setFilter("all");
       if ("notice" in created && typeof created.notice === "string") setNotice(created.notice);
@@ -304,6 +311,37 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
             </button>
           ))}
         </nav>
+
+        <details className="studio-direct">
+          <summary>Direct the tutor <span>optional</span></summary>
+          <label className="studio-field">Artifact type
+            <select data-testid="studio-direct-kind" value={directKind} onChange={(event) => setDirectKind(event.target.value as StudioKind)}>
+              {CREATE_ITEMS.filter((item) => item.kind !== "slide_deck").map((item) => (
+                <option key={item.id} value={item.kind}>{item.label}</option>
+              ))}
+            </select>
+          </label>
+          {directKind === "practice" && (
+            <label className="studio-field">Practice style
+              <select data-testid="studio-direct-practice" value={directPractice} onChange={(event) => setDirectPractice(event.target.value as PracticeType)}>
+                <option value="cards">Flashcards</option>
+                <option value="quiz">Quiz</option>
+                <option value="both">Cards and quiz</option>
+              </select>
+            </label>
+          )}
+          <label className="studio-field">Your direction
+            <textarea data-testid="studio-direction" rows={3} maxLength={500} value={direction}
+              onChange={(event) => setDirection(event.target.value)}
+              placeholder="e.g. explain it step by step for a beginner" />
+          </label>
+          <button type="button" className="studio-primary studio-direct-button" data-testid="studio-generate-directed"
+            disabled={busy || !!deckBusy || !direction.trim()}
+            onClick={() => void generate(directKind, directKind === "practice" ? directPractice : practiceType, direction)}>
+            Generate with direction
+          </button>
+          <p className="studio-direct-note">Shapes how it's presented. Facts and citations still come from this lesson.</p>
+        </details>
 
         <details>
           <summary>Advanced</summary>
@@ -441,28 +479,36 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           )}
 
           {!busy && shown && (
-            <div className="studio-artifact-bar">
-              <div className="studio-artifact-heading">
-                <span className="studio-kind" data-testid="artifact-kind">{KIND_LABEL[shown.kind]}</span>
-                {(shown.kind === "mind-map" || shown.kind === "practice")
-                  ? <h2>{shown.title}</h2>
-                  : <span className="studio-artifact-context">From this lesson</span>}
+            <>
+              <div className="studio-artifact-bar">
+                <div className="studio-artifact-heading">
+                  <span className="studio-kind" data-testid="artifact-kind">{KIND_LABEL[shown.kind]}</span>
+                  {(shown.kind === "mind-map" || shown.kind === "practice")
+                    ? <h2>{shown.title}</h2>
+                    : <span className="studio-artifact-context">From this lesson</span>}
+                </div>
+                <div className="studio-artifact-actions">
+                  <span className={`studio-review-status${acceptance === "accept" ? " accepted" : ""}`} data-testid="artifact-status" aria-live="polite">
+                    {acceptance === "accept"
+                      ? <><CircleCheck size={14} strokeWidth={2} aria-hidden="true" /><span data-testid="artifact-acceptance">Accepted</span></>
+                      : "Awaiting review"}
+                  </span>
+                  <button type="button" className="studio-toolbar-button" data-testid="artifact-accept" disabled={acceptance === "accept"} onClick={() => void accept()}>
+                    {acceptance === "accept" ? <CircleCheck size={15} strokeWidth={2} aria-hidden="true" /> : <Check size={15} strokeWidth={2} aria-hidden="true" />}
+                    {acceptance === "accept" ? "Accepted" : "Accept"}
+                  </button>
+                  <button type="button" className="studio-toolbar-button" data-testid="artifact-download" onClick={download}>
+                    <Download size={15} strokeWidth={1.9} aria-hidden="true" /> Download
+                  </button>
+                </div>
               </div>
-              <div className="studio-artifact-actions">
-                <span className={`studio-review-status${acceptance === "accept" ? " accepted" : ""}`} data-testid="artifact-status" aria-live="polite">
-                  {acceptance === "accept"
-                    ? <><CircleCheck size={14} strokeWidth={2} aria-hidden="true" /><span data-testid="artifact-acceptance">Accepted</span></>
-                    : "Awaiting review"}
-                </span>
-                <button type="button" className="studio-toolbar-button" data-testid="artifact-accept" disabled={acceptance === "accept"} onClick={() => void accept()}>
-                  {acceptance === "accept" ? <CircleCheck size={15} strokeWidth={2} aria-hidden="true" /> : <Check size={15} strokeWidth={2} aria-hidden="true" />}
-                  {acceptance === "accept" ? "Accepted" : "Accept"}
-                </button>
-                <button type="button" className="studio-toolbar-button" data-testid="artifact-download" onClick={download}>
-                  <Download size={15} strokeWidth={1.9} aria-hidden="true" /> Download
-                </button>
-              </div>
-            </div>
+              {shown.prompt && (
+                <details className="studio-prompt">
+                  <summary>Prompt used</summary>
+                  <p data-testid="artifact-prompt">{shown.prompt}</p>
+                </details>
+              )}
+            </>
           )}
 
           {!busy && !shown && !madeError && (

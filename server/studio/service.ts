@@ -71,6 +71,18 @@ export type StudioGenerator = (args: { system: string; user: string; input: Gene
 
 const LABELS: Record<StudioKind, string> = { "mind-map": "Mind map", "study-guide": "Study guide", infographic: "Infographic", practice: "Practice" };
 
+/** Appended after the grounding rules; the student's words never outrank them. */
+const DIRECTION_RULE = "The student's direction, when present, shapes presentation only: audience, angle, length, structure, style and examples. It never adds facts, citations, references, page numbers, numbers or answers that are absent from the supplied courseSources. If the direction conflicts with the supplied material, follow the supplied material and copy every citation exactly.";
+
+/** Plain text only: no IDs, JSON or refs are shown to the student. */
+function effectivePrompt(input: GenerateInput, grounding: Grounding, direction: string): string {
+  const amount = input.kind === "practice"
+    ? ` Ask for about ${input.count} ${input.practiceType === "cards" ? "cards" : input.practiceType === "quiz" ? "questions" : "cards and questions"}.`
+    : "";
+  const guidance = direction ? `Direction from you: ${direction}` : "Standard preset; no extra direction.";
+  return `Make a ${LABELS[input.kind].toLowerCase()} for this lesson from its own course material. Focus: ${grounding.focus}.${amount} ${guidance} Use only cited course evidence and say so when evidence is missing.`;
+}
+
 /**
  * Generates one provenance-bound artifact. Every emitted citation must be a ref that came from
  * the grounding packet; the server rewrites document IDs and pages from its own source map, so a
@@ -83,6 +95,7 @@ export async function generateStudioArtifact(
 ): Promise<StudioArtifact & { notice?: string }> {
   initializeStudioSchema(db);
   const input = GenerateSchema.parse(rawInput);
+  const direction = input.direction.trim();
   const grounding = buildGrounding(db, input.courseId, input.lessonId, input.focus);
   if (!grounding.sources.length && !grounding.concepts.length && !grounding.canvas.length) {
     throw new Error("No course sources, concepts or canvas knowledge are available for this lesson yet.");
@@ -101,6 +114,7 @@ export async function generateStudioArtifact(
     "Practice questions must require understanding or application; never use 'According to the excerpt...' or similar giveaway phrasing, and the cited excerpt should help check the answer without containing the correct choice verbatim.",
     "Give every practice question exactly four distinct choices: one correct answer and three plausible distractors drawn from the same supplied course material. Never add a choice that is not supported by that material.",
     "If the supplied material supports fewer solid questions than requestedCount, return only the questions you can ground honestly; the app will tell the student the test is shorter.",
+    ...(direction ? [DIRECTION_RULE] : []),
   ].join(" ");
 
   const user = JSON.stringify({
@@ -108,6 +122,7 @@ export async function generateStudioArtifact(
     focus: grounding.focus,
     requestedCount: input.count,
     practiceType: input.practiceType,
+    ...(direction ? { direction, directionScope: "presentation only; course evidence stays authoritative" } : {}),
     grounding: grounding.packet,
     outputShape: input.kind === "mind-map"
       ? '{"title":string,"nodes":[{"id":string,"label":string,"parentId":string|null,"detail"?:string,"sourceRef":string}]}'
@@ -153,6 +168,7 @@ export async function generateStudioArtifact(
     sourceRefs: refs,
     createdAt: new Date().toISOString(),
     acceptance: "pending",
+    prompt: effectivePrompt(input, grounding, direction),
     ...(notice ? { notice } : {}),
   };
   saveStudioArtifact(db, artifact);
@@ -162,8 +178,8 @@ export async function generateStudioArtifact(
 /** Sole insert path into the shared studio artifact store; compilePackage results use it too. */
 export function saveStudioArtifact(db: Database.Database, artifact: StudioArtifact): void {
   initializeStudioSchema(db);
-  db.prepare("INSERT INTO studio_artifacts(id,course_id,lesson_id,kind,title,content,source_refs,created_at,acceptance) VALUES(?,?,?,?,?,?,?,?,?)")
-    .run(artifact.id, artifact.courseId, artifact.lessonId, artifact.kind, artifact.title, JSON.stringify(artifact.content), JSON.stringify(artifact.sourceRefs), artifact.createdAt, artifact.acceptance ?? "pending");
+  db.prepare("INSERT INTO studio_artifacts(id,course_id,lesson_id,kind,title,content,source_refs,created_at,acceptance,prompt) VALUES(?,?,?,?,?,?,?,?,?,?)")
+    .run(artifact.id, artifact.courseId, artifact.lessonId, artifact.kind, artifact.title, JSON.stringify(artifact.content), JSON.stringify(artifact.sourceRefs), artifact.createdAt, artifact.acceptance ?? "pending", artifact.prompt ?? "");
 }
 
 type StudioRow = Omit<StudioArtifact, "content" | "sourceRefs"> & { content: string; sourceRefs: string };
@@ -174,7 +190,7 @@ function hydrate(row: StudioRow): StudioArtifact {
 
 export function getStudioArtifact(db: Database.Database, id: string, courseId: string, lessonId?: string): StudioArtifact | undefined {
   initializeStudioSchema(db);
-  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance FROM studio_artifacts WHERE id=? AND course_id=?")
+  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance,prompt FROM studio_artifacts WHERE id=? AND course_id=?")
     .get(id, courseId) as StudioRow | undefined;
   if (!row || (lessonId && row.lessonId !== lessonId)) return undefined;
   return hydrate(row);
@@ -182,7 +198,7 @@ export function getStudioArtifact(db: Database.Database, id: string, courseId: s
 
 export function listStudioArtifacts(db: Database.Database, courseId: string, lessonId?: string, kind?: StudioKind): StudioArtifact[] {
   initializeStudioSchema(db);
-  const rows = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance FROM studio_artifacts WHERE course_id=? AND (?='' OR lesson_id=?) AND (?='' OR kind=?) ORDER BY created_at DESC LIMIT 20")
+  const rows = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance,prompt FROM studio_artifacts WHERE course_id=? AND (?='' OR lesson_id=?) AND (?='' OR kind=?) ORDER BY created_at DESC LIMIT 20")
     .all(courseId, lessonId ?? "", lessonId ?? "", kind ?? "", kind ?? "") as StudioRow[];
   return rows.map(hydrate);
 }
@@ -194,7 +210,7 @@ export function setStudioArtifactAcceptance(
   initializeStudioSchema(db);
   const result = db.prepare("UPDATE studio_artifacts SET acceptance=? WHERE id=?").run(decision, id);
   if (!result.changes) return undefined;
-  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance FROM studio_artifacts WHERE id=?")
+  const row = db.prepare("SELECT id,course_id AS courseId,lesson_id AS lessonId,kind,title,content,source_refs AS sourceRefs,created_at AS createdAt,acceptance,prompt FROM studio_artifacts WHERE id=?")
     .get(id) as StudioRow | undefined;
   return row ? hydrate(row) : undefined;
 }

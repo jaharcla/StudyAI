@@ -31,11 +31,15 @@ export type StudioArtifact = {
   id: string; courseId: string; lessonId: string; kind: StudioKind; title: string;
   content: MindMapContent | StudyGuideContent | InfographicContent | PracticeContent;
   sourceRefs: string[]; createdAt: string; acceptance?: AcceptanceDecision;
+  /** Plain-text prompt actually used, so the student can read it back and regenerate. */
+  prompt?: string;
 };
 
 export type GenerateRequest = {
   courseId: string; lessonId: string; kind: StudioKind;
   focus: string; practiceType: PracticeType; count: number;
+  /** Optional presentation-only guidance; omit for the one-click route. */
+  direction?: string;
 };
 
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
