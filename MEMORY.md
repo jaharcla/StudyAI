@@ -37,6 +37,9 @@ Keep these links; install and actually use them if RAM or performance dips again
 - Windows Task Manager MCP: https://mcpmarket.com/es/server/windows-task-manager
 - Earlier Athola CPU/GPU skill page: https://skillselion.com/skills/athola/claude-night-market/cpu-gpu-performance
 
+## Machine state (2026-11-25)
+- Startup trim applied with user approval. Removed 8 HKCU Run entries: Steam, Overwolf, EpicGamesLauncher, EADM, BlueStacks Services, Adobe Acrobat Synchronizer, Opera Browser Assistant, Opera GX Browser Assistant. Backups in `%TEMP%\opencode\ram-optimization-backup\hkcu-run-20261125-125718.reg` and matching HKLM file. HKLM entries Acronis Scheduler2 Service and SteelSeriesGG were not removable without elevation. DiagTrack and SysMain remain Automatic for the same reason. Full RAM benefit arrives after next login.
+
 ## Where things live
 - UI source of truth: `DESIGN.md` at repo root.
 - Coordination ledger and scorecard: `docs/FINAL_PUSH.md`.
