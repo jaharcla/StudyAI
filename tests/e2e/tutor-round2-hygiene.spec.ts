@@ -41,6 +41,8 @@ test("grounded tutor answers hide reasoning and ship real citations", async ({ p
   const citations = tutor.locator('a[href^="#studyai-citation="]');
   await expect(citations.first()).toBeVisible({ timeout: 30_000 });
   await expect(citations.first()).toContainText("round2-proof.pdf");
+  await expect(page.locator(".breadcrumbs")).toContainText(course.title);
+  await expect(page.getByText("Select or create a course to create a canvas.")).toHaveCount(0);
   await page.screenshot({ path: `${SHOTS}/grounded-answer.png` });
 });
 
