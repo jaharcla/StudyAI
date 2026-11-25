@@ -124,3 +124,24 @@
   --chrome-accent: #f0b687;
   --chrome-bg: #211e1a;
 }
+
+/* Progressive reveal: muted destinations stay mounted and clickable. */
+.immersive-actions {
+  --next-line: #ded7c9;
+  --next-accent: #9a623f;
+  --next-tint: #f3e7df;
+}
+.app-shell.dark .immersive-actions {
+  --next-line: #4a4438;
+  --next-accent: #f0b687;
+  --next-tint: #3a2b24;
+}
+.app-shell .immersive-actions button[data-deemphasised="true"] { opacity: .55; }
+.app-shell .immersive-actions button[data-deemphasised="true"]:hover,
+.app-shell .immersive-actions button[data-deemphasised="true"]:focus-visible { opacity: 1; }
+.app-shell .immersive-actions .surface-next-chip {
+  border-color: var(--next-accent);
+  color: var(--next-accent);
+  background: var(--next-tint);
+}
+.app-shell .immersive-actions .surface-next-chip b { font-weight: 700; }

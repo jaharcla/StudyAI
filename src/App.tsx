@@ -47,6 +47,7 @@ type TutorStatus = { mode: string; provider: string; model: string; pickerActive
 type IntakeContext = { courseId: string; lessonId: string; courseTitle: string; lessonTitle: string };
 type TutorQuestion = IntakeContext & { question: string; sourceTitle: string; sourceRef: string };
 type RetrievedPassage = { title: string; excerpt: string; sourceRef: string };
+type SurfaceWork = { reviewed: number; artifacts: number; concepts: number };
 const noCourse: Course = { id: "", title: "", code: "", color: "#888888" };
 const generatedCourseId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Only collapse generated courses when the picker is flooded; small workspaces keep every course visible.
@@ -106,6 +107,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   }, [course.id, lessonId, tutorConfig]);
   const [tutor, setTutor] = useState(true);
   const [tutorQuestion, setTutorQuestion] = useState<TutorQuestion | null>(null);
+  const [surfaceWork, setSurfaceWork] = useState<SurfaceWork>({ reviewed: 0, artifacts: 0, concepts: 0 });
   const [showAllCourses, setShowAllCourses] = useState(false);
   const flooded = courses.length > generatedCourseFlood && !showAllCourses;
   const visibleCourses = flooded ? courses.filter((item) => !generatedCourseId.test(item.id)) : courses;
@@ -408,6 +410,27 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     return () => { live = false; };
   }, [course.id]);
 
+  // Progressive reveal reads only existing local signals. A failed or slow
+  // count leaves the destination de-emphasised; it never invents work.
+  useEffect(() => {
+    if (!course.id) { setSurfaceWork({ reviewed: 0, artifacts: 0, concepts: 0 }); return; }
+    let live = true;
+    const query = encodeURIComponent(course.id);
+    void Promise.allSettled([
+      requestJson<{ totalAttempts: number }>(`${API}/progress?course=${query}`),
+      requestJson<unknown[]>(`${API}/studio/artifacts?course=${query}`),
+      requestJson<{ nodes: unknown[] }>(`${API}/concepts/graph?course=${query}`),
+    ]).then(([progress, artifacts, concepts]) => {
+      if (!live) return;
+      setSurfaceWork({
+        reviewed: progress.status === "fulfilled" ? Number(progress.value.totalAttempts) || 0 : 0,
+        artifacts: artifacts.status === "fulfilled" && Array.isArray(artifacts.value) ? artifacts.value.length : 0,
+        concepts: concepts.status === "fulfilled" && Array.isArray(concepts.value.nodes) ? concepts.value.nodes.length : 0,
+      });
+    });
+    return () => { live = false; };
+  }, [course.id]);
+
   const changeCourse = (next: Course) => {
     setSidebar(false);
     if (next.id === course.id) return;
@@ -533,6 +556,9 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     setTutorWidth(Math.min(520, Math.max(300, window.innerWidth - event.clientX)));
   };
 
+  const surfaceHasWork = { study: surfaceWork.reviewed > 0, studio: surfaceWork.artifacts > 0, concepts: surfaceWork.concepts > 0 };
+  const nextSurface = (["study", "studio", "concepts"] as const).find((key) => surfaceHasWork[key]) ?? "canvas";
+  const surfaceLabels = { canvas: "Canvas", study: "Study", studio: "Studio", concepts: "Concepts" } as const;
 
   return <>{course.id && lessonId && <AgentContext course={course} canvas={canvasSummary} view={view} model={tutorStatus?.model || selectedModel} lessonId={lessonId} lessonTitle={lessonTitle} />}<LibraryArtifactTool courseId={course.id} lessonId={lessonId} /><div className={`app-shell view-${view.toLowerCase()} ${dark ? "dark" : ""} ${sidebar ? "sidebar-open" : ""} ${tutor ? "tutor-open" : ""}`} style={{ "--tutor-width": `${tutorWidth}px` } as React.CSSProperties}>
     {sidebar && <><div className="sidebar-scrim" onClick={() => setSidebar(false)} /><aside className="sidebar" inert={!sidebar}>
@@ -554,9 +580,10 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
         <div className="breadcrumbs"><button className="icon-button" onClick={() => setSidebar(!sidebar)} title="Toggle courses"><Menu size={17} /></button><span>{course.title || "Study workspace"}</span>{lessonTitle && <><ChevronRight size={14} /><b>{lessonTitle}</b></>}</div>
         <div className="immersive-actions">
           <button aria-label="Open canvas workspace" data-testid="open-canvas" className={mode === "canvas" ? "primary" : ""} onClick={() => { setMode("canvas"); setView("Canvas"); }} title="Open canvas workspace"><Layers size={15} /> Canvas</button>
-          <button className={mode === "study" ? "primary" : ""} disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
-          <button className={mode === "studio" ? "primary" : ""} disabled={!course.id || !lessonId} onClick={() => setMode("studio")} title="Open StudyAI Studio" data-testid="open-studio"><Sparkles size={15} /> Studio</button>
-          <button className={mode === "concepts" ? "primary" : ""} disabled={!course.id} data-testid="open-concept-graph" onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
+          <button className={mode === "study" ? "primary" : ""} data-testid="open-study" data-deemphasised={!surfaceHasWork.study} disabled={!course.id || !lessonId} onClick={() => setMode("study")} title="Open quizzes and flashcards"><Brain size={15} /> Study</button>
+          <button className={mode === "studio" ? "primary" : ""} data-testid="open-studio" data-deemphasised={!surfaceHasWork.studio} disabled={!course.id || !lessonId} onClick={() => setMode("studio")} title="Open StudyAI Studio"><Sparkles size={15} /> Studio</button>
+          <button className={mode === "concepts" ? "primary" : ""} data-testid="open-concept-graph" data-deemphasised={!surfaceHasWork.concepts} disabled={!course.id} onClick={() => setMode("concepts")} title="Open course concept graph"><Network size={15} /> Concepts</button>
+          <button type="button" className="surface-next-chip" data-testid="surface-next" data-target={nextSurface} title={`Next: ${surfaceLabels[nextSurface]}`} onClick={() => setMode(nextSurface)}><span>Next</span><b>{surfaceLabels[nextSurface]}</b><ChevronRight size={13} /></button>
         </div>
         <div className="top-actions"><span className="saved"><span />{status}</span><button className="icon-button" onClick={() => setTutor(!tutor)} title="Toggle study tutor"><Sparkles size={15} /></button><button className="icon-button" onClick={() => setDark(!dark)} title="Toggle theme">{dark ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => setHelpOpen(true)} title="Help"><CircleHelp size={17} /></button><button className="icon-button" onClick={() => setSettings(true)} title="Settings"><Settings2 size={17} /></button></div>
       </header>
