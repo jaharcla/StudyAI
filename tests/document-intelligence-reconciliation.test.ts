@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -103,7 +103,7 @@ describe("document file reconciliation", () => {
     expect(second.removedRows).toBe(0);
   });
 
-  it("keeps valid files when the storage root spelling changes only by case", async () => {
+  it.skipIf(process.platform !== "win32")("keeps valid files when the storage root spelling changes only by case", async () => {
     const [imported] = await importDocuments(db, "chem-120", [{ name: "case.txt", bytes: new TextEncoder().encode("Case matters.") }], storage);
     const row = db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id) as { storage_path: string };
     const alternate = row.storage_path.replace(/[A-Za-z]/g, (character) => character === character.toUpperCase() ? character.toLowerCase() : character.toUpperCase());
@@ -113,6 +113,22 @@ describe("document file reconciliation", () => {
     expect(result.removedRows).toBe(0);
     expect(existsSync(row.storage_path)).toBe(true);
     expect(db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id)).toMatchObject({ storage_path: alternate });
+  });
+
+  it("keeps valid files when the configured root is a symlink or junction alias", async () => {
+    const [imported] = await importDocuments(db, "chem-120", [{ name: "alias.txt", bytes: new TextEncoder().encode("Alias matters.") }], storage);
+    const row = db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id) as { storage_path: string };
+    const alias = join(root, "storage-alias");
+    symlinkSync(storage, alias, process.platform === "win32" ? "junction" : "dir");
+    try {
+      const result = await reconcile!(db, alias, now);
+      expect(result.removedFiles).toBe(0);
+      expect(result.removedRows).toBe(0);
+      expect(existsSync(row.storage_path)).toBe(true);
+      expect(db.prepare("SELECT 1 FROM di_documents WHERE id=?").get(imported.id)).toBeDefined();
+    } finally {
+      rmSync(alias, { recursive: true, force: true });
+    }
   });
 
   it("removes only aged incomplete upload parts", async () => {
