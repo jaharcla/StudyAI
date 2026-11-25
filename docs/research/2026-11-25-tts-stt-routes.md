@@ -59,11 +59,30 @@ Recommended split:
 
 Cloud pricing and quality change quickly; one [provider comparison](https://www.cekura.ai/blogs/elevenlabs-vs-cartesia) puts ElevenLabs v4 and Cartesia Sonic 3.6 near each other on naturalness but far apart on pronunciation. We would keep any cloud provider optional and BYOK, never a default.
 
+## User-provided repo survey (2026-11-25)
+
+All nine repositories were fetched and read at their GitHub pages. Verdicts are for our constraints, not general quality rankings.
+
+| Repo | What it is | Fit |
+| --- | --- | --- |
+| [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | Apache-2.0 local ASR, TTS, VAD, diarization on ONNX Runtime; iOS, Android, Windows, WASM, Node bindings; Piper/Kokoro/VITS voices | Best local runtime for iPhone STT and a possible unified local engine. Needs native binaries and model downloads; approval required. |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | MIT C/C++ Whisper, no dependencies, iOS/Android/WASM, VAD, word timestamps; tiny ~273 MB RAM, base ~388 MB | Best fallback if browser `processLocally` is unavailable. Still a binary plus weights; approval required. |
+| [NeMo Speech](https://github.com/NVIDIA-NeMo/Speech) | Apache-2.0 PyTorch/CUDA research framework; 0.6B streaming ASR, MagpieTTS, full-duplex VoiceChat | Reference only. Requires Python/PyTorch/CUDA and GPU-class resources; incompatible with our ~2 GB free RAM. |
+| [VibeVoice](https://github.com/microsoft/VibeVoice) | MIT research models; 0.5B realtime TTS ~300 ms first audio; ASR BitNet CPU 1.58 GB; **TTS code removed in 2025**; "research and development purposes only" | Not a shipping dependency. Watch as a future option only. |
+| [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) | Apache-2.0 0.6B/1.7B TTS, 97 ms first audio, voice design/cloning, 10 languages, strong WER | High quality but Python/PyTorch and large weights; GPU recommended. Future option behind Advanced, not now. |
+| [MOSS-TTS](https://github.com/OpenMOSS/MOSS-TTS) | Apache-2.0 family: TTSD for multi-speaker dialogue, Realtime 180 ms TTFB, Nano ~100M CPU-first; torch-free llama.cpp+ONNX path | Most relevant future local replacement for cloud: TTSD for podcasts, Nano/Realtime for the tutor. Model footprint still needs measurement on this machine. |
+| [pipecat](https://github.com/pipecat-ai/pipecat) | BSD-2 Python framework for voice agents: pluggable STT/LLM/TTS, WebRTC/WebSocket transports, VAD, barge-in | Do not adopt wholesale; it implies a Python service. Borrow the service seams and interruption model. |
+| [livekit/agents](https://github.com/livekit/agents) | Apache-2.0 server agents over WebRTC, semantic turn detection, MCP support, built-in test framework | Do not adopt; needs LiveKit server/credentials. Useful patterns: turn detection and agent testing. |
+| [realtime-voice-agent](https://github.com/CJimenezVC/realtime-voice-agent) | MIT reference pipecat agent with per-turn latency tracing and a barge-in test; local stack Ollama + Whisper + Kokoro ~669 ms total on an M4 Max | Best design reference for our Tutor loop. Do not copy code without attribution; emulate the observer, stage timings and barge-in test. |
+
+Decision: keep the approved Kokoro-82M route for desktop podcast narration and BYOK cloud for the live tutor. Add sherpa-onnx or whisper.cpp only if the browser STT fallback proves inadequate, and MOSS-TTS-Nano/Realtime only after a RAM and quality measurement. Avoid NeMo, VibeVoice, large Qwen3-TTS, pipecat and LiveKit in this phase.
+
 ## Needs approval before implementation
 
 - `kokoro-js` plus a Kokoro-82M q8/fp16 weight download (roughly 92–326 MB) for natural narration and downloadable podcast audio.
 - A Pocket-TTS/Phonon-class streaming engine or a BYOK key for a conversational voice. No provider key is currently configured in this environment, and `kimaki tts` reports "No OpenAI or Gemini key".
-- Any local STT model route if browser `processLocally` proves insufficient on the target browsers.
+- A local STT route via sherpa-onnx or whisper.cpp if browser `processLocally` proves insufficient. Prefer whisper.cpp for iOS quality and sherpa-onnx for a unified local runtime; both need binaries and weights.
+- MOSS-TTS-Nano or MOSS-TTS-Realtime if the cloud voice later needs a local replacement; measure RAM first.
 
 ## Objections and uncertainties
 
