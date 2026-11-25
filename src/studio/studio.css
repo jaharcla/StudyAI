@@ -464,7 +464,6 @@
 .studio-made-list .button-soft:hover { border-color: var(--st-accent); color: var(--st-accent-ink); }
 
 /* Slide deck review lives in the same frame as the generated artifacts. */
-.studio-deck-generate { width: calc(100% - 16px); margin: 14px 8px 2px; }
 .studio-deck-status { max-width: 760px; margin: 0 auto 22px; }
 .studio-deck { max-width: 900px; margin: 26px auto 0; padding-top: 22px; border-top: 1px solid var(--st-line); }
 .studio-deck .artifacts-status { margin: 0 0 14px; }

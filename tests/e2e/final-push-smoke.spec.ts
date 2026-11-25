@@ -25,7 +25,7 @@ test("every primary action has a DOM result or an honest failure", async ({ page
   await expect(page.getByTestId("studio-surface")).toBeVisible();
   await page.getByRole("button", { name: "Generate a mind map" }).click();
   await expect(page.getByTestId("studio-surface")).toContainText(/mind map|couldn't|didn't|unchanged|Generating/i, { timeout: 45000 });
-  await page.getByTestId("deck-generate").click();
+  await page.getByTestId("studio-tab-slide_deck").click();
   await expect(page.getByTestId("studio-surface")).toContainText(/deck|Presenton|couldn't|didn't|Building/i, { timeout: 45000 });
   await page.getByRole("button", { name: "Close Studio" }).click();
 
@@ -41,8 +41,9 @@ test("every primary action has a DOM result or an honest failure", async ({ page
   await expect(page.getByRole("dialog", { name: "Study session" })).toContainText(/Source:|Check answer|No reviewed questions|No course sources|didn't|did not|unchanged|usable/i, { timeout: 45000 });
   await page.getByRole("button", { name: "Close study session" }).click();
 
-  // Cards: one-click cards produce a card or an honest empty state.
-  await page.getByRole("button", { name: "Cards" }).click();
+  // Cards lives inside Study; one-click cards produce a card or an honest empty state.
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  await page.getByTestId("study-cards-mode").click();
   await expect(page.getByTestId("flashcard-review")).toBeVisible();
   const makeCards = page.getByRole("button", { name: "Make cards from this lesson" });
   if (await makeCards.isVisible()) {
@@ -52,6 +53,7 @@ test("every primary action has a DOM result or an honest failure", async ({ page
     await expect(page.getByTestId("flashcard-review")).toContainText(/QUESTION|ANSWER/i);
   }
   await page.getByRole("button", { name: "Close flashcard review" }).click();
+  await page.getByRole("button", { name: "Close study session" }).click();
 
   // Board switching changes the active board and stays on a real board.
   const switcher = page.getByRole("button", { name: "Choose canvas board" });

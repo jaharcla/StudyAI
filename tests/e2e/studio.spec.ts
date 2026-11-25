@@ -56,7 +56,6 @@ test("Studio shows a plain reason and keeps retry available when the model retur
 
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-study-guide").click();
-  await page.getByTestId("studio-generate").click();
 
   const error = page.getByTestId("studio-error");
   await expect(error).toContainText("couldn't turn this lesson");
@@ -82,7 +81,7 @@ test("Studio generates a grounded mind map, guide and practice in the new UI", a
   await page.getByTestId("studio-focus").fill("forces and equilibrium");
 
   // Mind map: real ReactFlow nodes, branch collapse, concept inspector, source navigation.
-  await page.getByTestId("studio-generate").click();
+  await page.getByTestId("studio-tab-mind-map").click();
   await expect(page.getByTestId("mind-map")).toBeVisible();
   await expect(page.getByTestId("mind-map-node")).toHaveCount(3);
   await page.locator(".studio-map-node").filter({ hasText: "Forces" }).getByRole("button", { name: "Collapse branch" }).click();
@@ -96,14 +95,12 @@ test("Studio generates a grounded mind map, guide and practice in the new UI", a
   // Study guide: grounded sections render with citations.
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-study-guide").click();
-  await page.getByTestId("studio-generate").click();
   await expect(page.getByTestId("study-guide")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Equilibrium" })).toBeVisible();
   await expect(page.locator(".studio-citations button").first()).toBeVisible();
 
   // Practice: import goes to the existing learning endpoints.
   await page.getByTestId("studio-tab-practice").click();
-  await page.getByTestId("studio-generate").click();
   await expect(page.getByTestId("practice-view")).toBeVisible();
   await expect(page.getByText("What is equilibrium?")).toBeVisible();
   await page.getByTestId("import-practice").click();

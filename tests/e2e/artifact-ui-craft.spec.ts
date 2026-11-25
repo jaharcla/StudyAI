@@ -70,6 +70,10 @@ test("library uses grounded labels, keyboard focus and a designed empty state", 
 test("guide and infographic use authored hierarchy, caption, credit and grounded citations", async ({ page }) => {
   await page.route("**/api/studio/artifacts**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([guide, infographic]) }));
+  await page.route("**/api/studio/generate", (route) => {
+    const { kind } = route.request().postDataJSON() as { kind: string };
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(kind === "infographic" ? infographic : guide) });
+  });
   await enterStudio(page);
 
   await page.getByTestId("artifact-list-item").filter({ hasText: "Forces study guide" }).click();
@@ -98,7 +102,6 @@ test("loading, error and success states are real and recoverable", async ({ page
   await page.route("**/api/studio/artifacts**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) }));
   await enterStudio(page);
-  await page.getByTestId("studio-tab-study-guide").click();
 
   // Empty artifact library gets a designed first-run state.
   await expect(page.getByTestId("studio-empty")).toBeVisible();
@@ -114,7 +117,7 @@ test("loading, error and success states are real and recoverable", async ({ page
     await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Model service unavailable." }) });
   });
 
-  await page.getByTestId("studio-generate").click();
+  await page.getByTestId("studio-tab-study-guide").click();
   await expect(page.getByTestId("studio-loading")).toBeVisible();
   await expect(page.getByTestId("studio-loading")).toContainText("Reading this lesson's sources");
   await expect(page.getByTestId("studio-loading")).toHaveAttribute("role", "status");
@@ -122,7 +125,7 @@ test("loading, error and success states are real and recoverable", async ({ page
   await expect(page.getByTestId("artifact-kind")).toHaveText("Study guide");
 
   // Failure names the problem and offers a recovery action.
-  await page.getByTestId("studio-generate").click();
+  await page.getByTestId("studio-tab-study-guide").click();
   await expect(page.getByTestId("studio-error")).toBeVisible();
   // The UI deliberately hides the raw provider string and shows an honest, recoverable message.
   await expect(page.getByTestId("studio-error")).toContainText("Generation didn't complete.");

@@ -118,7 +118,7 @@ test("Studio keeps the lesson while switching between create and everything made
   await page.getByTitle("Open StudyAI Studio").click();
   await expect(page.getByTestId("studio-surface")).toBeVisible();
   await expect(page.getByTestId("studio-surface")).toContainText("Cohesion lesson");
-  await expect(page.getByTestId("deck-generate")).toBeVisible();
+  await expect(page.getByTestId("studio-tab-slide_deck")).toBeVisible();
 
   await page.getByTestId("library-filter-slide_deck").click();
   await expect(page.getByTestId("library-empty")).toContainText("No artifacts yet");
@@ -180,6 +180,23 @@ test("surface entries are disabled without a course or lesson", async ({ page })
   await expect(page.getByTitle("Open Library")).toHaveCount(0);
 });
 
+test("top bar has four destinations and Cards lives inside Study", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Cohesion nav ${Date.now()}`, "Cohesion lesson");
+  await openCourse(page, course.title);
+
+  await expect(page.locator(".immersive-actions button")).toHaveCount(4);
+  await expect(page.getByTitle("Open Home")).toHaveCount(0);
+  await expect(page.getByTitle("Open Today")).toHaveCount(0);
+  await expect(page.getByTitle("Flashcards and review")).toHaveCount(0);
+  await expect(page.locator(".immersive-actions button.primary")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  await page.getByTestId("study-cards-mode").click();
+  await expect(page.getByTestId("flashcard-review")).toBeVisible();
+  await page.getByRole("button", { name: "Close flashcard review" }).click();
+  await expect(page.getByRole("dialog", { name: "Study session" })).toBeVisible();
+});
+
 test("citations from Studio artifacts, Studio decks and ConceptGraph open the cited source", async ({ page }) => {
   const { course, lesson } = await createCourseWithLesson(page.request, `Cohesion cite ${Date.now()}`, "Cohesion lesson");
   const source = await page.request.post("/api/documents", {
@@ -215,7 +232,6 @@ test("citations from Studio artifacts, Studio decks and ConceptGraph open the ci
 
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-study-guide").click();
-  await page.getByTestId("studio-generate").click();
   await page.getByTestId("citation-chip").first().click();
   await expect(page.getByTestId("studio-surface")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "cohesion-source.txt" })).toBeVisible();

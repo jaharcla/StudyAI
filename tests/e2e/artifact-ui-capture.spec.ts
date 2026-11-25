@@ -46,6 +46,10 @@ test("capture remastered artifact surfaces in light and dark", async ({ page }) 
   mkdirSync(dir, { recursive: true });
   await page.route("**/api/studio/artifacts**", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([guide, infographic]) }));
+  await page.route("**/api/studio/generate", (route) => {
+    const { kind } = route.request().postDataJSON() as { kind: string };
+    return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(kind === "infographic" ? infographic : guide) });
+  });
 
   const { course } = await createCourseWithLesson(page.request);
   for (const theme of ["light", "dark"] as const) {

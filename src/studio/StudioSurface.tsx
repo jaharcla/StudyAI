@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDialogFocus } from "../components/useDialogFocus";
 import {
-  BookOpen, ChartColumn, Check, CircleAlert, CircleCheck, Download,
-  ListTree, LoaderCircle, Sparkles,
+  BookOpen, Brain, ChartColumn, Check, CircleAlert, CircleCheck, Download,
+  Layers, ListTree, LoaderCircle, Sparkles,
 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import "./studio.css";
@@ -34,6 +34,16 @@ const TABS: Array<{ id: StudioKind; label: string; icon: typeof Sparkles }> = [
   { id: "study-guide", label: "Study guide", icon: BookOpen },
   { id: "infographic", label: "Infographic", icon: ChartColumn },
   { id: "practice", label: "Practice", icon: Sparkles },
+];
+
+const CREATE_ITEMS: Array<{ id: string; label: string; icon: typeof Sparkles; kind: StudioKind | "slide_deck"; practice?: PracticeType }> = [
+  { id: "quiz", label: "Quiz", icon: Brain, kind: "practice", practice: "quiz" },
+  { id: "practice", label: "Practice test", icon: Sparkles, kind: "practice", practice: "both" },
+  { id: "flashcards", label: "Flashcards", icon: BookOpen, kind: "practice", practice: "cards" },
+  { id: "study-guide", label: "Study guide", icon: BookOpen, kind: "study-guide" },
+  { id: "mind-map", label: "Mind map", icon: ListTree, kind: "mind-map" },
+  { id: "slide_deck", label: "Slide deck", icon: Layers, kind: "slide_deck" },
+  { id: "infographic", label: "Infographic", icon: ChartColumn, kind: "infographic" },
 ];
 
 const MADE_KIND_LABEL: Record<StudioKind | "slide_deck", string> = {
@@ -172,10 +182,11 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [madeLoading]);
 
-  const generate = async () => {
+  const generate = async (target: StudioKind = kind, type: PracticeType = practiceType) => {
     setBusy(true); setError(""); setNotice(""); setErrorAction("generate");
+    setKind(target); setPracticeType(type);
     try {
-      const created = await generateArtifact({ courseId, lessonId, kind, focus: focus.trim() || "Key concepts and mechanisms", practiceType, count });
+      const created = await generateArtifact({ courseId, lessonId, kind: target, focus: focus.trim() || "Key concepts and mechanisms", practiceType: type, count });
       setArtifact(created);
       setFilter("all");
       if ("notice" in created && typeof created.notice === "string") setNotice(created.notice);
@@ -283,40 +294,33 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
         <div className="studio-lesson"><strong>{lessonTitle}</strong><small>{courseTitle}</small></div>
 
         <div className="studio-group">Create</div>
-        <nav className="studio-tabs" aria-label="Artifact type">
-          {TABS.map((tab) => (
-            <button key={tab.id} type="button" data-testid={`studio-tab-${tab.id}`} className={kind === tab.id ? "active" : ""}
-              aria-current={kind === tab.id ? "true" : undefined} onClick={() => setKind(tab.id)}>
-              <tab.icon size={16} strokeWidth={1.8} aria-hidden="true" /> <span>{tab.label}</span>
+        <nav className="studio-tabs" aria-label="Create">
+          {CREATE_ITEMS.map((item) => (
+            <button key={item.id} type="button" data-testid={`studio-tab-${item.id}`} disabled={busy || !!deckBusy}
+              aria-busy={busy || (item.kind === "slide_deck" && deckBusy === "generating")}
+              className={kind === item.kind ? "active" : ""}
+              onClick={() => item.kind === "slide_deck" ? generateDeck() : void generate(item.kind as StudioKind, item.practice)}>
+              <item.icon size={16} strokeWidth={1.8} aria-hidden="true" /> <span>{item.label}</span>
             </button>
           ))}
         </nav>
 
-        <div className="studio-group">Generate from</div>
         <details>
           <summary>Advanced</summary>
           <label className="studio-field">Focus
             <input data-testid="studio-focus" value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="e.g. equilibrium and forces" />
           </label>
+          <label className="studio-field">Deck focus
+            <input data-testid="deck-focus" value={deckFocus} onChange={(event) => setDeckFocus(event.target.value)} placeholder="Key concepts and mechanisms" maxLength={500} />
+          </label>
           {kind === "practice" && (
-            <>
-              <label className="studio-field">Items
-                <select value={practiceType} onChange={(event) => setPracticeType(event.target.value as PracticeType)}>
-                  <option value="both">Cards and quiz</option><option value="cards">Flashcards only</option><option value="quiz">Quiz only</option>
-                </select>
-              </label>
-              <label className="studio-field">Count
-                <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
-                  {[5, 10, 15, 20].map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </label>
-            </>
+            <label className="studio-field">Count
+              <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
+                {[5, 10, 15, 20].map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
           )}
         </details>
-        <button type="button" className="studio-primary studio-generate" data-testid="studio-generate" disabled={busy} aria-busy={busy} onClick={() => void generate()}>
-          {busy ? <LoaderCircle size={15} strokeWidth={2} aria-hidden="true" /> : <Sparkles size={15} strokeWidth={1.8} aria-hidden="true" />}
-          {busy ? "Generating…" : `Generate ${KIND_LABEL[kind]}`}
-        </button>
 
         {history.length > 0 && (
           <>
@@ -342,17 +346,6 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
             </div>
           </>
         )}
-
-        <div className="studio-group">Slide deck</div>
-        <details>
-          <summary>Advanced</summary>
-          <label className="studio-field">Focus
-            <input data-testid="deck-focus" value={deckFocus} onChange={(event) => setDeckFocus(event.target.value)} placeholder="Key concepts and mechanisms" maxLength={500} />
-          </label>
-        </details>
-        <button type="button" className="studio-toolbar-button studio-deck-generate" data-testid="deck-generate" disabled={!!deckBusy} aria-busy={deckBusy === "generating"} onClick={generateDeck}>
-          {deckBusy === "generating" ? "Building…" : "Build slide deck"}
-        </button>
 
         <p className="studio-sidebar-note">Every item keeps a citation you can open.</p>
       </aside>
@@ -477,7 +470,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
               <span className="studio-empty-icon"><Sparkles size={22} strokeWidth={1.7} aria-hidden="true" /></span>
               <h2>Make this lesson easier to review</h2>
               <p>Turn the sources, concepts and canvas for this lesson into a study guide, mind map, infographic or practice set. Each item keeps a citation you can open.</p>
-              <button type="button" className="studio-primary" onClick={() => void generate()}>Generate a {KIND_LABEL[kind].toLowerCase()}</button>
+              <button type="button" className="studio-primary" onClick={() => void generate("mind-map")}>Generate a mind map</button>
             </div>
           )}
 

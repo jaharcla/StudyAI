@@ -64,7 +64,7 @@ test("Artifacts page builds, lists, opens and organizes a slide deck", async ({ 
 
   await page.getByText("Advanced").last().click();
   await page.getByTestId("deck-focus").fill("Forces and equilibrium");
-  await page.getByTestId("deck-generate").click();
+  await page.getByTestId("studio-tab-slide_deck").click();
   await expect(page.getByTestId("artifacts-status")).toContainText("Building your deck");
   await expect(page.getByTestId("artifacts-status")).toContainText("Deck ready", { timeout: 5000 });
   await expect(page.getByTestId("slide-card")).toHaveCount(2);
@@ -113,12 +113,12 @@ test("Artifacts page names the missing service instead of saying the deck servic
   await selectCourseOnPage(page, course.title);
 
   await page.getByTitle("Open StudyAI Studio").click();
-  await page.getByTestId("deck-generate").click();
+  await page.getByTestId("studio-tab-slide_deck").click();
   const status = page.getByTestId("artifacts-status");
   await expect(status).toContainText("presentation service");
   await expect(status).not.toContainText("busy");
   await expect(status).not.toContainText("502");
-  await expect(page.getByTestId("deck-generate")).toBeEnabled();
+  await expect(page.getByTestId("studio-tab-slide_deck")).toBeEnabled();
   await page.screenshot({ path: "test-results/shots/artifacts-error-after.png" });
 });
 
@@ -133,7 +133,7 @@ test("Artifacts page keeps a semantic deck usable when the renderer is absent", 
   await selectCourseOnPage(page, course.title);
 
   await page.getByTitle("Open StudyAI Studio").click();
-  await page.getByTestId("deck-generate").click();
+  await page.getByTestId("studio-tab-slide_deck").click();
   const status = page.getByTestId("artifacts-status");
   await expect(status).toContainText("slides and citations are ready");
   await expect(page.getByTestId("slide-card")).toHaveCount(2);
