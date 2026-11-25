@@ -47,6 +47,8 @@ No journey counts green until one uninterrupted mock-student run produces screen
 - `db3e5ef` Home and workspace UTF-8 repair — https://critique.work/v/f474e49c8831275213d313babf552df8
 - `9c843f1` practice flow stability — https://critique.work/v/b2faa53ca32dfc1b7e9c131f8036a830
 - `dc9565b` evidence contract implementation note — https://critique.work/v/e32f422ec8709ef11da691e7f704d025
+- `ad570b3` adopt DESIGN.md — https://critique.work/v/4a8674b77593c223a755e4a219bbc0a0
+- `14346d1` one primary action in Study — https://critique.work/v/12d2bc9dfb453c7e47a10092807df1cd
 
 ## Workers and threads
 
@@ -68,6 +70,10 @@ No journey counts green until one uninterrupted mock-student run produces screen
 - `work/deck-in-canvas-20261123` is the rejected deck-dock direction; not merged.
 - `work/canvas-remediation-phase1-20261123` has no commits beyond main; nothing to integrate.
 - Presenton/deck flow is on main as cited editable PPTX; export needs a running Presenton service.
+
+## Design source of truth
+
+`DESIGN.md` at the repo root is now the single source of truth for how StudyAI looks, moves and speaks. It supersedes the earlier "no DESIGN.md" rule. It is a cohesion pass on shared tokens, not a redesign. The Studio unification worker has been given its constraints: one Studio nav destination, create on one side and everything made on the other, filter chips, one primary per surface, at most one ink-filled control per group, segmented view control, banners with working Retry and never empty, human-label citation chips, and no raw IDs.
 
 ## Rules and reporting
 
