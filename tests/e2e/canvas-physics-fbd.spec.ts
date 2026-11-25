@@ -15,7 +15,8 @@ test("physics free-body diagram displays interactive angle/magnitude sliders and
   await selectCourseOnPage(page, course.title);
   await expect(page.getByRole("button", { name: "Choose canvas board" })).toBeVisible();
 
-  // Fetch the created board
+  // Fetch the created board once the client has persisted it
+  await expect.poll(async () => (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json())).length, { timeout: 15_000 }).toBeGreaterThan(0);
   const boards = await (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`)).json();
   const board = boards[0];
   const boardRow = await (await request.get(`/api/canvases/${board.id}?course=${course.id}&lesson=${lesson.id}`)).json();

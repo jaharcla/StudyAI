@@ -54,6 +54,7 @@ function seedObject(kind: Kind, index: number): SeedObject {
 }
 
 async function seedBoard(request: APIRequestContext, course: { id: string }, lesson: { id: string }) {
+  await expect.poll(async () => (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json())).length, { timeout: 15_000 }).toBeGreaterThan(0);
   const boards = await (await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`)).json();
   const board = boards[0];
   const row = await (await request.get(`/api/canvases/${board.id}?course=${course.id}&lesson=${lesson.id}`)).json();
