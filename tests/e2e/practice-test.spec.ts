@@ -54,10 +54,8 @@ async function mockStudio(page: Page, generateStatus = 201) {
 async function openTestFromLibrary(page: Page, courseTitle: string) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await selectCourseOnPage(page, courseTitle);
-  await page.getByTestId("open-library").click();
-  await page.getByTestId("library-open-studio").click();
+  await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-practice").click();
-  await page.getByTestId("studio-generate").click();
   await expect(page.getByTestId("practice-view")).toBeVisible();
   await page.getByTestId("take-practice-test").click();
   await expect(page.getByTestId("practice-test")).toBeVisible();
@@ -126,7 +124,6 @@ test("a provider failure is honest only on generation, with Retry still availabl
   await selectCourseOnPage(page, course.title);
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-practice").click();
-  await page.getByTestId("studio-generate").click();
 
   await expect(page.getByTestId("studio-error")).toContainText("isn't responding right now");
   await expect(page.getByTestId("studio-error")).not.toContainText("temporarily unavailable");

@@ -29,54 +29,68 @@ async function mockLibrary(page: Page, studioItems: unknown[] = [studio], deckIt
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(deck) }));
 }
 
-async function openLibrary(page: Page, title: string) {
+async function openStudio(page: Page, title: string) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await selectCourseOnPage(page, title);
-  await page.getByTestId("open-library").click();
-  await expect(page.getByTestId("library-surface")).toBeVisible();
+  await page.getByTitle("Open StudyAI Studio").click();
+  await expect(page.getByTestId("studio-surface")).toBeVisible();
 }
 
-test("one library lists studio artifacts and decks, opens each and filters by type", async ({ page, request }) => {
+test("one Studio surface lists studio artifacts and decks, opens each and filters by type", async ({ page, request }) => {
   await mockLibrary(page, [studio], [deck], 600);
   const { course } = await createCourseWithLesson(request, `Library ${Date.now()}`, "Library lesson");
-  await openLibrary(page, course.title);
+  await openStudio(page, course.title);
 
   await expect(page.getByTestId("library-status")).toContainText("Loading your library");
   await expect(page.getByTestId("library-item")).toHaveCount(2);
   await expect(page.getByTestId("library-item").first()).toContainText("Forces");
+  await expect(page.getByTestId("library-status")).toHaveCount(0);
   await page.screenshot({ path: "test-results/shots/library-unified.png" });
 
-  await page.getByTestId("library-filter").selectOption("slide_deck");
+  await page.getByTestId("library-filter-slide_deck").click();
   await expect(page.getByTestId("library-item")).toHaveCount(1);
   await expect(page.getByTestId("library-item")).toContainText("Forces study deck");
 
   await page.getByTestId("library-open").click();
-  await expect(page.getByRole("dialog", { name: "Artifacts" })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Artifacts" })).toContainText("Forces study deck");
-  await page.getByRole("button", { name: "Close artifacts" }).click();
+  await expect(page.getByTestId("deck-detail")).toBeVisible();
+  await expect(page.getByTestId("deck-detail")).toContainText("Forces study deck");
+  await page.screenshot({ path: "test-results/shots/studio-unified-deck.png" });
+  await page.getByRole("button", { name: "Close Studio" }).click();
 
-  await page.getByTestId("open-library").click();
-  await page.getByTestId("library-filter").selectOption("mind-map");
+  await page.getByTitle("Open StudyAI Studio").click();
+  await page.getByTestId("library-filter-mind-map").click();
   await expect(page.getByTestId("library-item")).toHaveCount(1);
   await page.getByTestId("library-open").click();
   await expect(page.getByTestId("studio-surface")).toBeVisible();
   await expect(page.getByTestId("mind-map")).toBeVisible();
 });
 
-test("library shows an honest empty state and a retryable error state", async ({ page, request }) => {
+test("unified library shows either empty or error, never both, and Retry actually reloads", async ({ page, request }) => {
   const { course } = await createCourseWithLesson(request, `Library empty ${Date.now()}`, "Empty lesson");
   await mockLibrary(page, [], []);
-  await openLibrary(page, course.title);
+  await openStudio(page, course.title);
   await expect(page.getByTestId("library-empty")).toContainText("No artifacts yet");
+  await expect(page.getByTestId("library-status")).toHaveCount(0);
   await page.screenshot({ path: "test-results/shots/library-empty.png" });
-  await page.getByRole("button", { name: "Close library" }).click();
+  await page.getByRole("button", { name: "Close Studio" }).click();
 
   await page.unroute(/\/api\/studio\/artifacts(\?|$)/);
   await page.unroute(/\/api\/slide-decks(\?|$)/);
   await page.route(/\/api\/studio\/artifacts(\?|$)/, (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"unavailable"}' }));
   await page.route(/\/api\/slide-decks(\?|$)/, (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"error":"unavailable"}' }));
-  await page.getByTestId("open-library").click();
+  await page.getByTitle("Open StudyAI Studio").click();
   await expect(page.getByTestId("library-status")).toContainText("couldn't be loaded");
+  await expect(page.getByTestId("library-status")).toContainText("unchanged");
   await expect(page.getByTestId("library-status")).not.toContainText("unavailable");
+  await expect(page.getByTestId("library-empty")).toHaveCount(0);
+  await expect(page.getByTestId("studio-empty")).toHaveCount(0);
   await page.screenshot({ path: "test-results/shots/library-error.png" });
+
+  await page.unroute(/\/api\/studio\/artifacts(\?|$)/);
+  await page.unroute(/\/api\/slide-decks(\?|$)/);
+  await page.route(/\/api\/studio\/artifacts(\?|$)/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([studio]) }));
+  await page.route(/\/api\/slide-decks(\?|$)/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([deck]) }));
+  await page.getByTestId("library-retry").click();
+  await expect(page.getByTestId("library-status")).toHaveCount(0);
+  await expect(page.getByTestId("library-item")).toHaveCount(2);
 });

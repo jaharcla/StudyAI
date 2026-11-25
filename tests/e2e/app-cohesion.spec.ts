@@ -54,7 +54,6 @@ test("shared chrome gives every surface one header with back and close", async (
 
   const surfaces = [
     { open: () => page.getByTitle("Open StudyAI Studio").click(), dialog: "StudyAI Studio", eyebrow: "Studio", title: "StudyAI Studio", back: "Back to workspace", close: "Close Studio" },
-    { open: () => page.getByTitle("Open Artifacts").click(), dialog: "Artifacts", eyebrow: "Artifacts", title: "Artifacts", back: "Back to workspace", close: "Close artifacts" },
     { open: () => page.getByTestId("open-concept-graph").click(), dialog: "Course concept graph", eyebrow: "Concepts", title: "Concept graph", back: "Back to workspace", close: "Close concept graph" },
     { open: () => page.getByRole("button", { name: "Study", exact: true }).click(), dialog: "Study session", eyebrow: "Study", title: "Study tutor", back: "Back to canvas", close: "Close study session" },
   ];
@@ -74,16 +73,24 @@ test("shared chrome gives every surface one header with back and close", async (
   }
 });
 
-test("shared notice uses the status role on artifacts", async ({ page }) => {
+test("shared notice uses the status role on the unified library", async ({ page }) => {
   const { course } = await createCourseWithLesson(page.request, `Cohesion notice ${Date.now()}`, "Cohesion lesson");
+  await page.route("**/api/studio/artifacts**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.route("**/api/slide-decks?course=**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
   await openCourse(page, course.title);
-  await page.getByTitle("Open Artifacts").click();
+  await page.getByTitle("Open StudyAI Studio").click();
 
-  const notice = page.locator('[data-testid="artifacts-surface"] .surface-notice');
+  const notice = page.locator('[data-testid="studio-surface"] [data-testid="library-status"]');
   await expect(notice).toHaveCount(1);
   await expect(notice).toHaveAttribute("role", "status");
   await expect(notice).toHaveAttribute("aria-live", "polite");
-  await expect(notice).toHaveAttribute("data-testid", "artifacts-status");
+  await expect(notice).toContainText("Loading your library");
 });
 
 test("topbar Study and lesson header open the same study stage", async ({ page }) => {
@@ -102,19 +109,19 @@ test("topbar Study and lesson header open the same study stage", async ({ page }
   await expect(stage.locator(".surface-subtitle")).toContainText("Cohesion lesson");
 });
 
-test("Studio and Artifacts open each other without losing the lesson", async ({ page }) => {
+test("Studio keeps the lesson while switching between create and everything made", async ({ page }) => {
   const { course } = await createCourseWithLesson(page.request, `Cohesion links ${Date.now()}`, "Cohesion lesson");
+  await page.route("**/api/studio/artifacts**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.route("**/api/slide-decks?course=**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await openCourse(page, course.title);
 
   await page.getByTitle("Open StudyAI Studio").click();
   await expect(page.getByTestId("studio-surface")).toBeVisible();
-  await page.getByTestId("studio-open-decks").click();
-  await expect(page.getByTestId("artifacts-surface")).toBeVisible();
-  await expect(page.getByTestId("studio-surface")).toHaveCount(0);
+  await expect(page.getByTestId("studio-surface")).toContainText("Cohesion lesson");
+  await expect(page.getByTestId("studio-tab-slide_deck")).toBeVisible();
 
-  await page.getByTestId("artifacts-open-studio").click();
-  await expect(page.getByTestId("studio-surface")).toBeVisible();
-  await expect(page.getByTestId("artifacts-surface")).toHaveCount(0);
+  await page.getByTestId("library-filter-slide_deck").click();
+  await expect(page.getByTestId("library-empty")).toContainText("No artifacts yet");
   await expect(page.getByTestId("studio-surface")).toContainText("Cohesion lesson");
 });
 
@@ -160,7 +167,6 @@ test("surface entries are disabled without a course or lesson", async ({ page })
   await expect(concepts).toBeEnabled();
   const entries = [
     page.getByTitle("Open StudyAI Studio"),
-    page.getByTitle("Open Artifacts"),
     page.getByRole("button", { name: "Study", exact: true }),
     page.getByRole("button", { name: "Study this lesson" }),
   ];
@@ -168,9 +174,30 @@ test("surface entries are disabled without a course or lesson", async ({ page })
   for (const entry of entries) await entry.click({ force: true });
   await expect(page.locator(".surface-header")).toHaveCount(0);
   await expect(page.locator(".study-stage")).toHaveCount(0);
+
+  // Studio is the only creation entry; the duplicate nav buttons are gone.
+  await expect(page.getByTitle("Open Artifacts")).toHaveCount(0);
+  await expect(page.getByTitle("Open Library")).toHaveCount(0);
 });
 
-test("citations from Studio, Artifacts and ConceptGraph open the cited source", async ({ page }) => {
+test("top bar has four destinations and Cards lives inside Study", async ({ page }) => {
+  const { course } = await createCourseWithLesson(page.request, `Cohesion nav ${Date.now()}`, "Cohesion lesson");
+  await openCourse(page, course.title);
+
+  await expect(page.locator(".immersive-actions button")).toHaveCount(4);
+  await expect(page.getByTitle("Open Home")).toHaveCount(0);
+  await expect(page.getByTitle("Open Today")).toHaveCount(0);
+  await expect(page.getByTitle("Flashcards and review")).toHaveCount(0);
+  await expect(page.locator(".immersive-actions button.primary")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  await page.getByTestId("study-cards-mode").click();
+  await expect(page.getByTestId("flashcard-review")).toBeVisible();
+  await page.getByRole("button", { name: "Close flashcard review" }).click();
+  await expect(page.getByRole("dialog", { name: "Study session" })).toBeVisible();
+});
+
+test("citations from Studio artifacts, Studio decks and ConceptGraph open the cited source", async ({ page }) => {
   const { course, lesson } = await createCourseWithLesson(page.request, `Cohesion cite ${Date.now()}`, "Cohesion lesson");
   const source = await page.request.post("/api/documents", {
     data: { courseId: course.id, name: "cohesion-source.txt", content: "A cited line from the course source." },
@@ -205,15 +232,15 @@ test("citations from Studio, Artifacts and ConceptGraph open the cited source", 
 
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-study-guide").click();
-  await page.getByTestId("studio-generate").click();
   await page.getByTestId("citation-chip").first().click();
   await expect(page.getByTestId("studio-surface")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "cohesion-source.txt" })).toBeVisible();
 
-  await page.getByTitle("Open Artifacts").click();
-  await page.getByTestId("artifact-open").first().click();
+  await page.getByTitle("Open StudyAI Studio").click();
+  await page.getByTestId("library-item").filter({ hasText: "Cited deck" }).getByTestId("library-open").click();
+  await expect(page.getByTestId("slide-citation")).toHaveCount(1);
   await page.getByTestId("slide-citation").first().click();
-  await expect(page.getByTestId("artifacts-surface")).toHaveCount(0);
+  await expect(page.getByTestId("studio-surface")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "cohesion-source.txt" })).toBeVisible();
 
   await page.getByTestId("open-concept-graph").click();
@@ -226,12 +253,20 @@ test("citations from Studio, Artifacts and ConceptGraph open the cited source", 
 
 test("shared chrome stays readable in light and dark", async ({ page }) => {
   const { course } = await createCourseWithLesson(page.request, `Cohesion contrast ${Date.now()}`, "Cohesion lesson");
+  await page.route("**/api/studio/artifacts**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.route("**/api/slide-decks?course=**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
   await openCourse(page, course.title);
-  await page.getByTitle("Open Artifacts").click();
+  await page.getByTitle("Open StudyAI Studio").click();
 
-  const header = page.locator('[data-testid="artifacts-surface"] .surface-header');
+  const header = page.locator('[data-testid="studio-surface"] .surface-header');
   const parts = [header.locator(".surface-eyebrow"), header.locator(".surface-title"), header.locator(".surface-subtitle")];
-  const notice = page.locator('[data-testid="artifacts-surface"] .surface-notice');
+  const notice = page.locator('[data-testid="studio-surface"] [data-testid="library-status"]');
   for (const part of parts) expect(await contrastOf(part)).toBeGreaterThanOrEqual(4.5);
   expect(await contrastOf(notice)).toBeGreaterThanOrEqual(4.5);
 

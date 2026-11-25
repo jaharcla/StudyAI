@@ -11,13 +11,14 @@ type Props = {
   lessonTitle: string;
   close: () => void;
   onOpenActivities: () => void;
+  onOpenCards: () => void;
   onOpenSources: () => void;
   onOpenSource: (sourceRef: string) => void;
 };
 
 /** Conversation-first secondary surface. The study content is the real
  *  adaptive StudyPanel (questions, FSRS reviews, real course citations). */
-export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenActivities, onOpenSources, onOpenSource }: Props) {
+export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitle, close, onOpenActivities, onOpenCards, onOpenSources, onOpenSource }: Props) {
   const [mode, setMode] = useState<"quiz" | "activities" | "sources">("quiz");
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef);
@@ -29,6 +30,7 @@ export default function StudyStage({ courseId, lessonId, courseTitle, lessonTitl
         <button className="stage-session active">{lessonTitle}<small>{courseTitle}</small></button>
         <div className="stage-group">MODES</div>
         <button className={`stage-session ${mode === "quiz" ? "active" : ""}`} aria-current={mode === "quiz" ? "step" : undefined} onClick={() => setMode("quiz")}><Layers size={13} /> Adaptive quiz<small>Reviewed questions + FSRS</small></button>
+        <button className="stage-session" data-testid="study-cards-mode" onClick={onOpenCards}><BookOpen size={13} /> Cards<small>Flashcards and review</small></button>
         <button className={`stage-session ${mode === "activities" ? "active" : ""}`} aria-current={mode === "activities" ? "step" : undefined} onClick={() => { setMode("activities"); onOpenActivities(); }}><Activity size={13} /> Activities<small>Guided canvas tasks</small></button>
         <button className={`stage-session ${mode === "sources" ? "active" : ""}`} aria-current={mode === "sources" ? "step" : undefined} onClick={() => { setMode("sources"); onOpenSources(); }}><BookOpen size={13} /> Course sources<small>Pages and slides</small></button>
       </aside>

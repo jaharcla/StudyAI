@@ -15,7 +15,6 @@ async function openGuideCitation(page: Page, courseId: string, lessonId: string,
   await selectCourseOnPage(page, courseTitle);
   await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-study-guide").click();
-  await page.getByTestId("studio-generate").click();
   await page.getByTestId("citation-chip").first().click();
 }
 

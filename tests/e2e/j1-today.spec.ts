@@ -1,13 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createCourseWithLesson, selectCourseOnPage } from "./helpers";
 
 test.setTimeout(180000);
+
+async function openFromSidebar(page: Page, testId: string) {
+  const shell = page.locator(".app-shell");
+  if (!(await shell.evaluate((el) => el.classList.contains("sidebar-open")))) await page.getByTitle("Toggle courses").click();
+  await page.getByTestId(testId).click();
+}
 
 test("first 60 seconds: drop a file, see indexing, a cited summary, three actions and one prepared Continue", async ({ page, request }) => {
   const { course, lesson } = await createCourseWithLesson(request, `First minute ${Date.now()}`, "Cell basics");
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await selectCourseOnPage(page, course.title);
-  await page.getByTestId("top-open-home").click();
+  await openFromSidebar(page, "open-home");
   await expect(page.getByTestId("home-surface")).toBeVisible();
 
   await expect(page.getByTestId("indexing-progress")).toContainText("No sources indexed yet");
@@ -27,7 +33,7 @@ test("first 60 seconds: drop a file, see indexing, a cited summary, three action
   await page.getByTestId("summary-citation").first().click();
   await expect(page.getByRole("dialog", { name: /Document preview|cell-notes/ })).toBeVisible();
   await page.getByRole("button", { name: "Close preview" }).click();
-  await page.getByTestId("top-open-home").click();
+  await openFromSidebar(page, "open-home");
 
   await page.getByTestId("home-continue").click();
   await expect(page.getByTestId("studio-surface")).toBeVisible({ timeout: 45000 });
@@ -65,7 +71,7 @@ test("return visit opens Today with the daily plan, a prepared Continue and quie
   await page.screenshot({ path: test.info().outputPath("j1-today-strip.png") });
   await page.getByRole("button", { name: "Close study session" }).click();
 
-  await page.getByTestId("top-open-today").click();
+  await openFromSidebar(page, "open-today");
   await expect(page.getByTestId("today-surface")).toBeVisible();
   await expect(page.getByTestId("today-resume")).toContainText(lesson.title);
   await expect(page.getByTestId("today-plan")).toContainText("step");
@@ -80,7 +86,7 @@ test("Home stays honest before any source exists and rejects an unsupported file
   const { course } = await createCourseWithLesson(request, `Empty start ${Date.now()}`, "Empty lesson");
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await selectCourseOnPage(page, course.title);
-  await page.getByTestId("top-open-home").click();
+  await openFromSidebar(page, "open-home");
 
   await expect(page.getByTestId("grounded-summary")).toContainText("Add a source");
   await expect(page.getByTestId("home-continue")).toBeDisabled();
