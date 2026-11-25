@@ -8,6 +8,7 @@ import {
   generateStudioArtifact, getStudioArtifact, importStudioArtifact, listStudioArtifacts,
 } from "../server/studio/service.js";
 import type { StudioGenerator } from "../server/studio/service.js";
+import { GenerateSchema } from "../server/studio/contracts.js";
 
 const COURSE = "course-1";
 const LESSON = "lesson-1";
@@ -123,7 +124,7 @@ describe("Studio to learning integration", () => {
       cards: [{ front: "What is equilibrium?", back: "ΣF = 0", concept: "Equilibrium", sourceRef: REF }],
       questions: [{
         concept: "Equilibrium", prompt: "What is the vector sum at rest?",
-        choices: [{ id: "a", text: "Zero" }, { id: "b", text: "Weight" }], correctChoice: "a",
+        choices: [{ id: "a", text: "Zero" }, { id: "b", text: "Weight" }, { id: "c", text: "Mass" }, { id: "d", text: "Energy" }], correctChoice: "a",
         explanation: "Forces cancel.", sourceRef: REF,
       }],
     });
@@ -138,11 +139,59 @@ describe("Studio to learning integration", () => {
     const generator: StudioGenerator = async () => ({
       cards: [],
       questions: [{
-        concept: "Equilibrium", prompt: "Invented?", choices: [{ id: "a", text: "Yes" }, { id: "b", text: "No" }],
+        concept: "Equilibrium", prompt: "Invented?", choices: [{ id: "a", text: "Yes" }, { id: "b", text: "No" }, { id: "c", text: "Maybe" }, { id: "d", text: "Unclear" }],
         correctChoice: "a", explanation: "No.", sourceRef: "studyai://document/fake/page/9?chunk=0",
       }],
     });
     await expect(generateStudioArtifact(db, { courseId: COURSE, lessonId: LESSON, kind: "practice", focus: "equilibrium" }, generator))
       .rejects.toThrow("No grounded practice items");
+  });
+});
+
+function quizQuestion(index: number, choiceTexts = ["Zero", "Weight", "Mass", "Energy"]) {
+  return {
+    concept: `Equilibrium ${index}`,
+    prompt: `What balances the block at rest, case ${index}?`,
+    choices: choiceTexts.map((text, position) => ({ id: String.fromCharCode(97 + position), text })),
+    correctChoice: "a",
+    explanation: "The vector sum of all forces is zero.",
+    sourceRef: REF,
+  };
+}
+
+describe("practice test length and shape", () => {
+  it("defaults a real practice test to ten questions and allows longer ones", () => {
+    expect(GenerateSchema.parse({ courseId: COURSE, lessonId: LESSON, kind: "practice" }).count).toBe(10);
+    expect(GenerateSchema.parse({ courseId: COURSE, lessonId: LESSON, kind: "practice", count: 20 }).count).toBe(20);
+  });
+
+  it("keeps ten four-choice questions when the sources support them", async () => {
+    const generator: StudioGenerator = async () => ({ cards: [], questions: Array.from({ length: 10 }, (_, index) => quizQuestion(index)) });
+    const artifact = await generateStudioArtifact(db, { courseId: COURSE, lessonId: LESSON, kind: "practice", focus: "equilibrium", practiceType: "quiz" }, generator);
+    const content = artifact.content as { questions: Array<{ choices: Array<{ text: string }> }>; note?: string };
+    expect(content.questions).toHaveLength(10);
+    expect(content.questions.every((question) => question.choices.length === 4)).toBe(true);
+    expect(content.note).toBeUndefined();
+  });
+
+  it("says plainly when the sources support fewer questions instead of inventing items", async () => {
+    const generator: StudioGenerator = async () => ({ cards: [], questions: Array.from({ length: 6 }, (_, index) => quizQuestion(index)) });
+    const artifact = await generateStudioArtifact(db, { courseId: COURSE, lessonId: LESSON, kind: "practice", focus: "equilibrium", practiceType: "quiz" }, generator);
+    const content = artifact.content as { questions: unknown[]; note?: string };
+    expect(content.questions).toHaveLength(6);
+    expect(content.note).toMatch(/6/);
+    expect(content.note).toMatch(/shorter/);
+    expect(content.note).toMatch(/Nothing was invented/);
+  });
+
+  it("drops questions that are not exactly four distinct choices and reports the shortfall", async () => {
+    const generator: StudioGenerator = async () => ({
+      cards: [],
+      questions: [quizQuestion(0), quizQuestion(1, ["Zero", "Weight"]), quizQuestion(2, ["Zero", "Zero", "Mass", "Energy"])],
+    });
+    const artifact = await generateStudioArtifact(db, { courseId: COURSE, lessonId: LESSON, kind: "practice", focus: "equilibrium", practiceType: "quiz" }, generator);
+    const content = artifact.content as { questions: unknown[]; note?: string };
+    expect(content.questions).toHaveLength(1);
+    expect(content.note).toMatch(/1/);
   });
 });

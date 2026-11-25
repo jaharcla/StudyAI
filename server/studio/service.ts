@@ -56,7 +56,7 @@ const PracticeOutput = z.object({
     back: z.string().trim().min(1).max(2000),
     concept: z.string().trim().min(1).max(160),
     sourceRef: z.string().trim().min(1),
-  })).max(8),
+  })).max(20),
   questions: z.array(z.object({
     concept: z.string().trim().min(1).max(160),
     prompt: z.string().trim().min(1).max(2000),
@@ -64,7 +64,7 @@ const PracticeOutput = z.object({
     correctChoice: z.string().trim().min(1),
     explanation: z.string().trim().min(1).max(2000),
     sourceRef: z.string().trim().min(1),
-  })).max(8),
+  })).max(20),
 });
 
 export type StudioGenerator = (args: { system: string; user: string; input: GenerateInput }) => Promise<unknown>;
@@ -99,6 +99,8 @@ export async function generateStudioArtifact(
     "If the material is insufficient for the requested number of items, return fewer honest items.",
     "Keep wording concise and suitable for a university student. Use LaTeX in $...$ for equations.",
     "Practice questions must require understanding or application; never use 'According to the excerpt...' or similar giveaway phrasing, and the cited excerpt should help check the answer without containing the correct choice verbatim.",
+    "Give every practice question exactly four distinct choices: one correct answer and three plausible distractors drawn from the same supplied course material. Never add a choice that is not supported by that material.",
+    "If the supplied material supports fewer solid questions than requestedCount, return only the questions you can ground honestly; the app will tell the student the test is shorter.",
   ].join(" ");
 
   const user = JSON.stringify({
@@ -130,8 +132,14 @@ export async function generateStudioArtifact(
     }
     content = validateContent(input.kind, parsed, grounding.sources, input.count, input.practiceType, canvasRefs);
   }
-  const notice = content ? undefined : STUDIO_FALLBACK_NOTICE;
+  let notice = content ? undefined : STUDIO_FALLBACK_NOTICE;
   if (!content) content = groundedFallback(input, grounding);
+  if (input.kind === "practice" && input.practiceType !== "cards" && "questions" in content) {
+    const produced = content.questions.length;
+    if (produced > 0 && produced < input.count) {
+      content.note = `This lesson's sources supported ${produced} grounded question${produced === 1 ? "" : "s"}, so the test is shorter than ${input.count}. Nothing was invented.`;
+    }
+  }
   const refs = [...new Set(collectRefs(content))];
   const title = "title" in content && content.title ? content.title : `${LABELS[input.kind]} · ${input.focus}`;
 
@@ -196,8 +204,8 @@ export function importStudioArtifact(db: Database.Database, learning: LearningSe
   initializeStudioSchema(db);
   const input: ImportInput = z.object({
     artifactId: z.string().min(1),
-    cards: z.array(z.number().int().nonnegative()).max(8).optional().default([]),
-    questions: z.array(z.number().int().nonnegative()).max(8).optional().default([]),
+    cards: z.array(z.number().int().nonnegative()).max(20).optional().default([]),
+    questions: z.array(z.number().int().nonnegative()).max(20).optional().default([]),
   }).strict().parse(rawInput);
 
   const row = db.prepare("SELECT course_id AS courseId,lesson_id AS lessonId,kind,content FROM studio_artifacts WHERE id=?").get(input.artifactId) as { courseId: string; lessonId: string; kind: string; content: string } | undefined;
@@ -342,7 +350,7 @@ function validateContent(kind: StudioKind, raw: unknown, sources: StudioSource[]
   const cards = (practiceType === "quiz" ? [] : parsed.cards)
     .map((card) => withSource(card, sources)).filter((card): card is NonNullable<typeof card> => Boolean(card)).slice(0, count);
   const questions = (practiceType === "cards" ? [] : parsed.questions)
-    .filter((question) => !isCopyStyleQuestionPrompt(question.prompt))
+    .filter((question) => !isCopyStyleQuestionPrompt(question.prompt) && hasFourDistinctChoices(question.choices))
     .map((question) => {
       const source = sourceFor(question.sourceRef, sources);
       if (!source || !question.choices.some((choice) => choice.id === question.correctChoice)) return undefined;
@@ -350,6 +358,12 @@ function validateContent(kind: StudioKind, raw: unknown, sources: StudioSource[]
     }).filter((question): question is NonNullable<typeof question> => Boolean(question)).slice(0, count);
   if (!cards.length && !questions.length) throw new Error("No grounded practice items were generated.");
   return { cards, questions };
+}
+
+function hasFourDistinctChoices(choices: Array<{ id: string; text: string }>): boolean {
+  if (choices.length !== 4) return false;
+  return new Set(choices.map((choice) => choice.id)).size === 4
+    && new Set(choices.map((choice) => choice.text.trim().toLowerCase())).size === 4;
 }
 
 function validRef(ref: string | undefined, sources: StudioSource[]): string | undefined {

@@ -9,14 +9,14 @@ export const GenerateSchema = z.object({
   kind: StudioKindSchema,
   focus: z.string().trim().min(1).max(500).optional().default("Key concepts and mechanisms"),
   practiceType: z.enum(["cards", "quiz", "both"]).optional().default("both"),
-  count: z.number().int().min(2).max(8).optional().default(4),
+  count: z.number().int().min(2).max(20).optional().default(10),
 }).strict();
 export type GenerateInput = z.infer<typeof GenerateSchema>;
 
 export const ImportSchema = z.object({
   artifactId: z.string().min(1),
-  cards: z.array(z.number().int().nonnegative()).max(8).optional().default([]),
-  questions: z.array(z.number().int().nonnegative()).max(8).optional().default([]),
+  cards: z.array(z.number().int().nonnegative()).max(20).optional().default([]),
+  questions: z.array(z.number().int().nonnegative()).max(20).optional().default([]),
 }).strict();
 export type ImportInput = z.infer<typeof ImportSchema>;
 
@@ -61,7 +61,12 @@ export type PracticeQuestion = {
   correctChoice: string; explanation: string;
   sourceRef: string; sourceDocumentId: string; sourcePage: number | null; sourceExcerpt: string;
 };
-export type PracticeContent = { cards: PracticeCard[]; questions: PracticeQuestion[] };
+export type PracticeContent = {
+  cards: PracticeCard[];
+  questions: PracticeQuestion[];
+  /** Plain note when the sources supported fewer grounded questions than requested. */
+  note?: string;
+};
 
 /** The deterministic, locally rendered projection of a package `diagram` component. */
 export type InfographicDiagram = {
