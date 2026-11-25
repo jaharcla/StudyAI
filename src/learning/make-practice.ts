@@ -5,7 +5,7 @@ export async function makePracticeTest(input: { courseId: string; lessonId: stri
   try {
     return await generateArtifact({
       courseId: input.courseId, lessonId: input.lessonId, kind: "practice",
-      focus: input.focus, practiceType: "quiz", count: input.count ?? 4,
+      focus: input.focus, practiceType: "quiz", count: input.count ?? 10,
     });
   } catch (error) {
     const status = (error as { status?: number } | null)?.status;
@@ -26,7 +26,7 @@ export type MakePracticeInput = {
 };
 
 export async function makePractice(input: MakePracticeInput): Promise<{ cardsAdded: number; questionsAdded: number }> {
-  const count = input.count ?? 4;
+  const count = input.count ?? 10;
   let artifact;
   try {
     artifact = await generateArtifact({

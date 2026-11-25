@@ -16,7 +16,7 @@ export type PracticeQuestion = {
   correctChoice: string; explanation: string; sourceRef: string;
   sourceDocumentId: string; sourcePage: number | null; sourceExcerpt: string;
 };
-export type PracticeContent = { cards: PracticeCard[]; questions: PracticeQuestion[] };
+export type PracticeContent = { cards: PracticeCard[]; questions: PracticeQuestion[]; note?: string };
 
 export type InfographicDiagram = {
   title: string;

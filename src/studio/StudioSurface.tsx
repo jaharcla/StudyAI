@@ -35,9 +35,10 @@ const FORMAT_ERROR = "The study assistant couldn't turn this lesson's material i
 
 function studentMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "";
+  const status = (error as { status?: number } | null)?.status;
   if (/did not return a JSON|couldn't format a response|could not format|study assistant couldn't/i.test(raw)) return FORMAT_ERROR;
   if (/No course sources|No grounded/i.test(raw)) return "This lesson doesn't have enough course material yet. Add a source or notes, then try again.";
-  if (/502|503|fetch failed|network/i.test(raw)) return "The study assistant isn't responding right now. Your course material is unchanged. Try again in a moment.";
+  if (status === 502 || status === 503 || /502|503|fetch failed|network/i.test(raw)) return "The study assistant isn't responding right now. Your course material is unchanged. Try again in a moment.";
   return "Generation didn't complete. Your course material is unchanged. Try again.";
 }
 
@@ -55,7 +56,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [kind, setKind] = useState<StudioKind>("mind-map");
   const [focus, setFocus] = useState(initialFocus);
   const [practiceType, setPracticeType] = useState<PracticeType>("both");
-  const [count, setCount] = useState(4);
+  const [count, setCount] = useState(10);
   const [artifact, setArtifact] = useState<StudioArtifact | undefined>();
   const [history, setHistory] = useState<StudioArtifact[]>([]);
   const [filter, setFilter] = useState<StudioKind | "all">("all");
@@ -156,7 +157,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
               </label>
               <label className="studio-field">Count
                 <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
-                  {[2, 3, 4, 6, 8].map((value) => <option key={value} value={value}>{value}</option>)}
+                  {[5, 10, 15, 20].map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               </label>
             </>
@@ -217,7 +218,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
               <div>
                 <strong>That didn't go through</strong>
                 <p>{error}</p>
-                <button type="button" className="studio-error-retry" onClick={retry}>Try again</button>
+                <button type="button" className="studio-error-retry" data-testid="studio-error-retry" onClick={retry}>Try again</button>
               </div>
             </div>
           )}

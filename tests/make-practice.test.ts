@@ -27,7 +27,7 @@ describe("makePractice", () => {
 
     const [genUrl, genInit] = fetchMock.mock.calls[0];
     expect(genUrl).toBe("/api/studio/generate");
-    expect(JSON.parse(genInit.body)).toMatchObject({ kind: "practice", focus: "focus", practiceType: "quiz", count: 4 });
+    expect(JSON.parse(genInit.body)).toMatchObject({ kind: "practice", focus: "focus", practiceType: "quiz", count: 10 });
     expect(genInit.headers).not.toHaveProperty("Origin");
 
     const [impUrl, impInit] = fetchMock.mock.calls[1];
