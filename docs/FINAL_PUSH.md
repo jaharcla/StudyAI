@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `59f02b1`. Final full `npm run verify` exit 0 on `d0f9430`: `tsc -b` clean, Vitest 140 files / 882 tests, Playwright 141 passed, 3 flaky (`canvas-physics-fbd` sliders, `canvas-visual-remediation` user-readiness, `math-workspace` Quickdraw), 6 skipped (2026-11-25). Voice branch after alignment: `tsc -b` clean, Vitest 144 files / 908 tests. No engine has been benchmarked yet. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `1d468d5`. Last full `npm run verify` exit 0 on `d0f9430`: `tsc -b` clean, Vitest 140 files / 882 tests, Playwright 141 passed, 3 flaky (`canvas-physics-fbd` sliders, `canvas-visual-remediation` user-readiness, `math-workspace` Quickdraw), 6 skipped (2026-11-25). After the voice merge and tutor fix only targeted checks ran: `tsc -b` clean, Vitest 144 files / 911 tests, Playwright `tutor-round2-hygiene` 2/2. A full verify on the current head is still pending. Voice branch after alignment: `tsc -b` clean, Vitest 144 files / 908 tests. No engine has been benchmarked yet. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -65,6 +65,9 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - `ada67cb` voice benchmark harness — https://critique.work/v/10e358c48371370451bc2ad98fceb3e3
 - `5eaf20b` align voice branch with main — https://critique.work/v/612265eb0b5d345883281adcefd36246
 - `59f02b1` merge voice benchmark harness — https://critique.work/v/8f8f935e35d2c382c416ab451939180b
+- `d148516` final verify and voice harness ledger — https://critique.work/v/e4905c43cab5d4ee6964bfae82e0b02b
+- `78d0df1` tutor thread survives transient course or lesson loading — https://critique.work/v/0af78b5a53aa421755b3a4b46eb01e09
+- `1d468d5` grounded-answer course persistence assertion — https://critique.work/v/f5d1d4b35d07430bb2e1b97422020a95
 
 ## Workers and threads
 
@@ -82,6 +85,7 @@ One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state sc
 - Local decks and in-site slide viewer: https://discord.com/channels/1574451017817399346/1575037172128546816 — merged
 - Guided artifact creation: https://discord.com/channels/1574451017817399346/1575041473534238730 — merged
 - Voice benchmark harness: https://discord.com/channels/1574451017817399346/1575054063345606760 — merged; tsc and Vitest clean, no engine measured
+- Tutor session reset fix: https://discord.com/channels/1574451017817399346/1575081898248507492 — merged at `78d0df1` / `1d468d5`; thread now resets only on a genuine change between complete course:lesson scopes
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
