@@ -21,6 +21,7 @@ import MindMapView from "./MindMapView";
 import StudyGuideView from "./StudyGuideView";
 import PracticeView from "./PracticeView";
 import InfographicView from "./InfographicView";
+import SlideDeckView from "./SlideDeckView";
 
 const KIND_LABEL: Record<StudioKind, string> = {
   "mind-map": "Mind map",
@@ -61,7 +62,7 @@ const MADE_FILTERS: Array<{ id: MadeKind | "all"; label: string }> = [
 ];
 
 const FORMAT_ERROR = "The study assistant couldn't turn this lesson's material into an artifact this time. Your course material is unchanged. Try again or choose another artifact type.";
-const RENDER_MISSING = "The local presentation service (Presenton) isn't running. Slides and citations are ready to review; start the service and build again to download a .pptx.";
+const SAVE_FAILED = "Your slides and citations are ready, but the .pptx couldn't be saved. Try building the deck again.";
 
 type Note = { tone: "info" | "error" | "success"; text: string };
 type MadeKind = StudioKind | "slide_deck";
@@ -99,7 +100,7 @@ function deckMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : "";
   if (/No course sources/i.test(raw)) return "This lesson has no course material to build a deck from yet. Add a source or notes first.";
   if (/validation failed|repair/i.test(raw)) return "The deck didn't pass the course-material checks. Try a different focus or source.";
-  if (/presenton|presentation service|renderer|502|503/i.test(raw)) return RENDER_MISSING;
+  if (/couldn't be saved|renderer|502|503/i.test(raw)) return SAVE_FAILED;
   return "We couldn't finish that. Try again in a moment.";
 }
 
@@ -134,6 +135,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   const [selectedDeck, setSelectedDeck] = useState<SlideDeckArtifact | undefined>();
   const [deckRename, setDeckRename] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [presenting, setPresenting] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   useDialogFocus(true, dialogRef);
@@ -161,6 +163,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
   }, [courseId, lessonId]);
 
   useEffect(() => { refreshMade(); }, [refreshMade]);
+  useEffect(() => { setPresenting(false); }, [selectedDeck]);
 
   const openDeck = useCallback((id: string) => {
     if (deckBusy) return;
@@ -236,7 +239,7 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     void generateSlideDeck({ courseId, lessonId, focus: deckFocus.trim() || lessonTitle || "Key concepts and mechanisms" })
       .then((item) => {
         const degraded = !item.filePath;
-        const reason = degraded && "notice" in item && typeof item.notice === "string" ? item.notice : RENDER_MISSING;
+        const reason = degraded && "notice" in item && typeof item.notice === "string" ? item.notice : SAVE_FAILED;
         setDeckNotice({ tone: degraded ? "info" : "success", text: degraded ? reason : "Deck ready. Open it below to review slides and speaker notes." });
         setSelectedDeck(item); setDeckRename(item.title); setConfirmDelete(false);
         return refreshMade();
@@ -483,13 +486,16 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
             <section className="studio-deck" data-testid="deck-detail" aria-label="Slide deck">
               <div className="artifacts-detail-head">
                 <div><h3>{selectedDeck.title}</h3><small>{selectedDeck.content.slides.length} slides · {selectedDeck.sourceRefs.length} cited sources</small></div>
-                {selectedDeck.filePath ? (
-                  <a className="button-soft" data-testid="artifact-download" href={downloadSlideDeckUrl(selectedDeck.id, selectedDeck.courseId)} download={deckFileName(selectedDeck.title)}>Download .pptx</a>
-                ) : (
-                  <button type="button" className="button-soft" data-testid="artifact-download-unavailable" aria-describedby="artifact-download-note" disabled>Download unavailable</button>
-                )}
+                <div className="deck-detail-actions">
+                  <button type="button" className="button-primary" data-testid="deck-viewer-present" onClick={() => setPresenting(true)}>Present deck</button>
+                  {selectedDeck.filePath ? (
+                    <a className="button-soft" data-testid="artifact-download" href={downloadSlideDeckUrl(selectedDeck.id, selectedDeck.courseId)} download={deckFileName(selectedDeck.title)}>Download .pptx</a>
+                  ) : (
+                    <button type="button" className="button-soft" data-testid="artifact-download-unavailable" aria-describedby="artifact-download-note" disabled>Download unavailable</button>
+                  )}
+                </div>
               </div>
-              {!selectedDeck.filePath && <p id="artifact-download-note" className="artifacts-empty" data-testid="artifact-download-note">{RENDER_MISSING}</p>}
+              {!selectedDeck.filePath && <p id="artifact-download-note" className="artifacts-empty" data-testid="artifact-download-note">{SAVE_FAILED}</p>}
               <div className="artifacts-rename">
                 <label htmlFor="artifact-title">Deck name</label>
                 <input id="artifact-title" data-testid="artifact-rename" aria-label="Artifact title" value={deckRename} onChange={(event) => setDeckRename(event.target.value)} maxLength={200} />
@@ -520,6 +526,9 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
           )}
         </div>
       </main>
+      {presenting && selectedDeck && (
+        <SlideDeckView deck={selectedDeck} onOpenSource={onOpenSource} onClose={() => setPresenting(false)} />
+      )}
     </div>
   );
 }

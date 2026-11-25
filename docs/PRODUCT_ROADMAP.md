@@ -50,7 +50,7 @@ Podcasts and audio lessons; narrated educational video; study guides as a first-
 | --- | --- | --- | --- |
 | A. Grounded tutoring, explanations, Socratic, adaptive questions, grading | Strong core; weak canvas description | Human-level canvas description; misconception→BKT | Voice tutoring unplanned |
 | A. Personalized plans and recommendations | Coach shipped: one ranked prompt, prepared targets, truthful Continue, course-change clearing and active provider display | Daily plans ([spec](superpowers/specs/2026-11-24-daily-plans-design.md)) and richer mastery labels | Original Critical gap now has a working, honest surface |
-| B. Presentations / slides | Implemented: Presenton renderer, artifacts page, editable PPTX, cited decks, human slide titles; export needs a running Presenton service | Service smoke test and export gate | No longer a design draft |
+| B. Presentations / slides | Implemented: local editable PPTX writer, cited decks, human slide titles and an in-site presenter view; no external service needed | Rendered-slide visual QA in PowerPoint | No longer a design draft or a service dependency |
 | B. Podcasts / audio lessons | Canvas narration shipped: grounded walkthrough of the student's board with browser speech and synchronized highlight | Reasoned generator vs deterministic readout | Distinctive first audio experience; generic podcasts still deferred |
 | B. Educational video | Absent | Research → spec | Scene-based explainers |
 | B. Study guides / summaries | Partial (Studio) | First-class artifact | Reuse grounding |

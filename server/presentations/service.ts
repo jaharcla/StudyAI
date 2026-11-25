@@ -34,8 +34,8 @@ export type SlideDeckArtifact = {
   notice?: string;
 };
 
-export const DECK_RENDER_NOTICE = "Your deck's slides and citations are ready. The .pptx download needs the local presentation service (Presenton), which isn't running. Start it and build again to export.";
-export const DECK_DOWNLOAD_NOTICE = "This deck has no .pptx file because the local presentation service (Presenton) was not running when it was built. Start the service and build the deck again to download.";
+export const DECK_RENDER_NOTICE = "Your deck's slides and citations are ready, but the .pptx couldn't be saved. Try building it again to export.";
+export const DECK_DOWNLOAD_NOTICE = "This deck has no .pptx file. Build it again to export a downloadable copy.";
 
 export type SlideDeckDeps = {
   renderer: (request: PresentonGenerateRequest) => Promise<RenderedDeck>;
