@@ -10,12 +10,15 @@ test("Cards opens flashcard review and a rated card advances", async ({ page, re
   await selectCourseOnPage(page, course.title);
   const scrim = page.locator(".sidebar-scrim");
   if (await scrim.isVisible()) await scrim.click();
-  await page.getByRole("button", { name: "Cards", exact: true }).click();
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Study session" })).toBeVisible();
+  await page.getByTestId("study-cards-mode").click();
   await expect(page.getByTestId("flashcard-review")).toBeVisible();
   await expect(page.getByText("H2O", { exact: true })).toBeHidden();
   await page.getByRole("button", { name: "Reveal card" }).click();
   await expect(page.getByText("H2O", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Good", exact: true }).click();
-  await expect(page.getByText(/Next review/)).toBeVisible();
-  await expect(page.getByText("No flashcards are due")).toBeVisible();
+  const review = page.getByTestId("flashcard-review");
+  await expect(review.getByText(/Next review/)).toBeVisible();
+  await expect(review.getByText("No flashcards are due")).toBeVisible();
 });
