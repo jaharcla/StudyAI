@@ -37,6 +37,12 @@ Keep these links; install and actually use them if RAM or performance dips again
 - Windows Task Manager MCP: https://mcpmarket.com/es/server/windows-task-manager
 - Earlier Athola CPU/GPU skill page: https://skillselion.com/skills/athola/claude-night-market/cpu-gpu-performance
 
+## CLI-Anything (2026-11-25, user explicitly approved)
+- `cli-hub-meta-skill` installed globally at `~\.agents\skills\cli-hub-meta-skill`.
+- Five OpenCode commands plus `HARNESS.md` installed globally at `~\.config\opencode\commands\`: cli-anything, cli-anything-refine, cli-anything-test, cli-anything-validate, cli-anything-list.
+- `cli-anything-hub` 0.4.1 installed via `python -m pip install --user`; executable at `C:\Users\Owner\AppData\Roaming\Python\Python310\Scripts\cli-hub.exe` but that Scripts directory is not on PATH, so invoke by full path.
+- Use only for scoped tasks. Generator produces Python Click harnesses; it is not part of the StudyAI runtime.
+
 ## Installed performance commands (2026-11-25, user-approved)
 - Seven `claude-code-templates` performance commands installed into `.claude/commands/`: optimize-memory-usage, performance-audit, add-performance-monitoring, implement-caching-strategy, optimize-api-performance, system-behavior-simulator, setup-cdn-optimization.
 - These are prompt checklists, not runtime tools. Most useful here: baseline before/after, heap and listener leak checks, streaming and limits on the data API. CDN, containers and autoscaling do not apply to a local-first app.
