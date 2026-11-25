@@ -14,7 +14,7 @@ import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { GroundingBadges, objectTitle } from "./SceneGlyph";
 import { applyArtifactBriefProposal, applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema, proposeArtifactBrief, proposeCanvasEdit, proposeCanvasObject, proposeMolecule, type ArtifactBriefProposal, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
-import { Atom, BookOpen, ChevronDown, Download, FileText, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
+import { Atom, BookOpen, ChevronDown, Download, FileText, FolderOpen, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
@@ -178,6 +178,7 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [, setEditorFrame] = useState(0);
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false });
   const [boardMenu, setBoardMenu] = useState(false);
+  const [boardFileOpen, setBoardFileOpen] = useState(false);
   const [proposal, setProposal] = useState<CanvasProposal>();
   const [objectProposal, setObjectProposal] = useState<CanvasObjectProposal>();
   const [recognitionOpen, setRecognitionOpen] = useState(false);
@@ -1141,11 +1142,14 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         <button className="button-soft" aria-label="Review canvas labels" aria-pressed={recognitionOpen} disabled={!activeBoard || loading} title="Teach selected ink a label, then accept, correct, or dismiss recognition candidates." onClick={() => void openRecognition()}><Tag size={14} />Labels</button>
         <button className="icon-button" title="Undo" aria-label="Undo canvas change" disabled={!undoState.canUndo} onClick={undo}><Undo2 size={15} /></button>
         <button className="icon-button" title="Redo" aria-label="Redo canvas change" disabled={!undoState.canRedo} onClick={redo}><Redo2 size={15} /></button>
-        <button className="icon-button" title="Import canvas JSON" aria-label="Import canvas JSON" onClick={() => importRef.current?.click()}><Upload size={15} /></button>
-        <button className="icon-button" title="Export canvas JSON" aria-label="Export canvas JSON" onClick={exportJson}><Download size={15} /></button>
-        <button className="icon-button" title="Export board image" aria-label="Export board image" onClick={() => void exportPng()}><FileText size={15} /></button>
+        <button className="icon-button" data-testid="board-file-menu" title="Board file actions" aria-label="Board file actions" aria-expanded={boardFileOpen} onClick={() => setBoardFileOpen((open) => !open)}><FolderOpen size={15} /></button>
         <input ref={importRef} hidden type="file" accept=".json,application/json" onChange={(event) => void importJson(event.target.files?.[0])} />
       </div>
+      {boardFileOpen && <div className="canvas-file-menu" role="group" aria-label="Board file actions">
+        <button className="button-soft" aria-label="Import canvas JSON" onClick={() => importRef.current?.click()}><Upload size={14} />Import JSON</button>
+        <button className="button-soft" aria-label="Export canvas JSON" onClick={exportJson}><Download size={14} />Export JSON</button>
+        <button className="button-soft" aria-label="Export board image" onClick={() => void exportPng()}><FileText size={15} />Export image</button>
+      </div>}
     </div>
     <div className="canvas-viewport lab-paper">
       {toolOpen && <aside className="canvas-tool-palette"><div className="palette-heading"><span>CANVAS TOOLS</span><button className="icon-button" title="Collapse canvas tools" aria-label="Collapse canvas tools" onClick={() => setToolOpen(false)}><X size={14} /></button></div><label className="palette-search"><Search size={14} /><input aria-label="Search canvas tools" placeholder="Find a tool" value={toolSearch} onChange={(event) => setToolSearch(event.target.value)} /></label>{(["Draw", "Science", "Learning"] as const).map((group) => {

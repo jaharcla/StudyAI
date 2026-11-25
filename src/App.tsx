@@ -39,6 +39,7 @@ import { registerCoachProducer } from "./coach/service";
 import { studyPreparationResult, type CoachPreparationResult, type CoachTarget } from "./coach/contract";
 import { HomeSurface, TodayStrip, TodaySurface } from "./today/DailySurfaces.js";
 import { OneDropSurface } from "./onboarding/OneDropSurface.js";
+import { courseIntakeState } from "./onboarding/intake-state.js";
 import { PreparedQuestion } from "./onboarding/PreparedQuestion.js";
 
 // Paid rail is dormant (PRODUCT_ROADMAP, 2026-11-23). Off unless explicitly enabled.
@@ -296,18 +297,33 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     prepareCoachTarget,
   );
 
-  useEffect(() => {
-    let live = true;
-    fetch(`${API}/courses`).then(async (response) => { if (!response.ok) throw new Error("Local storage is unavailable."); return response.json() as Promise<Course[]>; }).then((rows) => {
-      if (!live) return;
+  const loadCourses = useCallback(async (isLive: () => boolean) => {
+    setCoursesLoaded(false);
+    setCourseError("");
+    try {
+      const response = await fetch(`${API}/courses`);
+      if (!response.ok) throw new Error("Local storage is unavailable.");
+      const rows = await response.json() as Course[];
+      if (!isLive()) return;
       setCourses(rows);
       setCoursesLoaded(true);
       const selected = selectCourse(rows, localStorage.getItem("studyai.course")) ?? noCourse;
       setCourse(selected);
       if (selected.id) localStorage.setItem("studyai.course", selected.id);
-      setCourseError("");
       setStatus(rows.length ? "Local storage connected" : "No courses yet");
-    }).catch((error) => { if (live) { setCourses([]); setCoursesLoaded(true); setCourse(noCourse); setCourseError(error instanceof Error ? error.message : "Could not load courses."); setStatus("Local storage unavailable"); } });
+    } catch (error) {
+      if (!isLive()) return;
+      setCourses([]);
+      setCoursesLoaded(true);
+      setCourse(noCourse);
+      setCourseError(error instanceof Error ? error.message : "Could not load courses.");
+      setStatus("Local storage unavailable");
+    }
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    void loadCourses(() => live);
     fetch(`${API}/models`).then(async (response) => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Ollama is unavailable.");
@@ -325,7 +341,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     }).catch((error) => { if (live) { setModels([]); setSelectedModel(""); localStorage.removeItem("studyai.model"); setAiStatus(error instanceof Error ? error.message : "Ollama is unavailable"); } });
     fetch(`${API}/tutor-status`).then(async (response) => { const value = await response.json() as TutorStatus; if (live && response.ok) setTutorStatus(value); }).catch(() => { /* keep the Ollama status as fallback */ });
     return () => { live = false; };
-  }, []);
+  }, [loadCourses]);
 
   const creditHeaders = useCallback(() => ({
     "content-type": "application/json",
@@ -581,11 +597,25 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   const nextSurface = (["study", "studio", "concepts"] as const).find((key) => surfaceHasWork[key]) ?? "canvas";
   const surfaceLabels = { canvas: "Canvas", study: "Study", studio: "Studio", concepts: "Concepts" } as const;
 
-  // A truly empty workspace gets one surface. The canvas, toolbar and Tutor are
-  // created only after a source exists, so nothing competes with the drop zone.
-  if (coursesLoaded && !course.id && courses.length === 0) {
+  // Loading, successful-empty and failed course storage are distinct states.
+  // Only a successful empty workspace gets the one-drop surface.
+  const intakeState = courseIntakeState({ loaded: coursesLoaded, error: courseError, courseCount: courses.length });
+  if (intakeState !== "ready") {
     return <div className={`app-shell one-drop-shell ${dark ? "dark" : ""}`}>
-      <main className="main-area"><OneDropSurface onReady={(context) => void handleOneDropReady(context)} /></main>
+      {intakeState === "loading" && <main className="intake-state" data-testid="intake-loading" role="status">
+        <div className="intake-mark"><Sparkles size={18} /></div>
+        <h1>Opening your study space</h1>
+        <p>Checking local courses…</p>
+        <div className="intake-skeleton" aria-hidden="true" /><div className="intake-skeleton" aria-hidden="true" />
+      </main>}
+      {intakeState === "error" && <main className="intake-state" data-testid="intake-error" role="alert">
+        <div className="intake-mark"><CircleHelp size={18} /></div>
+        <h1>Course storage unavailable</h1>
+        <p>{courseError || "Local storage is unavailable."}</p>
+        <button className="button-primary" data-testid="intake-retry" onClick={() => void loadCourses(() => true)}>Try again</button>
+        <p className="intake-note">Uploads need local course storage. Retry before adding material.</p>
+      </main>}
+      {intakeState === "empty" && <main className="main-area"><OneDropSurface onReady={(context) => void handleOneDropReady(context)} /></main>}
     </div>;
   }
 

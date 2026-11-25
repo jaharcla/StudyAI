@@ -123,7 +123,9 @@ Destinations are a flat set with one selected at a time:
 
 ### 3.3 View switcher on the Canvas
 
-The Canvas / Lecture / Split / Activities / Chemistry control is a **segmented control**: exactly one segment selected. Notes is a **panel toggle**, not a view, so it uses the toggle style (outlined, pressed state) and is visually separate. Two filled-dark items in one row is never allowed; it reads as two selections.
+The view control is a **segmented control with exactly three views: Canvas / Lecture / Split**. Exactly one segment is selected; a view changes what occupies the workspace.
+
+**Activities and Chemistry are actions**, not views: they open their own panels and never render as selected segments. **Notes is a panel toggle**, not a view, so it uses the outlined toggle style with a pressed state and sits outside the segmented control. Two filled-dark items in one row is never allowed; it reads as two selections. Board utilities — board selection, ink OCR, analysis, labels, undo/redo and file import/export — belong to the canvas tool bar, not to the view control.
 
 ### 3.4 Surfaces
 

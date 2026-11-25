@@ -45,3 +45,40 @@ test("keeps Tutor replies direct and canvas descriptions semantic", async ({ pag
   await expect(assistant.last()).not.toContainText(new RegExp(arrowId));
   await expect(assistant.last()).not.toContainText(/coordinates?:|\bx\s*[=:]\s*\d+|\by\s*[=:]\s*\d+/i);
 });
+
+test("tutor starting actions meet the size and type tokens", async ({ page, request }) => {
+  const { course } = await createCourseWithLesson(request, `Tutor tokens ${Date.now()}`, "Token lesson");
+  await page.goto("/");
+  await selectCourseOnPage(page, course.title);
+  const actions = page.getByTestId("tutor-empty-actions");
+  await expect(actions).toBeVisible();
+
+  const measure = () => actions.evaluate((element) => {
+    const button = element.querySelector("button")!;
+    const label = element.querySelector("span")!;
+    const box = button.getBoundingClientRect();
+    return {
+      height: box.height,
+      width: box.width,
+      font: parseFloat(getComputedStyle(button).fontSize),
+      labelFont: parseFloat(getComputedStyle(label).fontSize),
+    };
+  });
+
+  const desktop = await measure();
+  expect(desktop.height).toBeGreaterThanOrEqual(36);
+  expect(desktop.font).toBeGreaterThanOrEqual(12);
+  expect(desktop.labelFont).toBeGreaterThanOrEqual(12);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const phone = await measure();
+  expect(phone.height).toBeGreaterThanOrEqual(44);
+  expect(phone.width).toBeGreaterThanOrEqual(44);
+
+  const button = actions.locator("button").first();
+  await button.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(button).toBeFocused();
+  expect(await button.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
+});

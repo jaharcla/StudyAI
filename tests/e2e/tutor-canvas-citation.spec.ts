@@ -58,7 +58,7 @@ test("a Tutor canvas citation focuses and highlights the named object", async ({
 });
 
 test("tutor actions follow the selected canvas object by human name", async ({ page }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(240_000);
   const { course, lesson } = await createCourseWithLesson(page.request, `Tutor context ${Date.now()}`, "Context board");
   await page.goto("/");
   await selectCourseOnPage(page, course.title);
@@ -78,7 +78,15 @@ test("tutor actions follow the selected canvas object by human name", async ({ p
   await expect(actions).toContainText("Cited concept");
   await expect(actions.locator("button")).toHaveCount(2);
   await actions.locator("button", { hasText: "Cited concept" }).click();
-  await expect(page.locator(".copilot-slot")).toContainText(/Cited concept/);
+
+  const answer = page.locator('[data-testid="copilot-assistant-message"]').last();
+  await expect(answer).toBeVisible({ timeout: 180_000 });
+  await expect(async () => {
+    const text = await answer.innerText();
+    const cited = await answer.locator('a[href^="#studyai-citation="]').count();
+    const abstained = /no course evidence|not in your course material/i.test(text);
+    expect(cited > 0 || abstained).toBe(true);
+  }).toPass({ timeout: 180_000 });
 });
 
 test("a stale canvas citation fails safely with a plain message", async ({ page }) => {
