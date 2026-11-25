@@ -53,13 +53,15 @@ export default function PracticeTestView({ artifact, courseId, lessonId, onOpenS
           body: JSON.stringify({ courseId, lessonId, artifactId: artifact.id, questionIndex: index, choiceId, idempotencyKey: `${runKey.current}:${index}` }),
         });
         const value = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(typeof value.error === "string" ? value.error : "The answer could not be saved.");
+        if (!response.ok) throw new Error(response.status >= 500
+          ? `service unavailable (${response.status})`
+          : typeof value.error === "string" ? value.error : "The answer could not be saved.");
         next[index] = value as AnswerResult;
         setResults({ ...next });
       }
     } catch (reason) {
       const raw = reason instanceof Error ? reason.message : "";
-      setError(/429|rate limit|fetch failed|network|isn't responding/i.test(raw)
+      setError(/429|5\d\d|service unavailable|rate limit|fetch failed|network|isn't responding/i.test(raw)
         ? "The study assistant isn't responding right now. Your course material is unchanged. Try again."
         : "We couldn't check your answers. Your course material is unchanged. Try again.");
     } finally {

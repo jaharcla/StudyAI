@@ -54,7 +54,7 @@ test("one click makes a practice test; checking answers shows the key, score and
   await expect(page.getByTestId("practice-test-progress")).toHaveText("0 of 2 answered");
   await page.screenshot({ path: "test-results/shots/practice-test-01-built.png" });
 
-  await page.getByTestId("practice-choice").nth(0).click();
+  await page.getByTestId("practice-choice").nth(1).click();
   await page.getByTestId("practice-choice").nth(3).click();
   await expect(page.getByTestId("practice-test-progress")).toHaveText("2 of 2 answered");
   await expect(page.getByTestId("check-practice-test")).toBeEnabled();
@@ -63,11 +63,11 @@ test("one click makes a practice test; checking answers shows the key, score and
   await expect(page.getByTestId("practice-checking")).toBeVisible();
   await expect(page.getByTestId("practice-score")).toContainText("1 of 2 correct");
   await expect(page.getByTestId("practice-result")).toHaveCount(2);
-  await expect(page.getByTestId("practice-result").first()).toContainText("Correct");
-  await expect(page.getByTestId("practice-result").nth(1)).toContainText("Not quite");
+  await expect(page.getByTestId("practice-result").first()).toContainText("Not quite");
+  await expect(page.getByTestId("practice-result").nth(1)).toContainText("Correct");
   await expect(page.getByTestId("practice-answer-key").first()).toContainText("6.626 x 10^-34 J s");
   await expect(page.getByTestId("practice-answer-key").nth(1)).toContainText("higher energy level");
-  expect(answers).toEqual([{ questionIndex: 0, choiceId: "a" }, { questionIndex: 1, choiceId: "b" }]);
+  expect(answers).toEqual([{ questionIndex: 0, choiceId: "b" }, { questionIndex: 1, choiceId: "b" }]);
   await page.screenshot({ path: "test-results/shots/practice-test-02-graded.png" });
 
   await page.getByTestId("practice-citation").first().click();
