@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useAgentContext, useFrontendTool } from "@copilotkit/react-core/v2";
 import type { Bounds, Snapshot, Store } from "@quickdrawjs/core";
@@ -9,7 +9,7 @@ import { boundedSceneSlice, CANVAS_DESIGN_GUIDE, canvasDescribeSchema, canvasEvi
 import { compileTeachingScene, teachingSceneSchema } from "./teaching-scene";
 import { objectOccupancy } from "./layout";
 import { buildTutorCanvasContext } from "./tutor-canvas-context";
-import { boardOccupancy, buildCanvasAIContext, type CanvasScope } from "./canvas-context";
+import { boardOccupancy, buildCanvasAIContext, roundViewport, type CanvasScope } from "./canvas-context";
 import { getArtifactCapabilities } from "../../../server/artifact-intelligence/capabilities";
 
 export type QuickdrawAIBridgeOptions = {
@@ -32,17 +32,26 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     requestCanvasScene(options.scope).then((graph) => { if (!cancelled) setScene(graph); }).catch(() => { if (!cancelled) setScene(null); });
     return () => { cancelled = true; };
   }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision]);
-  const source = options.store ?? options.snapshot ?? null;
-  const legacy = source ? buildCanvasAIContext({
-    source,
-    selectedIds: options.selectedIds,
-    viewport: options.viewport,
-    objects: options.objects,
-    scope: options.scope,
-    maxChars: options.maxContextChars,
-  }) : null;
-  const shapes = legacy ? { ...legacy, nearbyObjects: [], spatialRelationships: [] } : null;
-  const tutorContext = buildTutorCanvasContext({ scene, shapes, selectedIds: options.selectedIds, viewport: options.viewport });
+  // Camera bounds are re-created on every render; quantize them so pan/zoom
+  // frames that stay within a pixel reuse the same cached agent context.
+  const viewport = useMemo(() => roundViewport(options.viewport), [options.viewport.x, options.viewport.y, options.viewport.w, options.viewport.h]);
+  const shapes = useMemo(() => {
+    const source = options.store ?? options.snapshot ?? null;
+    if (!source) return null;
+    const legacy = buildCanvasAIContext({
+      source,
+      selectedIds: options.selectedIds,
+      viewport,
+      objects: options.objects,
+      scope: options.scope,
+      maxChars: options.maxContextChars,
+    });
+    return { ...legacy, nearbyObjects: [], spatialRelationships: [] };
+  }, [options.store, options.snapshot, options.selectedIds, viewport, options.objects, options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision, options.maxContextChars]);
+  const tutorContext = useMemo(
+    () => buildTutorCanvasContext({ scene, shapes, selectedIds: options.selectedIds, viewport }),
+    [scene, shapes, options.selectedIds, viewport],
+  );
   useAgentContext({ description: "Active canvas scene", value: tutorContext });
   useFrontendTool({
     name: "propose_canvas_action",
@@ -120,12 +129,12 @@ export function useQuickdrawAIBridge(options: QuickdrawAIBridgeOptions): void {
     handler: async ({ boardId }) => {
       try {
         if (boardId !== options.scope.boardId) throw new Error("The active board changed.");
-        return describeCanvas(await requestCanvasScene(options.scope), options.viewport);
+        return describeCanvas(await requestCanvasScene(options.scope), viewport);
       } catch (error) {
         return { error: error instanceof Error ? error.message : "Canvas description unavailable." };
       }
     },
-  }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision, options.viewport]);
+  }, [options.scope.boardId, options.scope.courseId, options.scope.lessonId, options.scope.revision, viewport]);
   useFrontendTool({
     name: "read_design_guide",
     description: "Read-only. Returns the canonical layout and annotation guide for the scientific canvas. Read it before proposing a diagram so shapes, arrows, and captions follow the same conventions.",

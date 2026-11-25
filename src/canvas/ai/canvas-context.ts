@@ -57,6 +57,11 @@ const gap = (a: Bounds, b: Bounds) => {
 const round = (n: number) => Math.round(n * 10) / 10;
 const validBounds = (b: Bounds) => [b.x, b.y, b.w, b.h].every(Number.isFinite) && b.w >= 0 && b.h >= 0;
 
+/** Quantize camera-derived bounds so sub-pixel pan/zoom frames produce identical AI context. */
+export function roundViewport(bounds: Bounds): Bounds {
+  return { x: Math.round(bounds.x), y: Math.round(bounds.y), w: Math.round(bounds.w), h: Math.round(bounds.h) };
+}
+
 export function shapeBounds(shape: ShapeRecord): Bounds {
   if (shape.type !== "text" && shape.type !== "note") return pageBounds(shape);
   const text = String(shape.props.text ?? "");
@@ -297,8 +302,30 @@ function scientificSummary(object: ScientificObject) {
   return { id: object.id, kind: object.kind, bounds: { x: object.x, y: object.y, w: object.width, h: object.height }, detail };
 }
 
+/**
+ * Trim to the character budget without re-serializing the whole context on every removal.
+ * Subtracting only each removed item's own size (not its comma) keeps the estimate
+ * conservative, so one reduction pass is enough to guarantee the final size fits.
+ */
+function trimToCharLimit(context: CanvasAIContext, maxChars: number): void {
+  let size = JSON.stringify(context).length;
+  if (size <= maxChars) return;
+  context.truncated = true;
+  const drop = (items: unknown[]) => {
+    while (items.length && size > maxChars) size -= JSON.stringify(items.pop()).length;
+  };
+  drop(context.nearbyObjects);
+  drop(context.spatialRelationships);
+  drop(context.visible);
+  if (size > maxChars) {
+    for (const shape of context.selected) if (shape.text) shape.text = shape.text.slice(0, 80);
+    size = JSON.stringify(context).length;
+    drop(context.selected);
+  }
+}
+
 export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAIContext {
-  const viewport = options.viewport;
+  const viewport = roundViewport(options.viewport);
   if (!validBounds(viewport)) throw new Error("Invalid viewport bounds.");
   if (![options.scope.boardId, options.scope.courseId, options.scope.lessonId].every((value) => typeof value === "string")) throw new Error("Invalid canvas scope.");
   const distance = options.nearbyDistance ?? 320;
@@ -323,17 +350,6 @@ export function buildCanvasAIContext(options: CanvasContextOptions): CanvasAICon
   const spatialRelationships = focus.flatMap((shape) => focus.filter((other) => other.id !== shape.id && gap(shape.bounds, other.bounds) <= nearbyDistance)
     .slice(0, 4).map((other) => ({ fromId: shape.id, relation: relationship(shape.bounds, other.bounds), toId: other.id }))).slice(0, maxItems * 4);
   const context: CanvasAIContext = { scope: { boardId: options.scope.boardId.slice(0, 160), courseId: options.scope.courseId.slice(0, 160), lessonId: options.scope.lessonId.slice(0, 160), revision: options.scope.revision }, viewport, selected, visible, nearbyObjects, spatialRelationships, truncated: selectedCandidates.length > selected.length || visibleCandidates.length > visible.length };
-  const maxChars = Math.floor(charLimit);
-  while (JSON.stringify(context).length > maxChars && (context.nearbyObjects.length || context.spatialRelationships.length || context.visible.length)) {
-    context.truncated = true;
-    if (context.nearbyObjects.length) context.nearbyObjects.pop();
-    else if (context.spatialRelationships.length) context.spatialRelationships.pop();
-    else context.visible.pop();
-  }
-  if (JSON.stringify(context).length > maxChars) {
-    context.truncated = true;
-    for (const shape of context.selected) if (shape.text) shape.text = shape.text.slice(0, 80);
-  }
-  while (JSON.stringify(context).length > maxChars && context.selected.length) { context.truncated = true; context.selected.pop(); }
+  trimToCharLimit(context, Math.floor(charLimit));
   return context;
 }
