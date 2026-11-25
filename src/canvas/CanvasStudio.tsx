@@ -44,6 +44,17 @@ type ExampleSession = { exampleId: string; states: CompiledExampleState[]; playe
 type AnalysisTelemetry = { totalMs: number; imageEgress: boolean; usage: Array<{ provider: string; calls: number; promptTokens: number; completionTokens: number; costUsd: number }> };
 type Props = { courseId: string; lessonId: string; theme: "light" | "dark"; onStatus: (status: string) => void; onOpenNote: (id: string) => void; onOpenDocument: (id: string, title: string) => void; onSummary: (summary: { objectCount: number; objectTypes: Record<string, number> }) => void; onSelectedObject?: (object: { id: string; name: string } | null) => void; preferredBoardId?: string; onBoardState?: (state: { id: string; revision: number; saved: boolean }) => void; activityMode?: boolean; focusCitation?: { ref: string; key: number } };
 
+/** Student-facing field names for a proposed edit; never expose serialized object fields. */
+function readableChangeFields(before: ScientificObject, after: ScientificObject): string {
+  const left = before as unknown as Record<string, unknown>;
+  const right = after as unknown as Record<string, unknown>;
+  const internal = new Set(["id", "kind", "provenance"]);
+  const changed = [...new Set([...Object.keys(left), ...Object.keys(right)])]
+    .filter((key) => !internal.has(key) && JSON.stringify(left[key]) !== JSON.stringify(right[key]));
+  if (!changed.length) return "review the requested change";
+  return changed.map((key) => key.replace(/([a-z])([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase())).join(", ");
+}
+
 const approveCanvasProposalAtRevision = approveCanvasProposal as unknown as (source: Store, activeBoardId: string, proposal: ShapeProposal, editor?: Editor, currentRevision?: number) => { changedId: string };
 // Quickdraw's own tool shortcuts (editor.js toolKeys) switch tools without
 // ending an active pointer session; match the set so we can close it first.
@@ -1066,20 +1077,20 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
 
   return <div className="canvas-studio">
     {canvasAnalysis && <CanvasAnalysisTutorContext analysis={canvasAnalysis} />}
-    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>{proposal.reason}</strong><pre>{proposal.patchJson}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved edit…" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
-    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>AI canvas proposal</strong><p>{shapeProposal.description}</p><pre>{JSON.stringify(shapeProposal.actions, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => {
+    {proposal && <section className="canvas-proposal" role="region" aria-label="Tutor canvas proposal"><strong>Review board edit</strong><p data-testid="tutor-proposal-summary">Change to {objectName(proposal.before)}: {readableChangeFields(proposal.before, proposal.after)}. {proposal.reason}</p><button className="button-primary" disabled={proposalBusy} onClick={() => void applyTutorProposal()}>{proposalBusy ? "Saving approved edit…" : "Apply tutor edit"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setProposal(undefined)}>Dismiss proposal</button></section>}
+    {shapeProposal && <section className="canvas-proposal" role="region" aria-label="QuickDraw AI proposal"><strong>Review canvas proposal</strong><p data-testid="tutor-proposal-summary">{shapeProposal.description}</p><p>{shapeProposal.actions.length} board change{shapeProposal.actions.length === 1 ? "" : "s"} proposed. Nothing changes until you apply it.</p><button className="button-primary" disabled={proposalBusy} onClick={() => {
       if (shapeProposal.requiresConfirmation && !window.confirm("This proposal includes deletion or a large batch. Apply it to this board?")) return;
       void applyQuickdrawProposal();
     }}>{proposalBusy ? "Saving approved proposal…" : "Apply canvas proposal"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setShapeProposal(undefined)}>Dismiss proposal</button></section>}
-    {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>{objectProposal.reason}</strong><p>Add {objectProposal.object.kind} object</p><pre>{JSON.stringify(objectProposal.object, null, 2)}</pre><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved object…" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
+    {objectProposal && <section className="canvas-proposal" role="region" aria-label="Canvas object proposal"><strong>Review scientific object</strong><p data-testid="tutor-proposal-summary">Add {objectName(objectProposal.object)} to the board. {objectProposal.reason}</p><button className="button-primary" disabled={proposalBusy} onClick={() => void applyObjectProposal()}>{proposalBusy ? "Saving approved object…" : "Add scientific object"}</button><button className="button-soft" disabled={proposalBusy} onClick={() => setObjectProposal(undefined)}>Dismiss proposal</button></section>}
     {artifactError && <section className="canvas-proposal" role="alert" aria-label="Board artifact problem" data-testid="board-artifact-problem">
       <strong>Board artifact needs correction</strong>
-      <pre>{artifactError}</pre>
+      <p>{artifactError}</p>
       <button className="button-soft" data-testid="dismiss-artifact-problem" onClick={() => setArtifactError(null)}>Dismiss</button>
     </section>}
     {artifactProposal && <section className="canvas-proposal" role="region" aria-label="Board artifact proposal" data-testid="board-artifact-proposal">
       <strong>Review board artifact</strong>
-      <p>{artifactProposal.description}</p>
+      <p data-testid="tutor-proposal-summary">Add {artifactProposal.brief.artifact.count} {artifactProposal.brief.artifact.kind} to the board. {artifactProposal.description}</p>
       {artifactProposal.brief.artifact.scenario && <p data-testid="artifact-scenario"><strong>Scenario:</strong> {artifactProposal.brief.artifact.scenario}</p>}
       {artifactProposal.brief.artifact.items?.filter((item) => item.scenario).map((item, index) => (
         <p key={`scenario-${index}`} data-testid="artifact-scenario"><strong>Scenario:</strong> {item.scenario}</p>
@@ -1231,6 +1242,10 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
         </>}
         {proposalBusy && <div role="status" aria-live="polite" style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "wait" }}>Saving approved canvas change…</div>}
       </div>
+      {!loading && document.objects.length === 0 && !exampleState && <div className="canvas-empty-state" data-testid="canvas-empty-state">
+        <span>START HERE</span><p>Draw on the board or add a scientific object.</p>
+        <button type="button" className="button-soft" onClick={() => setToolOpen(true)}>Open canvas tools</button>
+      </div>}
     </div>
     {selectedObject && <ObjectEditor object={selectedObject} objects={document.objects} onChange={(next) => updateObject(selectedObject.id, next)} onClose={() => setEditingId(undefined)} onOpenNote={onOpenNote} onCreateLinkedGraph={() => createLinkedGraph(selectedObject.id)} onRegisterCard={async (front, back, conceptId) => {
       try {

@@ -15,6 +15,15 @@ async function seedMolecule(request: APIRequestContext, course: { id: string }, 
   expect(saved.status()).toBe(200);
 }
 
+async function seedConcept(request: APIRequestContext, course: { id: string }, lesson: { id: string }, id: string) {
+  const boards = await request.get(`/api/canvases?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
+  const board = boards[0];
+  const row = await request.get(`/api/canvases/${board.id}?course=${course.id}&lesson=${lesson.id}`).then((response) => response.json());
+  const document = { version: 1, snapshot: { document: { store: {} } }, objects: [{ id, kind: "concept", title: "Cited concept", definition: "", x: 420, y: 240, width: 260, height: 154 }] };
+  const saved = await request.post("/api/canvases", { data: { id: board.id, courseId: course.id, lessonId: lesson.id, name: board.name, document, expectedRevision: row.revision } });
+  expect(saved.status()).toBe(200);
+}
+
 async function clickCanvasCitation(page: Page, ref: string) {
   await page.locator(".copilot-slot").evaluate((element, citationRef) => {
     const link = document.createElement("a");
@@ -46,6 +55,30 @@ test("a Tutor canvas citation focuses and highlights the named object", async ({
   await expect(page.getByTestId("selected-object-context")).toContainText("Cited molecule");
   await expect(page.locator(".scientific-layer .steppable-highlight")).toHaveCount(1);
   await page.screenshot({ path: "test-results/shots/tutor-canvas-citation-focus.png", fullPage: true });
+});
+
+test("tutor actions follow the selected canvas object by human name", async ({ page }) => {
+  test.setTimeout(90_000);
+  const { course, lesson } = await createCourseWithLesson(page.request, `Tutor context ${Date.now()}`, "Context board");
+  await page.goto("/");
+  await selectCourseOnPage(page, course.title);
+  await expect(page.locator(".scientific-layer")).toBeVisible();
+  await seedConcept(page.request, course, lesson, "context-object");
+  await page.reload();
+  await selectCourseOnPage(page, course.title);
+  await expect(page.locator(".scientific-layer")).toBeVisible();
+
+  const actions = page.getByTestId("tutor-empty-actions");
+  await expect(actions).toBeVisible();
+  await expect(actions).toContainText(/course passage/i);
+  await expect(actions).not.toContainText(/Ask about /);
+
+  await clickCanvasCitation(page, "science:context-object");
+  await expect(page.getByTestId("selected-object-context")).toContainText("Cited concept");
+  await expect(actions).toContainText("Cited concept");
+  await expect(actions.locator("button")).toHaveCount(2);
+  await actions.locator("button", { hasText: "Cited concept" }).click();
+  await expect(page.locator(".copilot-slot")).toContainText(/Cited concept/);
 });
 
 test("a stale canvas citation fails safely with a plain message", async ({ page }) => {

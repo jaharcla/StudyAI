@@ -1,6 +1,7 @@
 /* Home and Today share one visual language with the rest of the workspace. */
 .daily-strip,
-.daily-surface {
+.daily-surface,
+.one-drop-shell {
   --daily-ink: #2a2621;
   --daily-body: #574e43;
   --daily-muted: #8a8072;
@@ -12,7 +13,8 @@
   color: var(--daily-ink);
 }
 .dark .daily-strip,
-.dark .daily-surface {
+.dark .daily-surface,
+.dark .one-drop-shell {
   --daily-ink: #f4f2ea;
   --daily-body: #d7cfc4;
   --daily-muted: #b1a99c;
@@ -90,6 +92,10 @@
 .daily-secondary li strong { font-size: 12px; }
 .daily-secondary li p { margin: 2px 0 0; color: var(--daily-muted); font-size: 11px; }
 
+.one-drop-shell { display: grid; place-items: center; overflow: auto; background: #f4f1ea; color: var(--daily-ink); font: 12px/1.5 "DM Sans", Arial, sans-serif; }
+.dark .one-drop-shell { background: #1c1a17; }
+.one-drop-shell .main-area { width: min(620px, calc(100% - 32px)); padding: 24px 0; }
+.one-drop-shell .home-surface { width: 100%; padding: 24px; border: 1px solid var(--daily-line); border-radius: 14px; background: var(--daily-paper); box-shadow: 0 12px 40px rgba(40, 30, 20, .14); color: var(--daily-ink); }
 .home-dropzone { display: flex; align-items: center; gap: 14px; padding: 18px; border: 1px dashed var(--daily-line); border-radius: 12px; background: var(--daily-tint); color: var(--daily-accent); }
 .home-dropzone-active { border-color: var(--daily-accent); }
 .home-dropzone div { flex: 1; color: var(--daily-body); }

@@ -29,6 +29,26 @@ test("intake lands in one grounded question the student sends", async ({ page })
   await expect(page.getByTestId("tutor-provider-status")).toBeVisible();
 });
 
+test("an empty workspace shows one intake surface and no competing chrome", async ({ page }) => {
+  await emptyWorkspace(page);
+  await page.goto("/");
+  const surface = page.getByTestId("one-drop-surface");
+  await expect(surface).toBeVisible();
+  await expect(page.getByTestId("one-drop-zone")).toBeVisible();
+  await expect(page.getByTestId("one-drop-input")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Choose files" })).toHaveCount(1);
+  await expect(surface).toContainText(/PDF, DOCX, PPTX.*TXT/);
+  await expect(surface).toContainText(/20 MB/i);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(".tutor-panel")).toHaveCount(0);
+  await expect(page.locator(".canvas-pane")).toHaveCount(0);
+  await expect(page.locator(".workspace-toolbar")).toHaveCount(0);
+  await expect(page.locator(".lesson-header")).toHaveCount(0);
+  await page.setViewportSize({ width: 375, height: 812 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+  await expect(surface).toBeVisible();
+});
+
 test("no retrieved passage abstains without a citation or send button", async ({ page }) => {
   test.setTimeout(90_000);
   await emptyWorkspace(page);
