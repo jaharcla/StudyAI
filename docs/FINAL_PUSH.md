@@ -52,4 +52,12 @@ Reliability: PDF worker loads as a Vite asset. Provider-dependent flaky tests in
 
 ## Rules and reporting
 
-One worktree and branch per worker. Commits carry the Discord link, one critique URL per commit; workers do not merge or push. Coordinator reviews patches and merges only after `tsc -b`, Vitest and targeted Playwright pass. No subagents, no Groq, no new dependency or paid service, no `.env` edits, no DESIGN.md. Report J1–J7 pass/fail with ordered screenshots, critique URLs, verify output, honest gaps and three strongest objections.
+One worktree and branch per worker. Commits carry the Discord link, one critique URL per commit; workers do not merge or push. Coordinator reviews patches and merges only after `tsc -b`, Vitest and targeted Playwright pass. No subagents, no Groq, no new dependency or paid service, no `.env` edits, no DESIGN.md. Report J1–J7 pass/fail with ordered screenshots, critique URLs, verify output, honest gaps and three strongest objections. Report worker threads as full `https://discord.com/channels/...` URLs, never `<#id>` mentions. A journey is not green until one uninterrupted mock-student run produces screenshots of the end state.
+
+## Additional acceptance criteria (2026-11-24, required before J1/J6 and J4/J7 close)
+
+- **UTF-8**: fix mojibake (`â€¦`, `â€œ`, `Â·`, `Ã—`, `â†’`, `âŒ˜`) across `src/App.tsx` and `src/canvas/CanvasStudio.tsx`; the cited page must open with the passage highlighted, then re-capture the screenshot. Remove the leftover "Coach is quiet" row in `src/coach/useCoach.ts`.
+- **Library**: never show the error and empty states together; the error state has a working Retry. Remove the empty banner with the dot and style the filter like the rest of the UI.
+- **Grading**: Check answers must never call a provider. Grade deterministically against the stored answer key so grading still works while the provider is down; a provider error is valid only for generation.
+- **One surface**: merge Studio, Artifacts and Library into one Studio surface — create on one side, everything made on the other — and remove the duplicate nav entries.
+- **Practice tests**: default to a real length (10 or more where the sources allow), four choices, and distractors drawn from the same material. When sources support fewer questions, say so plainly.
