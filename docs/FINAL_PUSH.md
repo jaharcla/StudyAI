@@ -39,6 +39,8 @@ Reliability: PDF worker loads as a Vite asset. Provider-dependent flaky tests in
 
 - Reliability: <#1574910108671148052>. Today/daily plans: <#1574910341085794476>. Tutor trust: <#1574919601777803324>. Shared library: <#1574921923337650296>.
 - Tutor depth (Hy4): <#1574927860899119226>. Study loop (Hy4): <#1574927907959210014>.
+- J1/Today (Hy4): `work/j1-today-20261124`, thread `1574946647929000036`, ports 5709/8727/8728/8619. Running; Playwright first.
+- Canvas/cohesion (Hy4): `work/canvas-cohesion-20261124`, thread `1574946695655981227`, ports 5710/8729/8730/8620. Running; holds Playwright until J1/Today is clear.
 - Studio parity stopped after two non-implementations: <#1574919600615723039>; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
