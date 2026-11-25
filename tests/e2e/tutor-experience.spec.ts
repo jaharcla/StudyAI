@@ -26,7 +26,8 @@ test("keeps Tutor replies direct and canvas descriptions semantic", async ({ pag
   const assistant = tutor.locator('[data-testid="copilot-assistant-message"]');
   const chat = page.getByTestId("copilot-chat-textarea");
   await expect(page.locator(".suggestions")).toHaveCount(0);
-  await expect(tutor).toContainText(`Ask about ${lesson.title}`);
+  await expect(page.getByTestId("tutor-empty-actions")).toBeVisible();
+  await expect(page.getByTestId("tutor-empty-actions")).toContainText(/explain a visible step|find a course passage/i);
 
   await chat.fill("Reply with exactly: STUDYAI-OLLAMA-OK");
   await chat.press("Enter");
