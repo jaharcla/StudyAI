@@ -20,6 +20,13 @@
 - Resource baseline captured with OS counters and `nvidia-smi` before any further build or test.
 - No profiler was attached because no new hot path is being changed in this step; the audit's concrete findings already identify the targets.
 
+## Root cause of RAM pressure
+
+- Chronic baseline: the OpenCode service (PID 12248) owns 58 long-lived `npx` MCP-server processes started at 13:23, totaling about 2.8 GB, plus 46 Chrome/Edge WebView/headless processes totaling about 2.16 GB and Windows Memory Compression around 2.5 GB. That is roughly 7.5 GB of 15.71 GB before any test runs.
+- Acute trigger: the evaluator full verify used a dummy `CPK_INTELLIGENCE_API_KEY` because its worktree had no `.env`. Tutor/PDF cases failed and retried for 61 minutes, keeping headless Chromium trees and `tsx` workers alive; free RAM fell to 0.85 GB.
+- Evidence it is not an application memory leak: stopping the verify process tree freed about 1.3 GB immediately and free RAM recovered to 4-5 GB without code changes. No growing renderer or JS heap was identified.
+- Recommendations: keep only needed MCP servers enabled in the OpenCode config, copy the real CPK key into worktrees before a full gate, avoid concurrent Playwright suites, and cap retries so a failing suite cannot hold browser trees for an hour.
+
 ## RAM cleanup (2026-11-25 16:15 local)
 
 - The evaluator full verify (PID 18536, started 15:14) was stopped after 61 minutes of retry-heavy Playwright while free RAM sat at 0.85 GB. `taskkill /PID 18536 /T /F` freed about 1.3 GB (0.85 GB to 2.16 GB).
