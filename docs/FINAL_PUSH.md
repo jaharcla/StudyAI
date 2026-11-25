@@ -1,6 +1,6 @@
 # Final push — coordination ledger
 
-Main head `c465cfd`. Final `npm run verify` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 139 passed, 1 flaky (`tutor-round2-hygiene` selected object), 6 skipped (2026-11-25). Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `874671f`. Last full `npm run verify` at `c465cfd` exit 0: `tsc -b` clean, Vitest 139 files / 876 tests, Playwright 139 passed, 1 flaky (`tutor-round2-hygiene` selected object), 6 skipped (2026-11-25). Final verify pending the local-deck worker. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
 Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. All workers use `opencode-go/hy4-flash-free`, never beam-free.
 
@@ -8,15 +8,15 @@ Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-1
 
 | Journey | What must pass | Status |
 | --- | --- | --- |
-| J1 First 60 seconds | New course + files; indexing progress; grounded summary with citations; three suggested actions; one Continue | Feature merged: Home shows indexing, verbatim cited summary, three actions and one prepared Continue; J1 browser assertions pass. No single uninterrupted run with ordered end-state screenshots yet |
-| J2 Ask and verify | Streamed grounded Tutor answer, citations open exact passage; honest refusal | Feature merged: honest refusal, passage highlight re-captured, stale-ref message, canvas focus by human name, and a deterministic course-evidence notice with source count. No explicit grounding progress step; uninterrupted run pending |
-| J3 One-click artifacts | Quiz, cards, practice test, guide, mind map, deck, infographic; shared library; per-node edit, regenerate, export; honest failures | Partial: practice test with answer key/citations, local grading, 10-question default and honest generation failures merged. Library/Studio unification in progress; per-node edit/regenerate/export missing |
-| J4 Canvas and Tutor | Human object names, citation focus/highlight, deterministic validation, board switching, safe duplicates/deletes | Feature merged: duplicate labels disambiguated by human name, citation focus/highlight, stale/deleted refs fail plainly, 180/200/220 ms motion tokens. Cross-spec timing flake remains; uninterrupted run pending |
-| J5 Practice and mastery | Check answer works, misses feed mastery/FSRS, best next action and prepared Continue | Feature merged: local grading from stored key, fire-and-forget BKT/FSRS recording, provider down only affects generation. Rating still automatic, not student-chosen |
-| J6 Return visit | Today view with daily plan and resume | Feature merged: compact Today strip on load, full Today view one click away, dated step line and prepared Continue; browser assertions pass. Uninterrupted run pending |
-| J7 One app | Shared tokens light/dark, 180–220 ms interruptible motion, reduced motion, keyboard, phone width | Feature merged: shared motion tokens collapse under reduced motion; keyboard and phone-width assertions pass. `practice-flow` needed the shared course-selection helper to stop cross-spec flaking |
+| J1 First 60 seconds | New course + files; indexing progress; grounded summary with citations; three suggested actions; one Continue | Green in the live run: real `c121-module3` PDF imported, indexing, verbatim cited summary, three actions and one prepared Continue; screenshots 1–2 |
+| J2 Ask and verify | Streamed grounded Tutor answer, citations open exact passage; honest refusal | Green in the live run: live Tutor answer with source count, citation opens the highlighted PDF passage, honest refusal; screenshots 3–4 |
+| J3 One-click artifacts | Quiz, cards, practice test, guide, mind map, deck, infographic; shared library; per-node edit, regenerate, export; honest failures | Partial: study guide, mind map, quiz and flashcards generated live from the real PDF; infographic and deck end in their honest failures with Retry asserted; screenshot 5. Local deck work is in progress |
+| J4 Canvas and Tutor | Human object names, citation focus/highlight, deterministic validation, board switching, safe duplicates/deletes | Green in the live run: duplicate labels disambiguated, citation focus, stale-ref failure and board switching; screenshot 9. Canvas citations are injected in the test, not authored by the Tutor |
+| J5 Practice and mastery | Check answer works, misses feed mastery/FSRS, best next action and prepared Continue | Green in the live run: local grading, mastery and sync-failure retry; screenshots 6–8. Live practice returned cards but no questions, so questions were seeded from the PDF's own sample-test facts through the real learning store |
+| J6 Return visit | Today view with daily plan and resume | Green in the live run: Today strip, prepared Continue and full Today view; screenshots 10–11 |
+| J7 One app | Shared tokens light/dark, 180–220 ms interruptible motion, reduced motion, keyboard, phone width | Green in the live run: dark mode, motion tokens, reduced motion, keyboard traversal and phone width; screenshots 12–13 |
 
-No journey counts green until one uninterrupted mock-student run produces screenshots of the end state. The two persistent objections: no such uninterrupted run exists yet, and answer keys remain model output validated for real citations and existing choices but not entailment. Third objection: strict cross-spec runs still flake when fresh dev servers start.
+One uninterrupted 3.1-minute Playwright run now produces 13 ordered end-state screenshots on a real course PDF with live generation; the only stub is an injected 503. Persistent objections: the live provider is flaky and needed bounded student retries; answer keys are not entailment-checked; infographic and deck are not proven as generated artifacts in that run.
 
 ## Merged commits and critique URLs
 
@@ -52,6 +52,10 @@ No journey counts green until one uninterrupted mock-student run produces screen
 - `8af8015` unify Studio, Artifacts and Library — https://critique.work/v/c58d851a0bcbb9a639950222dd93849b
 - `44b4b3b` four-destination top bar and one-click Create — https://critique.work/v/5636a1cad491e2040ecea06317059911
 - `c465cfd` Cards follows the consolidated nav — https://critique.work/v/42769bef6f2444418fee1c4af5311906
+- `b4ee8c4` first uninterrupted J1–J7 run with ordered screenshots — https://critique.work/v/7de0c35cffd68c05bc77106663966fbd
+- `0a5cb5c` merge of first uninterrupted run — https://critique.work/v/4b88ed1db59a0ecfbf33641b7558479f
+- `39ee485` live-generation J1–J7 run on a real c121 PDF — https://critique.work/v/b63ae7276dae2c693f62959cfc6d10d1
+- `874671f` merge of live-generation run — https://critique.work/v/e9f52f7d088e5f4411b56a008d6bb21a
 
 ## Workers and threads
 
@@ -65,7 +69,8 @@ No journey counts green until one uninterrupted mock-student run produces screen
 - Canvas/cohesion: https://discord.com/channels/1574451017817399346/1574946695655981227 — merged
 - Practice correctness: https://discord.com/channels/1574451017817399346/1574953731907125369 — merged
 - Studio unification: https://discord.com/channels/1574451017817399346/1574977985943965767 — merged
-- Uninterrupted J1–J7 journey run: https://discord.com/channels/1574451017817399346/1575001612894736504 — running
+- Uninterrupted J1–J7 journey run: https://discord.com/channels/1574451017817399346/1575001612894736504 — merged; live c121 PDF run with 13 ordered screenshots
+- Local decks and in-site slide viewer: https://discord.com/channels/1574451017817399346/1575037172128546816 — running
 - Studio parity stopped after two non-implementations: https://discord.com/channels/1574451017817399346/1574919600615723039; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
@@ -81,7 +86,7 @@ No journey counts green until one uninterrupted mock-student run produces screen
 
 ## Rules and reporting
 
-One worktree and branch per worker. Commits carry the Discord link, one critique URL per commit; workers do not merge or push. Coordinator reviews patches and merges only after `tsc -b`, Vitest and targeted Playwright pass. No subagents, no Groq, no new dependency or paid service, no `.env` edits, no DESIGN.md. Report J1–J7 pass/fail with ordered screenshots, critique URLs, verify output, honest gaps and three strongest objections. Report worker threads as full `https://discord.com/channels/...` URLs, never `<#id>` mentions. The evidence-contract plan was executed natively task by task, with `npm run verify` at the end.
+One worktree and branch per worker. Commits carry the Discord link, one critique URL per commit; workers do not merge or push. Coordinator reviews patches and merges only after `tsc -b`, Vitest and targeted Playwright pass. No subagents, no Groq, no new dependency or paid service, no `.env` edits. `DESIGN.md` at the repo root is the UI source of truth and supersedes the old "no DESIGN.md" rule. Report J1–J7 pass/fail with ordered screenshots, critique URLs, verify output, honest gaps and three strongest objections. Report worker threads as full `https://discord.com/channels/...` URLs, never `<#id>` mentions. The evidence-contract plan was executed natively task by task, with `npm run verify` at the end.
 
 ## Additional acceptance criteria
 
