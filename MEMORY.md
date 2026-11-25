@@ -27,5 +27,6 @@
 
 ## Open goals
 - Execute the one-drop start plan task by task; no merge before `tsc -b`, Vitest and targeted Playwright pass.
+- Queued after the one-drop plan (user asked on 2026-11-25): fix the two mock-student defects — canvas inspection refuses a moderately populated board (3/3 attempts), and Notes autosave drops text when Done is clicked immediately.
 - Live-provider tutor turn remains unverified locally: no BYOK key configured.
 - ChatGPT upload limit (~18h from 2026-11-25 09:00) still blocks attaching ten walkthrough screenshots.
