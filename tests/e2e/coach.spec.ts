@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { createCourseWithLesson, selectCourseOnPage } from "./helpers";
+import { createCourseWithLesson, createLesson, selectCourseOnPage } from "./helpers";
 
 async function seedReviewedLesson(request: APIRequestContext, concepts: string[], title: string) {
   const { course, lesson } = await createCourseWithLesson(request, `Coach ${Date.now()} ${title}`, title);
@@ -86,6 +86,28 @@ test("Continue prepares Studio with the cited source focus", async ({ page, requ
   await expect(page.getByTestId("studio-focus")).toHaveValue(/intro\.txt/);
   await expect(page.getByTestId("coach-surface")).toBeVisible();
   await expect(page.getByTestId("coach-status")).toHaveText("Ready in Studio. Your source focus is set.");
+});
+
+test("a Studio source focus does not survive leaving by another navigation path", async ({ page, request }) => {
+  const { course, lesson } = await createCourseWithLesson(request, `Coach focus ${Date.now()}`, "Source lesson");
+  const alternateLesson = await createLesson(request, course.id, "Next lesson");
+  const document = await request.post("/api/documents", { data: { courseId: course.id, name: "focus-source.txt", content: "This lesson introduces the scientific method." } });
+  expect(document.ok()).toBeTruthy();
+  await openCoachedLesson(page, course.title, lesson.title);
+
+  await page.getByTestId("coach-continue").click();
+  await expect(page.getByTestId("studio-surface")).toBeVisible();
+  await expect(page.getByTestId("studio-focus")).toHaveValue(/focus-source\.txt/);
+
+  // Escape leaves the surface through the global key handler, not Studio's own close.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("studio-surface")).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Active lesson" }).selectOption(alternateLesson.id);
+  await expect(page.getByRole("heading", { name: "Next lesson", exact: true })).toBeVisible();
+  await page.getByTestId("open-studio").click();
+
+  await expect(page.getByTestId("studio-surface")).toBeVisible();
+  await expect(page.getByTestId("studio-focus")).toHaveValue("");
 });
 
 test("dismissal advances the stream and the keyboard path activates a prompt", async ({ page, request }) => {

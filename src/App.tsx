@@ -189,6 +189,16 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     return () => window.removeEventListener("keydown", onKey);
   }, [mode, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, scienceTool, tutorMenuOpen, sidebar]);
 
+  // A prepared handoff belongs to one Studio visit. Escape, the sidebar and scope changes
+  // all leave Studio without calling its close handler; a source focus from another lesson
+  // must never survive into the next Studio visit.
+  useEffect(() => {
+    if (mode === "studio") return;
+    setCoachFocus("");
+    setInitialArtifactId(undefined);
+    setInitialDeckId(undefined);
+  }, [mode]);
+
   const updateActivityCanvas = useCallback((state: { id: string; revision: number; saved: boolean }) => setActivityCanvasState(state), []);
   const launchActivity = useCallback((session: ActivitySession) => {
     setActiveActivity(session);
