@@ -1,8 +1,8 @@
 # Final push — coordination ledger
 
-Main head `46ba7df`. Full `npm run verify` exit 0: `tsc -b` clean, Vitest 135 files / 853 tests pass, Playwright 125 passed, 3 flaky on retry, 6 skipped (2026-11-24 19:20 UTC). Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
+Main head `6df9a2f`. Last full `npm run verify` exit 0: `tsc -b` clean, Vitest 135 files / 853 tests, Playwright 125 passed, 3 flaky, 6 skipped (2026-11-24 19:20 UTC). Since then: canvas cohesion merged (`tsc` clean, 858 unit tests, 3/3 browser assertions on isolated ports), UTF-8 mojibake repaired outside `App.tsx`, Coach quiet row removed (9/9 browser assertions). Full verify pending. Tunnel: `https://c7d03ce0d57d107355a2.d3yagp7kvlrp.opentunnel.xyz`.
 
-Hardware: Windows available RAM fell to 0.57 GB. Routine 2 (hardware guard firing every 10 s) was deleted on 2026-11-24 because it could not be edited while running; RAM recovered above 2 GB. Kimaki bot was restored in a background tuistory session. All workers must use `opencode-go/hy4-flash-free`, never beam-free.
+Hardware: a runaway "Kimaki setup" session from 2026-11-23 was aborted on 2026-11-25 with the user's permission; available RAM recovered from 0.66 GB to above 3 GB. The user granted permission to close apps and tune the PC for performance, but no other processes were killed. All workers must use `opencode-go/hy4-flash-free`, never beam-free.
 
 ## Journeys
 
@@ -40,7 +40,8 @@ Reliability: PDF worker loads as a Vite asset. Provider-dependent flaky tests in
 - Reliability: <#1574910108671148052>. Today/daily plans: <#1574910341085794476>. Tutor trust: <#1574919601777803324>. Shared library: <#1574921923337650296>.
 - Tutor depth (Hy4): <#1574927860899119226>. Study loop (Hy4): <#1574927907959210014>.
 - J1/Today (Hy4): `work/j1-today-20261124`, thread `1574946647929000036`, ports 5709/8727/8728/8619. Running; Playwright first.
-- Canvas/cohesion (Hy4): `work/canvas-cohesion-20261124`, thread `1574946695655981227`, ports 5710/8729/8730/8620. Running; holds Playwright until J1/Today is clear.
+- Canvas/cohesion (Hy4): merged. https://discord.com/channels/1574451017817399346/1574946695655981227
+- Practice correctness (Hy4): `work/practice-correctness-20261124`, https://discord.com/channels/1574451017817399346/1574953731907125369, ports 5712/8733/8734/8622. Running; holds Playwright until the coordinator says it is its turn.
 - Studio parity stopped after two non-implementations: <#1574919600615723039>; doc-only `cda98ba`, not merged.
 
 ## Integrations checked
