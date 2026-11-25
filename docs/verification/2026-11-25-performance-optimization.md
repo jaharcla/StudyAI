@@ -20,6 +20,12 @@
 - Resource baseline captured with OS counters and `nvidia-smi` before any further build or test.
 - No profiler was attached because no new hot path is being changed in this step; the audit's concrete findings already identify the targets.
 
+## RAM cleanup (2026-11-25 16:15 local)
+
+- The evaluator full verify (PID 18536, started 15:14) was stopped after 61 minutes of retry-heavy Playwright while free RAM sat at 0.85 GB. `taskkill /PID 18536 /T /F` freed about 1.3 GB (0.85 GB to 2.16 GB).
+- This is a resource stop, not a test verdict. Rerun the full gate after `CPK_INTELLIGENCE_API_KEY` is copied into the worktrees without printing it.
+- The flaky-spec worker resumes first; the evaluator queue stays held so only one Playwright suite runs at a time.
+
 ## GPU offload decision
 
 - GPU is idle (0% utilization, 0 MiB used). The queued work is TypeScript compilation, Vitest, Playwright and SQLite/JSON processing, all CPU or I/O bound; offloading it to the GPU would not help.
