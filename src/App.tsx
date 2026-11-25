@@ -20,6 +20,9 @@ import ProgressDialog from "./components/ProgressDialog";
 import HelpDialog from "./components/HelpDialog";
 import TutorMenu from "./components/TutorMenu";
 import { LibraryArtifactTool } from "./tutor/LibraryArtifactTool";
+import { MathEvaluationTool } from "./tutor/MathEvaluationTool";
+import { MathResultCard } from "./tutor/MathResultCard";
+import type { MathResult } from "./math/evaluator";
 import { useDialogFocus } from "./components/useDialogFocus";
 const DocumentLibrary = lazy(() => import("./components/document-intelligence").then((module) => ({ default: module.DocumentLibrary })));
 
@@ -628,7 +631,10 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   </div></>;
 }
 
-export default function App() { return <CopilotKitProvider runtimeUrl="/api/copilotkit" agentId="studyai" enableInspector={false}><VegaChartToolRenderer /><CopilotChatConfigurationProvider><Workspace /></CopilotChatConfigurationProvider></CopilotKitProvider>; }
+export default function App() {
+  const [mathResult, setMathResult] = useState<MathResult | null>(null);
+  return <CopilotKitProvider runtimeUrl="/api/copilotkit" agentId="studyai" enableInspector={false}><VegaChartToolRenderer /><MathEvaluationTool onResult={setMathResult} /><MathResultCard result={mathResult} /><CopilotChatConfigurationProvider><Workspace /></CopilotChatConfigurationProvider></CopilotKitProvider>;
+}
 
 function AgentContext({ course, canvas, view, model, lessonId, lessonTitle }: { lessonId: string; lessonTitle: string; course: Course; canvas: { objectCount: number; objectTypes: Record<string, number> }; view: View; model: string }) {
   useAgentContext({ description: "StudyAI current workspace and structured canvas metadata", value: { courseId: course.id, lessonId, course: course.title, courseCode: course.code, lesson: lessonTitle, view, canvas } });
