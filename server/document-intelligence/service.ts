@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile, unlink, readFile, readdir, rm, stat } from "node:fs/promises";
-import { basename, extname, join, resolve, sep } from "node:path";
+import { mkdir, writeFile, unlink, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import type Database from "better-sqlite3";
 import { chunkUnits } from "./chunk.js";
 import { extractDocument } from "./extract.js";
@@ -186,18 +186,33 @@ function insideStorage(root: string, candidate: string): boolean {
   return pathKey(candidate).startsWith(rootKey.endsWith(sep) ? rootKey : rootKey + sep);
 }
 
+/** Resolve symlinks/junctions so a configured alias and a stored physical path
+ *  compare as the same file. A missing file falls back to its nearest existing parent. */
+async function canonicalPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    try {
+      return join(await realpath(dirname(path)), basename(path));
+    } catch {
+      return path;
+    }
+  }
+}
+
 /** Reconciles interrupted imports and deletes after a restart. Only files with
  *  this service's UUID naming are eligible, and only inside the storage root. */
 export async function reconcileDocumentFiles(db: Database.Database, storageRoot = "data/documents", now = Date.now()): Promise<{ removedFiles: number; removedRows: number; removedUploads: number }> {
   initializeDocumentIntelligenceSchema(db);
   const root = resolve(storageRoot);
   await mkdir(root, { recursive: true });
+  const rootKey = pathKey(await canonicalPath(root));
   const rows = db.prepare("SELECT id,storage_path FROM di_documents").all() as Array<{ id: string; storage_path: string }>;
   const owned = new Set<string>();
   const dangling: string[] = [];
   for (const row of rows) {
-    const path = resolve(row.storage_path);
-    if (!insideStorage(root, path) || !OWNED_DOCUMENT_FILE.test(basename(path))) continue;
+    const path = await canonicalPath(resolve(row.storage_path));
+    if (!insideStorage(rootKey, path) || !OWNED_DOCUMENT_FILE.test(basename(path))) continue;
     owned.add(pathKey(path));
     if (!existsSync(path)) dangling.push(row.id);
   }
@@ -205,8 +220,8 @@ export async function reconcileDocumentFiles(db: Database.Database, storageRoot 
   let removedFiles = 0;
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (!entry.isFile() || !OWNED_DOCUMENT_FILE.test(entry.name)) continue;
-    const path = resolve(root, entry.name);
-    if (!insideStorage(root, path) || owned.has(pathKey(path))) continue;
+    const path = await canonicalPath(resolve(root, entry.name));
+    if (!insideStorage(rootKey, path) || owned.has(pathKey(path))) continue;
     await unlink(path).catch(() => undefined);
     removedFiles++;
   }
