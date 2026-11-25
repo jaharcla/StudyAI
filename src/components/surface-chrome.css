@@ -124,3 +124,27 @@
   --chrome-accent: #f0b687;
   --chrome-bg: #211e1a;
 }
+
+/* Progressive reveal: muted destinations stay mounted and clickable. */
+.app-shell .immersive-actions button[data-deemphasised="true"] { opacity: .55; }
+.app-shell .immersive-actions button[data-deemphasised="true"]:hover,
+.app-shell .immersive-actions button[data-deemphasised="true"]:focus-visible { opacity: 1; }
+/* The next-step hint sits outside the four-destination control group. */
+.surface-next-chip {
+  --next-accent: #9a623f;
+  --next-tint: #f3e7df;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--next-accent);
+  border-radius: 8px;
+  background: var(--next-tint);
+  color: var(--next-accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.app-shell.dark .surface-next-chip { --next-accent: #f0b687; --next-tint: #3a2b24; }
+.app-shell .surface-next-chip b { font-weight: 700; }
