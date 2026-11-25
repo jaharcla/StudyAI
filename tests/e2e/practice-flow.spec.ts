@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createCourseWithLesson } from "./helpers";
+import { createCourseWithLesson, selectCourseOnPage } from "./helpers";
 
 test.setTimeout(120000);
 
@@ -20,11 +20,7 @@ test("practice starts from a course excerpt and closes the answer loop", async (
   }
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const toggle = page.getByTitle("Toggle courses");
-  if (await toggle.isVisible()) await toggle.click();
-  await page.locator(".course-list button").filter({ has: page.getByText(courseTitle, { exact: true }) }).click();
-  const scrim = page.locator(".sidebar-scrim");
-  if (await scrim.isVisible()) await scrim.click();
+  await selectCourseOnPage(page, courseTitle);
   await page.getByTitle("Open quizzes and flashcards").click();
   await page.getByRole("button", { name: "Ask a reviewed question" }).click();
 
