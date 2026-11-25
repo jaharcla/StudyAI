@@ -59,11 +59,11 @@ test("keyboard-only shell traversal has visible focus, logical order and real hi
   expect(ring.width).toBeGreaterThanOrEqual(2);
 
   const names: string[] = [];
-  for (let index = 0; index < 10; index += 1) {
+  for (let index = 0; index < 12; index += 1) {
     names.push(await focusName(page));
     await page.keyboard.press("Tab");
   }
-  expect(names).toEqual(expect.arrayContaining(["Toggle courses", "Open StudyAI Studio", "Open Artifacts", "Open quizzes and flashcards", "Toggle theme", "Help", "Settings"]));
+  expect(names).toEqual(expect.arrayContaining(["Toggle courses", "Open StudyAI Studio", "Open Artifacts", "Open Library", "Open quizzes and flashcards", "Toggle theme", "Help", "Settings"]));
   expect(names.some((name) => name === "Active lesson")).toBe(false);
 
   const topbarTargets = await page.locator(".topbar button").evaluateAll((buttons) => buttons.map((button) => {
