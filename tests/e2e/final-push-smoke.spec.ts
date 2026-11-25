@@ -20,19 +20,14 @@ test("every primary action has a DOM result or an honest failure", async ({ page
 
   await expect(page.locator('[title*="not available yet"]')).toHaveCount(0);
 
-  // Studio: one primary generate action, then an artifact or an honest notice.
+  // One Studio surface: artifact and deck creation share a single create rail.
   await page.getByTitle("Open StudyAI Studio").click();
   await expect(page.getByTestId("studio-surface")).toBeVisible();
   await page.getByRole("button", { name: "Generate a mind map" }).click();
   await expect(page.getByTestId("studio-surface")).toContainText(/mind map|couldn't|didn't|unchanged|Generating/i, { timeout: 45000 });
+  await page.getByTestId("deck-generate").click();
+  await expect(page.getByTestId("studio-surface")).toContainText(/deck|Presenton|couldn't|didn't|Building/i, { timeout: 45000 });
   await page.getByRole("button", { name: "Close Studio" }).click();
-
-  // Artifacts: deck generation reports a deck or the missing local renderer.
-  await page.getByTitle("Open Artifacts").click();
-  await expect(page.getByTestId("artifacts-surface")).toBeVisible();
-  await page.getByRole("button", { name: "Build slide deck" }).click();
-  await expect(page.getByTestId("artifacts-surface")).toContainText(/deck|Presenton|couldn't|didn't|Building/i, { timeout: 45000 });
-  await page.getByRole("button", { name: "Close artifacts" }).click();
 
   // Concepts opens without a lesson-scoped guard.
   await page.getByTestId("open-concept-graph").click();

@@ -51,10 +51,10 @@ test("library uses grounded labels, keyboard focus and a designed empty state", 
   await expect(list).not.toContainText("study-guide");
 
   // Filter to a kind with no artifacts: designed empty state, not a blank list.
-  await page.getByTestId("artifact-filter").selectOption("practice");
+  await page.getByTestId("artifact-filter-practice").click();
   await expect(page.getByTestId("artifact-list-empty")).toBeVisible();
   await expect(page.getByTestId("artifact-list-item")).toHaveCount(0);
-  await page.getByTestId("artifact-filter").selectOption("all");
+  await page.getByTestId("artifact-filter-all").click();
 
   // Keyboard modality produces a designed focus ring on the next control.
   await page.getByTestId("studio-focus").focus();

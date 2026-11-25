@@ -28,7 +28,7 @@ test("a quiz request in Tutor chat creates a real artifact in the shared Library
   expect(result.status).toBe("ok");
   expect(result.message).toContain("Library");
 
-  await page.getByTestId("open-library").click();
+  await page.getByTitle("Open StudyAI Studio").click();
   await expect(page.getByTestId("library-item")).toHaveCount(1);
   await expect(page.getByTestId("library-item").first()).toContainText("Forces practice");
   await page.screenshot({ path: "test-results/shots/tutor-library-quiz.png", fullPage: true });

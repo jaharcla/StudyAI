@@ -54,8 +54,7 @@ async function mockStudio(page: Page, generateStatus = 201) {
 async function openTestFromLibrary(page: Page, courseTitle: string) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await selectCourseOnPage(page, courseTitle);
-  await page.getByTestId("open-library").click();
-  await page.getByTestId("library-open-studio").click();
+  await page.getByTitle("Open StudyAI Studio").click();
   await page.getByTestId("studio-tab-practice").click();
   await page.getByTestId("studio-generate").click();
   await expect(page.getByTestId("practice-view")).toBeVisible();

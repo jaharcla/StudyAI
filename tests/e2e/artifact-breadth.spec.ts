@@ -54,9 +54,9 @@ test("artifact library: list, filter, open, citation, accept and download a guid
   // List + filter: both first-class kinds live in the same store.
   await expect(page.getByTestId("artifact-list")).toBeVisible();
   await expect(page.getByTestId("artifact-list-item")).toHaveCount(2);
-  await page.getByTestId("artifact-filter").selectOption("infographic");
+  await page.getByTestId("artifact-filter-infographic").click();
   await expect(page.getByTestId("artifact-list-item")).toHaveCount(1);
-  await page.getByTestId("artifact-filter").selectOption("all");
+  await page.getByTestId("artifact-filter-all").click();
 
   // Open a study guide; its citation chip opens the grounded source.
   await page.getByTestId("artifact-list-item").filter({ hasText: "Forces study guide" }).click();
