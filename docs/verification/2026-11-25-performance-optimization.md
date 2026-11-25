@@ -20,6 +20,11 @@
 - Resource baseline captured with OS counters and `nvidia-smi` before any further build or test.
 - No profiler was attached because no new hot path is being changed in this step; the audit's concrete findings already identify the targets.
 
+## GPU offload decision
+
+- GPU is idle (0% utilization, 0 MiB used). The queued work is TypeScript compilation, Vitest, Playwright and SQLite/JSON processing, all CPU or I/O bound; offloading it to the GPU would not help.
+- The only local model path is CLIP canvas recognition in `server/canvas-intelligence/recognition/clip.ts`, and `CANVAS_CLIP_WARMUP=0` disables it. transformers.js in Node runs ONNX on CPU; GPU execution would need a new ONNX runtime provider dependency and explicit approval.
+
 ## Follow-ups
 
 - Wait for PID 18536 to exit, then record its exact result in the worker's verification note.
