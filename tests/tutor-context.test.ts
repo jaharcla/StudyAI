@@ -111,6 +111,29 @@ describe("Tutor context budgeting", () => {
     expect(providerDiagnostics.messages[0].contentCharacters).toBe("Inspect the board.".length);
   });
 
+  it("trims several canvas read results instead of refusing a moderately populated board", () => {
+    const toolResult = (name: string) => ({ type: "tool", name, content: JSON.stringify({ boardId: "board-8", objectCount: 40, shapes: Array.from({ length: 40 }, (_, index) => ({ id: `shape-${index}`, type: "shape", x: index * 10, y: index * 10, props: { text: "evidence ".repeat(24) } })) }) });
+    const conversation = [
+      { type: "human", content: "Inspect the forearm free-body diagram. Are all forces and moment arms accounted for?" },
+      toolResult("get_canvas_state"),
+      toolResult("get_canvas_scene"),
+      toolResult("search_canvas_evidence"),
+    ];
+    const result = budgetTutorContext({
+      systemInstructions: "Tutor rules. ".repeat(600),
+      contexts: [
+        { description: "StudyAI active scientific canvas objects", value: { objects: [{ id: "force-1", kind: "force", magnitude: 20 }] } },
+        { description: "Active canvas scene", value: { scope: { boardId: "board-8" }, nodes: [] } },
+      ],
+      evidence: null,
+      conversation,
+      budgetTokens: 14336,
+    });
+    expect(result.conversation[0].content).toContain("forearm free-body diagram");
+    expect(result.conversation.slice(1).every((message) => String(message.content).includes("[tool result truncated]"))).toBe(true);
+    expect(result.estimatedTokens).toBeLessThanOrEqual(14336);
+  });
+
   it("validates the configured context budget", () => {
     expect(getTutorContextBudget({} as NodeJS.ProcessEnv)).toBe(16_384);
     expect(getTutorContextBudget({ TUTOR_CONTEXT_BUDGET: "4096" } as NodeJS.ProcessEnv)).toBe(4096);

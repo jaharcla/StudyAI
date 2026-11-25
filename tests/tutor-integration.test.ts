@@ -2,7 +2,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
 import { makeMolecule } from "../src/canvas/model";
 import { pdfFixture } from "./fixtures/document-intelligence.js";
 
@@ -219,6 +219,25 @@ it("makes context omitted under the token budget visible in the tutor answer", a
   expect(result.messages.at(-1)?.content).toBe("No course evidence · Not in your course material\n\nAnswer based on current context.");
   expect(tutorMetadata(result).context.omittedTurnCount).toBeGreaterThan(0);
   expect(mocks.invoke.mock.calls[0][0].some((message: { content?: unknown }) => String(message.content).includes("Old question 0"))).toBe(false);
+});
+
+it("answers canvas inspection when several bounded tool results fill the turn", async () => {
+  process.env.TUTOR_CONTEXT_BUDGET = "8192";
+  process.env.TUTOR_MAX_COMPLETION_TOKENS = "1024";
+  const toolResult = JSON.stringify({ boardId: "board-1", shapes: Array.from({ length: 40 }, (_, index) => ({ id: `shape-${index}`, type: "shape", text: "evidence ".repeat(24) })) });
+  mocks.invoke.mockResolvedValue(new AIMessage("The forearm diagram is missing a moment arm."));
+  const messages = [
+    new HumanMessage("Inspect the forearm free-body diagram."),
+    new AIMessage(""),
+    new ToolMessage({ content: toolResult, tool_call_id: "read-1" }),
+    new ToolMessage({ content: toolResult, tool_call_id: "read-2" }),
+    new ToolMessage({ content: toolResult, tool_call_id: "read-3" }),
+  ];
+  const result = await graph.invoke({ copilotkit: { context }, messages });
+  const prompt = JSON.stringify(mocks.invoke.mock.calls[0][0]);
+  expect(prompt).toContain("[tool result truncated]");
+  expect(prompt).not.toContain("too detailed to answer in one go");
+  expect(String(result.messages.at(-1)?.content)).toContain("missing a moment arm");
 });
 
 it("flags canvas context already marked truncated by its producer", async () => {

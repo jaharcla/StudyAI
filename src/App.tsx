@@ -151,6 +151,20 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   const [noteTitle, setNoteTitle] = useState("");
   const [noteId, setNoteId] = useState<string>();
   const [noteLoadedFor, setNoteLoadedFor] = useState("");
+  const noteTimerRef = useRef<number | undefined>(undefined);
+  const noteDraftRef = useRef({ courseId: "", lessonId: "", loadedFor: "", id: undefined as string | undefined, title: "", body: "" });
+  noteDraftRef.current = { courseId: course.id, lessonId, loadedFor: noteLoadedFor, id: noteId, title: noteTitle, body: note };
+  const saveNoteNow = useCallback(() => {
+    const draft = noteDraftRef.current;
+    if (!draft.courseId || !draft.lessonId || draft.loadedFor !== `${draft.courseId}:${draft.lessonId}`) return;
+    window.clearTimeout(noteTimerRef.current);
+    const title = noteTitleRef.current?.value ?? draft.title;
+    const body = noteBodyRef.current?.value ?? draft.body;
+    setStatus("Saving note…");
+    fetch(`${API}/notes`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: draft.id, courseId: draft.courseId, lessonId: draft.lessonId, title, body }) })
+      .then(async (response) => { const value = await response.json().catch(() => ({})); if (!response.ok) throw new Error(value.error || "Notes save unavailable"); return value; }).then((saved) => { setNoteId(saved.id); setStatus("Note saved"); }).catch((error) => setStatus(error instanceof Error ? error.message : "Notes save unavailable"));
+  }, []);
+  const closeNotes = useCallback(() => { saveNoteNow(); setNoteOpen(false); }, [saveNoteNow]);
   const [scienceTool, setScienceTool] = useState<"chem" | "kin" | null>(null);
   const [activityLibraryOpen, setActivityLibraryOpen] = useState(false);
   const [activeActivity, setActiveActivity] = useState<ActivitySession | null>(null);
@@ -183,6 +197,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
   const settingsRef = useRef<HTMLDivElement>(null);
   const noteDialogRef = useRef<HTMLDivElement>(null);
   const noteTitleRef = useRef<HTMLInputElement>(null);
+  const noteBodyRef = useRef<HTMLTextAreaElement>(null);
   useDialogFocus(settings, settingsRef);
   useDialogFocus(noteOpen, noteDialogRef, noteTitleRef);
 
@@ -197,14 +212,14 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
       else if (progressOpen) setProgressOpen(false);
       else if (searchOpen) setSearchOpen(false);
       else if (settings) setSettings(false);
-      else if (noteOpen) setNoteOpen(false);
+      else if (noteOpen) closeNotes();
       else if (scienceTool) setScienceTool(null);
       else if (tutorMenuOpen) setTutorMenuOpen(false);
       else if (sidebar) setSidebar(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, scienceTool, tutorMenuOpen, sidebar]);
+  }, [mode, activityLibraryOpen, flashcardReviewOpen, helpOpen, progressOpen, searchOpen, settings, noteOpen, closeNotes, scienceTool, tutorMenuOpen, sidebar]);
 
   // A prepared handoff belongs to one Studio visit. Escape, the sidebar and scope changes
   // all leave Studio without calling its close handler; a source focus from another lesson
@@ -400,13 +415,10 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
 
   useEffect(() => {
     if (!noteOpen || !course.id || !lessonId || noteLoadedFor !== `${course.id}:${lessonId}`) return;
-    const timer = window.setTimeout(() => {
-      setStatus("Saving note…");
-      fetch(`${API}/notes`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: noteId, courseId: course.id, lessonId, title: noteTitle, body: note }) })
-        .then(async (response) => { const value = await response.json().catch(() => ({})); if (!response.ok) throw new Error(value.error || "Notes save unavailable"); return value; }).then((saved) => { setNoteId(saved.id); setStatus("Note saved"); }).catch((error) => setStatus(error instanceof Error ? error.message : "Notes save unavailable"));
-    }, 450);
+    const timer = window.setTimeout(saveNoteNow, 450);
+    noteTimerRef.current = timer;
     return () => window.clearTimeout(timer);
-  }, [note, noteOpen, noteId, noteTitle, course.id, lessonId, noteLoadedFor]);
+  }, [note, noteOpen, noteId, noteTitle, course.id, lessonId, noteLoadedFor, saveNoteNow]);
 
   useEffect(() => {
     let live = true;
@@ -612,7 +624,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     }} onMouseDown={() => { dragRef.current = true; }} onMouseMove={changeWidth} onMouseUp={() => { dragRef.current = false; }} onMouseLeave={() => { dragRef.current = false; }} /><aside className="tutor-panel" style={{ width: tutorWidth }}><div className="tutor-header"><div className="tutor-title"><div className="tutor-avatar"><Sparkles size={15} /></div><span><b>Study tutor</b><small data-testid="tutor-provider-status"><i />{activeTutor}</small></span></div><div><button className="icon-button" title="Tutor options" onClick={() => setTutorMenuOpen(true)}><MoreHorizontal size={17} /></button><button className="icon-button" onClick={() => setTutor(false)} title="Close tutor"><PanelRightClose size={17} /></button></div></div>{tutorContextOpen && course.id && lessonId && <div className="tutor-context"><div className="context-label"><span>LESSON CONTEXT</span><button className="icon-button" onClick={() => setTutorContextOpen(false)} aria-label="Hide lesson context"><X size={13} /></button></div><div className="context-card"><div className="context-icon"><Atom size={15} /></div><span><b>{lessonTitle}</b><small>{course.title}</small></span></div>{selectedObject && <div className="context-card" data-testid="selected-object-context"><div className="context-icon"><Atom size={15} /></div><span><b>{selectedObject.name}</b><small>Selected canvas object</small></span></div>}<p>Responses distinguish course excerpts from general knowledge. Open cited pages and slides from the answer.</p></div>}{coach.surface}{tutorQuestion && tutorQuestion.courseId === course.id && tutorQuestion.lessonId === lessonId && <PreparedQuestion question={tutorQuestion.question} title={tutorQuestion.sourceTitle} sourceRef={tutorQuestion.sourceRef} onSend={sendPreparedQuestion} onOpenSource={openSource} />}{course.id && lessonId ? <div className="copilot-slot" onClick={openCitation}><CopilotChat className="study-chat" messageView={{ assistantMessage: { markdownRenderer: CustomMarkdownRenderer }, toolCallDisplay: "turn" }} inspectorTools={import.meta.env.DEV} labels={{ welcomeMessageText: `Ask about ${lessonTitle}, request a worked example, or ask about the canvas.` }} /></div> : <div className="copilot-slot"><div className="canvas-loading">Select or create a lesson to start tutoring.</div></div>}<div className="tutor-disclaimer"><Sparkles size={12} /> AI can make mistakes. Check important details against your sources.</div></aside></>}
     {!tutor && <button className="reopen-tutor" onClick={() => setTutor(true)}><Sparkles size={16} /> Open tutor</button>}
     {settings && <div className="modal-shade" onClick={() => setSettings(false)}><div ref={settingsRef} tabIndex={-1} className="settings-modal" role="dialog" aria-label="StudyAI settings" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">PREFERENCES</span><h2>StudyAI settings</h2></div><button className="icon-button" aria-label="Close settings" onClick={() => setSettings(false)}><X size={18} /></button></div><label data-testid="active-tutor-provider">Active tutor provider<input value={activeTutor} readOnly /></label><label>Local model service (Ollama)<input value={aiStatus} readOnly /></label><FreeKeyGuide /><label>Local model<select aria-label="Model" data-testid="model-select" value={selectedModel} disabled={!models.length} onChange={(e) => { setSelectedModel(e.target.value); localStorage.setItem("studyai.model", e.target.value); }}>{!models.length && <option value="">{aiStatus}</option>}{models.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></label><p data-testid="model-provider-note">{tutorStatus && !tutorStatus.pickerActive ? tutorStatus.note : models.length ? "This list is the local Ollama service. It applies only when the Study tutor runs on Ollama; otherwise the tutor uses the model configured for the active provider, which this list cannot change." : aiStatus}</p>{PAID_ENABLED && <><label>AI provider<select data-testid="credit-provider-option" value={creditProvider} onChange={(e) => { setCreditProvider(e.target.value); localStorage.setItem("studyai.credit.provider", e.target.value); }}><option value="local">Local / BYOK</option><option value="credits">StudyAI Credits</option></select></label>{creditProvider === "credits" && <div className="credits-panel"><p data-testid="credit-balance">Balance: ${(creditBalance / 1_000_000).toFixed(2)}</p><p data-testid="credit-recovery-code">{creditRecovery}</p><p data-testid="credit-disclosure">Your wallet lives in this browser only. Save the recovery code: without it a balance cannot be recovered.</p><label>Redeem code<input data-testid="credit-redeem-input" value={creditCode} onChange={(e) => setCreditCode(e.target.value)} /></label><button data-testid="credit-redeem-button" onClick={redeemCredit}>Redeem</button><label>Ask with credits<input data-testid="credit-chat-input" value={creditQuestion} onChange={(e) => setCreditQuestion(e.target.value)} /></label><button data-testid="credit-chat-send" onClick={sendCreditChat}>Send</button>{creditAnswer && <div data-testid="credit-chat-answer"><CustomMarkdownRenderer content={creditAnswer} /></div>}{creditStatus && <p>{creditStatus}</p>}</div>}<div className="credits-panel" data-testid="support-panel"><h3>Support StudyAI</h3><div className="science-tabs"><button data-testid="support-kind-donation" className={supportKind === "donation" ? "current" : ""} onClick={() => { setSupportKind("donation"); setSupportChoice("small"); }}>Donate</button><button data-testid="support-kind-credits" className={supportKind === "credits" ? "current" : ""} onClick={() => { setSupportKind("credits"); setSupportChoice("small"); }}>Buy credits</button></div><label>Amount<select data-testid="support-amount" value={supportChoice} onChange={(e) => setSupportChoice(e.target.value)}>{(supportKind === "donation" ? [["small", "$2"], ["medium", "$5"], ["large", "$10"]] : [["small", "$5"], ["medium", "$10"], ["large", "$20"]]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><button data-testid="support-checkout-button" onClick={requestCheckout}>Continue to Stripe</button>{supportStatus && <p data-testid="support-status">{supportStatus}</p>}<p>Payments are processed by Stripe. Refunds are handled manually and credits are not revoked automatically.</p></div></>}<button className="button-primary" onClick={() => setSettings(false)}>Done</button></div></div>}
-    {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={() => setNoteOpen(false)}><div ref={noteDialogRef} tabIndex={-1} className="settings-modal notes-modal" role="dialog" aria-label="Lesson notes" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · {lessonTitle}</span><input ref={noteTitleRef} aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" aria-label="Close notes" onClick={() => setNoteOpen(false)}><X size={18} /></button></div><textarea autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lesson…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={() => setNoteOpen(false)}>Done</button></div></div>}
+    {noteOpen && course.id && lessonId && <div className="modal-shade" onClick={closeNotes}><div ref={noteDialogRef} tabIndex={-1} className="settings-modal notes-modal" role="dialog" aria-label="Lesson notes" aria-modal="true" onClick={(e) => e.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">{course.title} · {lessonTitle}</span><input ref={noteTitleRef} aria-label="Note title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} /></div><button className="icon-button" aria-label="Close notes" onClick={closeNotes}><X size={18} /></button></div><textarea ref={noteBodyRef} autoFocus value={note} onChange={(e) => setNote(e.target.value)} placeholder="Write notes for this lesson…" /><p>Notes save automatically to the local SQLite database.</p><button className="button-primary" onClick={closeNotes}>Done</button></div></div>}
     {scienceTool && <ScienceModal initial={scienceTool} close={() => setScienceTool(null)} />}
     {activityLibraryOpen && course.id && lessonId && <Suspense fallback={<ModeSurfaceLoading />}><ActivityLibrary courseId={course.id} lessonId={lessonId} onClose={() => setActivityLibraryOpen(false)} onStart={launchActivity} /></Suspense>}
     {tutorMenuOpen && <TutorMenu config={tutorConfig} onToggleContext={() => setTutorContextOpen(!tutorContextOpen)} onClose={() => setTutorMenuOpen(false)} />}

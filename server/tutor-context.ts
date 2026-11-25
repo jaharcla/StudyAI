@@ -99,7 +99,20 @@ export function budgetTutorContext(input: {
       : item);
     compactedBase = measureWith(contexts, conversation);
   }
-  if (compactedBase > input.budgetTokens) throw new TutorContextBudgetError(compactedBase, input.budgetTokens, diagnoseTutorContext(input, contexts, conversation, "protected_context_preflight"));
+  // Canvas read tools are bounded one by one, but several results can land in one turn.
+  // Trim them before refusing the request; the question and board scope stay intact.
+  const untrimmedConversation = conversation;
+  if (compactedBase > input.budgetTokens) {
+    conversation = conversation.map((message) => {
+      const role = message?._getType?.() ?? message?.type ?? message?.role;
+      if (role !== "tool" || typeof message.content !== "string") return message;
+      const limit = Math.min(canvasBudget, Math.max(1_000, Math.floor(message.content.length / 4)));
+      if (message.content.length <= limit) return message;
+      return Object.assign(Object.create(Object.getPrototypeOf(message)), message, { content: `${message.content.slice(0, limit)}\n[tool result truncated]` });
+    });
+    compactedBase = measureWith(contexts, conversation);
+  }
+  if (compactedBase > input.budgetTokens) throw new TutorContextBudgetError(compactedBase, input.budgetTokens, diagnoseTutorContext(input, contexts, untrimmedConversation, "protected_context_preflight"));
 
   for (const item of optionalContexts) {
     const candidate = [...contexts, item];
