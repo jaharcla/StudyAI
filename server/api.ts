@@ -214,6 +214,8 @@ const server = createServer(async (req, res) => {
     const input = JSON.parse(await body(req));
     if (!input.courseId || !courseExists(String(input.courseId)) || !input.snapshot || typeof input.snapshot !== "object") return json(res, 400, { error: "A valid courseId and snapshot are required." });
     const id = input.id ?? randomUUID();
+    const existing = db.prepare("SELECT course_id FROM drawings WHERE id=?").get(id) as { course_id: string } | undefined;
+    if (existing && existing.course_id !== String(input.courseId)) return json(res, 409, { error: "Drawing belongs to another course." });
     db.prepare("INSERT INTO drawings(id,course_id,snapshot,revision) VALUES(?,?,?,1) ON CONFLICT(id) DO UPDATE SET snapshot=excluded.snapshot,revision=drawings.revision+1,updated_at=CURRENT_TIMESTAMP").run(id, input.courseId, JSON.stringify(input.snapshot));
     return json(res, 200, { id });
   }
