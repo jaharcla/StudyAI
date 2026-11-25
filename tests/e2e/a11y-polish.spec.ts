@@ -59,7 +59,7 @@ test("keyboard-only shell traversal has visible focus, logical order and real hi
   expect(ring.width).toBeGreaterThanOrEqual(2);
 
   const names: string[] = [];
-  for (let index = 0; index < 12; index += 1) {
+  for (let index = 0; index < 14; index += 1) {
     names.push(await focusName(page));
     await page.keyboard.press("Tab");
   }
