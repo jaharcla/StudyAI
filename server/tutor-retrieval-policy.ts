@@ -54,6 +54,7 @@ const TOOL_ROUTES: Array<{ test: RegExp; names: string[] }> = [
   { test: /\b(?:molecule|lewis|bond|atom|formula|c2h4|ethylene)\b/i, names: ["propose_molecule"] },
   { test: /\b(?:vector|force|equation|graph|concept|flashcard|measurement|anatomy|linked note|linked document|practice question)\b/i, names: ["propose_scientific_object"] },
   { test: /\b(?:line|circle|ellipse|arrow|rectangle|triangle|diamond|hexagon|star|shape|text|note|draw|sketch|drawing)\b/i, names: ["propose_canvas_action"] },
+  { test: /\b(?:quiz me|make (?:me )?(?:cards|flashcards|slides|a slide deck)|create (?:a )?(?:quiz|cards|flashcards|slides)|generate (?:a )?(?:quiz|cards|flashcards|slides))\b/i, names: ["make_library_artifact"] },
   { test: /\b(?:add|create|place|insert|put|make)\b/i, names: ["propose_scientific_object"] },
   { test: /\b(?:search|find|across (?:my |the )?(?:boards|course)|evidence|label)\b/i, names: ["search_canvas_evidence", "describe_canvas"] },
   { test: /\b(?:according to|based on|from (?:the |my )?(?:lecture|course|notes|document|pdf|slides)|cite|source)\b/i, names: ["search_course_documents"] },
@@ -62,6 +63,10 @@ const TOOL_ROUTES: Array<{ test: RegExp; names: string[] }> = [
 
 export function recommendedToolsForQuery(query: string, available: readonly string[]): string[] {
   const present = new Set(available);
+  // Artifact creation is a single consequential verb. Other keyword routes
+  // ("make", "flashcard") would otherwise offer a competing canvas tool.
+  const libraryRoute = TOOL_ROUTES.find((route) => route.names.includes("make_library_artifact"));
+  if (present.has("make_library_artifact") && libraryRoute?.test.test(query)) return ["make_library_artifact"];
   const found: string[] = [];
   // A tool named verbatim by the user is a direct instruction. Honor it before
   // keyword routes that might otherwise suggest a different tool for the same
@@ -69,7 +74,7 @@ export function recommendedToolsForQuery(query: string, available: readonly stri
   for (const name of [
     "propose_canvas_edit", "propose_canvas_action", "propose_scientific_object",
     "propose_molecule", "get_canvas_state", "get_canvas_scene", "read_canvas_ink",
-    "search_canvas_evidence", "describe_canvas", "search_course_documents",
+    "search_canvas_evidence", "describe_canvas", "search_course_documents", "make_library_artifact",
   ]) {
     if (present.has(name) && new RegExp(`\\b${name}\\b`, "i").test(query)) found.push(name);
   }
