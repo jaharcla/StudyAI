@@ -52,6 +52,7 @@ test("duplicate object labels are disambiguated by human name, never by id", asy
   await seedObjects(page.request, course, lesson, [namedMolecule("dup-alpha", "Shared name"), namedMolecule("dup-beta", "Shared name")]);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator(".scientific-layer")).toBeVisible();
+  await expect(page.getByText("Shared name", { exact: true })).toHaveCount(2);
   if (!(await page.locator(".tutor-panel").isVisible())) {
     await page.getByRole("button", { name: "Toggle study tutor" }).click();
   }
