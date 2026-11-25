@@ -20,6 +20,13 @@
 - Resource baseline captured with OS counters and `nvidia-smi` before any further build or test.
 - No profiler was attached because no new hot path is being changed in this step; the audit's concrete findings already identify the targets.
 
+## Approved system memory optimization (2026-11-25 16:32 local)
+
+- Terminated 12 Wispr Flow, 9 Copilot app, 1 Copilot host, 4 rsAppUI, 1 OVR launcher subtree, 1 RemoteDesktopCompanion, 1 crashpad handler and 7 Chrome renderers older than 15:00 under PID 19256. `LEDKeeper2`, `MSI.CentralServer` and `rsEngineSvc` were already absent. Two OVR processes (`OVRServiceLauncher.exe`, `OVRRedir.exe`) remain: taskkill returned access denied.
+- Backed up `C:\Users\Owner\.config\opencode\opencode.json` to `C:\Users\Owner\AppData\Local\Temp\opencode\opencode.json.bak-20261125-1632.json`, set `disabled: true` on 10 MCP servers (agentmemory, browsermcp, chrome-devtools, openpets, rea, reddit_outreach, ui-expert, x_outreach, linkedin_outreach, zulip), and rewrote the file as formatted JSON.
+- `opencode mcp list` now shows 4 globally enabled servers (gitnexus, mcpproxy, sequentialthinking, serena) plus project-local `waterloo-learn`; all others disabled.
+- Node processes fell from 79 to 14 and npx MCP processes from 57 to 9. Free RAM rose from 3.72 GB before termination to 5.55 GB after config reload.
+
 ## Root cause of RAM pressure
 
 - Chronic baseline: the OpenCode service (PID 12248) owns 58 long-lived `npx` MCP-server processes started at 13:23, totaling about 2.8 GB, plus 46 Chrome/Edge WebView/headless processes totaling about 2.16 GB and Windows Memory Compression around 2.5 GB. That is roughly 7.5 GB of 15.71 GB before any test runs.
