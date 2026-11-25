@@ -59,6 +59,7 @@ Keep these links; install and actually use them if RAM or performance dips again
 - Uninterrupted J1–J7 proof: `tests/e2e/journey-uninterrupted.spec.ts` with 13 ordered screenshots.
 
 ## Open goals
+- Active sequential queue in thread `1575235495225598042` (started 2026-11-25, user asked to queue three tasks and then whatever follows): (1) bounded math evaluator from `docs/superpowers/plans/2026-11-25-bounded-math-evaluator.md`, (2) lazy-load mode-gated surfaces in `src/App.tsx`, (3) resolve uncommitted Creative Muse fixes in `.worktrees/creative-muse`, (4) final verification plus the two remaining low-risk performance findings. Workers do not merge; coordinator merges after reviewing each gate.
 - One-drop start plan merged into main on 2026-11-25 after green full gate (`tsc -b`, Vitest 918, Playwright 151 passed, 13-screenshot journey). Verification report: `docs/verification/2026-11-25-one-drop-start.md`. Next-Lesson Pre-flight was merged earlier the same day.
 - The two mock-student defects (canvas inspection refusing a populated board, Notes autosave dropping text on immediate Done) were fixed by the Creative Muse worker but remain uncommitted in `feat/creative-muse`; they are not merged. Live-provider behavior of the canvas fix is still unconfirmed.
 - Live-provider tutor turn remains unverified locally: no BYOK key configured.
