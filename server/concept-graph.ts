@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { parseCanvasDocument } from "../src/canvas/model.js";
+import { getDocumentLocation, makeSourceReference } from "./document-intelligence/service.js";
 
 export type ConceptGraphNode = {
   id: string;
@@ -24,7 +25,8 @@ type ConceptRow = {
   mastery: number;
   can_practice: number;
   source_title: string | null;
-  source_ref: string | null;
+  source_document_id: string | null;
+  source_page: number | null;
 };
 
 type PreparedStatements = {
@@ -45,10 +47,8 @@ function statementsFor(database: Database.Database): PreparedStatements {
             ORDER BY e.occurred_at DESC, e.sequence DESC LIMIT 1), 0.1) AS mastery,
           EXISTS(SELECT 1 FROM reviewed_questions q WHERE q.concept_id = k.id) AS can_practice,
           (SELECT q.source_title FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_title,
-          (SELECT CASE WHEN EXISTS(SELECT 1 FROM di_documents dd WHERE dd.id = q.source_document_id)
-            THEN 'studyai://document/' || q.source_document_id || '/' ||
-              CASE WHEN q.source_page IS NULL THEN 'text/0' ELSE 'page/' || q.source_page END || '?chunk=0'
-          END FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_ref
+          (SELECT q.source_document_id FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_document_id,
+          (SELECT q.source_page FROM reviewed_questions q WHERE q.concept_id = k.id ORDER BY q.rowid DESC LIMIT 1) AS source_page
         FROM learning_concepts k
         JOIN lessons l ON l.course_id = k.course_id AND l.id = k.lesson_id
         WHERE k.course_id = ?
@@ -79,6 +79,12 @@ function parseBoard(document: string): ReturnType<typeof parseCanvasDocument> | 
   return parsed;
 }
 
+function resolvedSourceRef(database: Database.Database, courseId: string, documentId: string | null, page: number | null): string | undefined {
+  if (!documentId) return undefined;
+  const ref = makeSourceReference({ documentId, unitType: page === null ? "text" : "page", unitNumber: page ?? 0, chunkIndex: 0 });
+  return getDocumentLocation(database, ref, courseId) ? ref : undefined;
+}
+
 /**
  * Read-only course graph. Nodes are real learning concepts; edges are real
  * `relationship` objects on this course's saved canvases. Nothing is generated.
@@ -87,18 +93,21 @@ export function buildConceptGraph(database: Database.Database, courseId: string,
   const statements = statementsFor(database);
   const rows = statements.concepts.all(courseId) as ConceptRow[];
 
-  const nodes: ConceptGraphNode[] = rows.map((row) => ({
-    id: row.id,
-    label: row.name,
-    parentId: null,
-    detail: row.source_ref ? undefined : row.source_title ?? undefined,
-    sourceRef: row.source_ref ?? undefined,
-    sourceLabel: row.source_title ?? undefined,
-    lessonId: row.lesson_id,
-    lessonTitle: row.lesson_title,
-    mastery: Number(row.mastery),
-    canPractice: Boolean(row.can_practice),
-  }));
+  const nodes: ConceptGraphNode[] = rows.map((row) => {
+    const sourceRef = resolvedSourceRef(database, courseId, row.source_document_id, row.source_page);
+    return {
+      id: row.id,
+      label: row.name,
+      parentId: null,
+      detail: sourceRef ? undefined : row.source_title ?? undefined,
+      sourceRef,
+      sourceLabel: row.source_title ?? undefined,
+      lessonId: row.lesson_id,
+      lessonTitle: row.lesson_title,
+      mastery: Number(row.mastery),
+      canPractice: Boolean(row.can_practice),
+    };
+  });
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const names = new Map<string, string[]>();
   for (const node of nodes) {
@@ -116,7 +125,7 @@ export function buildConceptGraph(database: Database.Database, courseId: string,
     for (const object of document.objects) {
       if (object.kind !== "concept") continue;
       const named = names.get(`${canvas.lesson_id}:${object.title}`) ?? [];
-      const conceptId = object.conceptId && byId.has(object.conceptId) ? object.conceptId : named[0];
+      const conceptId = object.conceptId && byId.has(object.conceptId) ? object.conceptId : named.length === 1 ? named[0] : undefined;
       if (conceptId) conceptIds.set(object.id, conceptId);
     }
     for (const object of document.objects) {
