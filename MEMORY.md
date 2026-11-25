@@ -50,6 +50,7 @@ Keep these links; install and actually use them if RAM or performance dips again
 
 ## Machine state (2026-11-25)
 - Startup trim applied with user approval. Removed 8 HKCU Run entries: Steam, Overwolf, EpicGamesLauncher, EADM, BlueStacks Services, Adobe Acrobat Synchronizer, Opera Browser Assistant, Opera GX Browser Assistant. Backups in `%TEMP%\opencode\ram-optimization-backup\hkcu-run-20261125-125718.reg` and matching HKLM file. HKLM entries Acronis Scheduler2 Service and SteelSeriesGG were not removable without elevation. DiagTrack and SysMain remain Automatic for the same reason. Full RAM benefit arrives after next login.
+- On 2026-11-25 the user approved a second RAM pass: background apps and idle Chrome renderers were stopped, and 10 MCP servers were disabled in `C:\Users\Owner\.config\opencode\opencode.json` (backup at `%TEMP%\opencode\opencode.json.bak-20261125-1632.json`). Only gitnexus, mcpproxy, sequentialthinking, serena and project-local waterloo-learn remain connected. Node processes fell 79 to 14; free RAM rose to about 5.5 GB. Two OVR processes still need elevation. Tools from the disabled servers (browsermcp, rea, agentmemory, reddit/x/linkedin/zulip outreach, openpets, chrome-devtools, ui-expert) are no longer available in this session.
 
 ## Where things live
 - UI source of truth: `DESIGN.md` at repo root.
