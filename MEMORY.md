@@ -5,6 +5,9 @@
 - The Scientific Canvas and the Canvas-aware Tutor are the reason to stay. Do not make Canvas opt-in.
 - User confirmed "both": the first minute must be effortless and the whole workspace must stay simple.
 
+## Coordination preferences
+- Do not paste the user's messages verbatim into worker prompts. Write short, synthesized briefs that give the worker only what it needs. User corrected this on 2026-11-25.
+
 ## Decisions
 - Preferred UX approach: one-drop start with progressive surfaces. Design: `docs/superpowers/specs/2026-11-25-one-drop-start-design.md`; plan: `docs/superpowers/plans/2026-11-25-one-drop-start.md`.
 - Navigator default: board is the one room; top bar has Canvas, Study, Studio, Concepts only. Home/Today in sidebar; decks live in the Studio/PPTX flow.
