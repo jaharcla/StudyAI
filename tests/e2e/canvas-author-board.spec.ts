@@ -91,6 +91,33 @@ test("one friction authoring turn: one review, one revision, cited and labelled 
   await expect.poll(async () => (await readSaved()).revision).toBe(before.revision + 1);
 });
 
+test("a proposal is readable before approval and exposes no raw JSON or internal ids", async ({ page }) => {
+  const { course, lesson } = await createCourseWithLesson(page.request, `Readable proposal ${Date.now()}`, "Friction lesson");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await selectCourseOnPage(page, course.title);
+  const scrim = page.locator(".sidebar-scrim");
+  if (await scrim.isVisible()) await scrim.click();
+  const url = `/api/canvases?course=${course.id}&lesson=${lesson.id}`;
+  await expect.poll(async () => ((await (await page.request.get(url)).json()) as Array<{ id: string }>).length, { timeout: 30_000 }).toBeGreaterThan(0);
+  const boards = await (await page.request.get(url)).json() as Array<{ id: string }>;
+  const boardId = boards[0].id;
+  await page.waitForFunction(() => typeof (window as TestWindow).__studyaiAuthorBoard === "function", null, { timeout: 30_000 });
+  await page.evaluate(async (payload) => (window as TestWindow).__studyaiAuthorBoard!(payload), mockedTurn(boardId));
+
+  const dialog = page.getByTestId("board-artifact-proposal");
+  await expect(dialog).toBeVisible();
+  const summary = dialog.getByTestId("tutor-proposal-summary");
+  await expect(summary).toBeVisible();
+  await expect(summary).toContainText(/question/i);
+  await expect(dialog.getByTestId("generated-unverified")).toBeVisible();
+  await expect(dialog.getByTestId("apply-artifact")).toBeVisible();
+  await expect(dialog.getByTestId("decline-artifact")).toBeVisible();
+  await expect(dialog.locator("pre")).toHaveCount(0);
+  const text = await dialog.innerText();
+  expect(text).not.toMatch(/[{}[\]]/);
+  expect(text).not.toMatch(/studyai:\/\/|chunk=|patchJson|fieldsJson|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+});
+
 test("an invalid brief is reported structurally and leaves the saved board byte-identical", async ({ page }) => {
   const { course, lesson } = await createCourseWithLesson(page.request, `Author board invalid ${Date.now()}`, "Friction lesson");
   await page.goto("/", { waitUntil: "domcontentloaded" });
