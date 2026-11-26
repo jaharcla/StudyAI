@@ -172,16 +172,19 @@ describe("document file reconciliation", () => {
     }
   });
 
-  it("refuses to run when most rows have no file in the configured root", async () => {
+  it("skips destructive work when most rows have no file in the configured root", async () => {
     await importDocuments(db, "chem-120", ["a.txt", "b.txt", "c.txt"].map((name) => ({ name, bytes: new TextEncoder().encode(name) })), storage);
     expect(readdirSync(storage).filter((name) => name !== ".uploads")).toHaveLength(3);
     const empty = join(root, "empty-root");
     mkdirSync(empty, { recursive: true });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      await expect(reconcile!(db, empty, now)).rejects.toThrow(/refused/i);
+      expect(await reconcile!(db, empty, now)).toMatchObject({ removedFiles: 0, removedRows: 0, removedUploads: 0 });
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Reconciliation skipped/));
       expect(db.prepare("SELECT count(*) AS count FROM di_documents").get()).toMatchObject({ count: 3 });
       expect(readdirSync(storage).filter((name) => name !== ".uploads")).toHaveLength(3);
     } finally {
+      warn.mockRestore();
       rmSync(empty, { recursive: true, force: true });
     }
   });

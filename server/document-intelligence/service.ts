@@ -202,8 +202,9 @@ async function canonicalPath(path: string): Promise<string> {
 
 /** Reconciles interrupted imports and deletes after a restart. Files are matched
  *  by the UUID in their name, not the stored absolute path, so moving the storage
- *  root keeps its documents. Orphans are moved aside, and a suspiciously large
- *  row loss aborts before anything is changed. */
+ *  root keeps its documents. Orphans are moved aside; when most rows would be
+ *  dropped, reconciliation is skipped entirely so the app still starts and no
+ *  files or rows are lost. */
 export async function reconcileDocumentFiles(db: Database.Database, storageRoot = "data/documents", now = Date.now()): Promise<{ removedFiles: number; removedRows: number; removedUploads: number }> {
   initializeDocumentIntelligenceSchema(db);
   const root = resolve(storageRoot);
@@ -224,7 +225,10 @@ export async function reconcileDocumentFiles(db: Database.Database, storageRoot 
   }
 
   const dangling = rows.filter((row) => !files.has(row.id.toLowerCase()));
-  if (rows.length > 1 && dangling.length > rows.length / 2) throw new Error(`Reconciliation refused: ${dangling.length} of ${rows.length} documents have no file in ${root}. Check STUDYAI_DOCUMENTS before starting.`);
+  if (rows.length > 1 && dangling.length > rows.length / 2) {
+    console.warn(`Reconciliation skipped: ${dangling.length} of ${rows.length} documents have no file in ${root}. Check STUDYAI_DOCUMENTS; no files or rows were changed.`);
+    return { removedFiles: 0, removedRows: 0, removedUploads: 0 };
+  }
 
   let removedFiles = 0;
   if (orphans.length) {
