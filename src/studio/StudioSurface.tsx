@@ -186,7 +186,6 @@ export default function StudioSurface({ courseId, lessonId, courseTitle, lessonT
     }
     if (initialDeckId && made.some((item) => item.source === "deck" && item.id === initialDeckId)) openDeck(initialDeckId);
     // Hand-off ids are applied once, after the first successful catalog load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [madeLoading]);
 
   const generate = async (target: StudioKind = kind, type: PracticeType = practiceType, guidance = "") => {

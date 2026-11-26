@@ -52,7 +52,7 @@ export function useCoach(context: CoachContext, onPrepare: CoachPreparation): { 
   const refresh = useCallback(async () => {
     const items = await collectCoachPrompts(context, dismissed);
     setPrompts(items);
-  }, [context.courseId, context.lessonId, context.boardId, context.boardRevision, dismissed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [context.courseId, context.lessonId, context.boardId, context.boardRevision, dismissed]);
 
   useEffect(() => {
     if (!enabled) return;

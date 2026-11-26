@@ -16,6 +16,8 @@ export default tseslint.config(
       "test-results/**",
       "data/**",
       ".worktrees/**",
+      ".venv-qag/**",
+      "worktree-retirement-backup-*/**",
     ],
   },
   js.configs.recommended,
@@ -33,11 +35,28 @@ export default tseslint.config(
         setTimeout: "readonly",
         clearTimeout: "readonly",
         URL: "readonly",
+        Buffer: "readonly",
       },
     },
     rules: {
       "no-empty": ["error", { allowEmptyCatch: true }],
     },
+  },
+  {
+    // Browser-side probe is plain JS evaluated in Chromium, not Node.
+    files: ["tests/voice-benchmark/browser-probe.js"],
+    languageOptions: {
+      globals: {
+        window: "readonly",
+        performance: "readonly",
+        SpeechSynthesisUtterance: "readonly",
+      },
+    },
+  },
+  {
+    // Visual capture script runs in a browser page via Playwright evaluation.
+    files: ["docs/design-directions/capture.mjs"],
+    languageOptions: { globals: { document: "readonly" } },
   },
   {
     rules: {

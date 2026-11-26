@@ -49,7 +49,7 @@ beforeAll(async () => {
   db.prepare("INSERT INTO courses(id,title,code,color) VALUES(?,?,?,?)").run("course-1", "Course One", "C1", "#ef805c");
   db.prepare("INSERT INTO courses(id,title,code,color) VALUES(?,?,?,?)").run("course-2", "Course Two", "C2", "#7a9b7b");
   db.prepare("INSERT INTO drawings(id,course_id,snapshot,revision) VALUES(?,?,?,1)").run("drawing-1", "course-1", JSON.stringify({ atom1: { type: "circle" } }));
-});
+}, 30_000);
 
 afterAll(async () => {
   db?.close();

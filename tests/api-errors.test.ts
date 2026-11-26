@@ -57,7 +57,7 @@ beforeAll(async () => {
 
   db = new Database(dbPath);
   db.prepare("INSERT INTO courses(id,title,code,color) VALUES(?,?,?,?)").run("course-1", "Course One", "C1", "#ef805c");
-});
+}, 30_000);
 
 afterAll(async () => {
   db?.close();

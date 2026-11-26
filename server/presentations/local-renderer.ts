@@ -24,6 +24,8 @@ const APP = "http://schemas.openxmlformats.org/officeDocument/2006/extended-prop
 
 function escapeXml(value: string): string {
   return value
+    // XML 1.0 excludes these control characters; strip them before escaping.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

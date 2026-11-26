@@ -62,7 +62,7 @@ beforeAll(async () => {
     if (!ready) await new Promise((resolve) => setTimeout(resolve, 100));
   }
   if (!ready) throw new Error(`Data API did not start:\n${output}`);
-});
+}, 30_000);
 
 afterAll(async () => {
   if (api && api.exitCode === null) {

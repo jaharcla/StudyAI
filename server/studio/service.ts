@@ -147,7 +147,7 @@ export async function generateStudioArtifact(
     }
     content = validateContent(input.kind, parsed, grounding.sources, input.count, input.practiceType, canvasRefs);
   }
-  let notice = content ? undefined : STUDIO_FALLBACK_NOTICE;
+  const notice = content ? undefined : STUDIO_FALLBACK_NOTICE;
   if (!content) content = groundedFallback(input, grounding);
   if (input.kind === "practice" && input.practiceType !== "cards" && "questions" in content) {
     const produced = content.questions.length;
