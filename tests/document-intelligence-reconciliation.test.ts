@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import Database from "better-sqlite3";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { initializeDocumentIntelligenceSchema } from "../server/document-intelligence/schema.js";
@@ -142,5 +142,47 @@ describe("document file reconciliation", () => {
     expect(existsSync(unrelated)).toBe(true);
     const second = await reconcile!(db, storage, now);
     expect(second.removedUploads).toBe(0);
+  });
+
+  it("moves orphaned UUID files into .trash instead of deleting them", async () => {
+    const orphan = writeOrphan(`${randomUUID()}.txt`);
+    const result = await reconcile!(db, storage, now);
+    expect(result.removedFiles).toBe(1);
+    expect(existsSync(orphan)).toBe(false);
+    const trashed = join(storage, ".trash", basename(orphan));
+    expect(existsSync(trashed)).toBe(true);
+    expect(readFileSync(trashed, "utf8")).toBe("unreferenced import output");
+  });
+
+  it("keeps files and rows when the documents root is relocated", async () => {
+    const [imported] = await importDocuments(db, "chem-120", [{ name: "moved.txt", bytes: new TextEncoder().encode("Moved body.") }], storage);
+    const oldPath = (db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id) as { storage_path: string }).storage_path;
+    const relocated = join(root, "relocated");
+    mkdirSync(relocated, { recursive: true });
+    const newPath = join(relocated, basename(oldPath));
+    renameSync(oldPath, newPath);
+    try {
+      const result = await reconcile!(db, relocated, now);
+      expect(result.removedFiles).toBe(0);
+      expect(result.removedRows).toBe(0);
+      expect(existsSync(newPath)).toBe(true);
+      expect(db.prepare("SELECT storage_path FROM di_documents WHERE id=?").get(imported.id)).toMatchObject({ storage_path: newPath });
+    } finally {
+      rmSync(relocated, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to run when most rows have no file in the configured root", async () => {
+    await importDocuments(db, "chem-120", ["a.txt", "b.txt", "c.txt"].map((name) => ({ name, bytes: new TextEncoder().encode(name) })), storage);
+    expect(readdirSync(storage).filter((name) => name !== ".uploads")).toHaveLength(3);
+    const empty = join(root, "empty-root");
+    mkdirSync(empty, { recursive: true });
+    try {
+      await expect(reconcile!(db, empty, now)).rejects.toThrow(/refused/i);
+      expect(db.prepare("SELECT count(*) AS count FROM di_documents").get()).toMatchObject({ count: 3 });
+      expect(readdirSync(storage).filter((name) => name !== ".uploads")).toHaveLength(3);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
   });
 });

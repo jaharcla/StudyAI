@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile, unlink, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
+import { mkdir, writeFile, unlink, readFile, readdir, realpath, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import type Database from "better-sqlite3";
 import { chunkUnits } from "./chunk.js";
@@ -200,40 +200,57 @@ async function canonicalPath(path: string): Promise<string> {
   }
 }
 
-/** Reconciles interrupted imports and deletes after a restart. Only files with
- *  this service's UUID naming are eligible, and only inside the storage root. */
+/** Reconciles interrupted imports and deletes after a restart. Files are matched
+ *  by the UUID in their name, not the stored absolute path, so moving the storage
+ *  root keeps its documents. Orphans are moved aside, and a suspiciously large
+ *  row loss aborts before anything is changed. */
 export async function reconcileDocumentFiles(db: Database.Database, storageRoot = "data/documents", now = Date.now()): Promise<{ removedFiles: number; removedRows: number; removedUploads: number }> {
   initializeDocumentIntelligenceSchema(db);
   const root = resolve(storageRoot);
   await mkdir(root, { recursive: true });
   const rootKey = pathKey(await canonicalPath(root));
   const rows = db.prepare("SELECT id,storage_path FROM di_documents").all() as Array<{ id: string; storage_path: string }>;
-  const owned = new Set<string>();
-  const dangling: string[] = [];
-  for (const row of rows) {
-    const path = await canonicalPath(resolve(row.storage_path));
-    if (!insideStorage(rootKey, path) || !OWNED_DOCUMENT_FILE.test(basename(path))) continue;
-    owned.add(pathKey(path));
-    if (!existsSync(path)) dangling.push(row.id);
-  }
 
-  let removedFiles = 0;
+  const ownedIds = new Set(rows.map((row) => row.id.toLowerCase()));
+  const files = new Map<string, string>();
+  const orphans: string[] = [];
   for (const entry of await readdir(root, { withFileTypes: true })) {
     if (!entry.isFile() || !OWNED_DOCUMENT_FILE.test(entry.name)) continue;
     const path = await canonicalPath(resolve(root, entry.name));
-    if (!insideStorage(rootKey, path) || owned.has(pathKey(path))) continue;
-    await unlink(path).catch(() => undefined);
-    removedFiles++;
+    if (!insideStorage(rootKey, path)) continue;
+    const id = entry.name.slice(0, 36).toLowerCase();
+    if (!ownedIds.has(id) || files.has(id)) orphans.push(path);
+    else files.set(id, path);
   }
 
+  const dangling = rows.filter((row) => !files.has(row.id.toLowerCase()));
+  if (rows.length > 1 && dangling.length > rows.length / 2) throw new Error(`Reconciliation refused: ${dangling.length} of ${rows.length} documents have no file in ${root}. Check STUDYAI_DOCUMENTS before starting.`);
+
+  let removedFiles = 0;
+  if (orphans.length) {
+    const trash = join(root, ".trash");
+    await mkdir(trash, { recursive: true });
+    for (const path of orphans) {
+      const name = basename(path);
+      const target = join(trash, existsSync(join(trash, name)) ? `${now}-${name}` : name);
+      try { await rename(path, target); removedFiles++; } catch { /* retry on next startup */ }
+    }
+  }
+
+  const moved = rows.flatMap((row) => {
+    const path = files.get(row.id.toLowerCase());
+    return path && !existsSync(row.storage_path) ? [{ id: row.id, path }] : [];
+  });
+
   let removedRows = 0;
-  if (dangling.length) db.transaction(() => {
-    for (const id of dangling) {
-      db.prepare("DELETE FROM di_chunks WHERE document_id=?").run(id);
-      db.prepare("DELETE FROM di_units WHERE document_id=?").run(id);
-      db.prepare("DELETE FROM di_documents WHERE id=?").run(id);
+  if (dangling.length || moved.length) db.transaction(() => {
+    for (const row of dangling) {
+      db.prepare("DELETE FROM di_chunks WHERE document_id=?").run(row.id);
+      db.prepare("DELETE FROM di_units WHERE document_id=?").run(row.id);
+      db.prepare("DELETE FROM di_documents WHERE id=?").run(row.id);
       removedRows++;
     }
+    for (const { id, path } of moved) db.prepare("UPDATE di_documents SET storage_path=? WHERE id=?").run(path, id);
   })();
 
   let removedUploads = 0;

@@ -31,7 +31,7 @@ beforeAll(async () => {
   origin = `http://127.0.0.1:${port}`;
   api = spawn(process.execPath, ["--import", "tsx", "server/api.ts"], {
     cwd: process.cwd(),
-    env: { ...process.env, STUDYAI_DB: dbPath, DATA_PORT: String(port), CANVAS_CLIP_WARMUP: "0" },
+    env: { ...process.env, STUDYAI_DB: dbPath, STUDYAI_DOCUMENTS: join(folder, "documents"), DATA_PORT: String(port), CANVAS_CLIP_WARMUP: "0" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   api.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });

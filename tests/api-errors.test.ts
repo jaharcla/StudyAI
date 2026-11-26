@@ -41,7 +41,7 @@ beforeAll(async () => {
   const slowPort = slowAddress && typeof slowAddress !== "string" ? slowAddress.port : 0;
   api = spawn(process.execPath, ["--import", "tsx", "server/api.ts"], {
     cwd: process.cwd(),
-    env: { ...process.env, STUDYAI_DB: dbPath, DATA_PORT: String(port), KIMAKI_TUNNEL_URL: tunnelOrigin, OLLAMA_BASE_URL: `http://127.0.0.1:${slowPort}`, CANVAS_CLIP_WARMUP: "0" },
+    env: { ...process.env, STUDYAI_DB: dbPath, STUDYAI_DOCUMENTS: join(folder, "documents"), DATA_PORT: String(port), KIMAKI_TUNNEL_URL: tunnelOrigin, OLLAMA_BASE_URL: `http://127.0.0.1:${slowPort}`, CANVAS_CLIP_WARMUP: "0" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   api.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
