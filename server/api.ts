@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { extname, basename, resolve } from "node:path";
+import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
+import { extname, basename, resolve, sep } from "node:path";
 import { db } from "./db.js";
 import { createDocumentIntelligenceHandler } from "./document-intelligence/http.js";
 import { reconcileDocumentFiles } from "./document-intelligence/service.js";
@@ -141,6 +141,14 @@ const server = createServer(async (req, res) => {
     db.prepare("INSERT INTO courses(id,title,code,color) VALUES(?,?,?,?)").run(id, title, typeof input.code === "string" ? input.code.trim().slice(0, 120) : "", color);
     return json(res, 201, { id, title, code: typeof input.code === "string" ? input.code.trim().slice(0, 120) : "", color });
   }
+  const courseDeleteMatch = req.method === "DELETE" && url.pathname.match(/^\/api\/courses\/([^/]+)$/);
+  if (courseDeleteMatch) {
+    let id: string;
+    try { id = decodeURIComponent(courseDeleteMatch[1]); } catch { return json(res, 400, { error: "Invalid course ID." }); }
+    if (!courseExists(id)) return json(res, 404, { error: "Course not found." });
+    const removed = await deleteCourseCascade(db, process.env.STUDYAI_DOCUMENTS ?? "data/documents", id);
+    return json(res, 200, { id, deleted: true, removed });
+  }
   if (req.method === "GET" && url.pathname === "/api/lessons") {
     const courseId = url.searchParams.get("course") ?? "";
     if (!courseId) return json(res, 400, { error: "course is required." });
@@ -274,6 +282,7 @@ const server = createServer(async (req, res) => {
     if (error instanceof RequestAbortedError) return;
     if (error instanceof PayloadTooLargeError) return json(res, 413, { error: "Payload too large." });
     if (error instanceof InvalidJsonError) return json(res, 400, { error: error.message });
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOSPC") return json(res, 507, { error: "Course storage is full. Delete documents or courses to free space." });
     console.error("StudyAI API request failed:", error);
     return json(res, 500, { error: "Internal server error." });
   }
@@ -327,6 +336,37 @@ function body(req: import("node:http").IncomingMessage, limit = 1_000_000) {
       else if (!settled) { settled = true; reject(error); }
     });
   });
+}
+
+/** Remove a course and every course-scoped row, then its stored files. Rows are
+ *  removed inside one transaction so a failed cascade cannot leave half a course. */
+async function deleteCourseCascade(database: import("better-sqlite3").Database, storageRoot: string, courseId: string): Promise<Record<string, number>> {
+  const diDocuments = database.prepare("SELECT id,storage_path FROM di_documents WHERE course_id=?").all(courseId) as Array<{ id: string; storage_path: string }>;
+  const legacyDocuments = database.prepare("SELECT id,path FROM documents WHERE course_id=?").all(courseId) as Array<{ id: string; path: string }>;
+  const removed: Record<string, number> = {};
+  database.transaction(() => {
+    // Keep external-content FTS tables consistent before their source rows go.
+    const legacyChunks = database.prepare("SELECT id,content FROM document_chunks WHERE course_id=?").all(courseId) as Array<{ id: number; content: string }>;
+    for (const chunk of legacyChunks) database.prepare("INSERT INTO chunk_search(chunk_search,rowid,content) VALUES('delete',?,?)").run(chunk.id, chunk.content);
+    const diChunks = database.prepare("SELECT id,content FROM di_chunks WHERE course_id=?").all(courseId) as Array<{ id: number; content: string }>;
+    for (const chunk of diChunks) database.prepare("INSERT INTO di_chunk_search(di_chunk_search,rowid,content) VALUES('delete',?,?)").run(chunk.id, chunk.content);
+    database.prepare("DELETE FROM di_units WHERE document_id IN (SELECT id FROM di_documents WHERE course_id=?)").run(courseId);
+    const tables = database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>;
+    for (const { name } of tables) {
+      if (name.startsWith("sqlite_")) continue;
+      const columns = database.pragma(`table_info(${name})`) as Array<{ name: string }>;
+      if (!columns.some((column) => column.name === "course_id")) continue;
+      removed[name] = database.prepare(`DELETE FROM ${name} WHERE course_id=?`).run(courseId).changes;
+    }
+    database.prepare("DELETE FROM courses WHERE id=?").run(courseId);
+  })();
+  const root = resolve(storageRoot).toLowerCase() + sep;
+  const paths = [...diDocuments.map((row) => row.storage_path), ...legacyDocuments.map((row) => row.path)];
+  await Promise.all(paths.map((path) => {
+    const absolute = resolve(path);
+    return absolute.toLowerCase().startsWith(root) ? unlink(absolute).catch(() => undefined) : Promise.resolve();
+  }));
+  return removed;
 }
 
 function courseExists(courseId: string): boolean { return Boolean(db.prepare("SELECT 1 FROM courses WHERE id=?").get(courseId)); }

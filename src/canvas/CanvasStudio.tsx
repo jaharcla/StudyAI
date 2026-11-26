@@ -14,7 +14,7 @@ import { stableJson } from "./stable-json";
 import { compileExpression, evaluateScientificObjects } from "./expressions";
 import { GroundingBadges, objectTitle } from "./SceneGlyph";
 import { applyArtifactBriefProposal, applyCanvasProposal, applyCanvasObjectProposal, canvasEditSchema, canvasObjectCreateSchema, MathProposalValidationError, moleculeProposalSchema, proposeArtifactBrief, proposeCanvasEdit, proposeCanvasObject, proposeMolecule, type ArtifactBriefProposal, type CanvasObjectProposal, type CanvasProposal } from "./tutor";
-import { Atom, BookOpen, ChevronDown, Download, FileText, FolderOpen, Link2, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
+import { Atom, BookOpen, ChevronDown, Download, FileText, FolderOpen, Link2, ListChecks, Plus, Redo2, Search, Tag, Trash2, Undo2, Upload, X } from "lucide-react";
 import { formalCharge, vectorMagnitude, type Element } from "../science";
 import { canvasTools, type CanvasTool } from "./registry";
 import { bondOrderSum, createObject, emptyCanvasDocument, formalChargeForAtom, moleculeBonds, newId, parseCanvasDocument, type BondOrder, type CanvasDocument, type MoleculeAtom, type MoleculeBond, type ScientificObject } from "./model";
@@ -179,6 +179,8 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
   const [undoState, setUndoState] = useState({ canUndo: false, canRedo: false });
   const [boardMenu, setBoardMenu] = useState(false);
   const [boardFileOpen, setBoardFileOpen] = useState(false);
+  const [objectsPanelOpen, setObjectsPanelOpen] = useState(false);
+  const [bulkSelection, setBulkSelection] = useState<string[]>([]);
   const [proposal, setProposal] = useState<CanvasProposal>();
   const [objectProposal, setObjectProposal] = useState<CanvasObjectProposal>();
   const [recognitionOpen, setRecognitionOpen] = useState(false);
@@ -1123,9 +1125,15 @@ const [registeredCards, setRegisteredCards] = useState<string[]>([]);
     </section>}
     <div className="canvas-tools-bar">
       <div className="canvas-board-selector">
-        <button className="canvas-board-button" onClick={() => setBoardMenu((open) => !open)} aria-label={`Choose canvas board: ${activeBoard?.name ?? "Loading board"}`}><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
-        {boardMenu && <div className="canvas-board-menu">{boards.map((board) => <button key={board.id} className={board.id === activeBoard?.id ? "current" : ""} onClick={() => void changeBoard(board.id)}>{board.name}</button>)}<button onClick={() => void createBoard()}><Plus size={13} /> New board</button>{boards.length > 1 && <button className="delete-board" onClick={() => void deleteBoard()}><Trash2 size={13} /> Delete current board</button>}</div>}
+        <button className="canvas-board-button" data-testid="board-selector" onClick={() => setBoardMenu((open) => !open)} aria-label={`Choose canvas board: ${activeBoard?.name ?? "Loading board"}`}><span>{activeBoard?.name ?? "Loading board"}</span><ChevronDown size={14} /></button>
+        {boardMenu && <div className="canvas-board-menu">{boards.map((board) => <button key={board.id} data-testid="board-option" className={board.id === activeBoard?.id ? "current" : ""} onClick={() => void changeBoard(board.id)}>{board.name}</button>)}<button onClick={() => void createBoard()}><Plus size={13} /> New board</button>{boards.length > 1 && <button className="delete-board" onClick={() => void deleteBoard()}><Trash2 size={13} /> Delete current board</button>}</div>}
       </div>
+      <button type="button" className="button-soft" data-testid="manage-objects" aria-expanded={objectsPanelOpen} onClick={() => { setObjectsPanelOpen((open) => !open); setBulkSelection([]); }}><ListChecks size={14} /> Objects</button>
+      {objectsPanelOpen && <div className="canvas-objects-panel" data-testid="objects-panel" role="group" aria-label="Select objects">
+        <h3>Objects on this board</h3>
+        {document.objects.length === 0 ? <p>No objects on this board</p> : document.objects.map((object) => <label key={object.id}><input type="checkbox" checked={bulkSelection.includes(object.id)} onChange={() => setBulkSelection((current) => current.includes(object.id) ? current.filter((id) => id !== object.id) : [...current, object.id])} />{names.get(object.id) ?? objectName(object)}</label>)}
+        <button type="button" className="button-soft" data-testid="delete-selected-objects" disabled={!bulkSelection.length} onClick={() => { replaceObjects(document.objects.filter((object) => !bulkSelection.includes(object.id))); setBulkSelection([]); onStatus(`Deleted ${bulkSelection.length} object${bulkSelection.length === 1 ? "" : "s"}`); }}><Trash2 size={13} /> Delete selected ({bulkSelection.length})</button>
+      </div>}
       {scienceMode && <span className="science-mode-status" role="status">{["vector", "force", "measurement", "relationship", "bond"].includes(scienceMode) ? "Drag to draw" : "Click to place"} {scienceMode} · Esc cancels</span>}
       {selectedId && <div className="science-selection-actions"><button className="button-soft" aria-label="Inspect selected object" onClick={() => setEditingId(selectedId)}>Inspect</button><button className="button-soft" aria-label="Send scientific object to back" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([object, ...document.objects.filter((item) => item.id !== selectedId)]); }}>Back</button><button className="button-soft" aria-label="Bring scientific object to front" onClick={() => { const object = document.objects.find((item) => item.id === selectedId)!; replaceObjects([...document.objects.filter((item) => item.id !== selectedId), object]); }}>Front</button><button className="button-soft" aria-label="Delete selected scientific object" onClick={() => { replaceObjects(document.objects.filter((item) => item.id !== selectedId)); setSelectedId(undefined); }}>Delete</button></div>}
       <div className="canvas-actions">

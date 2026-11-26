@@ -187,6 +187,8 @@ function send(response: ServerResponse, status: number, value: unknown): boolean
 }
 
 function sendError(response: ServerResponse, error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  if (code === "ENOSPC" || code === "EDQUOT") return send(response, 507, { error: "Course storage is full. Delete documents or courses to free space." });
   const status = Number((error as { statusCode?: number }).statusCode) || 400;
   return send(response, status, { error: error instanceof Error ? error.message : "Document operation failed." });
 }

@@ -1,6 +1,6 @@
 ﻿import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { CopilotChat, CopilotChatConfigurationProvider, CopilotKitProvider, useAgent, useAgentContext, useCopilotChatConfiguration, useCopilotKit } from "@copilotkit/react-core/v2";
-import { Activity, Atom, BookOpen, Brain, CalendarDays, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Menu, Moon, MoreHorizontal, Network, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, X } from "lucide-react";
+import { Activity, Atom, BookOpen, Brain, CalendarDays, ChevronLeft, ChevronRight, CircleHelp, FileText, GraduationCap, Layers, Menu, Moon, MoreHorizontal, Network, PanelRightClose, PanelRightOpen, Plus, Search, Settings2, Sparkles, Sun, Trash2, X } from "lucide-react";
 import { formalCharge, vectorDot, vectorMagnitude, type Element } from "./science";
 import { CanvasStudio } from "./canvas/CanvasStudio";
 import { parseCanvasCitation } from "./canvas/citation-focus";
@@ -343,6 +343,21 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
     return () => { live = false; };
   }, [loadCourses]);
 
+  const deleteCourse = useCallback(async (target: Course) => {
+    if (!window.confirm(`Delete “${target.title}” and all its lessons, documents, canvases and notes? This cannot be undone.`)) return;
+    try {
+      const response = await fetch(`${API}/courses/${encodeURIComponent(target.id)}`, { method: "DELETE" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || "Could not delete the course.");
+      }
+      setStatus(`Deleted ${target.title}`);
+      await loadCourses(() => true);
+    } catch (reason) {
+      setStatus(reason instanceof Error ? reason.message : "Could not delete the course.");
+    }
+  }, [loadCourses]);
+
   const creditHeaders = useCallback(() => ({
     "content-type": "application/json",
     authorization: `Bearer ${creditToken}`,
@@ -629,7 +644,7 @@ const [initialDeckId, setInitialDeckId] = useState<string | undefined>();
       <button className={`nav-item ${mode === "canvas" ? "active" : ""}`} onClick={() => setMode("canvas")}><GraduationCap size={17} /> Study workspace</button>
       <button className="nav-item" onClick={() => setProgressOpen(true)}><Activity size={17} /> Learning progress</button>
       <div className="course-heading"><span>COURSES</span><button className="icon-button" onClick={() => void addCourse()} title="Add course" aria-label="Add course"><Plus size={16} /></button></div>
-      <div className="course-list">{visibleCourses.map((item) => <button key={item.id} className={`course-item ${course.id === item.id ? "selected" : ""}`} onClick={() => changeCourse(item)}><i style={{ background: item.color }} /><span><b>{item.title}</b><small>{item.code}</small></span><MoreHorizontal size={15} className="course-more" /></button>)}{hiddenCourseCount > 0 && <button className="tree-sub" data-testid="show-all-courses" onClick={() => setShowAllCourses(true)}>Show {hiddenCourseCount} more courses</button>}</div>
+      <div className="course-list">{visibleCourses.map((item) => <div className="course-item-row" key={item.id}><button className={`course-item ${course.id === item.id ? "selected" : ""}`} onClick={() => changeCourse(item)}><i style={{ background: item.color }} /><span><b>{item.title}</b><small>{item.code}</small></span><MoreHorizontal size={15} className="course-more" /></button><button className="icon-button course-delete" data-testid={`delete-course-${item.id}`} aria-label={`Delete course ${item.title}`} title="Delete course" onClick={() => void deleteCourse(item)}><Trash2 size={14} /></button></div>)}{hiddenCourseCount > 0 && <button className="tree-sub" data-testid="show-all-courses" onClick={() => setShowAllCourses(true)}>Show {hiddenCourseCount} more courses</button>}</div>
       {course.id ? <div className="course-tree"><div className="tree-course">{course.title}</div>{lessons.map((item) => <button key={item.id} className={`tree-sub ${lessonId === item.id ? "lesson-current" : ""}`} onClick={() => changeLesson(item.id)}>{lessonId === item.id && <span className="lesson-dot" />}{humanizeLessonTitle(item.title)}</button>)}<button className="tree-sub" onClick={() => void addLesson()}>+ Add lesson</button>{lessonError && <small role="alert">{lessonError}</small>}</div> : <div className="course-tree"><span>{courseError || (status === "No courses yet" ? "Add a course to begin." : "Loading courses…")}</span><button className="tree-sub" onClick={() => void addCourse()}>+ Add course</button></div>}
       <div className="sidebar-bottom"><button className="nav-item" onClick={() => setSettings(true)}><Settings2 size={17} /> Settings</button><div className="local-status"><span />{status}</div></div>
     </aside></>}

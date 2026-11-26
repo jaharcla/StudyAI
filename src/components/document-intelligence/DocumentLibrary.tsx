@@ -5,7 +5,7 @@ import { DocumentViewer } from "./DocumentViewer.js";
 import { DOCUMENT_API, type LibraryDocument, type SearchHit, parseSourceReference, requestJson, uploadOne } from "./api.js";
 
 type Course = { id: string; title: string };
-type Upload = { id: string; file: File; status: "queued" | "uploading" | "imported" | "duplicate" | "error"; progress: number; message?: string; documentId?: string };
+type Upload = { id: string; file: File; status: "queued" | "uploading" | "imported" | "duplicate" | "error"; progress: number; stage?: "uploading" | "indexing"; message?: string; documentId?: string };
 type Props = { courseId: string; lessonId?: string; courses?: Course[]; onCourseChange?: (courseId: string) => void; initialDocumentId?: string; initialSourceRef?: string; initialSourceKey?: number; initialQuery?: string };
 
 export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChange, initialDocumentId, initialSourceRef, initialSourceKey, initialQuery }: Props) {
@@ -50,6 +50,14 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
 
   useEffect(() => { if (initialQuery !== undefined) setQuery(initialQuery); }, [initialQuery]);
 
+  const runUpload = async (job: Upload) => {
+    if (!courseId) return;
+    setUploads((current) => current.map((item) => item.id === job.id ? { ...item, status: "uploading", stage: "uploading", progress: 0, message: undefined } : item));
+    const result = await uploadOne(job.file, courseId, (progress) => setUploads((current) => current.map((item) => item.id === job.id ? { ...item, progress, stage: progress >= 100 ? "indexing" : "uploading" } : item)), lessonId);
+    setUploads((current) => current.map((item) => item.id === job.id ? { ...item, status: result.status, stage: undefined, progress: result.status === "error" ? item.progress : 100, message: result.message, documentId: result.documentId } : item));
+    if (result.status === "imported") await refresh(query);
+  };
+
   const importFiles = async (files: File[]) => {
     if (!files.length || !courseId) return;
     const accepted: File[] = [];
@@ -58,7 +66,7 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
     for (const file of files.slice(0, 20)) {
       bytes += file.size;
       const validType = /\.(pdf|docx|pptx|txt)$/i.test(file.name);
-      const message = !validType ? "Supported formats: PDF, DOCX, PPTX, TXT." : file.size > 20 * 1024 * 1024 ? "File exceeds 20 MB." : bytes > 50 * 1024 * 1024 ? "Batch exceeds 50 MB." : "";
+      const message = !validType ? "Supported formats: PDF, DOCX, PPTX, TXT." : file.size > 20 * 1024 * 1024 ? `${file.name} exceeds 20 MB.` : bytes > 50 * 1024 * 1024 ? "Batch exceeds 50 MB. Delete documents or split the batch." : "";
       if (message) rejected.push({ id: crypto.randomUUID(), file, status: "error", progress: 0, message });
       else accepted.push(file);
     }
@@ -67,12 +75,11 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
     setUploads((current) => [...jobs, ...current].slice(0, 40));
     for (const job of jobs) {
       if (job.status === "error") continue;
-      setUploads((current) => current.map((item) => item.id === job.id ? { ...item, status: "uploading", progress: 0 } : item));
-      const result = await uploadOne(job.file, courseId, (progress) => setUploads((current) => current.map((item) => item.id === job.id ? { ...item, progress } : item)), lessonId);
-      setUploads((current) => current.map((item) => item.id === job.id ? { ...item, status: result.status, progress: result.status === "error" ? item.progress : 100, message: result.message, documentId: result.documentId } : item));
-      if (result.status === "imported") await refresh(query);
+      await runUpload(job);
     }
   };
+
+  const storageFull = uploads.some((upload) => upload.status === "error" && /storage is full/i.test(upload.message ?? ""));
 
   const deleteItem = async (document: LibraryDocument) => {
     if (!window.confirm("Delete “" + document.filename + "” and its indexed text?")) return;
@@ -111,15 +118,17 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
 
       {uploads.length > 0 && <div className="di-upload-list" aria-live="polite">
         <div className="di-section-heading"><h3>Recent imports</h3><button className="di-text-button" onClick={() => setUploads([])}>Clear</button></div>
-        {uploads.map((upload) => <div className="di-upload-row" key={upload.id}>
-          <FileText size={16} /><div className="di-upload-copy"><strong>{upload.file.name}</strong><span>{upload.status === "uploading" ? "Uploading…" : upload.message || upload.status}</span>{upload.status === "uploading" && <div className="di-progress"><i style={{ width: upload.progress + "%" }} /></div>}</div>
+        {uploads.map((upload) => <div className="di-upload-row" data-testid="di-upload-row" key={upload.id}>
+          <FileText size={16} /><div className="di-upload-copy"><strong>{upload.file.name}</strong><span>{upload.stage === "indexing" ? "Indexing…" : upload.status === "uploading" ? "Uploading…" : upload.message || upload.status}</span>{(upload.status === "uploading" || upload.stage === "indexing") && <div className="di-progress"><i style={{ width: upload.progress + "%" }} /></div>}</div>
           {upload.status === "uploading" && <span className="di-upload-percent">{upload.progress}%</span>}
           {upload.status === "imported" && <Check className="di-success-icon" size={16} />}
           {upload.status === "duplicate" && <span className="di-duplicate-pill">Duplicate</span>}
-          {upload.status === "error" && <TriangleAlert className="di-error-icon" size={16} />}
+          {upload.status === "error" && <><TriangleAlert className="di-error-icon" size={16} /><button type="button" className="di-text-button" data-testid="di-upload-retry" onClick={() => void runUpload(upload)}>Retry</button></>}
           {upload.status === "queued" && <LoaderCircle className="di-muted-icon" size={16} />}
         </div>)}
       </div>}
+
+      {storageFull && <div className="di-error di-inline-error" data-testid="di-storage-help" role="status"><TriangleAlert size={16} />Course storage is full. Delete a document below or remove a course in the course list to free space.</div>}
 
       {error && <div className="di-error di-inline-error"><TriangleAlert size={16} />{error}<button className="di-icon-button" onClick={() => setError("")} aria-label="Dismiss error"><X size={14} /></button></div>}
 
@@ -143,7 +152,7 @@ export function DocumentLibrary({ courseId, lessonId, courses = [], onCourseChan
           </button>
           <div className="di-document-meta"><span>{formatType(document.mimeType)}</span><span>{document.unitCount} {document.mimeType.includes("presentation") ? "slides" : document.mimeType === "application/pdf" ? "pages" : "text units"}</span><time>{formatDate(document.importedAt)}</time><button className="di-delete-button" title="Delete document" onClick={() => void deleteItem(document)}><Trash2 size={14} /></button></div>
         </article>)}</div>
-        : <div className="di-library-state"><BookOpen size={25} /><strong>{query ? "No matching documents" : "No documents yet"}</strong><span>{query ? "Try another title or phrase." : "Add a PDF, presentation, document, or text file to begin."}</span></div>}
+        : <div className="di-library-state" data-testid="di-library-empty"><BookOpen size={25} /><strong>{query ? "No matching documents" : "No documents yet"}</strong><span>{query ? "Try another title or phrase." : "Add a PDF, presentation, document, or text file to begin."}</span></div>}
 
       </>}
     </section>

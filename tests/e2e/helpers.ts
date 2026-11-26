@@ -30,7 +30,7 @@ export async function selectCourseOnPage(page: Page, title: string): Promise<voi
   }
   const showMore = page.getByRole("button", { name: /Show \d+ more courses/ });
   while (await showMore.isVisible()) await showMore.click();
-  await page.locator(".course-list").getByRole("button", { name: new RegExp(escaped) }).click();
+  await page.locator(".course-list button.course-item").filter({ hasText: new RegExp(escaped) }).click();
 }
 
 export async function drawCarbonDioxide(page: Page, leaveInspectorOpen = true): Promise<void> {
